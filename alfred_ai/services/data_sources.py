@@ -10,6 +10,40 @@ from apps.loans.models import Loan, LoanImportDocument
 from apps.mobility.models import BikeProfile, TravelPlan, TravelPreferenceProfile
 
 
+def knowledge_sources_snapshot(user):
+    """Explicit owner check: metadata only, using existing retention/source validation."""
+    from datetime import datetime
+    from pathlib import Path
+    from django.conf import settings
+    from apps.ml_engine.services.document_corpus import DocumentCorpus
+    from apps.ml_engine.services.persistent_memory import MemoryStore
+
+    unavailable = {'state': 'Unavailable'}
+    try:
+        directory = Path(settings.ALFRED_MEMORY_DIR)
+        database = directory / 'verified.sqlite3'
+        key = directory / 'journal.key'
+        if not database.exists() and not key.exists():
+            return {'state': 'Not configured'}
+        if not database.is_file() or not key.is_file():
+            return unavailable
+        store = MemoryStore(directory)
+        documents = DocumentCorpus(store).list(user)
+        memories = store.list_memories(user)
+        return {
+            'state': 'Checked locally',
+            'documents': len(documents['documents']),
+            'memories': len(memories),
+            'last_document': max((datetime.fromisoformat(r['created_at']) for r in documents['documents']), default=None),
+            'last_memory': max((datetime.fromisoformat(r['verified_at']) for r in memories), default=None),
+            'memory_retention_days': store.retention_days(user),
+            'document_retention_days': documents['maximum_retention_days'],
+        }
+    except Exception:
+        # Corrupt/private storage errors must not expose paths, keys or source contents.
+        return unavailable
+
+
 def data_sources_snapshot(user):
     groups = [
         ('Finance', [(BankAccount, 'Bank accounts'), (Expense, 'Transactions')], StatementUpload, 'uploaded_at',

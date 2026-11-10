@@ -395,6 +395,66 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(audit['violations'], [])
         self.browser.save_screenshot(str(self.artifacts/'data-sources.png'))
 
+    def test_data_sources_explicit_knowledge_check_keyboard_reopen_and_key_recovery(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from selenium.webdriver.common.keys import Keys
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-browser-knowledge-')))
+        directory = root/'vault'
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=directory))
+        store = MemoryStore(directory, embedder=SyntheticEmbeddings())
+        owner = self.scenario['user']
+        other = get_user_model().objects.create_user(username='synthetic-knowledge-browser-other')
+        for user, count in ((owner, 1), (other, 2)):
+            for i in range(count):
+                store.save_verified(user, {'statement':f'PRIVATE-KNOWLEDGE-FACT-{i}'},
+                    {'source':'PRIVATE-KNOWLEDGE-PROVENANCE'}, verified=True)
+                DocumentCorpus(store).upload(user,
+                    SimpleUploadedFile(f'PRIVATE-KNOWLEDGE-{i}.txt', b'PRIVATE-KNOWLEDGE-DOCUMENT hiking supplies'),
+                    consent=True, days=7)
+        key = store.key_file.read_bytes()
+        self.login()
+        self.browser.get(self.live_server_url+'/data-sources/')
+        self.assertIn('Not checked', self.text('knowledgeReadiness'))
+        button = self.browser.find_element(self.By.CSS_SELECTOR, 'button[value="check_knowledge"]')
+        self.browser.execute_script('arguments[0].focus()', button)
+        button.send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Checked locally' in self.text('knowledgeReadiness'))
+        self.assertEqual(self.text('knowledgeDocumentCount'), '1')
+        self.assertEqual(self.text('knowledgeMemoryCount'), '1')
+        self.assertNotIn('PRIVATE-KNOWLEDGE', self.browser.page_source)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        audits = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                audits.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'knowledge-readiness-accessibility.json').write_text(json.dumps(audits,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'], [])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth>innerWidth'))
+                self.browser.find_element(self.By.ID, 'knowledgeSourcesTitle').location_once_scrolled_into_view
+                self.capture(f'knowledge-readiness-{width}-{theme}')
+        self.browser.get(self.live_server_url+'/data-sources/')
+        self.assertIn('Not checked', self.text('knowledgeReadiness'))
+        store.key_file.unlink()
+        before = store.database.read_bytes()
+        self.memory_click('button[value="check_knowledge"]')
+        self.wait.until(lambda _: 'Unavailable' in self.text('knowledgeReadiness'))
+        self.assertFalse(store.key_file.exists())
+        self.assertEqual(store.database.read_bytes(), before)
+        store.key_file.write_bytes(key)
+        self.memory_click('button[value="check_knowledge"]')
+        self.wait.until(lambda _: 'Checked locally' in self.text('knowledgeReadiness'))
+        self.assertEqual(self.text('knowledgeMemoryCount'), '1')
+        self.assertEqual(store.key_file.read_bytes(), key)
+
     def test_data_sources_guides_review_confirmation_and_updates_readiness(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from apps.loans.models import Loan

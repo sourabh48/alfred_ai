@@ -1,5 +1,14 @@
 # Using the local assistant
 
+In **Data Sources**, choose **Check local knowledge readiness** to see your retained
+document and owner-confirmed memory counts, latest save times and retention limits.
+Opening the page leaves private storage unopened. The explicit check uses the
+existing expiry and changed-source rules; document copies remain unverified evidence.
+It runs locally without inference or external services. Use **Documents** to review,
+add or remove consented sources, and **Memory, privacy and retention** for facts and
+retention controls. An unavailable vault needs existing recovery controls and its
+protected key backup; the check never creates replacement keys.
+
 With approved local history enabled, type in **Search saved titles on this page**
 to filter titles immediately. Choose **Search saved messages** to also find text
 inside retained questions and answers, then reopen a matching conversation.

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load tz %}
 {% block title %}Data Sources - ALFRED{% endblock %}
 {% block content %}
 <section class="alfred-hero mb-4">
@@ -13,7 +14,7 @@
     <a class="btn btn-primary" href="{{ next_setup.next_action.url }}">{{ next_setup.next_action.label }}</a>
     {% else %}<p>Each supported module group contains saved data. Review source freshness and permissions before relying on it.</p>
     <a class="btn btn-outline-primary" href="/settings/diagnostics/">Check local AI readiness</a>{% endif %}
-    <p class="small mt-3 mb-0">This page reads your record counts only. It does not open private memory, run AI inference or change data. Memory consent and document readiness remain in their existing controls below.</p>
+    <p class="small mt-3 mb-0">Opening this page reads your record counts without opening private memory or running AI. Use the separate local knowledge check below to inspect encrypted source readiness.</p>
 </section>
 <section class="surface-card mb-4" aria-labelledby="gettingStartedTitle">
     <h2 class="h4" id="gettingStartedTitle">Get started</h2>
@@ -54,7 +55,29 @@
 </section>
 <section class="surface-card" aria-labelledby="knowledgeSourcesTitle">
     <h2 class="h4" id="knowledgeSourcesTitle">Personal knowledge and permissions</h2>
-    <p>Document and memory readiness is unverified here. Open their local controls to inspect retained sources, citations and consent. Conversation statements become permanent facts only after your explicit review.</p>
+    <p>Check counts and retention in your existing encrypted local vault. No document text, filenames or memory facts are displayed here. Document copies remain unverified evidence; conversation statements become permanent facts only after your explicit review.</p>
+    <form method="post" action="{% url 'data_sources' %}#knowledgeSourcesTitle" class="mb-3">
+        {% csrf_token %}
+        <p id="knowledgeCheckHelp">This check applies your existing expiry and changed-source invalidation rules. It does not create a vault, change consent or retention, run a model or contact an external service.</p>
+        <button class="btn btn-primary" type="submit" name="action" value="check_knowledge" aria-describedby="knowledgeCheckHelp">Check local knowledge readiness</button>
+    </form>
+    <div id="knowledgeReadiness" role="status">
+        <p class="fw-semibold">{{ knowledge.state|default:"Not checked" }}</p>
+        {% if knowledge.state == 'Checked locally' %}
+        <dl class="row">
+            <dt class="col-sm-7">Retained document copies (not verified facts)</dt><dd class="col-sm-5" id="knowledgeDocumentCount">{{ knowledge.documents }}</dd>
+            <dt class="col-sm-7">Owner-confirmed memories</dt><dd class="col-sm-5" id="knowledgeMemoryCount">{{ knowledge.memories }}</dd>
+            <dt class="col-sm-7">Latest retained document saved (UTC)</dt><dd class="col-sm-5">{{ knowledge.last_document|timezone:"UTC"|date:"j M Y, H:i"|default:"Not recorded" }}</dd>
+            <dt class="col-sm-7">Latest retained memory verified (UTC)</dt><dd class="col-sm-5">{{ knowledge.last_memory|timezone:"UTC"|date:"j M Y, H:i"|default:"Not recorded" }}</dd>
+            <dt class="col-sm-7">Memory retention</dt><dd class="col-sm-5">{{ knowledge.memory_retention_days }} days</dd>
+            <dt class="col-sm-7">Maximum document retention</dt><dd class="col-sm-5">{{ knowledge.document_retention_days }} days; individual sources may expire sooner</dd>
+        </dl>
+        <p>These counts cover your account's currently retained sources only. They do not establish model availability, completeness, or the freshness of a source's claims. Consent is granted per saved item in its existing review controls.</p>
+        {% elif knowledge.state == 'Not configured' %}<p>No existing vault was found. Open Documents or memory settings below to choose what to retain with explicit consent.</p>
+        {% elif knowledge.state == 'Unavailable' %}<p>The existing vault could not be checked. Data and keys have been preserved. Check local diagnostics and use the existing recovery controls; do not create replacement keys.</p>
+        <a href="/settings/diagnostics/" class="btn btn-outline-secondary mb-2">Check local diagnostics</a>
+        {% else %}<p>Knowledge readiness remains unverified until you request a local check.</p>{% endif %}
+    </div>
     <a class="btn btn-outline-primary" href="/documents/">Documents and extracted knowledge</a>
     <a class="btn btn-outline-primary" href="/settings/#privateMemoryPanel">Memory, privacy and retention</a>
     <p class="mt-3 mb-0">Import, correction and deletion use each module's existing permission and confirmation controls. Deleting a source may affect its linked evidence; review the module's explanation first.</p>

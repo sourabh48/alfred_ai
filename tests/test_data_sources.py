@@ -48,7 +48,7 @@ class DataSourcesTests(TestCase):
         self.assertContains(response, 'Data Sources')
         self.assertNotContains(response, 'SYNTHETIC-PRIVATE-FILENAME')
         self.assertIn('no-store', response['Cache-Control'])
-        self.assertEqual(self.client.post('/data-sources/').status_code, 405)
+        self.assertEqual(self.client.post('/data-sources/').status_code, 400)
 
     def test_parsed_financial_preview_is_awaiting_review_without_populating_finance(self):
         StatementUpload.objects.create(user=self.owner, file_name='synthetic-pending.pdf', parser_status='parsed',
@@ -115,3 +115,109 @@ class DataSourcesTests(TestCase):
         self.assertFalse(finance['has_data'])
         self.assertEqual(finance['reviews'], [])
         self.assertEqual(result['next_setup']['next_action']['url'], '/settings/diagnostics/')
+
+
+class KnowledgeReadinessTests(TestCase):
+    def setUp(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from django.test import override_settings
+        self.root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-knowledge-readiness-')))
+        self.directory = self.root / 'vault'
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=self.directory))
+        self.owner = get_user_model().objects.create_user(username='synthetic-knowledge-owner')
+        self.other = get_user_model().objects.create_user(username='synthetic-knowledge-other')
+        self.client.force_login(self.owner)
+
+    def test_explicit_check_does_not_initialize_an_absent_vault(self):
+        response = self.client.post('/data-sources/', {'action': 'check_knowledge'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Not configured')
+        self.assertFalse(self.directory.exists())
+
+    def seed_vault(self):
+        from apps.ml_engine.services.persistent_memory import MemoryStore
+        from apps.ml_engine.services.document_corpus import DocumentCorpus
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        store = MemoryStore(self.directory, embedder=SyntheticEmbeddings())
+        for owner, count in ((self.owner, 1), (self.other, 2)):
+            for i in range(count):
+                store.save_verified(owner, {'statement': f'SYNTHETIC-PRIVATE-FACT-{i}'},
+                    {'source':'SYNTHETIC-PRIVATE-PROVENANCE'}, verified=True)
+                DocumentCorpus(store).upload(owner,
+                    SimpleUploadedFile(f'PRIVATE-FILENAME-{i}.txt', b'PRIVATE-DOCUMENT-TEXT hiking supplies'),
+                    consent=True, days=7)
+        return store
+
+    def test_metadata_is_owned_private_and_uses_existing_encrypted_services_without_inference(self):
+        from unittest.mock import patch
+        store = self.seed_vault()
+        key = store.key_file.read_bytes()
+        with patch('apps.ml_engine.services.local_embeddings.OllamaEmbeddings.embed', side_effect=AssertionError('No inference')):
+            response = self.client.post('/data-sources/', {'action':'check_knowledge'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['knowledge']['documents'], 1)
+        self.assertEqual(response.context['knowledge']['memories'], 1)
+        self.assertIsNotNone(response.context['knowledge']['last_memory'])
+        self.assertIsNotNone(response.context['knowledge']['last_document'])
+        self.assertEqual(response.context['knowledge']['document_retention_days'], 30)
+        for secret in ('PRIVATE-FACT', 'PRIVATE-PROVENANCE', 'PRIVATE-FILENAME', 'PRIVATE-DOCUMENT-TEXT', str(self.directory)):
+            self.assertNotContains(response, secret)
+        self.assertIn('no-store', response['Cache-Control'])
+        self.assertEqual(store.key_file.read_bytes(), key)
+        self.client.force_login(self.other)
+        response = self.client.post('/data-sources/', {'action':'check_knowledge'})
+        self.assertEqual(response.context['knowledge']['documents'], 2)
+        self.assertEqual(response.context['knowledge']['memories'], 2)
+
+    def test_expiry_obeys_existing_policy_without_changing_retention(self):
+        from datetime import datetime, timedelta, timezone
+        from unittest.mock import patch
+        from alfred_ai.services.data_sources import knowledge_sources_snapshot
+        store = self.seed_vault()
+        store.set_retention(self.owner, 1)
+        future = datetime.now(timezone.utc) + timedelta(days=8)
+        with patch('apps.ml_engine.services.document_corpus.timezone.now', return_value=future), \
+             patch('apps.ml_engine.services.persistent_memory.datetime') as clock:
+            clock.now.return_value = future
+            clock.fromisoformat.side_effect = datetime.fromisoformat
+            snapshot = knowledge_sources_snapshot(self.owner)
+        self.assertEqual(snapshot['documents'], 0)
+        self.assertEqual(snapshot['memories'], 0)
+        self.assertEqual(store.retention_days(self.owner), 1)
+        self.assertEqual(len(store.list_memories(self.other)), 2)
+
+    def test_missing_key_never_regenerates_it_and_corrupt_storage_is_preserved(self):
+        store = self.seed_vault()
+        store.key_file.unlink()
+        before = store.database.read_bytes()
+        response = self.client.post('/data-sources/', {'action':'check_knowledge'})
+        self.assertEqual(response.context['knowledge'], {'state':'Unavailable'})
+        self.assertFalse(store.key_file.exists())
+        self.assertEqual(store.database.read_bytes(), before)
+        store.key_file.write_bytes(b'SYNTHETIC-INVALID-KEY')
+        response = self.client.post('/data-sources/', {'action':'check_knowledge'})
+        self.assertEqual(response.context['knowledge'], {'state':'Unavailable'})
+        self.assertEqual(store.key_file.read_bytes(), b'SYNTHETIC-INVALID-KEY')
+        self.assertNotContains(response, str(self.directory))
+
+    def test_authentication_csrf_and_request_scope_are_required(self):
+        from django.test import Client
+        self.client.logout()
+        self.assertEqual(self.client.post('/data-sources/', {'action':'check_knowledge'}).status_code, 302)
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.owner)
+        self.assertEqual(client.post('/data-sources/', {'action':'check_knowledge'}).status_code, 403)
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.post('/data-sources/?owner=other', {'action':'check_knowledge'}).status_code, 400)
+        self.assertFalse(self.directory.exists())
+
+    def test_normal_get_and_invalid_post_never_open_the_vault(self):
+        from unittest.mock import patch
+        with patch('apps.ml_engine.services.persistent_memory.MemoryStore', side_effect=AssertionError('Must stay unopened')):
+            self.assertContains(self.client.get('/data-sources/'), 'Not checked')
+            for data in ({}, {'action':'wrong'}, {'action':'check_knowledge','owner':self.other.pk},
+                         {'action':['check_knowledge','check_knowledge']}):
+                self.assertEqual(self.client.post('/data-sources/', data).status_code, 400)
+        self.assertFalse(self.directory.exists())
