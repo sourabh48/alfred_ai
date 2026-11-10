@@ -4767,7 +4767,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.save_screenshot(str(self.artifacts/f'history-outage-{width}-{theme}.png'))
         with patch.object(ConversationCollectionAPI,'get',side_effect=PermissionDenied('SYNTHETIC-PERMISSION-LOSS')):
             self.memory_click('#conversationHistoryRefresh')
-            self.wait.until(lambda _: self.text('intelligenceAnswers') == '')
+            self.wait.until(lambda _: self.text('intelligenceAnswers') == '' and
+                self.browser.find_element(self.By.ID,'intelligenceScope').get_property('disabled'))
         self.assertEqual(self.text('intelligenceAnswers'),'')
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
 
