@@ -95,8 +95,10 @@
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Allow approved cloud fallback for this question if Ollama fails.</label>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
+        <p class="small">Local chat without saved history can show an unverified preview. Stop keeps your draft. Financial figures, source-backed answers and saved conversations wait for a complete answer.</p>
         <p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone only until you press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Check the text before you ask.</p>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
+            <button id="intelligenceStop" class="btn btn-outline-danger" type="button" hidden>Stop generation</button>
             <button id="intelligenceMic" class="btn btn-outline-primary" type="button" aria-pressed="false" aria-describedby="intelligenceSpeechHint" hidden>Speak</button>
             <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
         <fieldset id="intelligenceSources" class="conversation-evidence mt-3 d-none" aria-describedby="intelligenceSourcesHelp">
@@ -201,5 +203,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=20"></script>
+<script src="/static/js/intelligence.js?v=21"></script>
 {% endblock %}

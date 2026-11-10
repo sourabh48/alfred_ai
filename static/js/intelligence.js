@@ -37,6 +37,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
     let pageDialogue = [];
+    let streamRequest = null;
+    const stopGeneration = document.getElementById('intelligenceStop');
+    stopGeneration.addEventListener('click', () => streamRequest?.abort());
     let sourceRequest = 0, picker = null;
     const modelPanel=document.getElementById('modelReadinessPanel'), modelItems=document.getElementById('modelReadinessItems');
     const modelStatus=document.getElementById('modelReadinessStatus'), modelRefresh=document.getElementById('modelReadinessRefresh');
@@ -194,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateScope(false);
     }
     function clearConversation(clearDraft = false) {
+        streamRequest?.abort();
         generation++; conversation = null; requestToken = null; historyBlocked = false;
         pageDialogue = [];
         resetSources();
@@ -202,6 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateHistoryControls();
     }
     function forgetPrivatePage() {
+        streamRequest?.abort();
         active = false; generation++; conversation = null; historyPolicy = null; requestToken = null; historyBlocked = false;
         pageDialogue = [];
         resetSources();
@@ -600,6 +605,74 @@ document.addEventListener("DOMContentLoaded", () => {
         speech = state; mic.hidden = speechHint.hidden = !state.listen || !navigator.mediaDevices?.getUserMedia;
         document.querySelectorAll("[data-read-aloud]").forEach(button => { button.hidden = !state.speak; });
     }).catch(() => {});
+    async function streamAnswer(payload, ticket) {
+        const controller = new AbortController(); streamRequest = controller;
+        stopGeneration.hidden = false;
+        const partial = document.createElement('article'); partial.className = 'conversation-message mt-3';
+        partial.dataset.status = 'generating'; partial.setAttribute('aria-live','off');
+        const label = document.createElement('span'); label.className = 'conversation-label';
+        label.textContent = 'Unverified local preview - still generating. Figures and sources are buffered.';
+        const text = document.createElement('p'); partial.append(label,text); answers.append(partial); empty.hidden = true;
+        let reader, timedOut = false, received = 0, buffer = '', preview = '';
+        const timeout = setTimeout(() => { timedOut = true; controller.abort(); },33000);
+        try {
+            const response = await fetch('/api/ai/personal-insights/stream/', {method:'POST',credentials:'same-origin',
+                signal:controller.signal,headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify(payload)});
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw Object.assign(new Error(data.detail || 'Local stream unavailable. Your draft is preserved.'),{status:response.status,code:data.code,reference:data.error_id});
+            }
+            if (!response.body || response.headers.get('Content-Type')?.split(';')[0] !== 'application/x-ndjson') throw new Error('Invalid local stream. Your draft is preserved.');
+            reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8',{fatal:true});
+            while (true) {
+                const {done,value} = await reader.read();
+                if (done) break;
+                if (!active || ticket !== generation) throw new Error('This page no longer owns the stream.');
+                received += value.byteLength;
+                if (received > 262144) throw new Error('Local stream exceeded its limit.');
+                buffer += decoder.decode(value,{stream:true});
+                let newline;
+                while ((newline = buffer.indexOf('\n')) >= 0) {
+                    const line = buffer.slice(0,newline); buffer = buffer.slice(newline+1);
+                    if (new TextEncoder().encode(line).length > 65536) throw new Error('Local stream frame exceeded its limit.');
+                    const event = JSON.parse(line);
+                    if (event.type === 'delta') {
+                        if (typeof event.text !== 'string' || /[\p{N}\p{Sc}]/u.test(event.text)) throw new Error('Invalid unverified preview.');
+                        preview += event.text;
+                        if (new TextEncoder().encode(preview).length > 8192) throw new Error('Local preview exceeded its limit.');
+                        text.textContent = preview;
+                    } else if (event.type === 'buffering') {
+                        preview = ''; text.textContent = ''; label.textContent = 'Validating full local output. Figures and sources are buffered.';
+                    } else if (event.type === 'error') {
+                        throw Object.assign(new Error(event.detail || 'Local output is incomplete. Your draft is preserved.'),{status:event.status,code:event.code,reference:event.error_id});
+                    } else if (event.type === 'final') {
+                        if (!event.result || event.result.provider !== 'ollama' || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
+                        partial.remove(); return event.result;
+                    } else if (!['started','heartbeat'].includes(event.type)) throw new Error('Invalid local stream event.');
+                }
+                if (new TextEncoder().encode(buffer).length > 65536) throw new Error('Local stream frame exceeded its limit.');
+            }
+            throw new Error('Connection ended before validation. Your draft is preserved; retry when ready.');
+        } catch (error) {
+            if (active && ticket === generation) {
+                partial.dataset.status = 'partial'; label.textContent = 'Partial, unverified - not saved. Retry to request a complete answer.';
+                if ([401,403,409].includes(error.status)) text.textContent = '';
+            }
+            if (controller.signal.aborted) throw Object.assign(new Error(timedOut
+                ? 'Local generation timed out. Your draft is preserved; retry when ready.'
+                : 'Local generation stopped. The partial preview is unverified and not saved; your draft is preserved.'),{code:timedOut ? 'local_stream_timeout' : 'local_stream_stopped'});
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+            await reader?.cancel().catch(() => {});
+            reader?.releaseLock(); controller.abort();
+            if (streamRequest === controller) streamRequest = null;
+            const restoreFocus = document.activeElement === stopGeneration;
+            stopGeneration.hidden = true;
+            if (restoreFocus && active && ticket === generation) query.focus();
+        }
+    }
     form.addEventListener("submit", async event => {
         event.preventDefault();
         if (pending) return;
@@ -649,7 +722,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (requestToken?.fingerprint !== fingerprint) requestToken = {fingerprint, id:crypto.randomUUID().replaceAll("-", "")};
                 Object.assign(payload, {cloud_consent:false, conversation_id:conversation.id, conversation_revision:conversation.revision, request_id:requestToken.id});
             }
-            const result = await Alfred.fetchJSON("/api/ai/personal-insights/", {method: "POST", body: JSON.stringify(payload)});
+            const result = payload.scope === 'general' && !payload.cloud_consent && !historyEnabled() && window.ReadableStream && window.AbortController
+                ? await streamAnswer(payload,ticket)
+                : await Alfred.fetchJSON("/api/ai/personal-insights/", {method: "POST", body: JSON.stringify(payload)});
             if (!active || ticket !== generation) return;
             if (result.conversation) conversation.revision = result.conversation.revision;
             renderTurn(payload, result, ticket, Boolean(result.historical));
@@ -689,7 +764,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     await refreshHistory().catch(() => { historyPolicy = null; });
                     if (active && !conversation) feedback.textContent = "Conversation no longer available. Displayed turns cleared; your draft is preserved for a new conversation.";
                 }
-                setLocalStatus(error.code === "local_model_unavailable" ? "Ollama unavailable" : "Local request did not complete", "unavailable");
+                setLocalStatus(error.code === 'local_stream_stopped' ? 'Local generation stopped'
+                    : error.code === "local_model_unavailable" ? "Ollama unavailable" : "Local request did not complete",
+                    error.code === 'local_stream_stopped' ? 'ready' : 'unavailable');
                 if (error.code === "reasoning_budget_reached") document.getElementById("intelligenceCloudStatus").textContent = "Cloud budget reached";
                 if ([401,403].includes(error.status)) { forgetPrivatePage(); feedback.textContent = "Session or history permission is no longer available. Sign in or reload before continuing."; }
             }

@@ -13,10 +13,25 @@ private history remains a separate opt-in with retention and recovery controls.
 
 ![Local answer choices and conversation, using synthetic data](images/usability/local-answer-style.png)
 
+Page-only local general chat streams an **unverified preview** while generating.
+Press **Stop generation** to cancel, including by keyboard. Stop, timeout or a
+broken connection preserves the draft and labels any preview **Partial, unverified**.
+It has no source links, memory promotion or history-save controls. Use **Retry**
+to request a complete answer. If the output limit is reached, choose Concise or
+narrow the question. Partial or interrupted responses never enter saved history.
+
+![Unverified preview and Stop generation, using synthetic data](images/usability/local-stream.png)
+
+Figures and source-backed output are buffered until the complete response passes
+validation. Source links and accepted answer controls appear only after validation.
+Saved-history, domain and consented-fallback requests retain their complete-response
+path in this slice; they have no streaming Stop control. History privacy and
+financial grounding rules still apply.
+
 If Ollama is unavailable, the draft remains in the composer. Open Settings →
 Diagnostics to check local inference, then use **Retry**. External fallback still
 requires its separate public-query consent; the answer-style selection controls
-local generation. Generation is currently delivered as a complete answer.
+local generation.
 
 Private conversation history requires both local operator authorization and your
 explicit consent with a retention period. Open the private-history panel to enable

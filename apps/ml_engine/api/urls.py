@@ -1,6 +1,7 @@
 from django.urls import path
 from .assistant_actions import AssistantActionConfirmAPI, AssistantActionProposeAPI
 from .speech import SpeechSpeakAPI, SpeechStatusAPI, SpeechTranscribeAPI
+from .chat_stream import LocalChatStreamAPI
 from .statements import StatementEvidenceAPI
 from .investment_evidence import InvestmentEvidenceAPI
 from .loan_evidence import LoanEvidenceAPI
@@ -52,6 +53,7 @@ urlpatterns = [
     path("emotion/", EmotionalSpendAPI.as_view()),
     path("explain/", AlfredExplainAPI.as_view()),
     path("personal-insights/", AlfredPersonalInsightsAPI.as_view()),
+    path("personal-insights/stream/", LocalChatStreamAPI.as_view()),
     path("runtime-status/", MLRuntimeStatusAPI.as_view()),
     path("runtime-control/", MLRuntimeControlAPI.as_view()),
 ]

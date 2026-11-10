@@ -25,12 +25,20 @@ def validate_vector(value):
 class OllamaEmbeddings:
     model = 'all-minilm:latest'
     READ_SECONDS = 30  # per socket wait; an owner-started slow task may raise it on its own subclass
+    cancellation = None
 
     def _request(self, method, path, payload=None, *, deadline=None):
+        if self.cancellation is not None:
+            self.cancellation.check()
+            deadline = min(deadline if deadline is not None else self.cancellation.deadline, self.cancellation.deadline)
         timeout=self.READ_SECONDS if deadline is None else min(self.READ_SECONDS,deadline-time.monotonic())
         if timeout<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
         connection = HTTPConnection('127.0.0.1', 11434, timeout=timeout)
         try:
+            if self.cancellation is not None:
+                connection.connect()
+                connection.auto_open = 0
+                self.cancellation.attach(connection)
             body = json.dumps(payload, allow_nan=False).encode() if payload is not None else None
             connection.request(method, path, body=body, headers={'Content-Type': 'application/json', 'Accept-Encoding': 'identity'})
             response = connection.getresponse()
@@ -55,8 +63,10 @@ class OllamaEmbeddings:
                 raise ValueError()
             return result
         except (OSError, HTTPException, ValueError, KeyError, TypeError, UnicodeError):
+            if self.cancellation is not None: self.cancellation.check()
             raise EmbeddingUnavailable('Local embedding service is unavailable.') from None
         finally:
+            if self.cancellation is not None: self.cancellation.detach(connection)
             connection.close()
 
     def _digest(self, *, deadline=None):

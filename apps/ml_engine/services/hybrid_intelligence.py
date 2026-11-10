@@ -12,6 +12,9 @@ from .local_embeddings import KEEP_ALIVE, OllamaEmbeddings, EmbeddingUnavailable
 from .persistent_memory import _owner, MemoryConflict
 from .memory_reasoning import reason_with_memory, reasoning_provider
 
+FINANCIAL_LANGUAGE = re.compile(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',re.I)
+CURRENCY_LANGUAGE = re.compile(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',re.I)
+
 ANSWER_STYLES = {
     'concise': (192, 'Answer briefly in a few clear sentences.'),
     'detailed': (1024, 'Give a detailed, readable explanation with short labelled sections.'),
@@ -38,7 +41,8 @@ def answer_budget(query, scope, style='auto'):
 class OllamaReasoner(OllamaEmbeddings):
     name='ollama'
 
-    def __init__(self):
+    def __init__(self, *, stream=None):
+        self.cancellation = stream
         self.model=settings.ALFRED_MEMORY_OLLAMA_MODEL
         if not isinstance(self.model,str) or not re.fullmatch(r'[\w.:-]{1,100}',self.model) or 'cloud' in self.model.lower():
             raise EmbeddingUnavailable('A fixed installed local model is required.')
@@ -71,7 +75,8 @@ class OllamaReasoner(OllamaEmbeddings):
                 + ANSWER_STYLES[style][1]},
                 {'role':'user','content':json.dumps(payload,ensure_ascii=False,allow_nan=False)}]}
         if len(body['messages'][1]['content'].encode())>4096: raise ValueError('Local context exceeds its limit.')
-        result=self._request('POST','/api/chat',body,deadline=deadline)
+        result=(self._request('POST','/api/chat',body,deadline=deadline) if self.cancellation is None
+                else self.cancellation.chat(body,deadline=deadline))
         message=result.get('message',{})
         if (result.get('model')!=self.model or result.get('done') is not True or not isinstance(message,dict)
                 or message.get('role')!='assistant' or message.get('tool_calls') or not isinstance(message.get('content'),str)
@@ -177,9 +182,9 @@ def present_answer(result,scope,query=''):
     # Financial models currently have no currency column; never infer it from model prose or OCR.
     claims=result['answer']
     for source in result.get('sources',[]): claims=claims.replace(str(source['ref']),'')
-    currency=any(category(char)=='Sc' for char in claims) or re.search(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',claims,re.I)
+    currency=any(category(char)=='Sc' for char in claims) or CURRENCY_LANGUAGE.search(claims)
     intent=claims+' '+(query if scope=='general' else '')
-    financial=scope in ('finance','documents','bank_statements','financial_records','financial_document') or re.search(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',intent,re.I)
+    financial=scope in ('finance','documents','bank_statements','financial_records','financial_document') or FINANCIAL_LANGUAGE.search(intent)
     numbers=re.search(r'\d',claims)
     withheld=bool((currency and (numbers or financial)) or (financial and numbers))
     if withheld:

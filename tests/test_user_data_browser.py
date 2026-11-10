@@ -2011,6 +2011,96 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: not path.exists())
         self.assertFalse(TripVideo.objects.exists())
 
+    def test_local_stream_progress_keyboard_stop_partial_retry_and_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        from apps.ml_engine.services.local_chat_stream import GenerationCancelled, GenerationIncomplete
+        history, _ = self.private_history_fixture(authorized=False); owner = self.scenario['user']
+        mode = {'value':'wait'}; stopped = threading.Event(); streams = []; seen = []
+        def factory(*,stream):
+            streams.append(stream)
+            from unittest.mock import Mock
+            model = Mock()
+            def reason(*args,**kwargs):
+                seen.append(args[0])
+                stream.offer(dict(type='delta',text='Synthetic local preview <img src=x onerror="window.streamLeak=true">'
+                    if mode['value']=='wait' else 'Synthetic local preview: the fictional robot enjoys dancing in rain.'))
+                if mode['value'] in ('wait','guide'):
+                    try:
+                        while True:
+                            stream.check(); time.sleep(.02)
+                    except GenerationCancelled:
+                        stopped.set(); raise
+                if mode['value']=='broken': raise GenerationIncomplete('SYNTHETIC-PRIVATE provider path')
+                return 'Synthetic complete local hypothesis.'
+            model.reason.side_effect = reason
+            return model
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',side_effect=factory))
+        def cleanup():
+            for stream in streams:
+                stream.close(); stream.worker.join(timeout=3)
+        self.addCleanup(cleanup)
+        draft = 'Tell a synthetic fictional story'
+        query = self.browser.find_element(self.By.ID,'intelligenceQuery')
+        query.send_keys(draft,Keys.CONTROL,Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic local preview' in self.text('intelligenceAnswers'))
+        self.assertNotIn('AI hypothesis',self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.streamLeak)'))
+        self.browser.find_element(self.By.ID,'intelligenceStop').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Local generation stopped' in self.text('intelligenceFeedback'))
+        self.wait.until(lambda _: stopped.is_set())
+        self.assertEqual(query.get_property('value'),draft)
+        self.assertEqual(self.browser.switch_to.active_element.get_attribute('id'),'intelligenceQuery')
+        self.assertIn('Partial, unverified',self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceStop').is_displayed())
+        self.assertFalse(history.policy(owner)['enabled'])
+        self.capture('local-stream-stopped')
+        mode['value'] = 'broken'; self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Local output is incomplete' in self.text('intelligenceFeedback'))
+        self.assertEqual(query.get_property('value'),draft)
+        self.assertNotIn('SYNTHETIC-PRIVATE',self.text('intelligenceFeedback'))
+        mode['value'] = 'complete'; self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Synthetic complete local hypothesis.' in self.text('intelligenceAnswers'))
+        self.wait.until(lambda _: query.get_property('value') == '')
+        self.assertIn('AI hypothesis',self.text('intelligenceAnswers'))
+        self.assertTrue(all('history' not in item for item in seen))
+        self.ask_history_question('Continue the complete synthetic story')
+        self.wait.until(lambda _: query.get_property('value') == '')
+        self.assertEqual(seen[-1]['history'][-1]['content'],'Synthetic complete local hypothesis.')
+        self.assertEqual(len(seen[-1]['history']),2)
+        with history.store._transaction() as db:
+            for table in ('conversations','conversation_policies','memories','events'):
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
+        self.memory_click('#intelligenceNew')
+        self.assertEqual(self.text('intelligenceAnswers'),'')
+        mode['value'] = 'guide'
+        query.send_keys('Continue the fictional robot story',Keys.CONTROL,Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic local preview:' in self.text('intelligenceAnswers'))
+        self.assertNotIn('history',seen[-1])
+        self.capture('local-stream-guide')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'local-stream-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'local-stream-{width}-{theme}.png'))
+        stopped.clear()
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))")
+        self.wait.until(lambda _: stopped.is_set())
+        self.assertEqual(query.get_property('value'),'')
+        self.assertEqual(self.text('intelligenceAnswers'),'')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceStop').is_displayed())
+
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock
         from selenium.webdriver.common.keys import Keys
@@ -2548,7 +2638,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())
         self.assertIn('OpenAI disabled', self.text('intelligenceCloudStatus'))
-        with patch('apps.ml_engine.api.views.hybrid_answer', wraps=hybrid_answer) as request:
+        with patch('apps.ml_engine.api.views.hybrid_answer', wraps=hybrid_answer) as request, \
+                patch('apps.ml_engine.services.hybrid_intelligence.hybrid_answer',new=request):
             local.reason.side_effect = None
             self.ask_history_question('Synthetic private page warmup')
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
