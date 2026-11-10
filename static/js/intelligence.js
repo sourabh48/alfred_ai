@@ -522,19 +522,27 @@ document.addEventListener("DOMContentLoaded", () => {
         reply.append(label, summary); row.append(userMessage, reply);
         if (result.proposal) {
             const status = document.createElement("p"); status.className = "small"; status.setAttribute("role", "status");
+            status.textContent = `Review the exact values above. This proposal expires at ${new Date(result.proposal.expires_at).toLocaleTimeString()}.`;
             const actions = document.createElement("div"); actions.className = "d-flex gap-2";
             const confirmButton = document.createElement("button"); confirmButton.type = "button"; confirmButton.className = "btn btn-primary btn-sm"; confirmButton.textContent = "Confirm";
             const cancelButton = document.createElement("button"); cancelButton.type = "button"; cancelButton.className = "btn btn-outline-secondary btn-sm"; cancelButton.textContent = "Cancel";
-            const finish = message => { actions.remove(); status.textContent = message; };
+            const finish = message => { actions.remove(); status.textContent = message; status.tabIndex = -1; status.focus(); };
             confirmButton.addEventListener("click", async () => {
                 confirmButton.disabled = cancelButton.disabled = true;
                 try {
-                    const saved = await Alfred.fetchJSON("/api/ai/actions/confirm/", {method:"POST", body:JSON.stringify({...result.proposal, confirmed:true})});
+                    const {proposal_id, action, fields} = result.proposal;
+                    const saved = await Alfred.fetchJSON("/api/ai/actions/confirm/", {method:"POST", body:JSON.stringify({proposal_id, action, fields, confirmed:true})});
                     finish(saved.message);
                     const link = document.createElement("a"); link.href = saved.url; link.textContent = "Open Budgets"; status.append(" ", link);
-                } catch (error) { confirmButton.disabled = cancelButton.disabled = false; status.textContent = `${error.message} Nothing was saved.`; }
+                } catch (error) { confirmButton.disabled = cancelButton.disabled = false; status.textContent = `${error.message} Retry this same card safely, or check Budgets.`; }
             });
-            cancelButton.addEventListener("click", () => finish("Cancelled. Nothing was saved."));
+            cancelButton.addEventListener("click", async () => {
+                confirmButton.disabled = cancelButton.disabled = true;
+                try {
+                    const cancelled = await Alfred.fetchJSON("/api/ai/actions/cancel/", {method:"POST", body:JSON.stringify({proposal_id:result.proposal.proposal_id})});
+                    finish(cancelled.message);
+                } catch (error) { confirmButton.disabled = cancelButton.disabled = false; status.textContent = error.message; }
+            });
             actions.append(confirmButton, cancelButton); reply.append(actions, status);
         }
         reply.append(readAloudButton(summary.textContent));
@@ -708,7 +716,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
         try {
-            const action = await Alfred.fetchJSON("/api/ai/actions/propose/", {method:"POST", body:JSON.stringify({text:query.value})}).catch(() => null);
+            const action = await Alfred.fetchJSON("/api/ai/actions/propose/", {method:"POST", body:JSON.stringify({text:query.value})});
             if (!active || ticket !== generation) return;
             if (action?.proposal || action?.detail) {
                 renderActionProposal(query.value, action);

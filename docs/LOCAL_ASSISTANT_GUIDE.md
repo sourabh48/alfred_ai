@@ -1,5 +1,19 @@
 # Using the local assistant
 
+To create a savings goal, ask "add a savings goal Bike of 1000.25". To report
+progress, ask "update Bike saved to 250.10". Review the name, amount and date in
+the proposal, then choose **Confirm** or **Cancel**. Proposals expire after ten
+minutes. If you change the goal elsewhere, ask again to obtain a fresh review.
+Cancelled or expired cards cannot change a goal. These actions use the existing
+Budgets validation locally and do not require a model or a paid API.
+
+If confirmation is interrupted, retry the **same card** or check **Budgets**.
+The same proposal can save only once, including after ALFRED restarts. A repeated
+confirmation returns its receipt without overwriting subsequent changes. Reloading
+the page clears the visible card; saved goals remain in Budgets. The local action
+audit retains a keyed fingerprint and outcome, without the request, goal name or
+amount. Clearing that audit makes its old proposals unavailable.
+
 Open **AI Assistant** from the sidebar. Under **Local answer style**, choose
 Automatic, Concise, Detailed explanation, Comparison or Step by step. Enter your
 question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit

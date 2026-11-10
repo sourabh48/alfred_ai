@@ -10,6 +10,8 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_assistant_action_proposal_saves_only_after_confirm": 8.453,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_assistant_action_stale_review_and_lost_response_retry_keyboard_accessibility": 11.531,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_answer_markdown_dom_safety_limits_and_plaintext_fallback": 4.453,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_answer_markdown_saved_reopen_financial_guard_keyboard_and_accessibility": 11.031,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_legacy_loan_source_removal_preserves_the_canonical_record": 11.765,

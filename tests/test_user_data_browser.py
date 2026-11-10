@@ -1822,6 +1822,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         card = '#intelligenceAnswers [data-action-proposal]:last-child'
         self.assertIn('₹150,000.00', self.browser.find_element(self.By.CSS_SELECTOR, card).text)
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, card+' b'))
+        self.assertIn('This proposal expires at', self.browser.find_element(self.By.CSS_SELECTOR, card).text)
         self.assertFalse(SavingsGoal.objects.filter(user=owner).exists())
         self.memory_click(card+' .btn-outline-secondary')
         self.wait.until(lambda _: 'Cancelled. Nothing was saved.' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
@@ -1832,8 +1833,72 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: SavingsGoal.objects.filter(user=owner).exists() and 'Open Budgets' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
         goal = SavingsGoal.objects.get(user=owner)
         self.assertEqual((goal.name, goal.target_amount, goal.target_date.isoformat()), ('Synthetic bike', Decimal('150000.00'), '2027-03-31'))
+        self.browser.get(self.live_server_url+'/budgets/')
+        self.wait.until(lambda _: 'Synthetic bike' in self.text('savingsGoalList'))
+        self.browser.refresh()
+        self.wait.until(lambda _: 'Synthetic bike' in self.text('savingsGoalList'))
         local.reason.assert_not_called()
         self.capture('assistant-action-confirmed')
+
+    def test_assistant_action_stale_review_and_lost_response_retry_keyboard_accessibility(self):
+        from decimal import Decimal
+        from selenium.webdriver.common.keys import Keys
+        from apps.budgets.models import SavingsGoal
+        from apps.reports.models import OperationalLog
+        _, local = self.private_history_fixture(authorized=False)
+        local.reason.side_effect = AssertionError('Actions must not reach inference')
+        owner = self.scenario['user']
+        goal = SavingsGoal.objects.create(user=owner, name='Synthetic bike', target_amount='1000.00')
+        def ask(text):
+            field = self.browser.find_element(self.By.ID, 'intelligenceQuery'); field.clear(); field.send_keys(text)
+            self.memory_click('#intelligenceForm button[type="submit"]')
+        card = '#intelligenceAnswers [data-action-proposal]:last-child'
+        ask('update Synthetic bike saved to 250.10')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, card+' .btn-primary'))
+        SavingsGoal.objects.filter(pk=goal.pk).update(saved_amount='600.25')
+        button = self.browser.find_element(self.By.CSS_SELECTOR, card+' .btn-primary')
+        self.browser.execute_script('arguments[0].scrollIntoView({block:"center"})', button)
+        button.send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'The goal changed after this review' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        goal.refresh_from_db(); self.assertEqual(goal.saved_amount, Decimal('600.25'))
+        self.memory_click(card+' .btn-outline-secondary')
+        self.wait.until(lambda _: 'Cancelled. Nothing was saved.' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        self.assertEqual(OperationalLog.objects.get(scope='assistant_action').payload['state'], 'cancelled')
+        ask('update Synthetic bike saved to 700.35')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#intelligenceAnswers [data-action-proposal]')) == 2)
+        self.browser.execute_script('''const original = window.fetch.bind(window); window.__loseActionResponse = true;
+            window.fetch = async (...args) => {const response = await original(...args);
+                if (String(args[0]).endsWith('/api/ai/actions/confirm/') && window.__loseActionResponse) {
+                    window.__loseActionResponse = false; await response.text(); throw new TypeError('Synthetic interrupted response');
+                } return response;};''')
+        self.memory_click(card+' .btn-primary')
+        self.wait.until(lambda _: 'Retry this same card safely' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        goal.refresh_from_db(); self.assertEqual(goal.saved_amount, Decimal('700.35'))
+        button = self.browser.find_element(self.By.CSS_SELECTOR, card+' .btn-primary'); button.send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Open Budgets' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        self.assertEqual(SavingsGoal.objects.filter(user=owner).count(), 1)
+        self.assertEqual(OperationalLog.objects.filter(event_type='assistant_action_confirmed').count(), 1)
+        self.assertTrue(self.browser.execute_script('return document.activeElement.getAttribute("role")==="status"'))
+        # Audit the active proposal buttons as well as the completed receipt.
+        ask('add a savings goal Synthetic pending of 10.25')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#intelligenceAnswers [data-action-proposal]')) == 3)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width, height=1100, deviceScaleFactor=1, mobile=False))
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width, theme=theme, **audit))
+                (self.artifacts/'assistant-actions-accessibility.json').write_text(json.dumps(findings, indent=2), encoding='utf-8')
+                self.assertEqual(audit['violations'], [])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.execute_script('document.querySelector(arguments[0]).scrollIntoView({block:"start",behavior:"instant"})', card)
+                self.browser.save_screenshot(str(self.artifacts/f'assistant-actions-{width}-{theme}.png'))
+        local.reason.assert_not_called()
 
     def test_assistant_speech_fills_the_question_and_reads_replies_aloud(self):
         from unittest.mock import Mock

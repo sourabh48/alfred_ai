@@ -402,6 +402,8 @@ class OperationalLoggingService:
             "payload": entry.payload or {},
             "created_at": entry.created_at.isoformat(),
         }
+        if entry.module == "assistant" and entry.scope == "assistant_action":
+            data["payload"] = {key: entry.payload[key] for key in ("action", "state", "expires_at", "confirmed_at", "goal_id") if key in entry.payload}
         if entry.module == "loans" or entry.scope in {"loan_document", "loan_closure_document"}:
             from apps.loans.diagnostics import public_payload
             data.update(message="Loan document processing event recorded.", file_name="",
