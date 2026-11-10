@@ -1,5 +1,35 @@
 # Current execution board
 
+## Sprint checkpoint - 2026-11-10 bound savings-goal actions
+
+Codex is the sole writer; active sprint continues. Preparation branch
+`work/usability-integration`, source `0ca216859c8a4f5a75594e0cb88cc625c1abddb1`,
+base `378e8ab5b38bf60c0db466b371e4774d0e1d2c72`. USE-05/bound-savings-goal-confirmation
+is LOCAL_ACCEPTED / COMMITTED_LOCAL. Existing arbitrary-payload, duplicate replay
+and stale-progress overwrite defects were reproduced, then fixed in the shared path.
+
+Server-issued IDs bind exact reviewed fields with a keyed fingerprint in the
+existing redacted audit table. Ten-minute expiry, owner/revision checks, transactional
+claim/write/receipt, idempotent replay, server cancellation and safe interrupted
+retry are enforced. No new financial engine/schema/dependency. Current Budgets
+Decimal serializer remains authoritative; no currency policy or external action added.
+Older cards without server IDs must be reviewed again. Clearing audit records makes
+old IDs unavailable; it cannot re-enable them. The proposal body is not stored in logs.
+
+Exact-source 136 backend PASS (207.856s), three Chrome PASS (37.367s Django test
+runtime; runner wall50.281s), four light/dark1440/390 Axe audits zero violations;
+gradient contrast/manual review remains. Actual Waitress/file-SQLite simultaneous
+confirmation201/200 and process-restart replay200 left one goal/one receipt.
+Source/privacy/dependency/migration preflight PASS; no CI/push/PR/merge/deployment.
+No owner database/config/key/model/document/backup/installation changes. Cache edit
+hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 preserved.
+
+Approval gates: owner/package/upgrade/independent/CI and3.0 remain. Baseline85/143,
+extensions0/13 unchanged; USE-05 as a whole remains partial. Next executable step:
+inspect and reproduce model-outage behavior for existing canonical record overview;
+select a bounded USE-04 read-only repair only if grounded in that path. Do not repeat
+accepted import/streaming work. Exact files and receipts: STATE/TEST_EVIDENCE.
+
 Writer state after checkpoint: READY_FOR_NEXT; Codex stops after this continuation.
 No automated Claude launch or independent audit is claimed.
 No concurrent writer is authorized in `F:/ALFRED/alfred_ai`.

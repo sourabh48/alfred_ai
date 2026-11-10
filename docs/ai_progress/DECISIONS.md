@@ -1,5 +1,20 @@
 # Execution decisions
 
+## 2026-11-10 - existing action safety before further tool expansion
+
+- The existing savings-goal action was already reachable. Reproduced financial-write
+  flaws justify this bounded USE-05 exception before full USE-04 expansion; earlier
+  queue items still need owner/provider/package evidence. No baseline acceptance added.
+- Reuse OperationalLog as the redacted server proposal/receipt, with keyed payload
+  and exact goal revision bindings. No plaintext request/amount/name is logged, no
+  cache-dependent claim or new schema. Public audit serialization excludes bindings/IDs.
+- Claim and canonical Decimal write share one database transaction, with first-write
+  serialization for SQLite. Replay returns the outcome without reapplying changes.
+  Cancellation is persisted, and ambiguous network errors never claim nothing saved.
+- No upstream component adopted in this scope. Existing reference matrix boundaries
+  and canonical engines preserved. New tools/actions, application MCP connections,
+  real-account/independent/package/release/3.0 gates remain unaccepted.
+
 - 2026-11-10 `next`: selected USE-03 safe answer formatting while earlier baseline
   queue items still require owner/provider/package evidence. No baseline acceptance
   is inferred from this separate usability slice; one task only.

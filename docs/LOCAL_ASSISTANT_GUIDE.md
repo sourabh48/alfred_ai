@@ -14,6 +14,8 @@ the page clears the visible card; saved goals remain in Budgets. The local actio
 audit retains a keyed fingerprint and outcome, without the request, goal name or
 amount. Clearing that audit makes its old proposals unavailable.
 
+![Savings-goal review with synthetic values and an expiring Confirm card](images/usability/confirmed-action.png)
+
 Open **AI Assistant** from the sidebar. Under **Local answer style**, choose
 Automatic, Concise, Detailed explanation, Comparison or Step by step. Enter your
 question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit

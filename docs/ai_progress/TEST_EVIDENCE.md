@@ -1,5 +1,39 @@
 # Test evidence index
 
+## 2026-11-10 - bound savings-goal actions
+
+Source0ca216859c8a4f5a75594e0cb88cc625c1abddb1; base378e8ab5b38bf60c0db466b371e4774d0e1d2c72.
+All records/requests are synthetic and isolated. Receipts under
+`artifacts/bound-actions-20261110/`; source/commands/hashes in source-manifest.json.
+
+- Reproduction: three new safety assertions FAILED against old source, proving
+  arbitrary amount acceptance, duplicate creation on replay and stale overwrite.
+  `reproduction.log` retained. Initial focused follow-up exposed the prior proposal
+  error-response shape; compatibility restored, failure retained, not hidden.
+- Exact-source136 backend PASS, zero failures/skips,207.856s:
+  actions, savings, session/CSRF, budget Decimal/currency/acceptance, operational
+  logging, native runtime, hybrid grounding and live UI contracts.
+  `backend-exact-source.log`. Earlier37/85/21-case runs overlap; do not sum.
+- Three exact-source real Chrome journeys PASS, zero failures/skips,37.367s
+  (runner wall50.281s): proposal/cancel/confirm/Budgets save-reopen; stale rejection,
+  actual committed HTTP response intentionally interrupted then keyboard retry;
+  existing savings CRUD. `browser-exact-source.json` records exact source SHA.
+- Four Axe light/dark1440/390 audits: zero violations; existing gradient contrast
+  incomplete/manual check remains. Screenshots/JSON under browser-exact/user-data;
+  guide screenshot is the actual synthetic active proposal, visually inspected.
+- Actual Waitress/file-SQLite HTTP drill: simultaneous201/200, one goal/receipt;
+  new server process on the same isolated database returns replay200.
+  `native-exact-source.log`, reproducible `native_restart_drill.py` (hash retained).
+  Initial harness incorrectly put SQLite in a nonprivate temporary parent; storage
+  guard refused it. A new private sibling database directory fixed the fixture,
+  without weakening ACL checks. Cleanup/connection failures retained; final helper
+  shutdown and explicit connection close PASS. No installed runtime was used.
+- Clean detached validation worktree F:/ALFRED_DEV/usability-actions-check-0ca2168:
+  source/privacy/dependencies/migration preflight PASS in clean-source-preflight;
+  technical/promotion remain BLOCKED, no waivers. JS/diff and AST-only graph update PASS.
+- No new migration/dependency/owner runtime/key/weights/media/backups/install or
+  remote change. No hosted CI run, independent review or real-account acceptance.
+
 Safe answer formatting source a74995c94998bfbd3adeb91654554836cb452bb6,
 base 86243336764bf233c6a2ac439d73513b06c031c3:
 

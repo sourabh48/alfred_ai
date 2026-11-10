@@ -1,5 +1,14 @@
 # Known issues and gates
 
+## Bound actions - remaining scope
+
+The locally accepted savings-goal hardening0ca2168 fixes server binding, expiry,
+stale review, replay, cancellation and retry. It does not accept full USE-05.
+Only the existing deterministic savings-goal actions are exposed; no external
+writes or new actions/MCP servers. Audit deletion invalidates old cards; page
+reload requires a new review for unsaved cards. Old clients must reload for IDs.
+Owner/manual contrast/independent/CI/package/upgrade acceptance remains open.
+
 - **USE-02 bounded repairs accepted locally:** statements0f35605, loans88c1df8
   and investmentsb42988b stage owned previews before confirmed canonical writes.
   Broader real-document/provider/owner/package acceptance remains separate.
