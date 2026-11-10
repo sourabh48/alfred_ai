@@ -30,6 +30,18 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 .conversation-message { max-width: 100%; overflow-wrap: anywhere; padding: 1rem 1.2rem; border-radius: 14px; background: #f4f7fc; }
 .conversation-message--user { max-width: 85%; margin-left: auto; background: #e8efff; }
 .conversation-message p { margin: .5rem 0 0; white-space: pre-wrap; }
+.conversation-messages > article, .assistant-answer { min-width: 0; max-width: 100%; }
+.assistant-answer h3, .assistant-answer h4, .assistant-answer h5, .assistant-answer h6 { margin: 1rem 0 .5rem; font-size: 1.05rem; }
+.assistant-answer ul, .assistant-answer ol { padding-left: 1.5rem; }
+.assistant-answer blockquote { border-left: 3px solid var(--alfred-stroke); padding-left: 1rem; white-space: pre-wrap; }
+.assistant-answer figure { margin: 1rem 0; }
+.assistant-answer figcaption { color: var(--alfred-muted); font-size: .85rem; }
+.assistant-answer pre { max-width: 100%; max-height: 24rem; overflow: auto; white-space: pre; padding: 1rem; border: 1px solid var(--alfred-stroke); border-radius: 8px; }
+.assistant-answer code { color: inherit; font-family: ui-monospace, Consolas, monospace; }
+.assistant-table { max-width: 100%; overflow-x: auto; overflow-y: hidden; margin: 1rem 0; }
+.assistant-table table { border-collapse: collapse; min-width: 100%; }
+.assistant-table th, .assistant-table td { min-width: 6rem; padding: .6rem; border: 1px solid var(--alfred-stroke); text-align: left; }
+.assistant-answer [tabindex]:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .conversation-label { font-size: .78rem; font-weight: 700; color: var(--alfred-muted); }
 .conversation-composer { padding-top: 1rem; border-top: 1px solid var(--alfred-stroke); }
 .conversation-options { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }

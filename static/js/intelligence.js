@@ -456,7 +456,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
         const label = document.createElement("span"); label.className = "conversation-label";
         label.textContent = result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
-        const answer = document.createElement("p"); answer.textContent = result.answer;
+        const answer = result.provider !== 'local_evidence' && !result.narrative_withheld
+            ? Alfred.renderAnswerMarkdown(result.answer) : document.createElement('p');
+        if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
         if (historical) label.textContent = `Historical AI hypothesis · Ollama (local) · saved ${new Date(result.saved_at).toLocaleString()}`;
         assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
         const evidence = document.createElement("details"); evidence.className = "conversation-evidence";

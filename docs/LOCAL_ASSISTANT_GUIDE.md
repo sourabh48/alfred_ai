@@ -6,6 +6,18 @@ question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit
 requests for brevity, detail, comparisons or steps. Answers have bounded lengths
 and deadlines; detailed financial and document replies have a stricter limit.
 
+Completed answers display headings, emphasis, inline code, fenced code blocks,
+flat lists, quotes and simple pipe tables. Wide tables and code blocks can be
+focused and scrolled with the keyboard. The same formatting appears when you
+reopen a saved conversation; the original encrypted transcript is preserved.
+
+Links, images and raw HTML supplied in answer text stay inert text. Verified source
+links remain in the separate evidence cards. Questions and unverified streaming
+previews remain plain text. Irregular or oversized tables fall back to text so
+values are retained. Advanced Markdown and code syntax colouring are not supported.
+
+![Formatted local comparison from a synthetic fictional prompt](images/usability/answer-format.png)
+
 With private history off, local general-chat follow-ups can use up to three recent
 turns from the current page. That dialogue stays in page memory. **New conversation**,
 navigation or reload clears it. It is omitted when you choose cloud fallback;

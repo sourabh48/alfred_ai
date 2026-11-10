@@ -2011,6 +2011,110 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: not path.exists())
         self.assertFalse(TripVideo.objects.exists())
 
+    def test_answer_markdown_dom_safety_limits_and_plaintext_fallback(self):
+        self.private_history_fixture(authorized=False)
+        results = self.browser.execute_script("""
+            const render=Alfred.renderAnswerMarkdown, host=document.createElement('div'); document.body.append(host);
+            function inspect(text) { const node=render(text); host.append(node); return node; }
+            const normal=inspect('# Title\\n\\nA **bold** and *careful* `example()`.\\n\\n- First\\n- Second\\n\\n3. Prepare\\n4. Practice\\n\\n> A quote\\n\\n~~~js\\n**literal** <script>window.mdLeak=true</script>\\n~~~');
+            const table=inspect('| Option | Detail |\\n| --- | --- |\\n| **A** | Safe |');
+            const malformed='| A | B |\\n| --- | --- |\\n| kept | extra | value |';
+            const broken=inspect(malformed);
+            const wide=inspect('| '+Array(13).fill('Header').join(' | ')+' |\\n| '+Array(13).fill('---').join(' | ')+' |');
+            const tall=inspect('| A | B |\\n| --- | --- |\\n'+Array(101).fill('| kept | preserved |').join('\\n'));
+            const long='# '+ 'x'.repeat(8193), fallback=inspect(long);
+            const lines=Array(513).fill('unchanged').join('\\n'), many=inspect(lines);
+            const attack=inspect('<img src="https://example.invalid/private" onerror="window.mdLeak=true">\\n<svg onload="window.mdLeak=true"></svg>\\n<script>window.mdLeak=true</script>\\n[Run](javascript:window.mdLeak=true) ![remote](https://example.invalid/image) <iframe srcdoc="bad"></iframe>');
+            const escaped=inspect('```html\\n<img src=x onerror="window.mdLeak=true">\\n```');
+            const unclosed=inspect('```python\\nprint("kept")');
+            const url='See **details** at https://example.invalid/private_name_value and [a_b_c](javascript:window.mdLeak=true)';
+            const literalUrl=inspect(url);
+            const identifierText='user_id_name and first__last__name plus a_b@local.invalid';
+            const identifiers=inspect(identifierText), underscored=inspect('__strong__ and _emphasis_');
+            const result={head:normal.querySelector('h3').textContent,strong:normal.querySelector('strong').textContent,
+                em:normal.querySelector('em').textContent,inline:normal.querySelector('p code').textContent,
+                bullets:normal.querySelectorAll('ul li').length,ordered:normal.querySelector('ol').start,
+                quote:normal.querySelector('blockquote').textContent,code:normal.querySelector('pre code').textContent,
+                tableCells:table.querySelectorAll('tbody td').length,tableHeader:table.querySelector('th').scope,
+                tableRegion:table.querySelector('[role=region]').tabIndex,
+                brokenTable:broken.querySelectorAll('table').length,brokenText:broken.textContent,
+                wideTable:wide.querySelectorAll('table').length,tallTable:tall.querySelectorAll('table').length,
+                tallText:tall.textContent.includes('preserved'),longFallback:fallback.textContent===long,
+                manyFallback:many.textContent===lines,dangerous:host.querySelectorAll('script,img,svg,iframe,a,form,input,style').length,
+                attackText:attack.textContent.includes('javascript:'),escaped:escaped.querySelector('pre code').textContent,
+                unclosed:unclosed.querySelector('pre code').textContent,
+                literalUrl:literalUrl.textContent.includes('https://example.invalid/private_name_value') && literalUrl.textContent.includes('[a_b_c](javascript:window.mdLeak=true)'),
+                identifiers:identifiers.textContent===identifierText && !identifiers.querySelector('em,strong'),
+                underscored:underscored.querySelector('strong').textContent==='strong' && underscored.querySelector('em').textContent==='emphasis',leak:Boolean(window.mdLeak)};
+            host.remove();return result;
+        """)
+        self.assertEqual((results['head'],results['strong'],results['em'],results['inline']),('Title','bold','careful','example()'))
+        self.assertEqual((results['bullets'],results['ordered'],results['quote']),(2,3,'A quote'))
+        self.assertIn('**literal** <script>',results['code'])
+        self.assertEqual((results['tableCells'],results['tableHeader'],results['tableRegion']),(2,'col',0))
+        self.assertEqual((results['brokenTable'],results['wideTable'],results['tallTable'],results['dangerous']),(0,0,0,0))
+        for key in ('tallText','longFallback','manyFallback','attackText','literalUrl','identifiers','underscored'): self.assertTrue(results[key],key)
+        self.assertIn('extra | value',results['brokenText']); self.assertIn('<img',results['escaped'])
+        self.assertEqual(results['unclosed'],'print("kept")'); self.assertFalse(results['leak'])
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(r=>r.name.includes('example.invalid'))"))
+
+    def test_answer_markdown_saved_reopen_financial_guard_keyboard_and_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        raw = ('# A quiet practice\n\nA **clear** explanation with *care* and `practice()`.\n\n'
+            '- Observe\n- Rehearse\n\n1. Prepare\n2. Reflect\n\n> Synthetic quote\n\n'
+            '| Approach | Rhythm | Practice | Feedback |\n| --- | --- | --- | --- |\n'
+            '| Sketch | Slow | Repeat gently | Reflect quietly |\n| Rehearse | Steady | Rest often | Share notes |\n\n'
+            '```python\nprint("A calm practice session")\n```\n\n'
+            '[Unverified link](https://example.invalid/private) ![Image](https://example.invalid/image)\n'
+            '<img src=x onerror="window.mdLeak=true">')
+        local.reason.return_value = raw
+        self.enable_private_history_ui()
+        self.ask_history_question('Compare practice approaches **without styling my question**')
+        self.wait.until(lambda _: bool(self.browser.find_elements(self.By.CSS_SELECTOR,'.assistant-answer table')))
+        self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'.assistant-answer strong').text,'clear')
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'.assistant-answer tbody tr')),2)
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'.assistant-answer pre code').text,'print("A calm practice session")')
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'.assistant-answer a,.assistant-answer img,.assistant-answer script'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'.conversation-message--user strong'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.mdLeak)'))
+        identity = history.list(owner)[0]['id']
+        self.assertEqual(history.get(owner,identity)['turns'][0]['answer'],raw)
+        self.assertEqual(history.store.list_memories(owner),[])
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On \u00b7 local only')
+        self.memory_click('#conversationHistoryPanel > summary'); self.memory_click('#conversationHistoryList li button:first-child')
+        self.wait.until(lambda _: 'Historical AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'.assistant-answer table')),1)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                table = self.browser.find_element(self.By.CSS_SELECTOR,'.assistant-table')
+                if width == 390: self.assertGreater(table.get_property('scrollWidth'),table.get_property('clientWidth'))
+                table.send_keys(Keys.ARROW_RIGHT)
+                self.assertEqual(self.browser.switch_to.active_element,table)
+                if width == 390: self.wait.until(lambda _: table.get_property('scrollLeft') > 0)
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'answer-format-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'answer-format-{width}-{theme}.png'))
+        self.browser.execute_cdp_cmd('Emulation.clearDeviceMetricsOverride',{})
+        self.memory_click('#intelligenceNew'); local.reason.return_value = '# Summary\n\n| Savings | Value |\n| --- | --- |\n| Goal | 99999 |'
+        self.ask_history_question('Explain my savings')
+        self.wait.until(lambda _: 'withheld' in self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,'.assistant-answer table'))
+        self.assertNotIn('99999',self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(r=>r.name.includes('example.invalid'))"))
+
     def test_local_stream_progress_keyboard_stop_partial_retry_and_accessibility(self):
         from selenium.webdriver.common.keys import Keys
         from apps.ml_engine.services.local_chat_stream import GenerationCancelled, GenerationIncomplete
