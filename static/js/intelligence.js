@@ -356,6 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
             : tool ? `Selected data tool: ${tool.title}. Reads only your records; does not change them or contact external providers.`
             : 'Tool permission details are unavailable. Source reads still require server checks; reload to recheck permissions.';
         toolPolicy.dataset.tool = tool?.name || '';
+        if (active && scope.value === 'career') toolPolicy.textContent += ' Page-only progress snapshot; saved stages do not verify submissions. Open Career to review or update them.';
         scope.disabled = !active || pending;
         const documents = scope.value === "documents";
         document.getElementById("intelligenceDocumentField").classList.toggle("d-none", !documents);
@@ -369,6 +370,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const documentQuestion = scope.value === "financial_document";
         document.getElementById("intelligenceFinancialDocumentField").classList.toggle("d-none", !documentQuestion);
         historyCurrent.textContent = documentQuestion ? "Document questions are page-only · never saved to conversation history"
+            : scope.value === 'career' ? 'Career progress is page-only · never saved to conversation history'
             : conversation ? `Saved locally: ${conversation.title} · expires ${new Date(conversation.expires_at).toLocaleString()}`
             : historyEnabled() ? "New local conversation · saved only after a successful local answer" : "Page-only conversation";
         ensureSources();
@@ -452,7 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const requestedFinancial = `${new URLSearchParams(location.search).get("record_type")}:${new URLSearchParams(location.search).get("record_id")}`;
     const documentKind = new URLSearchParams(location.search).get("record_type"), documentId = new URLSearchParams(location.search).get("document_id");
     const requestedDocumentKey = /^(expense|loan|investment)$/.test(documentKind || "") && /^[1-9]\d*$/.test(documentId || "") && Number.isSafeInteger(Number(documentId)) ? `${documentKind}:${documentId}` : "";
-    if (["finance","travel","bank_statements","financial_records","financial_document","documents"].includes(requestedScope)) scope.value = requestedScope;
+    if (["finance","travel","career","bank_statements","financial_records","financial_document","documents"].includes(requestedScope)) scope.value = requestedScope;
     query.addEventListener("keydown", event => {
         if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });
@@ -463,7 +465,7 @@ document.addEventListener("DOMContentLoaded", () => {
         consent.checked = false; feedback.textContent = "New conversation. Previous messages cleared from this page."; retry.hidden = true; query.focus();
     });
     function safeCitation(url) {
-        return ['/loans/','/expenses/','/mobility/'].includes(url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(url || "") || /^\/documents\/(investments|loans)\/\d+\/records\/\d+\/$/.test(url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(url || "");
+        return ['/career/','/loans/','/expenses/','/mobility/'].includes(url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(url || "") || /^\/documents\/(investments|loans)\/\d+\/records\/\d+\/$/.test(url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(url || "");
     }
     function renderTurn(payload, result, ticket, historical = false) {
         const row = document.createElement("article");
@@ -503,8 +505,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
                 if (["metric_states","amounts","document_sources","document_selection","applied_payment_source"].includes(key) || Object.hasOwn(source.data.amounts || {},key)) return;
                 const fact = document.createElement("p");
-                if (key === 'limitations' && Array.isArray(value) && value.every(item => typeof item === 'string')) {
-                    fact.textContent = value.length ? 'limitations:' : 'limitations: None recorded';
+                if (['limitations','progress','recent_opportunities'].includes(key) && Array.isArray(value) && value.every(item => typeof item === 'string')) {
+                    fact.textContent = `${key.replaceAll('_',' ')}: ${value.length ? '' : 'None recorded'}`;
                     evidence.append(fact);
                     if (value.length) {
                         const list = document.createElement('ul');
@@ -712,7 +714,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async event => {
         event.preventDefault();
         if (pending) return;
-        if (!historyPolicy || (scope.value !== "financial_document" && historyBlocked)) { feedback.textContent = "Reopen the saved conversation or reload local history status before sending. Your draft is preserved."; return; }
+        if (!historyPolicy || (!["financial_document","career"].includes(scope.value) && historyBlocked)) { feedback.textContent = "Reopen the saved conversation or reload local history status before sending. Your draft is preserved."; return; }
         if ((scope.value === "financial_document" && !picker) || (["financial_records","financial_document"].includes(scope.value) && picker && (picker.loading || picker.blocked || ((picker.explicit || picker.count > 5) && !picker.selected.size)))) {
             feedback.textContent = "Choose current reviewed source documents, or refresh the source list before sending. Your draft is preserved."; return;
         }
@@ -751,7 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 query.value = ""; requestToken = null;
                 return;
             }
-            if (historyEnabled() && payload.scope !== "financial_document") {
+            if (historyEnabled() && !["financial_document","career"].includes(payload.scope)) {
                 if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || "Private conversation"})});
                 if (!active || ticket !== generation) return;
                 const fingerprint = JSON.stringify(payload);
@@ -768,7 +770,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (result.conversation_context_turns) feedback.textContent += ` Used ${result.conversation_context_turns} recent local turn(s) as unverified follow-up context.`;
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             if (result.provider === "local_evidence") {
-                if (result.grounding === "canonical_record_overview") {
+                if (result.grounding === "recorded_career_progress") {
+                    feedback.textContent = 'Recorded Career progress ready. Review the source records; no model or saved conversation turn was used.';
+                    setLocalStatus('Career records ready', 'ready');
+                    query.value = ''; requestToken = null; retry.hidden = true;
+                } else if (result.grounding === "canonical_record_overview") {
                     feedback.textContent = "Recorded values ready. Local AI is unavailable; review the current source cards. No cloud fallback was used and no conversation turn was saved.";
                     setLocalStatus("Recorded sources · AI unavailable", "review");
                     query.value = ""; requestToken = null; retry.hidden = true;
@@ -792,7 +798,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 pageDialogue = [...pageDialogue, {role:"user",content:dialogueSnippet(payload.query)},
                     {role:"assistant",content:dialogueSnippet(result.answer)}].slice(-6);
             }
-            if (historyEnabled() && payload.scope !== "financial_document") await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = `${result.conversation_saved === true ? 'Answer saved, but history' : 'History'} status could not refresh. Reload before another question.`; });
+            if (historyEnabled() && !["financial_document","career"].includes(payload.scope)) await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = `${result.conversation_saved === true ? 'Answer saved, but history' : 'History'} status could not refresh. Reload before another question.`; });
         } catch (error) {
             if (active && ticket === generation) {
                 feedback.textContent = `${error.message}${error.reference ? ` Reference: ${error.reference}` : ""}`;

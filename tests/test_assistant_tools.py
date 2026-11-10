@@ -22,8 +22,8 @@ class AssistantToolCatalogTests(TestCase):
     def test_catalogue_declares_permissions_and_detached_schemas_without_reading_data(self):
         with self.assertNumQueries(0), patch('socket.socket.connect', side_effect=AssertionError('No catalogue network')):
             catalog = tools.tool_catalog()
-        self.assertEqual(len(catalog), 6)
-        self.assertEqual(len({tool['name'] for tool in catalog}), 6)
+        self.assertEqual(len(catalog), 7)
+        self.assertEqual(len({tool['name'] for tool in catalog}), 7)
         for tool in catalog:
             self.assertEqual(tool['input_schema']['type'], 'object')
             self.assertFalse(tool['input_schema']['additionalProperties'])

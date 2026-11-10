@@ -123,6 +123,9 @@ def source_context(user,scope,document_id=None,transaction_id=None,record_type=N
 
 
 def _read_source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
+    if scope=='career':
+        from .career_evidence import application_source
+        return [application_source(user)]
     if scope=='financial_document':
         from .canonical_evidence import document_record_sources
         return document_record_sources(user,record_type,document_id,selected_records,source_catalog)
@@ -217,7 +220,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     from .canonical_evidence import KINDS, supported_question, requested_record_field
     owner=_owner(user)
     validate_dialogue(conversation_context, scope, cloud_consent)
-    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records','financial_document')
+    if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','career','documents','bank_statements','financial_records','financial_document')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
             or (scope in ('documents','financial_document') and (type(document_id) is not int or document_id<1))
             or (scope not in ('documents','financial_document') and document_id is not None)
@@ -229,15 +232,23 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             or (scope!='financial_document' and selected_records is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
     style, output_limit = answer_budget(query, scope, answer_style)
-    if scope in ('bank_statements','financial_records','financial_document') and cloud_consent:
+    if scope in ('bank_statements','financial_records','financial_document','career') and cloud_consent:
         from django.core.exceptions import PermissionDenied
-        raise PermissionDenied('Private financial evidence is local only.')
+        raise PermissionDenied('This private evidence is local only.')
     tools=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
     def revalidate():
         from django.http import Http404
         try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
         except (Http404, PermissionError) as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
         if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
+    if scope=='career':
+        revalidate()
+        return {'answer':'Current recorded application progress is shown below. Stages and sent follow-ups are saved reports, '
+                    'not independent confirmation of a submission or employer response. Open Career to review or update them. '
+                    'This source provides a progress snapshot; it does not establish job matches, salary advice or submitted applications.',
+            'provider':'local_evidence','classification':'owner_recorded_fact','financial_authority':False,
+            'grounding':'recorded_career_progress','sources':tools,'narrative_withheld':False,'context_omitted':0,
+            'memory_retrieval_available':None}
     field=requested_record_field(query,kind='expense' if scope=='bank_statements' else record_type) if scope in ('bank_statements','financial_records','financial_document') else None
     period_query=requested_record_field(query,kind='expense')=='statement_period' or bool(
         re.search(r'\bstatements?\b',query,re.I) and re.search(r'\bperiods?\b|\bdate range\b|\bstart and end\b',query,re.I))

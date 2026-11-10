@@ -10,6 +10,7 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_career_application_progress_is_owned_page_only_offline_and_reopens": 13.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_registered_tools_permissions_real_reads_timeout_and_keyboard_accessibility": 12.125,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_source_card_record_id_is_not_money_and_limitations_are_readable": 6.61,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_canonical_record_overview_during_real_socket_refusal_and_reopen": 14.484,

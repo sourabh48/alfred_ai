@@ -88,12 +88,12 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                     or {'conversation_id','conversation_revision','request_id'} & set(data)):
                 raise ValueError('Page dialogue is restricted to unsaved local general chat.')
             validate_dialogue(conversation_context, 'general', False)
-        document_question=data.get('scope')=='financial_document'
-        if document_question:
+        page_only_question=data.get('scope') in ('financial_document','career')
+        if page_only_question:
             from .conversations import current_session
             current_session(request)
-            if data.get('conversation_id') is not None: raise ValueError('Document-question persistence is not supported.')
-        store = None if document_question else memory_store()
+            if data.get('conversation_id') is not None: raise ValueError('This source is page-only; conversation persistence is not supported.')
+        store = None if page_only_question else memory_store()
         identity = data.get('conversation_id')
         history_fields = {'conversation_id','conversation_revision','request_id'}
         if identity is None and history_fields & set(data): raise ValueError()
@@ -122,7 +122,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 query_sensitivity=data.get('query_sensitivity','sensitive'), conversation_context=conversation_context,
                 answer_style=data.get('answer_style','auto'))
         finally:
-            if document_question: current_session(request)
+            if page_only_question: current_session(request)
         if identity is not None:
             current_session(request)
             revision = data.get('conversation_revision')

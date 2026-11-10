@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 TIMEOUT_SECONDS = 5
 MAX_RESULT_BYTES = 128 * 1024
 MAX_ID = 2**63 - 1
-SOURCE_URL = (r'^/(?:mobility/|ai/financial-records/(?:expense|budget|loan|investment|baseline)/[1-9][0-9]*/|'
+SOURCE_URL = (r'^/(?:career/|mobility/|ai/financial-records/(?:expense|budget|loan|investment|baseline)/[1-9][0-9]*/|'
               r'documents/(?:loan-closures/[1-9][0-9]*/|statements/[1-9][0-9]*/transactions/[1-9][0-9]*/|'
               r'(?:loans|investments)/[1-9][0-9]*/records/[1-9][0-9]*/))$')
 
@@ -131,6 +131,7 @@ TOOLS = (
          ('record_type', 'document_id', 'selected_records', 'source_catalog')),
     Tool('documents.loan_closure', 'documents', 'Verified loan closure', ('document_id',), ('document_id',)),
     Tool('travel.preferences', 'travel', 'Saved travel preferences'),
+    Tool('career.applications', 'career', 'Recorded Career application progress'),
 )
 
 

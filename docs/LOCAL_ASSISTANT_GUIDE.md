@@ -3,7 +3,7 @@
 Under **Include local records**, choose the records to use for this question.
 The permission note names the selected read-only data tool. Expand **Available
 local read-only tools** to see the current catalogue. These tools read your own
-Finance records, reviewed statement/document evidence or saved Travel preferences;
+Finance records, reviewed statement/document evidence, recorded Career application progress or saved Travel preferences;
 they do not make changes, book travel, trade or contact external providers.
 General chat keeps its existing verified-memory and conversation controls.
 
@@ -14,6 +14,16 @@ are not enabled by this catalogue. New actions still require their separate revi
 and confirmation flow.
 
 ![Local read-only tool permissions and a retained question on a synthetic account](images/usability/local-tools.png)
+
+For application progress, choose **My recorded Career application progress**, then
+ask "Summarize my application progress". You can also use **Review application
+progress with ALFRED** on Career. The snapshot shows recorded stages and follow-up
+dates, with scan limits and missing dates explained. **Open source records** returns
+to Career to review or update them. Reopen and ask again to see changes.
+
+Career snapshots stay on the page even when conversation history is enabled.
+They work without a model and do not verify that an application or message was sent.
+No salary, contacts, resume text or job-description text is included.
 
 To create a savings goal, ask "add a savings goal Bike of 1000.25". To report
 progress, ask "update Bike saved to 250.10". Review the name, amount and date in

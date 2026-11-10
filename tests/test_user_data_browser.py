@@ -4618,6 +4618,65 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
 
+    def test_career_application_progress_is_owned_page_only_offline_and_reopens(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.career.models import CareerJobAnalysis
+        from apps.career.services.application_tracker import apply_change
+        history, local = self.private_history_fixture()
+        self.enable_private_history_ui()
+        owner = self.scenario['user']; today = timezone.localdate()
+        application = apply_change({}, {'stage':'applied','on':(today-timedelta(days=10)).isoformat()}, today=today)
+        row = CareerJobAnalysis.objects.create(user=owner, job_title='Synthetic Java Engineer',
+            company='<img src=x onerror="window.careerInjected=true">', extracted_text='PRIVATE-RAW-RESUME',
+            extracted_payload={'application':application,'salary':'PRIVATE-SALARY'})
+        other = get_user_model().objects.create_user(username='synthetic-browser-career-other')
+        CareerJobAnalysis.objects.create(user=other, company='OTHER-OWNER-SECRET')
+        self.browser.get(self.live_server_url+'/ai/insights/?scope=career')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceToolPolicy').get_attribute('data-tool') == 'career.applications')
+        self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
+        self.assertIn('page-only', self.text('conversationHistoryCurrent'))
+        before = list(CareerJobAnalysis.objects.values())
+        self.ask_history_question('Summarize my application progress')
+        self.wait.until(lambda _: 'Recorded Career progress ready' in self.text('intelligenceFeedback'))
+        answer = self.text('intelligenceAnswers')
+        self.assertIn('applied: 1', answer)
+        self.assertIn('Next follow-up due', answer)
+        self.assertIn('Synthetic Java Engineer', answer)
+        self.assertIn('not independent', answer)
+        self.assertIn('<img src=x', answer)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.careerInjected)'))
+        self.assertNotIn('PRIVATE-', answer); self.assertNotIn('OTHER-OWNER', answer)
+        self.assertEqual(history.list(owner), []); local.reason.assert_not_called()
+        self.assertEqual(list(CareerJobAnalysis.objects.values()), before)
+        self.memory_click('#intelligenceAnswers a[href="/career/"]')
+        self.wait.until(lambda _: self.browser.current_url == self.live_server_url+'/career/')
+        self.client.force_login(owner)
+        saved = self.client.post(f'/api/career/job-analyses/{row.pk}/application/',
+            {'stage':'interview','on':today.isoformat()}, content_type='application/json')
+        self.assertEqual(saved.status_code, 200)
+        self.memory_click('a[href="/ai/insights/?scope=career"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceToolPolicy').get_attribute('data-tool') == 'career.applications')
+        self.ask_history_question('What is my application progress now?')
+        self.wait.until(lambda _: 'interview: 1' in self.text('intelligenceAnswers'))
+        self.assertEqual(history.list(owner), []); local.reason.assert_not_called()
+        self.capture('career-assistant-progress')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'career-assistant-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'career-assistant-{width}-{theme}.png'))
+
     def test_registered_tools_permissions_real_reads_timeout_and_keyboard_accessibility(self):
         from selenium.webdriver.common.keys import Keys
         from selenium.webdriver.support.ui import Select
@@ -4630,7 +4689,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         before = list(Investment.objects.values())
         execute = self.enterContext(patch.object(assistant_tools, 'execute_tool', wraps=assistant_tools.execute_tool))
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
-        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceToolsList li')) == 6)
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceToolsList li')) == 7)
         panel = self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceToolsPanel summary')
         self.browser.execute_script('arguments[0].scrollIntoView({block:"center"})', panel); panel.send_keys(Keys.ENTER)
         self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceToolsPanel').get_property('open'))

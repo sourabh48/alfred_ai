@@ -13,6 +13,7 @@ revalidation both pass through the registry. The existing memory path remains se
 | documents.financial_records | financial_document; up to three reviewed records |
 | documents.loan_closure | documents; verified owned closure evidence |
 | travel.preferences | travel; saved owned preferences |
+| career.applications | career; recorded application progress, page-only |
 
 Authenticated `GET /api/ai/tools/` returns input/output JSON schemas and each tool's
 owner, authentication/authorization, consent, sensitivity, network, timeout, cache,
@@ -34,5 +35,13 @@ arguments, results, document names or exception text. No additional result cache
 canonical writes, worker, dependency, database schema or credentials were introduced.
 
 This is a bounded local registry, not an MCP transport or autonomous planner.
-Career tools, broader Travel/research operations and approved MCP servers remain
+Career progress reuses the existing application tracker for follow-up dates. Counts
+cover up to 300 most recently updated owned opportunities, with the omitted count
+and at most three recent details shown explicitly. Stages are recorded reports,
+not verified submissions or employer replies. Missing/malformed dates remain
+unresolved. The source is re-read before acceptance and is never sent to a model,
+provider or transcript store. No profile is created by this tool; salary, contacts,
+resume/JD text and private job URLs are excluded.
+
+Career job discovery/matching, broader Travel/research operations and approved MCP servers remain
 outside this implementation. Server configuration/disclosure approvals are unchanged.
