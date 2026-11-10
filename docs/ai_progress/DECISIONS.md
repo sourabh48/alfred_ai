@@ -1,5 +1,19 @@
 # Execution decisions
 
+- 2026-11-10 `next`: selected USE-03 safe answer formatting while earlier baseline
+  queue items still require owner/provider/package evidence. No baseline acceptance
+  is inferred from this separate usability slice; one task only.
+- Reuse the current final/historical renderTurn and raw answer for speech/memory/
+  encrypted history. A small DOM-only formatter supports headings, emphasis, inline/
+  fenced code, flat lists, quotes and simple pipe tables. No HTML parsing, executable
+  links/images, external requests, dependency or alternate UI/backend introduced.
+- Model URLs/HTML and identifiers preserve literal characters; verified source-card
+  links remain the sole citation controls. Questions/previews/withheld narratives
+  and deterministic financial cards retain their current rendering/authority.
+- Limit structural formatting to existing 8192-byte answer, 512 lines and simple
+  tables of 2-12 columns/at most 100 data rows. Irregular/oversized tables fall back
+  to text. No claim of full CommonMark, nested syntax or syntax highlighting.
+
 -2026-11-10 continuation: reuse OllamaReasoner/hybrid_answer for bounded page-only
  streaming. No second reasoning/financial engine. Native Waitress remains four
  threads; at most two transient inference workers/eight queued frames each. The

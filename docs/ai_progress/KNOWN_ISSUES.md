@@ -15,7 +15,9 @@
   revision-bound rename/title searcha173b3e and page-only dialoguec365a38 accepted
   locally. Title search covers titles, not transcript bodies. Page-only local general
   streaming/cancellation0712fa2 is locally accepted; saved-history/domain/cloud
-  streaming, Markdown/tables and broader model routing remain. Source-backed/financial
+  streaming and broader model routing remain. Bounded final-answer Markdown/tables
+  a74995c accepted locally; nested/advanced syntax and code colouring remain.
+  Source-backed/financial
   output is buffered for final validation. No full assistant parity claim.
 - Existing savings-goal action flow still requires scoped hardening review before extension.
 - No application MCP server/source connection is configured. Host tools available

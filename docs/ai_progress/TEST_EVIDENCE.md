@@ -1,5 +1,39 @@
 # Test evidence index
 
+Safe answer formatting source a74995c94998bfbd3adeb91654554836cb452bb6,
+base 86243336764bf233c6a2ac439d73513b06c031c3:
+
+- Exact-source 93 backend PASS, zero failures/skips,31.390s: hybrid/history/UI,
+  currency, stream and browser-plan guards. No backend/financial algorithm changed.
+- Four exact-source actual Chrome journeys PASS, zero failures/skips,45.569s:
+  DOM format safety/bounds, raw encrypted save/reopen/financial guard/keyboard,
+  unverified stream/Stop lifecycle regression, owned citations/reviewed memory save.
+  Four light/dark1440/390 Axe audits zero violations; gradient contrast incomplete.
+  Earlier 3-case runs overlap; do not sum. Existing source-card links remain separate.
+- One exact-source real Chrome/Ollama comparison PASS,10.040s; model-to-render
+  sample2.656s, synthetic fictional rows Calm/Quiet and Lively/Bright. No inference
+  provider mocked; unrelated external domain sources isolated with the established
+  offline fixture. This is a rendering journey, not universal semantic/model accuracy.
+  Earlier real-model sample10.578s (15.185s test) predates the commit and is separate.
+- DOM cases cover inert HTML/JavaScript links/images, no external image requests,
+  literal code/URLs/identifiers, malformed/oversized tables, unclosed fences, bound
+  fallback with no value loss. Source text, questions, partial previews and withheld
+  financial claims retain existing paths; stored history keeps exact raw answers.
+- Initial two-case browser run had one immediate keyboard-scroll assertion failure;
+  explicit overflow and asynchronous arrow-scroll checks passed on rerun. No scroll
+  assertion was suppressed. Horizontal-only table scrolling also removes an observed
+  fractional-height vertical scrollbar. Failed receipt retained; no other failure or
+  skipped run counted as acceptance.
+- Receipts: artifacts/answer-format-20261110/{backend-exact-source.log,
+  browser-exact-source.json,real-browser-exact-source.log,clean-source-preflight/}.
+  Source/receipt hashes and commands: source-manifest.json/commands.json there.
+  Exact clean-source/privacy/dependency/migration preflight PASS; promotion BLOCKED.
+  JS syntax/diff whitespace/AST graph update PASS. No migrations/dependencies/runtime
+  keys/documents/models/backups/install/remote changes. Cache hash preserved.
+- No native package/upgrade, owner account, manual contrast/screen reader, hosted
+  CI or independent release review claimed. Advanced Markdown/colouring remain out
+  of this bounded slice. Baseline85/143/extensions0/13 unchanged. No next task selected.
+
 Page-only local streaming source0712fa2ede3c6fb4051ec3654232e05e0a7d9479,
 base0842d0e11a2988db2dd2883fbcdca47b7df55f7a (preparation branch):
 

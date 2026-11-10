@@ -1,5 +1,30 @@
 # ALFRED execution state
 
+## Current next-task checkpoint - 2026-11-10
+
+- READY_FOR_NEXT. USE-03/safe-answer-formatting completed locally; `next` selected
+  one eligible usability slice and no subsequent task. Last writer Codex; no agent
+  launch or independent audit. Verify sole writer before another edit.
+- Branch `work/usability-integration`; implementation source
+  a74995c94998bfbd3adeb91654554836cb452bb6, base
+  86243336764bf233c6a2ac439d73513b06c031c3. Documentation checkpoint HEAD:
+  `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+- Completed answers now render bounded headings/emphasis/code/flat lists/quotes/
+  simple tables through fixed DOM elements and text nodes. Model HTML, URLs and
+  images stay inert; approved source links remain separate. Questions, previews,
+  withheld financial prose, canonical cards and encrypted raw history stay unchanged.
+- Exact-source 93 backend PASS (31.390s), four Chrome PASS (45.569s), one real
+  Chrome/Ollama comparison PASS (10.040s; model-to-render sample 2.656s). Four
+  light/dark desktop/mobile Axe audits zero violations; manual contrast remains.
+  Malformed/oversized tables preserve text; keyboard scrolling and saved reopen pass.
+- Source/privacy/dependency/migration preflight PASS. No new dependencies/schema,
+  owner runtime/data/key/model/backup/install or remote changes. Cache edit hash
+  41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 preserved.
+- Advanced/nested Markdown, code syntax colouring and saved/domain streaming remain.
+  Release/owner/CI/independent/manual/package gates still open; baseline 85/143,
+  extensions 0/13 unchanged. On `continue`, report READY_FOR_NEXT; only `next`,
+  `sprint` or an explicit scope selects more work. Files/evidence: STATE/HANDOFF.
+
 ## Current continuation checkpoint -2026-11-10
 
 - READY_FOR_NEXT. Selected USE-03 local streaming/cancellation slice completed

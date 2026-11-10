@@ -1,5 +1,36 @@
 # Codex / Claude checkpoint
 
+## READY_FOR_NEXT - 2026-11-10 safe answer formatting
+
+Latest `next` task USE-03/safe-answer-formatting completed locally. Codex stops
+after checkpoint; no next task selected, no agent launch or independent audit.
+Verify Git/status/HEAD and sole writer before editing. Preserve the unrelated
+materialized_cache.py edit/hash below; no owner runtime changes authorized.
+
+Branch work/usability-integration, source a74995c94998bfbd3adeb91654554836cb452bb6,
+base86243336764bf233c6a2ac439d73513b06c031c3. Documentation HEAD resolution:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Completed final/historical answer formatting uses fixed DOM elements/text only:
+headings/emphasis/code/flat lists/quotes/simple tables. Inert model HTML/URLs/images
+cannot add links, requests or privileged elements. Questions/stream previews and
+withheld financial prose retain plain text; approved citation cards stay separate.
+Original encrypted transcripts, raw speech/memory callers and financial calculations
+are unchanged. No dependency, framework, schema or alternate engine introduced.
+
+Exact-source93 backend/four Chrome/one real Chrome-Ollama comparison PASS. Four
+Axe audits zero violations/manual contrast pending. Clean source/privacy/dependency/
+migration preflight PASS; promotion BLOCKED. Guide and genuine synthetic screenshot
+updated. Exact files, receipts, failed first scroll assertion and limits are in
+STATE/TEST_EVIDENCE and artifacts/answer-format-20261110/. Clean validation worktree
+retained at F:/ALFRED_DEV/usability-format-check-a74995c.
+
+Current scope is bounded formatting, not full CommonMark, nested syntax or code
+colouring. On `continue` report READY_FOR_NEXT and stop; `next`, an explicit scope
+or a new `sprint` selects one eligible task. Saved/domain streaming, broader tools/
+actions/usability and release/owner/CI/package/3.0 gates remain. Baseline85/143 and
+extensions0/13 unchanged. Historical handoff/selection instructions below superseded.
+
 ## READY_FOR_NEXT -2026-11-10 streaming continuation
 
 Current `continue` completed the selected bounded page-only local streaming/

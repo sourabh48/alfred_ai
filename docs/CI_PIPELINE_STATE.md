@@ -1,5 +1,17 @@
 # Development CI and integration pipeline
 
+## Safe answer formatting source - 2026-11-10
+
+Source a74995c94998bfbd3adeb91654554836cb452bb6, base
+86243336764bf233c6a2ac439d73513b06c031c3: LOCAL_ACCEPTED / COMMITTED_LOCAL on
+work/usability-integration. Exact-source 93 backend PASS (31.390s), four Chrome
+PASS (45.569s), one real Chrome/Ollama comparison PASS (10.040s). Four Axe audits
+zero violations/manual contrast open. New regular browser cases are in the measured
+browser inventory; actual local-model acceptance is separately opt-in. No checks or
+skip policy weakened. Source/privacy/dependency/migration preflight PASS; promotion
+BLOCKED. No CI IDs, push, PR, merge, install or publication. Owner/independent/manual/
+package/upgrade/whole release gates remain. `next` ends READY_FOR_NEXT, no new scope.
+
 ## Page-only local streaming source -2026-11-10
 
 Source0712fa2ede3c6fb4051ec3654232e05e0a7d9479, base0842d0e11a2988db2dd2883fbcdca47b7df55f7a:

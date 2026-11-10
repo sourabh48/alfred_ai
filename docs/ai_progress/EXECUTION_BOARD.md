@@ -19,6 +19,7 @@ Validated loan implementation:88c1df8; latest preservation follow-up:c2d1517.
 | USE-03 conversation rename and search | LOCAL_ACCEPTED / COMMITTED_LOCAL | a173b3e;85 backend/3 Chrome/1 actual Ollama PASS; four Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
 | USE-03 page-only follow-up context | LOCAL_ACCEPTED / COMMITTED_LOCAL | c365a38;117 focused backend/2 Chrome/1 actual Ollama PASS; consolidated194 backend and3 affected exact-source Chrome PASS; clean-source preflight PASS |
 | USE-03 page-only local streaming and cancellation | LOCAL_ACCEPTED / COMMITTED_LOCAL | 0712fa2;239 backend/28 caller/4 exact-source Chrome/2 actual Waitress-Ollama PASS; four active-Stop Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
+| USE-03 safe answer formatting | LOCAL_ACCEPTED / COMMITTED_LOCAL | a74995c;93 backend/4 exact-source Chrome/1 real Chrome-Ollama PASS; four Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
 | Remaining USE-01/02 journeys | QUEUED | Other imports, knowledge readiness and owner/package acceptance remain |
 | Remaining USE-03, USE-04, USE-05 | QUEUED | Follow the usability ledger; existing domain adapters/actions first |
 | USE-06 release and complete 2.0 acceptance | GATED | Exact-head CI, independent/owner/package/upgrade gates remain |
