@@ -1,5 +1,20 @@
 # Current execution board
 
+## Saved general streaming - 2026-11-11
+
+USE-03/saved-general-streaming LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source `b9688647c776ce818a7ec4d2f218cd63639420a5`,
+base `ba5d376df84fa179a9f124ca11198ce97cfd79d0`. Existing transport now serves
+consented saved general chat through shared history/context/replay controls.
+Transactional cancellation guard and honest completed-save/lost-response recovery
+preserve drafts and single-turn retry. Exact-source 269 backend/6 Chrome/2 real
+Waitress-Ollama PASS, zero skips; four new Axe audits zero violations/manual contrast
+open. Clean source/privacy/dependency/migration preflight and AST graph update PASS.
+No owner runtime/remote/schema/dependency/model-policy change; cache edit preserved.
+Baseline 85/143 and extensions 0/13 unchanged. Full USE-03 and owner/CI/independent/
+package/release/3.0 gates remain. READY_FOR_NEXT; no next task selected. Exact files,
+receipts and next command: docs/ai_progress/STATE.json and TEST_EVIDENCE.md.
+
 ## Private message search - 2026-11-11
 
 USE-03/private-message-search LOCAL_ACCEPTED / COMMITTED_LOCAL on

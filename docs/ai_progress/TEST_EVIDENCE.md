@@ -1,5 +1,59 @@
 # Test evidence index
 
+## 2026-11-11 - saved local general streaming
+
+Exact source `b9688647c776ce818a7ec4d2f218cd63639420a5`, base
+`ba5d376df84fa179a9f124ca11198ce97cfd79d0`. Commands, source blobs and receipt hashes:
+`artifacts/saved-stream-20261111/`. All accounts, runtime/media/vaults are synthetic
+under `F:/ALFRED/dev-test-data/saved-stream-20261111/` or temporary fixture roots.
+
+- Exact-source 269 backend PASS in 148.147s, zero failures/skips. Covers stream wire
+  validation/cancellation/deadline, history/context/append/replay and source/session/
+  CSRF/privacy boundaries, plus canonical financial grounding, typed tools, Career,
+  native and release/browser inventories. New integration checks reject foreign,
+  stale, expired, revoked and malformed history, client context/cloud/domain mixing;
+  source/consent/revision changes and session logout cannot append. Disconnect before
+  completion saves no turn; same request retries. Lost final acknowledgement replays
+  one stored turn without another model call. Cancellation after the SQL UPDATE
+  demonstrably rolls back the existing transaction. No financial algorithm change.
+- Six exact-source actual Chrome journeys PASS in 88.874s (runner 102.640s), zero
+  failures/skips: saved progressive preview/keyboard Stop/draft/retry/follow-up/reload,
+  lost-final response recovery without duplicate/inference, earlier unsaved-stream
+  Stop/broken retry/accessibility, history consent/reopen/delete/clear/mobile, saved
+  message search and history-outage/stale-edit/clear regressions. Live server, real
+  vault and SQLite; unrelated inference faults use controlled synthetic providers.
+- Four new 1440/390px light/dark Axe audits zero automated violations, one incomplete
+  contrast rule each. Current screenshot inspected locally; its hostile synthetic
+  preview text stays inert. No real-account screenshot or full manual acceptance.
+- Two exact-source actual Waitress/Ollama tests PASS in 19.912s, no mocked model
+  output: encrypted save/reopen, fictional follow-up continuity and replay without
+  another inference; active saved-generation disconnect closes the worker with no
+  appended turn. Reply/follow-up total observations 17.250s/0.797s; worker stop in 0.063s.
+  Key bytes unchanged, no verified memories. These are same-host synthetic HTTP/vault
+  checks, not packaged app, full process restart, GPU/first-token or quality claims.
+- Reproduced missing capability with one failing test before edits: valid saved
+  stream POST returned 400. Retained reproduction.log. Initial working-tree 49
+  history/stream PASS in 20.616s; expanded 77 backend PASS in 35.684s; two working-tree Chrome
+  PASS in 26.143s. These overlap final checks and are not additive/exact-source receipts.
+- Clean detached F:/ALFRED_DEV/usability-saved-stream-check-b968864: source/privacy/
+  dependency/migration preflight PASS. Its full technical/promotion report remains
+  BLOCKED; standalone tests do not replace release/owner/CI/recovery evidence.
+  AST graph update PASS without semantic APIs; unsupported/empty-symbol files remain
+  outside the structural index. No schema, dependency or model-policy change.
+- No personal runtime/account/key/model/document/backup/install or remote changes;
+  cache edit/hash preserved. Baseline 85/143, extensions 0/13 unchanged. Full USE-03,
+  manual contrast, broad model quality, owner/CI/independent/package/release/3.0 open.
+
+Implementation files (10): `apps/ml_engine/api/chat_stream.py`,
+`apps/ml_engine/api/views.py`, `apps/ml_engine/services/conversation_history.py`,
+`docs/LOCAL_ASSISTANT_GUIDE.md`, `static/js/intelligence.js`,
+`templates/ai_insights.html`, `tests/browser_durations.json`,
+`tests/test_local_chat_stream.py`, `tests/test_local_stream_acceptance.py`,
+`tests/test_user_data_browser.py`. Checkpoint-only files are in STATE.json.
+READY_FOR_NEXT; no next task selected.
+- `scripts/project_execution.py --check` PASS; generated views and acceptance
+  counts remain unchanged at 85/143 original requirements and 0/13 extensions.
+
 ## 2026-11-11 - private saved-message search
 
 Final source `d1ba65750f95b1102d4a2cc32cb19c040a48791e`, base

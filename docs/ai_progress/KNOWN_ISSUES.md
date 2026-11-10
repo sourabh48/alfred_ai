@@ -1,5 +1,20 @@
 # Known issues and gates
 
+## Saved general stream bounds - 2026-11-11
+
+Source b9688647c776ce818a7ec4d2f218cd63639420a5 adds streaming only to consented
+saved local general chat. Domain and cloud-fallback responses remain buffered.
+Existing three-turn context, retention, token and 30-second limits remain. A lost
+connection can follow a completed commit: partial previews are never retained, but
+a completed turn may already exist. Retry the same draft/request or reopen history;
+this cannot undo an already completed save. No private-history activation occurred.
+
+Actual synthetic Waitress/Ollama reply/follow-up/Stop observations do not establish
+broad model quality, first-token/GPU performance, independent-host reliability or
+packaged restart acceptance. Manual contrast, owner/CI/independent/package/release
+and 3.0 gates remain. The earlier Ollama deadline variation remains an open issue;
+this passing bounded run is not a universal availability claim.
+
 ## Private message search bounds - 2026-11-11
 
 Source d1ba65750f95b1102d4a2cc32cb19c040a48791e searches retained titles/questions/

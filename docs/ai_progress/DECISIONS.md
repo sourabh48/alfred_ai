@@ -1,5 +1,25 @@
 # Execution decisions
 
+## 2026-11-11 - stream saved local general conversations
+
+- NEXT selects USE-03/saved-general-streaming from the existing authorized usability
+  ledger. Original queue items retain owner/external/dependency blockers; no original
+  requirement or whole capability is promoted by this bounded prerequisite exception.
+- Share AlfredPersonalInsightsAPI.answer between its ordinary POST and the saved
+  stream worker. Reuse current prepare/context/append/replay, local streaming,
+  source revalidation and UI lifecycle. No parallel financial or conversation engine.
+- Only local general chat gains saved streaming. History fields are complete/typed;
+  client page-context injection, domain streaming and cloud consent remain rejected.
+  Operator availability and owner retention consent remain off unless already chosen.
+- The existing append transaction gains an optional cancellation/session check
+  before processing and after its SQL write, allowing rollback before commit. Stop
+  cannot undo a completed commit; the UI warns of a possibly saved completed turn.
+  Same-request replay recovers it without another inference or duplicate turn.
+- Retain existing 30-second deadline, output/context limits, model digest guards,
+  figure/source buffering, owner boundaries and no automatic fact promotion.
+- NO_UPSTREAM_ADOPTION. Existing Django/vault/JavaScript services are reused; no new
+  dependency/schema, MCP service, paid provider, runtime activation or external action.
+
 ## 2026-11-11 - private saved-message search
 
 - NEXT selects USE-03/private-message-search from the existing authorized usability

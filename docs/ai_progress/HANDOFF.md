@@ -1,5 +1,36 @@
 # Codex / Claude checkpoint
 
+## Saved general streaming - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-03/saved-general-streaming on
+`work/usability-integration`, source `b9688647c776ce818a7ec4d2f218cd63639420a5`,
+base `ba5d376df84fa179a9f124ca11198ce97cfd79d0`. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Saved local general chat now uses the existing stream transport and the same
+history/context/save/replay orchestration as nonstreaming chat. Explicit owner/
+operator consent, session/revision/source validation, bounded context/output and
+30-second deadline remain. A cancellation/session check inside the existing vault
+transaction rolls back interrupted writes. Completed lost acknowledgements replay
+one saved turn without another model call; the UI explains this completion race.
+Partial previews remain unverified text, never verified memories. Domain/cloud
+requests keep their current complete-response path; no new provider or schema.
+
+Exact-source 269 backend PASS in 148.147s; six real Chrome journeys PASS in 88.874s
+(runner 102.640s); two real Waitress/Ollama tests PASS in 19.912s. Zero failures/skips
+in these runs. Actual saved reply/follow-up totals 17.250s/0.797s; disconnect stopped
+the worker in 0.063s with no turn. These are synthetic local observations, not GPU,
+first-token, model-quality or universal performance claims. Four new Axe audits
+zero violations; manual contrast remains. Clean source/privacy/dependency/migration
+preflight and AST graph update PASS. Reproduction failure (400) retained separately.
+
+No owner runtime/data/key/model/document/backup/install or remote changes; cache
+edit/hash preserved. No new migration/dependency or model policy. Baseline 85/143,
+extensions 0/13 unchanged; full USE-03 and owner/CI/independent/package/release/3.0
+acceptance remain open. Exact files/evidence/limits: STATE.json and TEST_EVIDENCE.md.
+No next task or agent selected/launched. `continue` reports READY_FOR_NEXT and stops;
+only next/sprint/explicit scope selects further work after Git/writer checks.
+
 ## Private message search - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-03/private-message-search on
