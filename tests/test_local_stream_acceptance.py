@@ -185,7 +185,7 @@ class NativeLocalStreamAcceptance(TransactionTestCase):
                 result=original(); ready.set(); return result
             transport.getresponse=response
             return transport
-        payload=dict(query='Explain this record with several careful qualitative points and no figures.',scope='financial_records',
+        payload=dict(query='Explain this record and limitations',scope='financial_records',
             record_type='expense',record_id=row.pk,cloud_consent=False,answer_style='detailed')
         with patch('apps.ml_engine.services.local_chat_stream.HTTPConnection',side_effect=connection):
             response=self.session.post(self.base+'/api/ai/personal-insights/stream/',json=payload,stream=True,timeout=(3,35))
