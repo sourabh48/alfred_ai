@@ -1,5 +1,39 @@
 # Test evidence index
 
+Sprint2026-11-10, preparation branch work/usability-integration:
+
+- Guided readiness source a78096e119ecfe2a3a098dba227e49781bdb9f29:
+ 8 backend PASS (0.209s),2 actual Chrome journeys PASS (17.290s). Empty career
+ stubs fail before correction; database-unavailable state and owned review links
+ covered. Four Axe audits zero violations; gradient contrast incomplete. Receipts:
+ `artifacts/readiness-sprint-20261110/`; guided audit under `artifacts/browser/user-data/`.
+- Local answer budgets source b535299097686cbc7e12a71b844cc97a6305c4b9:
+ 167 backend PASS, zero skips/failures (50.807s), covering hybrid/history/UI,
+ canonical/statement/loan/investment grounding, currency and memory privacy/reasoning.
+ Prior50-case run overlaps; do not sum.2 real Chrome PASS (25.723s); keyboard style,
+ outage retry and encrypted save/reopen covered. Four Axe audits zero violations,
+ manual gradient contrast remains. Browser uses synthetic provider responses;
+ actual local model is tested separately. Final prompt correction followed the
+ browser run; UI/API code was unchanged, final backend and real-model runs passed.
+-2 actual Ollama tests PASS (11.267s): fictional concise95words/607bytes/2.312s,
+ detailed342words/2097bytes/6.406s; local history reopened and fictional detail
+ recalled. These are measured examples, not universal model-quality guarantees.
+ Ollama `/api/ps` reported qwen3.5:4b,8192 context, size/VRAM3375397600bytes.
+ No first-token benchmark rerun in this slice. All prompts and accounts synthetic.
+- Initial real-model run failed2 cases: financial guard withheld a longer fictional
+ garden answer and prior-turn fiction was refused. Intermediate correction passed
+ styles but still refused continuity. Both failures retained; clarified fiction/
+ personal-fact distinction passed final acceptance, with numeric guard unchanged.
+ Initial browser invocation skipped2 because of an incorrect opt-in variable;
+ accounting rejected it. Correct invocation passed2; no skipped run is acceptance.
+- Receipts: `artifacts/answer-budget-sprint-20261110/{backend-final.log,browser-final.json,
+ real-local-continuity.log,local-model-state.json,clean-source-preflight/release.json}`.
+ Clean exact-source preflight PASS for source/privacy/dependencies/migration drift;
+ technical/promotion gates remain BLOCKED. JS syntax/diff whitespace PASS.
+- No schema/dependency, owner runtime/database/media/key/model/backup/install,
+ push/PR/CI/master/publication changes. Native worker/package journeys were not
+ rerun for these read-only/UI/local inference changes. Baseline85/143,extensions0/13.
+
 Prior scoped receipts: [usability evidence](../ALFRED_USABILITY_INTEGRATION.md)
 and local `artifacts/usability-20261109/`. They include source hashes, failed
 attempts and corrected runs. Do not count reruns twice or transfer CI green.

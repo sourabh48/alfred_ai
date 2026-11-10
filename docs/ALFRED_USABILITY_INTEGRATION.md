@@ -16,7 +16,15 @@ information; command-scoped existing repository author identity closed this
 checkpoint without global config changes. Diagnostics/source-center source is
 `cba5b53`; bounded conversation source is `4019ee2`. Both are local only.
 
-Current bounded investment scope: LOCAL_ACCEPTED at
+Current sprint2026-11-10: guided data readiness source a78096e and local answer
+budgets source b535299 LOCAL_ACCEPTED / COMMITTED_LOCAL.8 backend/2 Chrome
+for readiness;167 backend/2 Chrome/2 actual Ollama tests for answer styles.
+Four Axe audits per affected page show zero violations; manual contrast remains.
+Clean source preflight PASS at b535299; promotion blocked. Active next scope:
+conversation rename/search in the existing encrypted vault. Exact receipts and
+failures: [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
+
+Prior bounded investment scope: LOCAL_ACCEPTED at
 `b42988b4ceeab3cfa07dec0a4ad9b345d2f3ec77`. Upload/retry/correction stage retained
 owned drafts. Signed, bound, expiring confirmation creates through canonical
 InvestmentSerializer/Decimal services. Existing holdings link without field updates;
@@ -26,7 +34,7 @@ inferred values, explicit zero, provenance and receipts remain distinct.
 audits and native24 PASS; manual contrast review open. Clean source/privacy/
 dependency/migration preflight PASS; release remains BLOCKED. No owner data or
 baseline counts changed. Statement0f35605, loan88c1df8 and preservationc2d1517 are
-retained. READY_FOR_NEXT; no new task automatically selected. Exact files and
+retained. Historical READY_FOR_NEXT was superseded by the owner's explicit sprint. Exact files and
 scope-specific receipts: [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
 Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 
@@ -34,7 +42,7 @@ Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 | --- | --- | --- |
 | USE-01 Runtime and health | PARTIALLY_IMPLEMENTED | Authenticated diagnostics, selected database identity, schema inspection, instance-bound heartbeats and explicit synthetic local inference benchmark. Native drill and owner sign-in acceptance remain separate. |
 | USE-02 Onboarding and data sources | PARTIALLY_IMPLEMENTED | Data Sources Center links existing local workflows and reports owned saved-record/parser counts. Complete preview/duplicate/correction/confirmation journeys, knowledge readiness and source-level consent/freshness/deletion acceptance remain. |
-| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Up to three recent general-chat turns from consented encrypted history feed local inference within the existing context cap. Cloud use prohibited, current source grounding retained. Streaming, cancellation, rename/search, output budgets and complete UI/model routing remain. |
+| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Up to three recent general-chat turns from consented encrypted history feed local inference. Bounded answer styles and fictional continuity validated with real Ollama; current grounding retained. Streaming, cancellation, rename/search and complete UI/model routing remain. |
 | USE-04 Read-only tools / MCP | NOT_IMPLEMENTED | Reuse current domain adapters. External MCP server/source selection requested; no connection, credentials, private disclosure or cost-saving claim. MCP is a protocol, not a guarantee of free provider data. |
 | USE-05 Confirmed actions | NOT_IMPLEMENTED | Existing savings-goal proposal implementation retained; audit its exact security properties before extending it. |
 | USE-06 Windows release | NOT_IMPLEMENTED | Current-source package, clean-machine upgrade/rollback and six end-to-end journeys remain; installation replacement and owner-account tests need their explicit gates. |

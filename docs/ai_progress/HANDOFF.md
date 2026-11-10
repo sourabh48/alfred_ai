@@ -1,5 +1,21 @@
 # Codex / Claude checkpoint
 
+## Active sprint2026-11-10 (supersedes the historical stop below)
+
+Owner explicitly invoked sprint; Codex remains sole writer. Source b535299 on
+work/usability-integration, prior checkpoint dc791af. Guided readiness a78096e
+and answer budgets b535299 are locally accepted. Exact files/tests/failures and
+privacy limits: STATE.json and TEST_EVIDENCE.md. Clean source preflight PASS;
+no CI dispatched and no deployment/release acceptance. Cache hash below unchanged.
+
+Next active scope USE-03/conversation-rename-search: extend existing encrypted
+ConversationHistory with revision-bound owner rename; filter bounded owned titles
+in-page without URL/search logs or plaintext indexing. Keep retention fixed from
+creation, policy/session gates, stale inference rejection and existing delete flow.
+Read current source first, run focused tests/actual Chrome, commit/checkpoint;
+then select another eligible slice only while this explicit sprint remains active.
+No Claude launch or independent review is claimed.
+
 Status: READY_FOR_NEXT. The selected investment-import review task is completed
 locally. Codex stops after saving this checkpoint; no Claude agent was launched.
 This is neither final-review nor release readiness. No next task is selected.

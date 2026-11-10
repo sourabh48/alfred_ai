@@ -1,71 +1,82 @@
 {
-  "schema": 1,
-  "active_agent": "Codex",
-  "handoff_status": "SPRINT_ACTIVE",
-  "workspace": "F:/ALFRED/alfred_ai",
-  "single_writer": true,
-  "branch": "work/usability-integration",
-  "recorded_at_head": "a78096e119ecfe2a3a098dba227e49781bdb9f29",
-  "active_task_id": "USE-03/task-aware-answer-budgets",
-  "canonical_checkpoint": "docs/EXECUTION_STATE.md",
-  "requirement_inventory": "docs/PROJECT_STATUS.md",
-  "files_changed": [
-    "alfred_ai/services/data_sources.py",
-    "templates/data_sources.html",
-    "tests/test_data_sources.py",
-    "tests/test_user_data_browser.py",
-    "tests/backend_durations.json",
-    "tests/browser_durations.json"
-  ],
-  "completed_steps": [
-    "Guided onboarding source a78096e committed:8 backend and2 Chrome journeys PASS; four Axe audits zero violations/manual contrast pending",
-    "Confirmed current source reviews are distinct from parsing; empty career stubs no longer count as populated; memory vault stays unopened"
-  ],
-  "remaining_steps": [
-    "Implement bounded task-aware local answer length through existing hybrid service/API/UI",
-    "Run privacy/grounding/conversation/real-local inference checks",
-    "Checkpoint and select next eligible sprint task"
-  ],
-  "test_evidence": "docs/ai_progress/TEST_EVIDENCE.md",
-  "ci_run_ids": [],
-  "ci_status": "NOT_RUN_LOCAL_ONLY",
-  "pending_migrations_added_by_this_scope": [],
-  "blockers": [
-    "Owner installation and real-account acceptance pending",
-    "Independent release review pending",
-    "MCP application server/source not selected"
-  ],
-  "approvals_pending": [
-    "Owner installation replacement/deployment",
-    "Required canonical integration/release gates",
-    "3.0 branch and release prerequisite"
-  ],
-  "preserve_unrelated_dirty_paths": [
-    "alfred_ai/services/materialized_cache.py"
-  ],
-  "next_exact_instruction": "Current investment review task is completed locally. Report READY_FOR_NEXT and wait for next, sprint or an explicit scope; do not automatically select another task. At resume verify actual Git status/HEAD and preserve the existing cache edit before claiming the sole writer role.",
-  "last_active_agent": "Codex",
-  "implementation_source_head": "a78096e119ecfe2a3a098dba227e49781bdb9f29",
-  "checkpoint_at": "2026-11-10T09:05:36.973325+00:00",
-  "active_task_state": "IMPLEMENTING",
-  "next_task_id": null,
-  "clean_validation_worktree": "F:/ALFRED_DEV/usability-investment-check-b42988b",
-  "claude_cli_available": true,
-  "claude_agent_launched": false,
-  "unattended_claude_write_handoff_verified": false,
-  "checkpoint_files_changed": [
-    "docs/ALFRED_USABILITY_INTEGRATION.md",
-    "docs/CI_PIPELINE_STATE.md",
-    "docs/EXECUTION_STATE.md",
-    "docs/ai_progress/DECISIONS.md",
-    "docs/ai_progress/EXECUTION_BOARD.md",
-    "docs/ai_progress/HANDOFF.md",
-    "docs/ai_progress/KNOWN_ISSUES.md",
-    "docs/ai_progress/STATE.json",
-    "docs/ai_progress/TEST_EVIDENCE.md"
-  ],
-  "checkpoint_commit_resolution": "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-  "release_preflight_source_head": "b42988b4ceeab3cfa07dec0a4ad9b345d2f3ec77",
-  "release_preflight_status": "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
-  "identity_note": "Executing agent is Codex; no Claude launch or independent audit is claimed."
+    "schema":  1,
+    "active_agent":  "Codex",
+    "handoff_status":  "SPRINT_ACTIVE",
+    "workspace":  "F:/ALFRED/alfred_ai",
+    "single_writer":  true,
+    "branch":  "work/usability-integration",
+    "recorded_at_head":  "b535299097686cbc7e12a71b844cc97a6305c4b9",
+    "active_task_id":  "USE-03/conversation-rename-search",
+    "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
+    "requirement_inventory":  "docs/PROJECT_STATUS.md",
+    "files_changed":  [
+                          "apps/ml_engine/api/views.py",
+                          "apps/ml_engine/services/hybrid_intelligence.py",
+                          "docs/LOCAL_ASSISTANT_GUIDE.md",
+                          "docs/images/usability/local-answer-style.png",
+                          "static/js/intelligence.js",
+                          "templates/ai_insights.html",
+                          "tests/browser_durations.json",
+                          "tests/test_conversation_history.py",
+                          "tests/test_hybrid_intelligence.py",
+                          "tests/test_local_conversation_acceptance.py",
+                          "tests/test_user_data_browser.py"
+                      ],
+    "completed_steps":  [
+                            "Guided readiness a78096e:8 backend/2 Chrome PASS; four Axe audits zero violations/manual contrast pending",
+                            "Answer budgets b535299:167 backend/2 Chrome/2 actual Ollama acceptance PASS; four Axe audits zero violations/manual contrast pending",
+                            "Fixed real-model fiction continuity refusal while preserving unverified-dialogue, financial, citation, context/output and deadline guards",
+                            "Clean exact-source/privacy/dependency/migration preflight PASS; release promotion remains BLOCKED"
+                        ],
+    "remaining_steps":  [
+                            "Implement owner revision-bound encrypted conversation rename and in-page title search",
+                            "Test stale/replay/ownership/CSRF/retention and actual keyboard/browser reopen; commit and checkpoint",
+                            "Continue another eligible scope only during explicit sprint; preserve external/owner/package/3.0 gates"
+                        ],
+    "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
+    "ci_run_ids":  [
+
+                   ],
+    "ci_status":  "NOT_RUN_LOCAL_ONLY",
+    "pending_migrations_added_by_this_scope":  [
+
+                                               ],
+    "blockers":  [
+                     "Owner installation and real-account acceptance pending",
+                     "Independent release review pending",
+                     "MCP application server/source not selected"
+                 ],
+    "approvals_pending":  [
+                              "Owner installation replacement/deployment",
+                              "Required canonical integration/release gates",
+                              "3.0 branch and release prerequisite"
+                          ],
+    "preserve_unrelated_dirty_paths":  [
+                                           "alfred_ai/services/materialized_cache.py"
+                                       ],
+    "next_exact_instruction":  "Resume USE-03/conversation-rename-search on current preparation branch. Preserve cache edit, inspect existing encrypted history/service/API/JS, use bounded title filtering without URL or plaintext index, and test revision-bound rename before selecting another scope.",
+    "last_active_agent":  "Codex",
+    "implementation_source_head":  "b535299097686cbc7e12a71b844cc97a6305c4b9",
+    "checkpoint_at":  "2026-11-10T10:11:26.8841289Z",
+    "active_task_state":  "IMPLEMENTING",
+    "next_task_id":  null,
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-sprint-check-b535299",
+    "claude_cli_available":  true,
+    "claude_agent_launched":  false,
+    "unattended_claude_write_handoff_verified":  false,
+    "checkpoint_files_changed":  [
+                                     "docs/ALFRED_USABILITY_INTEGRATION.md",
+                                     "docs/CI_PIPELINE_STATE.md",
+                                     "docs/EXECUTION_STATE.md",
+                                     "docs/ai_progress/DECISIONS.md",
+                                     "docs/ai_progress/EXECUTION_BOARD.md",
+                                     "docs/ai_progress/HANDOFF.md",
+                                     "docs/ai_progress/KNOWN_ISSUES.md",
+                                     "docs/ai_progress/STATE.json",
+                                     "docs/ai_progress/TEST_EVIDENCE.md"
+                                 ],
+    "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
+    "release_preflight_source_head":  "b535299097686cbc7e12a71b844cc97a6305c4b9",
+    "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
+    "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed."
 }

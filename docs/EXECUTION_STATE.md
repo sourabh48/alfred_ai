@@ -7,9 +7,14 @@
  8 backend and2 Chrome journeys PASS; four Axe audits zero violations/manual contrast pending.
   Empty career profiles no longer count as populated; current confirmed reviews and
   pending owner links guide the next setup action. GET does not open memory or run inference.
-- Next active scope: USE-03/task-aware-answer-budgets. Read existing hybrid/API/history/UI;
-  preserve money/citation/privacy bounds. Independent local chat improvement selected
-  while deeper knowledge readiness and manual/owner/package acceptance remain open.
+- Answer budgets source b535299097686cbc7e12a71b844cc97a6305c4b9:167 backend,
+ 2 Chrome and2 actual Ollama acceptance PASS. Four Axe audits zero violations;
+ manual contrast remains. Concise/detail/comparison/steps retain context/output/
+ financial/source/deadline caps. Fixed real-model fiction-continuity refusal without
+ promoting dialogue to facts. Clean-source privacy/dependency/migration preflight PASS.
+- Next active scope: USE-03/conversation-rename-search. Reuse encrypted history and
+ revision-bound writes; search stays in the page, with no URL query or plaintext index.
+ Deeper knowledge readiness and manual/owner/package acceptance remain open.
 - No schema/dependency/runtime/keys/personal-data/remote changes. Baseline85/143,
   extensions0/13 unchanged. Exact tests under artifacts/readiness-sprint-20261110.
 
