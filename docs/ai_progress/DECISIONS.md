@@ -43,3 +43,19 @@ stop-after-one-task selection for this active execution; safety gates remain.
   loan deletion remains in the existing loan controls. Sourcec2d1517 accepted locally.
 - Context handoff remains Codex?Claude even though the owner's continuation prompt
   called the agent Claude: Codex executed and no automatic transfer was attempted.
+
+-2026-11-10 continuation: reuse existing investment parser, source JSON/M2M,
+  canonical InvestmentSerializer/investment_money and evidence capture. The existing
+  bank/loan owner-confirmation pattern supplies bounded signed review. No new engine,
+  schema, dependency, currency inference or upstream component adoption occurred.
+- All investment import entry points prepare drafts, including the existing binary
+  attachment caller. Existing holdings are link-only; editing a source cannot change
+  a valuation or rename/delete a canonical holding. Existing holding-edit controls
+  remain the deliberate route for those changes. Source retention supersedes automatic
+  extraction cleanup for this reviewed flow.
+- Positional amounts and inferred asset/rate fields require owner review, with
+  unresolved currency/SIP left blank. Decimal text and negative signs are preserved;
+  rounding and validation remain canonical. Source evidence is distinct from owner
+  entry and issuer authentication.
+- `continue` resumed and completed the recorded investment task. READY_FOR_NEXT is
+  the resulting protocol state; no subsequent task or Claude launch was inferred.

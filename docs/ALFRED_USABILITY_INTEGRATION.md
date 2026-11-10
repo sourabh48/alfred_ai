@@ -16,17 +16,18 @@ information; command-scoped existing repository author identity closed this
 checkpoint without global config changes. Diagnostics/source-center source is
 `cba5b53`; bounded conversation source is `4019ee2`. Both are local only.
 
-Current bounded loan scope: LOCAL_ACCEPTED at
-`88c1df826aa14fc56247678cabaa175356d62882`. Upload/retry stage editable owned
-previews. Explicit signed confirmation creates via canonical LoanSerializer/Decimal
-services; existing matches link without changing any loan fields. Sources, originals,
-corrections, duplicate identity and receipts are retained.215 backend,2 Chrome,
-native22 PASS; four Axe audits show zero automated violations, with gradient contrast
-manual review pending. Clean source/privacy/dependency/migration preflight PASS;
-release remains BLOCKED. No baseline counts changed or owner data was modified.
-Follow-upc2d1517 preserves loans after legacy source removal (86 backend/1 Chrome
-PASS; clean-source preflight PASS). Previous statement acceptance0f35605 is retained. Next selected scope: investment
-preview/confirmation. Exact files, failures and evidence: [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
+Current bounded investment scope: LOCAL_ACCEPTED at
+`b42988b4ceeab3cfa07dec0a4ad9b345d2f3ec77`. Upload/retry/correction stage retained
+owned drafts. Signed, bound, expiring confirmation creates through canonical
+InvestmentSerializer/Decimal services. Existing holdings link without field updates;
+source removal preserves holdings. Original precision/signs, unresolved currency,
+inferred values, explicit zero, provenance and receipts remain distinct.
+272 backend PASS plus45 overlapping final attachment cases, actual Chrome/four Axe
+audits and native24 PASS; manual contrast review open. Clean source/privacy/
+dependency/migration preflight PASS; release remains BLOCKED. No owner data or
+baseline counts changed. Statement0f35605, loan88c1df8 and preservationc2d1517 are
+retained. READY_FOR_NEXT; no new task automatically selected. Exact files and
+scope-specific receipts: [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
 Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 
 | Scope | State | Implemented slice / remaining acceptance |

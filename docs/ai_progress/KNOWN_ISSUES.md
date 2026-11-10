@@ -34,6 +34,13 @@ or remote publication changed.
   are still outstanding. No current installer was built or replaced in this slice.
 
 - Fixed atc2d1517: removing legacy loan sources no longer deletes canonical loans.
-  Investment upload/retry/correction still contain automatic holding writes; next
-  selected scope is their review/confirmation. This is source tracing, not accepted
-  investment usability. Investment source removal also needs preservation review.
+  Investment upload/retry/correction now stage owned drafts atb42988b. Existing
+  holdings remain unchanged when linked or when their sources are removed.
+
+- Investment review bounds:100 rows/2 MiB structured extraction,10 per page,
+ 24-hour draft/30-minute confirmation. Existing holding updates use separate edit
+  controls. Expired edited drafts need a new source upload; their corrections are
+  preserved. Source-currency evidence stays unknown when the PDF did not establish it.
+- Manual gradient contrast, real email-provider acceptance, owner runtime/installer,
+  complete source-specific onboarding, streaming/tools/actions and2.0 release remain
+  open. Current task is READY_FOR_NEXT; no subsequent task was automatically selected.

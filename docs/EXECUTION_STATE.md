@@ -1,5 +1,34 @@
 # ALFRED execution state
 
+## Current checkpoint - investment review, 2026-11-10
+
+- READY_FOR_NEXT. Current continuation task completed locally; no next task was
+  automatically selected. Last writer Codex; no Claude launch or independent audit.
+- Branch `work/usability-integration`; implementation source
+  `b42988b4ceeab3cfa07dec0a4ad9b345d2f3ec77`, base407789e. Resolve the documentation
+  checkpoint commit with `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+- USE-02 investment preview/confirmation LOCAL_ACCEPTED / COMMITTED_LOCAL. Upload,
+  retry, correction and binary-file callers prepare owned drafts. Canonical creation
+  requires signed, expiring, revision/source/dependency-bound confirmation; existing
+  holdings link without valuation updates. Source deletion preserves holdings.
+- Positional/inferred values require explicit review. Missing currency/SIP stay
+  unresolved; deterministic investment_money/InvestmentSerializer reused. Decimal
+  extraction retains precision and negative signs. Original sources/evidence retained.
+-272 backend PASS (244.426 s), followed by45 overlapping tests PASS (77.468 s)
+  after final BinaryIO caller fix; no summed test count. Actual Chrome full journey
+  PASS; four1440/390 light/dark Axe audits have zero violations, manual gradient
+  contrast remains. Native24 PASS, run dfac5d1fc9. Exact scopes/hashes and failures:
+  artifacts/investment-review-20261110 and ai_progress/TEST_EVIDENCE.md.
+- Clean source/privacy/dependency/migration preflight PASS atb42988b. No migration,
+  dependency, owner runtime/data/config/key/model/backup/install or remote changes.
+  Existing cache hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9
+  preserved and unstaged. Clean detached validation worktree retained under ALFRED_DEV.
+- Original baseline85/143 and extensions0/13 unchanged; parent USE-02 remains partial.
+  Exact-head CI, independent/owner/package/upgrade/manual accessibility acceptance
+  and required3.0 gates remain. On `continue`, report READY_FOR_NEXT; `next` or an
+  explicit sprint selects subsequent authorized work. Do not redo accepted imports.
+
+
 ## Final continuation checkpoint ? 2026-11-10
 
 - CODEX_TO_CLAUDE_READY. Last executing agent Codex; no Claude launch/independent

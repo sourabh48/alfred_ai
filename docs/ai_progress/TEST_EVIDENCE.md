@@ -87,3 +87,39 @@ no new CI run was dispatched. Historical c730360 CI is separate exact-source evi
 - Graphify AST refreshed after removal; JS syntax/diff/tracker checks PASS.
   No new dependencies/schema/runtime changes. Guide and deletion prompt describe
   preserved canonical loans. All evidence files under artifacts/loan-review-20261110.
+
+## Investment review - sourceb42988b4ceeab3cfa07dec0a4ad9b345d2f3ec77
+
+Receipts: `artifacts/investment-review-20261110/`.
+
+-272 consolidated backend PASS, zero failures/skips,244.426 s:
+  `backend-consolidated.log`. Earlier271-case green followed by an added negative
+  sign case. Final non-Django binary-file wrapper is validated by45 overlapping
+  backend cases PASS,77.468 s: `attachment-acceptance.log`. Do not sum reruns.
+-12 investment-review cases in the45-case follow-up include real PDF extraction,
+  Decimal precision/signs, missing/invalid fields, explicit zero, source evidence,
+  duplicates, ownership/CSRF, expired token/draft, stale dependencies/source,
+  correction/retry races, rollback/recovery, source removal and real concurrent
+  confirmation. Measured16.863 s total recorded in the established duration inventory.
+- Actual Chrome PDF upload -> no writes -> source review/corrections/currency/SIP ->
+  confirmation -> reopen -> refreshed register PASS: `browser-final.json`/log,
+ 32.339 s suite. Four full-page1440/390 light/dark Axe audits: zero violations;
+  each retains one incomplete color-contrast rule on gradient surfaces. Full
+  manual accessibility acceptance remains open. Sanitized guide/screenshot committed.
+- Native24 PASS, run dfac5d1fc9: `native.json` and `native-consolidated.log`.
+  Real PDF/HTTP preview/edit/confirmation/replay and owner boundary, restart,
+  worker/scheduler/cache/recovery and independent synthetic backup/restore.
+  Source runtime only; no installer/portable or owner data acceptance.
+- Native/Chrome broader runs preceded the final File wrapper for non-Django
+  binary-file callers;45 focused cases validate the additional caller path. No
+  new full exact-head CI is claimed. Browser checkout metadata is407789e plus dirty
+  scope, pinned by30 final file hashes in `source-manifest.json` and source commit.
+- Source/dependency/migration/privacy preflight PASS on clean exact source:
+  `clean-source-preflight/release.json`. Promotion remains BLOCKED. Validation
+  worktree retained at F:/ALFRED_DEV/usability-investment-check-b42988b.
+- Failed receipts retained: first116-case compatibility run,97-case correction run
+  and197-case run with one obsolete summary assertion. Initial Chrome caught decimal
+  splitting; corrected extraction preserves full decimal text. Negative sign and
+  attachment-caller checks added before final acceptance. No security checks waived.
+- Migration drift reports no changes; JS syntax/diff checks PASS. Graphify AST
+  refreshed14068 nodes/40240 edges. No dependencies/schema/valuation policy changed.
