@@ -41,6 +41,8 @@ If confirmation is interrupted, retry the same card or reload Career. Each revie
 can save only once. Recovery supports at most five retained timelines and a bounded
 source size; larger or incompatible records stay intact for separate review.
 
+![A synthetic recovered timeline with its exact earlier source retained for review](images/usability/career-history-recovery.png)
+
 ![Synthetic Career history marked unavailable while a valid follow-up remains visible](images/usability/career-history-review.png)
 
 ![Recorded application progress on a synthetic account with history enabled and the Career snapshot kept page-only](images/usability/career-progress.png)

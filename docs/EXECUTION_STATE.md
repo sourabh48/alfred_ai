@@ -1,5 +1,35 @@
 # ALFRED execution state
 
+## Reviewed Career history recovery - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-02/career-history-recovery locally on
+`work/usability-integration`, sourcee2deec85ae6b4dd9475b6d785852545cc5496317,
+base d33bd9f0884a5a7b7221c7a03315d77a7c363444. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Manual owned inspection/preview/confirm/cancel now recovers an unavailable Career
+timeline from an explicit stage/date while retaining the exact prior history.
+Existing action identity/HMAC/TTL/SQLite claim controls and canonical Career validation
+are reused. Owner/target/full-revision/exact-field binding, expiry, cancellation,
+transactional archive/write/receipt and idempotent retry protect canonical changes.
+No model/provider, external action, new schema/dependency/key or automatic repair.
+
+Exact-source246 backend PASS233.041s;3 Chrome PASS138.196s (runner164.672s), zero
+failures/skips. Four recovery light/dark1440/390 Axe audits zero violations; manual
+contrast remains. Actual Windows file-SQLite concurrent confirmation and new-process
+confirmation/replay PASS, one archive each. Initial probe fixture lacked private ACLs;
+application correctly refused it. New empty test directory protected using existing
+helper, then rerun PASS without weakening security or changing application source.
+Clean source/privacy/dependency/migration preflight PASS; full release gates remain.
+
+No owner runtime/data/key/model/document/backup/install or remote changes. Existing
+cache edit/hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 preserved.
+Exact files/receipts: docs/ai_progress/STATE.json and TEST_EVIDENCE.md. Baseline85/143,
+extensions0/13 unchanged. Bounds preserve oversized/incompatible histories for separate
+review; full USE-02/04/05 and CI/independent/package/owner/release/3.0 acceptance remain.
+Codex stops at this checkpoint; no other agent launched. `continue` reports READY_FOR_NEXT
+and stops. Only next/sprint/explicit scope selects further work; none selected now.
+
 ## Career follow-up integrity - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-04/career-follow-up-integrity locally on

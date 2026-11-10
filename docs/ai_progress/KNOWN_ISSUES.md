@@ -1,5 +1,16 @@
 # Known issues and gates
 
+## Reviewed recovery bounds - 2026-11-11
+
+Sourcee2deec85ae6b4dd9475b6d785852545cc5496317 adds manual preview/confirm/cancel
+recovery for unavailable Career timelines. The original JSON stays privately
+retained. Recovery starts a new owner-reported stage/date; it does not establish
+old submission/employer facts. Valid timelines use normal stage editing.
+Sixteen-KiB current-source,128KiB review-envelope and five-archive bounds preserve
+oversized/incompatible records for separate review. No bulk/automatic historical
+repair, model/provider use or owner-data acceptance is claimed. Manual contrast,
+CI/independent/package/release/real-account and3.0 gates remain open.
+
 ## Follow-up history recovery boundary - 2026-11-11
 
 Source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00 repairs guessed follow-up dates

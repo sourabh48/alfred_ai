@@ -1,5 +1,28 @@
 # Execution decisions
 
+## 2026-11-11 - reviewed Career timeline recovery
+
+- NEXT selects USE-02/career-history-recovery under the authorized usability
+  milestone. This later-phase prerequisite exception unblocks manual recovery of
+  existing records; earlier baseline approval/external-evidence gates are unchanged.
+- NO_UPSTREAM_ADOPTION. Reuse the existing Career application tracker and its MIT
+  Career Ops attribution/pin4df3d0525a0a466f6b08928a7c3bd23946cb410f; no upstream
+  component/runtime/license changes or second calculation/scheduling engine.
+- Recovery starts an explicitly owner-reported stage/date timeline; it does not
+  fabricate or silently repair historical dates. Exact original application JSON
+  and unrelated opportunity fields remain private in the owned canonical record.
+  Earlier follow-ups stay archived and do not count in the new timeline.
+- Reuse existing action identity, keyed fingerprint, expiry and SQLite-first-write
+  claim conventions. The Career adapter binds owner/target/exact fields/full source
+  revision; ten-minute expiry, cancellation, atomic archive/write/receipt and single-use
+  idempotent retry prevent stale or repeated canonical changes. Audit payloads are
+  redacted fingerprints/status/times, never raw histories, resumes or personal dates.
+- Source views are authenticated/no-store/session-rechecked; untrusted JSON is inert
+  text. Inspect original before preview, then explicit confirmation. No model,
+  provider, external message, new key, schema/dependency or personal-runtime change.
+- Bounds:16KiB current timeline,128KiB retained review envelope, five archives and
+  twenty pending reviews per ten minutes. Unsupported data remains intact; no pruning.
+
 ## 2026-11-11 - Career follow-up integrity repair
 
 - NEXT selects one bounded usability repair, USE-04/career-follow-up-integrity,

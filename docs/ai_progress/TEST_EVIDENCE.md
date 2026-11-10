@@ -1,5 +1,58 @@
 # Test evidence index
 
+## 2026-11-11 - reviewed Career history recovery
+
+Sourcee2deec85ae6b4dd9475b6d785852545cc5496317, base d33bd9f0884a5a7b7221c7a03315d77a7c363444.
+Commands/receipts/source blobs/hashes: `artifacts/career-history-recovery-20261111/`.
+Synthetic data only under `F:/ALFRED/dev-test-data/career-history-recovery-20261111/`
+and temporary fixture roots. No personal runtime/data/config/key/model changes.
+
+- Exact-source246 backend PASS233.041s, zero failures/skips: review owner/target/
+  exact-field/revision/expiry/confirmation/cancellation/replay/rollback/concurrency,
+  source/provenance retention, bounds, CSRF/session/private API; existing actions,
+  Career intake/matching/timing/assistant, registry/hybrid/history/private-memory,
+  native, release/browser inventory and user-data-reset regressions.
+- Three exact-source actual Chrome journeys PASS138.196s (runner164.672s), zero
+  failures/skips: real review/preview/cancel, no canonical write before confirmation,
+  deliberate post-commit lost acknowledgement and same-card retry, normal editing
+  restored, reload/retained source, inert hostile history, keyboard focus; prior
+  malformed-list recovery and page-only assistant/history regressions. Unrelated
+  providers isolated; recovery itself uses no model/provider/mock inference.
+- Four recovery Axe light/dark1440/390 audits zero automated violations; one
+  incomplete/manual contrast item each. Actual synthetic screenshot inspected
+  and linked in guide. Other selected journeys retain their own accessibility checks.
+- Real Windows private file-SQLite probe: simultaneous confirmations returned
+  already_applied false/true and left one archive. A different pending review was
+  confirmed by a new Python process, then replayed by another process (false/true),
+  also one archive. Original history absent from audit payloads. The synthetic
+  database is retained at the path in `native-probe-private-e2deec8.log`.
+- Initial native probe failed at child startup because its synthetic DB directory
+  lacked private ACLs. Correct application guard refused it. A new empty fixture
+  directory was protected using `alfred_private_storage.private_directory`, then
+  rerun PASS. No existing owner directory/ACL or source security check changed.
+  Initial failed log retained; this is service/process persistence evidence, not
+  packaged application, Waitress lifecycle or independent-machine acceptance.
+- Working-tree28 backend PASS7.194s; final measured new8-case module PASS1.500s;
+  one working-tree Chrome PASS24.198s. Earlier runs overlap final coverage; they
+  are not relabelled as exact-source tests. New module/journey are in measured inventories.
+- Clean detached `F:/ALFRED_DEV/usability-recovery-check-e2deec8`: source/privacy/
+  dependency/migration preflight PASS. Its full technical/promotion receipt stays
+  BLOCKED; standalone local receipts are not fabricated as release-gate evidence.
+  Graphify AST update PASS with no semantic API.
+- No schema/dependency, new key, owner account, document/model/backup/install or
+  remote changes. Cache edit/hash preserved. Full USE-02/04/05, model quality,
+  real-account/package/CI/independent/release and3.0 gates remain open. Baseline85/143,
+  extensions0/13 unchanged. READY_FOR_NEXT, no next task selected.
+- `scripts/project_execution.py --check` PASS; generated views unchanged,85/143
+  original requirements and0/13 extensions remain accepted.
+
+Implementation files (11): `apps/career/history_review_api.py`,
+`apps/career/services/history_review.py`, `apps/career/urls.py`,
+`docs/LOCAL_ASSISTANT_GUIDE.md`, `scripts/release_validation.py`, `static/js/career.js`,
+`templates/career/list.html`, `tests/backend_durations.json`,
+`tests/browser_durations.json`, `tests/test_career_history_review.py`,
+`tests/test_user_data_browser.py`. Checkpoint-only files are listed in STATE.json.
+
 ## 2026-11-11 - Career follow-up integrity
 
 Source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00, basee9e35b7a62484de2f95292a333fc9a5c58060232.

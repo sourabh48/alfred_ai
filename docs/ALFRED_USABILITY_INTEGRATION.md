@@ -1,5 +1,19 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Reviewed Career history recovery - 2026-11-11
+
+USE-02/career-history-recovery LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, sourcee2deec85ae6b4dd9475b6d785852545cc5496317,
+base d33bd9f0884a5a7b7221c7a03315d77a7c363444. Owned preview/confirm/cancel recovers
+an unavailable timeline with exact source retention and server-bound single-use review.
+Exact-source246 backend/3 Chrome PASS; four recovery Axe audits zero violations/manual
+contrast open. Actual private file-SQLite concurrency/new-process confirmation/replay
+PASS; clean source/privacy/dependency/migration preflight PASS. Full parent/release/
+owner/package/independent/CI/3.0 gates remain open. No owner runtime or remote changes.
+Baseline85/143, extensions0/13 unchanged. READY_FOR_NEXT; no new task selected.
+Exact files, receipts, limits and next command: docs/ai_progress/STATE.json,
+TEST_EVIDENCE.md and docs/EXECUTION_STATE.md. Cache edit preserved.
+
 ## Career follow-up integrity - 2026-11-11
 
 USE-04/career-follow-up-integrity LOCAL_ACCEPTED / COMMITTED_LOCAL on
