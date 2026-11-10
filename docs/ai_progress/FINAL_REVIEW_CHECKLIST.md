@@ -2,6 +2,10 @@
 
 CLAUDE_FINAL_REVIEW_READY: NO. 2.0 release readiness: NO. 3.0 implementation: gated.
 
+2026-11-11 sprint: explicit knowledge readiness and expiry-aware import navigation
+have bounded local source evidence (STATE/TEST_EVIDENCE). These do not close full
+USE-02, manual contrast, exact-head CI, independent/owner/package or release gates.
+
 Before a stable final-review candidate exists, verify all applicable gates:
 
 - Canonical 143 requirements, 13 extensions, usability scope, owner decisions and

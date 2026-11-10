@@ -1,5 +1,21 @@
 # Codex / Claude checkpoint
 
+## Completed usability sprint - 2026-11-11
+
+READY_FOR_NEXT. Codex completed knowledge-source-readiness (90f1ee9, docs801b0c9)
+and expired-review-navigation (0d34a7e753e783cf602e65b72e978897e64ec8ed). Latest
+source has 77 backend/3 Chrome PASS, four new Axe audits zero violations/manual
+contrast open, clean source/privacy/dependency/migration preflight and AST graph
+update PASS. Separate first-leaf source evidence stays pinned in TEST_EVIDENCE.
+No writer remains active; no Claude launched or independent review claimed.
+No owner runtime, keys, schema, calculations, dependencies or remote changes.
+Preserve cache edit/hash and all accepted import/AI services. Canonical development
+and full integration/owner/CI/independent/package/release/MCP/3.0 gates remain.
+Exact files, failures, receipts and next executable instruction: STATE.json.
+On continue report READY_FOR_NEXT and stop; next/sprint inspects remaining authorized
+USE-02 Career/Travel readiness before selecting one eligible uncompleted leaf.
+
+
 ## Active sprint - explicit knowledge readiness, 2026-11-11
 
 Codex remains single writer; no Claude launched. USE-02/knowledge-source-readiness

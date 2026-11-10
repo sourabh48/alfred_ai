@@ -1,5 +1,19 @@
 # Development CI and integration pipeline
 
+## Expiry-aware source review navigation - 2026-11-11
+
+USE-02/expired-review-navigation LOCAL_ACCEPTED / COMMITTED_LOCAL, source
+0d34a7e753e783cf602e65b72e978897e64ec8ed, base 801b0c9e2013530374c1da383586197b5837fa61,
+work/usability-integration preparation. Exact-source 77 backend/3 Chrome PASS;
+source/privacy/dependency/migration preflight and AST graph update PASS. No remote
+CI IDs, push, PR, merge or deployment. Canonical development remains
+development/alfred-integrated; closed integration PRs untouched. Cumulative review/
+protection/authorization/compatibility/release gates remain, no merge-readiness claim.
+Rollback: retained parent/source commits and clean detached validation worktree
+F:/ALFRED_DEV/usability-expiry-check-0d34a7e; no runtime changes. Both sprint leaves
+checkpointed, exact files and evidence in STATE/TEST_EVIDENCE.
+
+
 ## Explicit knowledge readiness - 2026-11-11
 
 USE-02/knowledge-source-readiness LOCAL_ACCEPTED / COMMITTED_LOCAL (not PUSHED):

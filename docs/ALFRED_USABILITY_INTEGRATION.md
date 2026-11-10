@@ -1,5 +1,19 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Expiry-aware source review navigation - 2026-11-11
+
+USE-02/expired-review-navigation LOCAL_ACCEPTED / COMMITTED_LOCAL, source
+0d34a7e753e783cf602e65b72e978897e64ec8ed on work/usability-integration. Bounded
+owned bank/loan/investment review links explain expiry and safe edited-draft recovery.
+No confirmation, retry, deadline or canonical-write change. Exact-source 77 backend/
+3 Chrome PASS; four new Axe audits zero violations/manual contrast open. Source/
+privacy/dependency/migration preflight and AST graph update PASS. No owner runtime,
+schema, calculation, dependency or remote change. Baseline 85/143, extensions 0/13
+unchanged; full USE-02 partial. Sprint's two leaves checkpointed; exact files,
+receipts, limits and next executable instruction: STATE/TEST_EVIDENCE. Integration,
+owner/CI/independent/package/release/MCP selection and 3.0 gates remain.
+
+
 ## Explicit knowledge source readiness - 2026-11-11
 
 USE-02/knowledge-source-readiness LOCAL_ACCEPTED / COMMITTED_LOCAL at source

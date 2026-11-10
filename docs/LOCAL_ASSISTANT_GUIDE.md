@@ -17,6 +17,8 @@ blocked. Keep edited previews and re-upload the original for a fresh review; ret
 an unedited source in **Documents**. An unavailable deadline needs inspection in the
 source review. The center does not extend deadlines or retry an import automatically.
 
+![Expired source review and recovery guidance using synthetic data](images/usability/review-expiry.png)
+
 With approved local history enabled, type in **Search saved titles on this page**
 to filter titles immediately. Choose **Search saved messages** to also find text
 inside retained questions and answers, then reopen a matching conversation.

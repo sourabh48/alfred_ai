@@ -1,5 +1,16 @@
 # Current execution board
 
+## Expiry-aware source review navigation - 2026-11-11
+
+USE-02/expired-review-navigation LOCAL_ACCEPTED / COMMITTED_LOCAL at
+0d34a7e753e783cf602e65b72e978897e64ec8ed; exact-source 77 backend/3 Chrome PASS,
+four new Axe audits zero violations/manual contrast open; clean source/privacy/
+dependency/migration preflight and AST graph update PASS. Read-only bounded metadata
+navigation preserves all existing expiry/write/retry controls. Both sprint leaves
+complete locally; full USE-02 and owner/integration/release/3.0 gates remain.
+Next selection requires current Git/queue/ledger inspection; STATE owns next command.
+
+
 ## Explicit knowledge source readiness - 2026-11-11
 
 USE-02/knowledge-source-readiness LOCAL_ACCEPTED / COMMITTED_LOCAL, source

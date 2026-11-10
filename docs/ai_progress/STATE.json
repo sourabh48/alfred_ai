@@ -1,16 +1,15 @@
 {
     "schema":  1,
-    "active_agent":  "Codex",
-    "handoff_status":  "SPRINT_ACTIVE",
+    "active_agent":  null,
+    "handoff_status":  "READY_FOR_NEXT",
     "workspace":  "F:/ALFRED/alfred_ai",
-    "single_writer":  true,
+    "single_writer":  false,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
-    "active_task_id":  "USE-02/knowledge-source-readiness",
+    "recorded_at_head":  "0d34a7e753e783cf602e65b72e978897e64ec8ed",
+    "active_task_id":  "USE-02/expired-review-navigation",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
-                          "alfred_ai/data_sources_views.py",
                           "alfred_ai/services/data_sources.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
                           "templates/data_sources.html",
@@ -19,15 +18,16 @@
                           "tests/test_user_data_browser.py"
                       ],
     "completed_steps":  [
-                            "Recovered d182204; verified writer, cache hash and source; scoped graph queries and internal reuse, NO_UPSTREAM_ADOPTION.",
-                            "Explicit authenticated CSRF-protected readiness action returns owned counts/timestamps/retention only; no auto vault/key creation or external calls.",
-                            "Exact source: 99 backend PASS in 37.487s; 3 Chrome PASS in 23.856s (runner 36.203s). Four new Axe audits zero violations; manual contrast open.",
-                            "Clean detached source/privacy/dependency/migration preflight PASS; initial incomplete-checkout refusal and fixture failures retained.",
-                            "No owner runtime, schema, financial, dependency or remote changes. GitHub MCP read-only canonical branch lookup succeeded."
+                            "Recovered 801b0c9 after completing knowledge readiness; preserved single-writer/cache and owner runtime; reproduced hidden expired-review status.",
+                            "Added expiry-aware metadata to existing three-item owned pending-review links; retained source review authority, edited drafts and no automatic retry/deadline extension. NO_UPSTREAM_ADOPTION.",
+                            "Exact source 0d34a7e: 77 backend PASS in 65.499s; 3 Chrome PASS in 33.650s (runner50.000s), zero failures/skips. Four new Axe audits zero violations/manual contrast open.",
+                            "Clean detached source/privacy/dependency/migration preflight and AST graph update PASS; commands, failures, source manifests and synthetic screenshots retained.",
+                            "Two sprint leaves committed locally, no migration/dependency/calculation/owner-runtime/remote change; baseline85/143 and extensions0/13 unchanged."
                         ],
     "remaining_steps":  [
-                            "Authorized sprint continues safe preparation; inspect/reproduce expired import-review navigation before selecting next bounded leaf.",
-                            "Full USE-02, manual contrast, owner/CI/independent/package/release/canonical integration/3.0 gates remain."
+                            "Both sprint leaves locally complete; no next task selected or writer active.",
+                            "Full USE-02, manual contrast, owner/CI/independent/package/release/canonical integration/approved MCP/3.0 gates remain.",
+                            "Latest three review labels are page-load metadata; source confirmation services still validate exact tokens, revisions, evidence and expiry."
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -50,13 +50,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "During current authorized sprint inspect expired bank/loan/investment review navigation, reproduce any mismatch and select only a bounded eligible usability task. Preserve existing confirmation/expiry controls and cache edit/hash. No owner runtime or remote mutation; canonical development branch remains development/alfred-integrated with integration gates.",
+    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. On next/sprint recover branch/HEAD/dirty cache/writer/queue, then inspect remaining USE-02 Career/Travel onboarding readiness and select one eligible uncompleted leaf from authorized usability scope. Preserve accepted import/AI services, owner runtime and all integration/release/3.0 gates; canonical development remains development/alfred-integrated.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
-    "checkpoint_at":  "2026-11-10T23:38:02.3287957Z",
+    "implementation_source_head":  "0d34a7e753e783cf602e65b72e978897e64ec8ed",
+    "checkpoint_at":  "2026-11-10T23:47:53.6453625Z",
     "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-knowledge-check-90f1ee9",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-expiry-check-0d34a7e",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -67,19 +67,19 @@
                                      "docs/LOCAL_ASSISTANT_GUIDE.md",
                                      "docs/ai_progress/DECISIONS.md",
                                      "docs/ai_progress/EXECUTION_BOARD.md",
+                                     "docs/ai_progress/FINAL_REVIEW_CHECKLIST.md",
                                      "docs/ai_progress/HANDOFF.md",
                                      "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
                                      "docs/ai_progress/TEST_EVIDENCE.md",
-                                     "docs/images/usability/knowledge-readiness.png"
+                                     "docs/images/usability/review-expiry.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
+    "release_preflight_source_head":  "0d34a7e753e783cf602e65b72e978897e64ec8ed",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
-    "last_completed_task_id":  "USE-02/knowledge-source-readiness",
+    "last_completed_task_id":  "USE-02/expired-review-navigation",
     "last_completed_files_changed":  [
-                                         "alfred_ai/data_sources_views.py",
                                          "alfred_ai/services/data_sources.py",
                                          "docs/LOCAL_ASSISTANT_GUIDE.md",
                                          "templates/data_sources.html",
@@ -92,6 +92,7 @@
                                           "ebbd0560507706babbea20635ab74ed20b0cc831",
                                           "e9808c27ad3b4dcdd80c09054e728f3df2dcc92f",
                                           "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62",
-                                          "90f1ee90a9487e1d36a88cf9443825f083e0ca60"
+                                          "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
+                                          "0d34a7e753e783cf602e65b72e978897e64ec8ed"
                                       ]
 }

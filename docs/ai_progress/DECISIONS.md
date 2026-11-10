@@ -1,5 +1,16 @@
 # Execution decisions
 
+## 2026-11-11 - expose existing review expiry without extending it
+
+USE-02/expired-review-navigation reuses the center's three-item owned review query,
+adding only the stored deadline projection and aware timestamp validation. Existing
+review pages remain authoritative; no tokens, candidate values or source contents
+enter the center and no automatic retry/deadline extension is added. Edited previews
+remain retained. NO_UPSTREAM_ADOPTION: internal navigation of existing import services.
+Canonical baseline queue blockers justify only this authorized usability leaf; no
+parent acceptance, integration or publication authorization follows.
+
+
 ## 2026-11-11 - explicit metadata-only knowledge readiness
 
 USE-02/knowledge-source-readiness reuses MemoryStore and DocumentCorpus behind an

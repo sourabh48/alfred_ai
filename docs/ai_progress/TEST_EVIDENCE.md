@@ -1,5 +1,34 @@
 # Test evidence index
 
+## 2026-11-11 - expiry-aware import review navigation
+
+USE-02/expired-review-navigation, Codex, work/usability-integration; source
+0d34a7e753e783cf602e65b72e978897e64ec8ed, base 801b0c9e2013530374c1da383586197b5837fa61.
+Exact-source 77 backend PASS in 65.499s, 3 Chrome PASS in 33.650s (runner 50.000s),
+zero failures/skips. Current, expired, exact-boundary, timezone-offset, missing,
+naive, malformed/oversized/non-string deadlines; all three financial document types;
+owned bounded links; metadata privacy and no writes covered. Existing statement,
+loan, investment confirmation/replay/stale/edited-retry and document corpus tests
+remain green. Real Chrome checks keyboard navigation to expired preview, disabled
+confirmation, retained edited payload/original bytes/canonical records, revisit,
+ordinary confirmation/readiness refresh and private-vault recovery.
+Four new Axe audits zero violations; one incomplete contrast rule each, manual open.
+Clean source/privacy/dependency/migration preflight and AST graph update PASS;
+full technical/promotion/release/integration acceptance remains BLOCKED.
+
+Synthetic isolated Windows/DPAPI data only. Staged browser loan extraction is a fixture,
+not real lender/extraction acceptance; no provider/model accuracy claim. Before change:
+one regression FAIL with three missing-status subtest errors; retained repro.log.
+Uncommitted source 16 focused/77 broader backend and 3 Chrome PASS, retained separately.
+Receipts: artifacts/review-expiry-20261111/{repro.log,focused.log,backend.log,
+exact-backend.log,browser.log,browser-report.json,exact-browser.log,
+exact-browser-report.json,preflight.log,clean-source-preflight.*,graph-update.log,
+project-execution-check.log,commands.txt,source-manifest.json}, browser subdirectories.
+Source files and checkpoint: STATE.json. No deadline, write/retry/calculation engine,
+schema, dependency, personal runtime or remote change; cache edit/hash preserved.
+No exact-head remote CI run, independent review, package/owner or release claim.
+
+
 ## 2026-11-11 - explicit local knowledge readiness
 
 USE-02/knowledge-source-readiness, Codex, work/usability-integration; source

@@ -1,8 +1,27 @@
 # ALFRED execution state
 
-## Active sprint - 2026-11-11
+## Usability sprint checkpoint - 2026-11-11
 
-Codex remains single writer on work/usability-integration. USE-02/knowledge-source-readiness
+READY_FOR_NEXT. Codex completed two locally accepted USE-02 leaves on
+work/usability-integration: knowledge-source-readiness at 90f1ee9 (checkpoint801b0c9)
+and expired-review-navigation at 0d34a7e753e783cf602e65b72e978897e64ec8ed, base
+801b0c9e2013530374c1da383586197b5837fa61. No active writer or next task remains.
+Latest source: 77 backend PASS in 65.499s; 3 Chrome PASS in33.650s (runner50.000s),
+four new Axe audits zero violations/manual contrast open. Clean source/privacy/
+dependency/migration preflight and AST graph update PASS. Source-specific first
+leaf evidence below; do not combine counts or transfer receipts between SHAs.
+Bounded owned review links now explain existing expiry and edited-draft recovery;
+no source/confirmation/retry/deadline/calculation/write-engine changes. No owner
+runtime/data/key/schema/dependency/remote change; cache edit/hash preserved.
+Full USE-02, 85/143 baseline, 0/13 extensions, integration/owner/CI/independent/
+package/release/MCP selection and 3.0 gates remain. Exact files/failures/receipts:
+STATE.json and TEST_EVIDENCE.md. Documentation HEAD resolves via
+git log -1 --format=%H -- docs/ai_progress/STATE.json.
+On continue report READY_FOR_NEXT and stop. On next/sprint recover Git/writer/queue,
+then inspect remaining USE-02 Career/Travel onboarding readiness and select one
+eligible uncompleted usability leaf; preserve accepted imports and all existing gates.
+
+Earlier sprint milestone: USE-02/knowledge-source-readiness
 LOCAL_ACCEPTED / COMMITTED_LOCAL at 90f1ee90a9487e1d36a88cf9443825f083e0ca60,
 base d18220443e62dfaa1bbc13d903dc93ece449a5ac. Explicit metadata-only checks reuse
 encrypted services and existing expiry/source rules; normal GET leaves vault closed.
@@ -13,8 +32,7 @@ No personal runtime/data/key/schema/calculation/dependency/remote changes. Cache
 edit/hash preserved. Baseline 85/143 and extensions 0/13 unchanged; parent USE-02
 partial. NO_UPSTREAM_ADOPTION. Canonical development remains development/alfred-integrated;
 preparation is not integration. Exact files, failures/receipts: STATE/TEST_EVIDENCE.
-Sprint continues: inspect expired financial-review navigation as a bounded authorized
-usability gap, reproduce before editing; preserve all existing confirmation controls.
+The follow-on expiry navigation scope was completed above; do not repeat either leaf.
 
 ## Cancellable domain chat - 2026-11-11
 

@@ -1,5 +1,16 @@
 # Known issues and gates
 
+## Expiry-aware review navigation limits - 2026-11-11
+
+The center now labels deadlines for only the latest three owned pending reviews per
+financial source group. Labels are a page-load snapshot; refresh to recheck. Unknown
+or naive deadlines remain unverified. Source review and confirmation services still
+own all expiry/token/revision/source validation; an awaiting-review label does not
+authorize a write. Recovery requires the existing explicit retry/re-upload/review
+controls and preserves edited drafts. Full USE-02, manual contrast, owner/CI/
+independent/package/release, canonical integration, approved MCP and 3.0 gates remain.
+
+
 ## Local knowledge readiness limits - 2026-11-11
 
 USE-02/knowledge-source-readiness is metadata-only and explicitly requested.
