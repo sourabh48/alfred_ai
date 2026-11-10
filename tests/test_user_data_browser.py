@@ -455,6 +455,58 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('knowledgeMemoryCount'), '1')
         self.assertEqual(store.key_file.read_bytes(), key)
 
+    def test_data_sources_expired_review_explains_recovery_and_cannot_confirm(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from selenium.webdriver.common.keys import Keys
+        from apps.loans.models import Loan
+        from apps.loans.services.import_review import stage_loan_document
+        from tests.test_loan_import_review import extraction
+        self.login()
+        owner = self.scenario['user']
+        document = stage_loan_document(user=owner, parsed=extraction(),
+            upload_file=SimpleUploadedFile('synthetic-expired-preview.pdf', b'%PDF synthetic expired preview'))
+        document.extracted_payload['import_review']['expires_at'] = (timezone.now()-timedelta(hours=1)).isoformat()
+        document.extracted_payload['import_review']['revision'] = 1
+        document.save(update_fields=['extracted_payload'])
+        original = document.extracted_payload
+        source_bytes = Path(document.uploaded_file.path).read_bytes()
+        before = list(Loan.objects.filter(user=owner).values())
+        self.browser.get(self.live_server_url+'/data-sources/')
+        link = f'main li a[href="/loans/import-uploads/{document.pk}/review/"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        self.assertIn('Reopen expired review', self.browser.find_element(self.By.CSS_SELECTOR, link).text)
+        self.assertIn('Keep edited previews', self.browser.find_element(self.By.TAG_NAME,'main').text)
+        self.assertNotIn('synthetic-expired-preview.pdf', self.browser.page_source)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        audits = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                audits.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'review-expiry-accessibility.json').write_text(json.dumps(audits,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'], [])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth>innerWidth'))
+                self.browser.find_element(self.By.CSS_SELECTOR, link).location_once_scrolled_into_view
+                self.capture(f'review-expiry-{width}-{theme}')
+        element = self.browser.find_element(self.By.CSS_SELECTOR, link)
+        self.browser.execute_script('arguments[0].focus()', element)
+        element.send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'This draft expired.' in self.browser.find_element(self.By.TAG_NAME,'main').text)
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'button[value="confirm"]').is_enabled())
+        self.browser.get(self.live_server_url+'/data-sources/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload, original)
+        self.assertEqual(Path(document.uploaded_file.path).read_bytes(), source_bytes)
+        self.assertEqual(list(Loan.objects.filter(user=owner).values()), before)
+
     def test_data_sources_guides_review_confirmation_and_updates_readiness(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
         from apps.loans.models import Loan

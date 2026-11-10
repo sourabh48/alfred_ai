@@ -1,6 +1,8 @@
 """Owned source inventory; saved records and parser success never imply verification."""
 from django.db import DatabaseError
 from django.db.models import Count, Max, Q
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from apps.budgets.models import Budget, SavingsGoal
 from apps.career.models import CareerProfile, CareerResume
@@ -45,6 +47,7 @@ def knowledge_sources_snapshot(user):
 
 
 def data_sources_snapshot(user):
+    checked_at = timezone.now()
     groups = [
         ('Finance', [(BankAccount, 'Bank accounts'), (Expense, 'Transactions')], StatementUpload, 'uploaded_at',
          [('Income and preferences', '/settings/'), ('Accounts and statements', '/expenses/')]),
@@ -84,9 +87,21 @@ def data_sources_snapshot(user):
                                  InvestmentImportDocument: '/investments/import-uploads/'}.get(document_model)
                 if review_prefix:
                     source['imports']['confirmed'] = documents.filter(extracted_payload__import_review__state='confirmed').count()
-                    source['reviews'] = [dict(url=f'{review_prefix}{pk}/review/', uploaded_at=uploaded_at)
-                        for pk, uploaded_at in documents.filter(extracted_payload__import_review__state='pending')
-                            .order_by('-pk').values_list('pk', timestamp)[:3]]
+                    for pk, uploaded_at, raw in documents.filter(extracted_payload__import_review__state='pending') \
+                            .order_by('-pk').values_list('pk', timestamp, 'extracted_payload__import_review__expires_at')[:3]:
+                        expiry = None
+                        if isinstance(raw, str) and len(raw) <= 64:
+                            try:
+                                expiry = parse_datetime(raw)
+                            except ValueError:
+                                pass
+                        if expiry is not None and timezone.is_naive(expiry):
+                            expiry = None
+                        status = 'Expiry unavailable'
+                        if expiry:
+                            status = 'Expired' if expiry <= checked_at else 'Awaiting review'
+                        source['reviews'].append(dict(url=f'{review_prefix}{pk}/review/', uploaded_at=uploaded_at,
+                            expires_at=expiry, status=status))
                 if label == 'Career':
                     source['has_data'] = source['has_data'] or source['imports']['parsed'] > 0
             if label == 'Travel':
@@ -105,7 +120,8 @@ def data_sources_snapshot(user):
         elif source['state'] == 'Import needs attention':
             source['next_action'] = dict(label='Check source issues in Documents', url='/documents/')
         elif source['reviews']:
-            source['next_action'] = dict(label='Review the latest extraction', url=source['reviews'][0]['url'])
+            source['next_action'] = dict(label='Reopen expired review' if source['reviews'][0]['status'] == 'Expired'
+                else 'Review the latest extraction', url=source['reviews'][0]['url'])
         elif source['state'] == 'Review needed':
             source['next_action'] = dict(label='Review extracted information', url='/documents/')
         elif not source['has_data']:

@@ -44,7 +44,12 @@
             <dt class="col-sm-7">Last parsed file update</dt><dd class="col-sm-5">{{ source.imports.last_parsed|default:"Not recorded" }}</dd>
         </dl>
         {% if source.reviews %}<p class="fw-semibold">Recent uploads awaiting review</p><ul>
-            {% for review in source.reviews %}<li class="mb-2"><a href="{{ review.url }}">Review source saved {{ review.uploaded_at|date:"j M Y, H:i" }}</a></li>{% endfor %}
+            {% for review in source.reviews %}<li class="mb-2">
+                <a href="{{ review.url }}">{% if review.status == 'Expired' %}Reopen expired review{% else %}Review source{% endif %} saved {{ review.uploaded_at|date:"j M Y, H:i" }}</a>
+                <span class="d-block">{{ review.status }}{% if review.expires_at %}. Confirmation deadline (UTC): {{ review.expires_at|timezone:"UTC"|date:"j M Y, H:i" }}{% endif %}.</span>
+                {% if review.status == 'Expired' %}<span class="d-block">Confirmation is blocked. Keep edited previews; re-upload the original for a fresh review, or retry an unedited source in Documents.</span>
+                {% elif review.status == 'Expiry unavailable' %}<span class="d-block">Open the source review to check its validity before confirming.</span>{% endif %}
+            </li>{% endfor %}
         </ul>{% endif %}
         {% endif %}
         <p class="small">{{ source.provenance }} Counts cover only your account. Record acceptance and rejection totals are not inferred from parser status. Freshness of balances and public evidence must be checked in the source screen.</p>

@@ -11,6 +11,12 @@ protected key backup; the check never creates replacement keys.
 
 ![Local knowledge readiness using synthetic data](images/usability/knowledge-readiness.png)
 
+Pending bank, loan and investment reviews in **Data Sources** show their confirmation
+deadline. **Reopen expired review** opens the retained preview with confirmation
+blocked. Keep edited previews and re-upload the original for a fresh review; retry
+an unedited source in **Documents**. An unavailable deadline needs inspection in the
+source review. The center does not extend deadlines or retry an import automatically.
+
 With approved local history enabled, type in **Search saved titles on this page**
 to filter titles immediately. Choose **Search saved messages** to also find text
 inside retained questions and answers, then reopen a matching conversation.

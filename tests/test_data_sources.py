@@ -116,6 +116,52 @@ class DataSourcesTests(TestCase):
         self.assertEqual(finance['reviews'], [])
         self.assertEqual(result['next_setup']['next_action']['url'], '/settings/diagnostics/')
 
+    def test_pending_review_links_explain_expired_and_unverified_deadlines_without_writes(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        for model, label in ((StatementUpload,'Finance'), (LoanImportDocument,'Loans'),
+                             (InvestmentImportDocument,'Investments')):
+            with self.subTest(label=label):
+                for deadline in ((timezone.now()+timedelta(hours=1)).isoformat(), 'invalid',
+                                 (timezone.now()-timedelta(hours=1)).isoformat()):
+                    model.objects.create(user=self.owner, parser_status='needs_review',
+                        file_name='PRIVATE-EXPIRY-SOURCE.pdf', extracted_payload={'import_review':{
+                            'state':'pending','expires_at':deadline}})
+                model.objects.create(user=self.other, parser_status='needs_review',
+                    extracted_payload={'import_review':{'state':'pending','expires_at':'foreign'}})
+                before = list(model.objects.values())
+                source = next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label']==label)
+                self.assertEqual([r['status'] for r in source['reviews']], ['Expired','Expiry unavailable','Awaiting review'])
+                self.assertEqual(source['next_action']['label'], 'Reopen expired review')
+                self.assertEqual(source['imports']['awaiting_review'], 3)
+                self.assertEqual(list(model.objects.values()), before)
+        self.client.force_login(self.owner)
+        response = self.client.get('/data-sources/')
+        self.assertContains(response, 'Reopen expired review')
+        self.assertContains(response, 'Keep edited previews')
+        self.assertNotContains(response, 'PRIVATE-EXPIRY-SOURCE')
+
+    def test_deadline_metadata_requires_an_aware_valid_timestamp_and_checks_boundary(self):
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        now = datetime(2026, 11, 11, tzinfo=timezone.utc)
+        for value in (None, True, 123, {}, [], '2026-11-12T00:00:00', '2026-99-11T00:00:00Z', 'x'*65):
+            with self.subTest(value=value):
+                LoanImportDocument.objects.filter(user=self.owner).delete()
+                LoanImportDocument.objects.create(user=self.owner, extracted_payload={
+                    'import_review':{'state':'pending','expires_at':value}})
+                source = next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label']=='Loans')
+                self.assertEqual(source['reviews'][0]['status'], 'Expiry unavailable')
+                self.assertIsNone(source['reviews'][0]['expires_at'])
+        document = LoanImportDocument.objects.filter(user=self.owner).get()
+        for value, expected in (('2026-11-11T00:00:00Z','Expired'),
+                                ('2026-11-11T05:30:01+05:30','Awaiting review')):
+            document.extracted_payload={'import_review':{'state':'pending','expires_at':value}}
+            document.save(update_fields=['extracted_payload'])
+            with patch('alfred_ai.services.data_sources.timezone.now', return_value=now):
+                source = next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label']=='Loans')
+            self.assertEqual(source['reviews'][0]['status'], expected)
+
 
 class KnowledgeReadinessTests(TestCase):
     def setUp(self):
