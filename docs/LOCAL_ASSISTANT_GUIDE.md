@@ -6,6 +6,11 @@ question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit
 requests for brevity, detail, comparisons or steps. Answers have bounded lengths
 and deadlines; detailed financial and document replies have a stricter limit.
 
+With private history off, local general-chat follow-ups can use up to three recent
+turns from the current page. That dialogue stays in page memory. **New conversation**,
+navigation or reload clears it. It is omitted when you choose cloud fallback;
+private history remains a separate opt-in with retention and recovery controls.
+
 ![Local answer choices and conversation, using synthetic data](images/usability/local-answer-style.png)
 
 If Ollama is unavailable, the draft remains in the composer. Open Settings →

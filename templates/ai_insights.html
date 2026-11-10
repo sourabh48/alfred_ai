@@ -54,7 +54,7 @@
     <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
     <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
         <p>Ask about a saved memory, your financial snapshot or your Travel preferences.</p>
-        <p class="small">This conversation stays on this page unless you explicitly enable private history. Save only facts you have checked.</p></div>
+        <p class="small">With history off, local general chat can use up to three recent turns on this page. New conversation, navigation or reload clears that dialogue. It is never sent to cloud fallback or saved as verified facts.</p></div>
     <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
     <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
         <label class="form-label" for="intelligenceAnswerStyle">Local answer style</label>
@@ -201,5 +201,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=19"></script>
+<script src="/static/js/intelligence.js?v=20"></script>
 {% endblock %}

@@ -188,18 +188,22 @@ def present_answer(result,scope,query=''):
     return result
 
 
-def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None,conversation_context=None,answer_style='auto'):
-    from .canonical_evidence import KINDS, supported_question, requested_record_field
-    owner=_owner(user)
-    if conversation_context is not None:
-        if (not isinstance(conversation_context, list) or len(conversation_context) > 6 or len(conversation_context) % 2
+def validate_dialogue(context, scope, cloud_consent):
+    if context is not None:
+        if (not isinstance(context, list) or len(context) > 6 or len(context) % 2
                 or any(not isinstance(turn, dict) or set(turn) != {'role', 'content'}
                        or turn['role'] != ('user' if index % 2 == 0 else 'assistant')
                        or not isinstance(turn['content'], str) or len(turn['content'].encode()) > 768
-                       for index, turn in enumerate(conversation_context))):
+                       for index, turn in enumerate(context))):
             raise ValueError('Invalid bounded conversation context.')
-        if conversation_context and (scope != 'general' or cloud_consent):
+        if context and (scope != 'general' or cloud_consent):
             raise ValueError('Conversation context is restricted to local general chat.')
+
+
+def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None,conversation_context=None,answer_style='auto'):
+    from .canonical_evidence import KINDS, supported_question, requested_record_field
+    owner=_owner(user)
+    validate_dialogue(conversation_context, scope, cloud_consent)
     if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','documents','bank_statements','financial_records','financial_document')
             or type(cloud_consent) is not bool or query_sensitivity not in ('public','personal','sensitive')
             or (scope in ('documents','financial_document') and (type(document_id) is not int or document_id<1))

@@ -78,9 +78,16 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
 
     def post(self,request):
         data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','selected_records','cloud_consent','query_sensitivity',
-                           'conversation_id','conversation_revision','request_id','answer_style'))
-        from ..services.hybrid_intelligence import answer_budget
+                           'conversation_id','conversation_revision','request_id','answer_style','page_context'))
+        from ..services.hybrid_intelligence import answer_budget, validate_dialogue
         answer_budget('', data.get('scope', 'general'), data.get('answer_style', 'auto'))
+        conversation_context = data.get('page_context', [])
+        if 'page_context' in data:
+            if (not isinstance(conversation_context, list) or data.get('scope','general') != 'general'
+                    or data.get('cloud_consent',False) is not False
+                    or {'conversation_id','conversation_revision','request_id'} & set(data)):
+                raise ValueError('Page dialogue is restricted to unsaved local general chat.')
+            validate_dialogue(conversation_context, 'general', False)
         document_question=data.get('scope')=='financial_document'
         if document_question:
             from .conversations import current_session
@@ -90,7 +97,6 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
         identity = data.get('conversation_id')
         history_fields = {'conversation_id','conversation_revision','request_id'}
         if identity is None and history_fields & set(data): raise ValueError()
-        conversation_context = []
         if identity is not None:
             from .conversations import current_session
             from ..services.conversation_history import ConversationHistory, ConversationPermission

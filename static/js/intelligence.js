@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const sourceReset = document.getElementById("intelligenceSourcesReset");
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
+    let pageDialogue = [];
     let sourceRequest = 0, picker = null;
     const modelPanel=document.getElementById('modelReadinessPanel'), modelItems=document.getElementById('modelReadinessItems');
     const modelStatus=document.getElementById('modelReadinessStatus'), modelRefresh=document.getElementById('modelReadinessRefresh');
@@ -194,6 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function clearConversation(clearDraft = false) {
         generation++; conversation = null; requestToken = null; historyBlocked = false;
+        pageDialogue = [];
         resetSources();
         answers.replaceChildren(); empty.hidden = false; retry.hidden = true; consent.checked = false;
         if (clearDraft) { query.value = ""; historyTitle.value = ""; }
@@ -201,6 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function forgetPrivatePage() {
         active = false; generation++; conversation = null; historyPolicy = null; requestToken = null; historyBlocked = false;
+        pageDialogue = [];
         resetSources();
         answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); financialChoice.replaceChildren(); empty.hidden = false;
         document.getElementById("intelligenceFinancialDocumentContext").textContent = "";
@@ -263,6 +266,15 @@ document.addEventListener("DOMContentLoaded", () => {
             ? `Showing ${matches} of ${historyList.children.length} saved titles. Search stays on this page.` : "";
     }
     historySearch.addEventListener("input", filterHistory);
+    function dialogueSnippet(text) {
+        const encoder = new TextEncoder(); let snippet = "", size = 0;
+        for (const character of text) {
+            const bytes = encoder.encode(character).length;
+            if (size + bytes > 768) break;
+            snippet += character; size += bytes;
+        }
+        return snippet;
+    }
     document.getElementById("conversationTitleForm").addEventListener("submit", event => {
         event.preventDefault();
         if (!conversation || !historyEnabled()) return;
@@ -604,6 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
         button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
+        if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && pageDialogue.length) payload.page_context = pageDialogue;
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);
         if (scope.value === "financial_document") {
@@ -659,6 +672,10 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
                 query.value = ""; requestToken = null;
+            }
+            if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && result.provider === "ollama" && !result.narrative_withheld) {
+                pageDialogue = [...pageDialogue, {role:"user",content:dialogueSnippet(payload.query)},
+                    {role:"assistant",content:dialogueSnippet(result.answer)}].slice(-6);
             }
             if (historyEnabled() && payload.scope !== "financial_document") await refreshHistory().catch(() => { historyPolicy = null; historyFeedback.textContent = `${result.conversation_saved === true ? 'Answer saved, but history' : 'History'} status could not refresh. Reload before another question.`; });
         } catch (error) {

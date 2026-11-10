@@ -2491,6 +2491,51 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(len(history.get(owner, history.list(owner)[0]['id'])['turns']), 1)
         self.capture('history-logout-cleared')
 
+    def test_page_dialogue_followups_bound_unicode_retry_and_clear_without_retention(self):
+        from selenium.webdriver.common.keys import Keys
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        history, local = self.private_history_fixture(authorized=False); owner = self.scenario['user']
+        local.reason.return_value = 'Synthetic page answer '+ '🌧'*400
+        first = 'In our fictional story robot Pavo likes cobalt. '+ '🌧'*190
+        self.ask_history_question(first)
+        self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertNotIn('history',local.reason.call_args.args[0])
+        local.reason.side_effect = EmbeddingUnavailable('Synthetic page outage')
+        self.ask_history_question('What was that fictional color?')
+        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        context = local.reason.call_args.args[0]['history']
+        self.assertEqual(len(context),2)
+        for turn in context:
+            self.assertLessEqual(len(turn['content'].encode()),768)
+            self.assertNotIn('\ufffd',turn['content'])
+        local.reason.side_effect = None
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
+        self.assertEqual(local.reason.call_args.args[0]['history'],context)
+        for count in (4,6,6):
+            self.ask_history_question('Continue the synthetic story')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
+            self.assertEqual(len(local.reason.call_args.args[0]['history']),count)
+        with history.store._transaction() as db:
+            for table in ('conversations','conversation_policies','memories','events'):
+                self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
+        stored = self.browser.execute_script('return JSON.stringify(localStorage)+JSON.stringify(sessionStorage)')
+        self.assertNotIn('Pavo',stored); self.assertNotIn('Synthetic page answer',stored)
+        self.memory_click('#intelligenceNew')
+        self.ask_history_question('Synthetic question after new conversation')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
+        self.assertNotIn('history',local.reason.call_args.args[0])
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.ask_history_question('Synthetic question after page restore')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
+        self.assertNotIn('history',local.reason.call_args.args[0])
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.ask_history_question('Synthetic question after reload')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
+        self.assertNotIn('history',local.reason.call_args.args[0])
+
     def test_private_history_never_reuses_public_cloud_consent(self):
         from apps.ml_engine.services.memory_reasoning import configure_reasoning
         from apps.ml_engine.services.hybrid_intelligence import hybrid_answer
@@ -2504,12 +2549,18 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())
         self.assertIn('OpenAI disabled', self.text('intelligenceCloudStatus'))
         with patch('apps.ml_engine.api.views.hybrid_answer', wraps=hybrid_answer) as request:
+            local.reason.side_effect = None
+            self.ask_history_question('Synthetic private page warmup')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
+            local.reason.side_effect = EmbeddingUnavailable('synthetic local outage')
             self.ask_history_question('Synthetic public retry question')
             self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
             self.assertFalse(request.call_args.kwargs['cloud_consent'])
+            self.assertEqual(len(request.call_args.kwargs['conversation_context']),2)
             self.memory_click('#intelligenceCloudConsent'); self.memory_click('#intelligenceRetry')
             self.wait.until(lambda _: 'Mock (synthetic)' in self.text('intelligenceAnswers'))
             self.assertTrue(request.call_args.kwargs['cloud_consent'])
+            self.assertEqual(request.call_args.kwargs['conversation_context'],[])
             self.memory_click('#conversationHistoryPanel > summary'); self.enable_private_history_ui()
             self.assertFalse(self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())
             self.browser.execute_script("document.getElementById('intelligenceCloudConsent').checked=true")

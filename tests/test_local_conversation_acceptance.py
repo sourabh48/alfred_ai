@@ -16,6 +16,27 @@ from apps.ml_engine.services.persistent_memory import MemoryStore
 
 @skipUnless(os.environ.get('ALFRED_RUN_LOCAL_AI_ACCEPTANCE') == 'true', 'Requires explicit real local Ollama acceptance')
 class LocalConversationAcceptance(TestCase):
+    def test_actual_local_page_followup_without_history_retention(self):
+        with TemporaryDirectory(prefix='alfred-local-page-synthetic-') as directory, override_settings(
+                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
+                ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
+            owner = get_user_model().objects.create_user(username='synthetic-real-local-page')
+            self.client.force_login(owner)
+            first_query = 'In this fictional story the robot likes the color cobalt. Acknowledge briefly.'
+            first = self.client.post('/api/ai/personal-insights/',dict(query=first_query,cloud_consent=False),content_type='application/json')
+            self.assertEqual(first.status_code,200,first.content)
+            self.assertEqual(first.json()['provider'],'ollama')
+            snippet = first.json()['answer'].encode()[:768].decode(errors='ignore')
+            second = self.client.post('/api/ai/personal-insights/',dict(query='What color did the fictional robot like?',
+                cloud_consent=False,page_context=[dict(role='user',content=first_query),dict(role='assistant',content=snippet)]),content_type='application/json')
+            self.assertEqual(second.status_code,200,second.content)
+            self.assertIn('cobalt',second.json()['answer'].lower())
+            self.assertEqual(second.json()['conversation_context_turns'],1)
+            store = MemoryStore(Path(directory)/'vault')
+            with store._transaction() as db:
+                for table in ('conversations','conversation_policies','memories','events'):
+                    self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
+
     def test_actual_local_answer_styles_respect_server_budgets(self):
         with TemporaryDirectory(prefix='alfred-local-styles-synthetic-') as directory, override_settings(
                 ALFRED_MEMORY_DIR=str(Path(directory)/'vault'), ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
