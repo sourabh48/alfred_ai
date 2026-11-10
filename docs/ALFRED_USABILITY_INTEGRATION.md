@@ -1,5 +1,20 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Private message search - 2026-11-11
+
+USE-03/private-message-search LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source `d1ba65750f95b1102d4a2cc32cb19c040a48791e`,
+base `af2801d54b04acfc69bc39b27cc6bec775e731a1`. Bounded encrypted title/message
+search reuses existing history/consent; no plaintext index, provider or excerpts.
+Final-source 53 focused backend/6 Chrome PASS; four new Axe audits zero violations,
+manual contrast open. Broader 261 backend PASS at b60d809 is recorded separately.
+Windows new-process search at capacity PASS in 674ms, not a universal speed claim.
+Final clean source/privacy/dependency/migration preflight and AST graph update PASS.
+Owner/CI/independent/package/release/3.0 gates remain. No owner runtime or remote
+change; cache edit preserved. Baseline 85/143 and extensions 0/13 unchanged.
+READY_FOR_NEXT; no next task selected. Exact files, evidence and next instruction:
+docs/ai_progress/STATE.json, TEST_EVIDENCE.md and docs/EXECUTION_STATE.md.
+
 ## History-outage page-only source recovery - 2026-11-11
 
 USE-03/history-outage-page-only-sources LOCAL_ACCEPTED / COMMITTED_LOCAL on
@@ -182,7 +197,7 @@ Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 | --- | --- | --- |
 | USE-01 Runtime and health | PARTIALLY_IMPLEMENTED | Authenticated diagnostics, selected database identity, schema inspection, instance-bound heartbeats and explicit synthetic local inference benchmark. Native drill and owner sign-in acceptance remain separate. |
 | USE-02 Onboarding and data sources | PARTIALLY_IMPLEMENTED | Data Sources Center links existing local workflows and reports owned saved-record/parser counts. Complete preview/duplicate/correction/confirmation journeys, knowledge readiness and source-level consent/freshness/deletion acceptance remain. |
-| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Bounded local dialogue/history, styles, fiction continuity, rename/title search, page-only streaming/Stop and safe final-answer Markdown/tables validated. Current grounding retained; figures/source-backed output buffered. Saved-history/domain streaming, transcript-body search, advanced/nested Markdown, code colouring and broader UI/model routing remain. |
+| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Bounded local dialogue/history, styles, fiction continuity, rename/title search, explicit encrypted saved-message search, page-only streaming/Stop and safe final-answer Markdown/tables validated locally. Current grounding retained; figures/source-backed output buffered. Saved-history/domain streaming, advanced/nested Markdown, code colouring, broader UI/model routing and owner/release acceptance remain. |
 | USE-04 Read-only tools / MCP | PARTIALLY_IMPLEMENTED | Seven typed existing-domain read tools with owner/consent/output/deadline/audit controls; bounded Career progress and shared history integrity validated locally. Broader tools, cross-module orchestration and approved MCP transport remain. No external server, credentials, private disclosure or cost-saving claim. Source-specific receipts: ai_progress/TEST_EVIDENCE.md. |
 | USE-05 Confirmed actions | PARTIALLY_IMPLEMENTED | Bound savings-goal confirmation at0ca2168 has retained backend/Chrome/native replay evidence in ai_progress/TEST_EVIDENCE.md. Broader actions and owner/release acceptance remain; this checkpoint adds no action implementation or acceptance. |
 | USE-06 Windows release | NOT_IMPLEMENTED | Current-source package, clean-machine upgrade/rollback and six end-to-end journeys remain; installation replacement and owner-account tests need their explicit gates. |

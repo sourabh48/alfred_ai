@@ -1,5 +1,65 @@
 # Test evidence index
 
+## 2026-11-11 - private saved-message search
+
+Final source `d1ba65750f95b1102d4a2cc32cb19c040a48791e`, base
+`af2801d54b04acfc69bc39b27cc6bec775e731a1`; primary implementation
+`b60d80981d9b7e6f544a74ada4eecc81ccfe7d8b`. Commands/source blobs/receipt hashes:
+`artifacts/private-message-search-20261111/`. Synthetic fixtures only under
+`F:/ALFRED/dev-test-data/private-message-search-20261111/` and temporary vaults.
+
+- Final-source 53 focused backend PASS in 41.470s, zero failures/skips: literal and
+  Unicode case matching, title/question/answer coverage, metadata-only output,
+  owner isolation, opt-in/operator gates, malformed/oversized/control input,
+  CSRF/session/consent recheck, expiration/deletion, corrupt turns/ciphertext and
+  lost-key preservation. Existing lifecycle, stale/replay/privacy/API checks pass.
+- Final-source six actual Chrome journeys PASS in 80.043s, runner 96.891s, zero
+  failures/skips: explicit message search finds a non-title answer, keeps draft and
+  active conversation, restores keyboard focus, avoids URL/browser-storage queries,
+  reopens after reload, clears private state on pagehide/permission loss; outage
+  retry and stale conflict; prior rename/title-search, history-consent lifecycle,
+  saved-conversation conflict and page-only Career/history-outage regressions.
+- Four new light/dark at 1440/390px Axe audits zero violations; each has one
+  incomplete contrast rule requiring manual review. Current synthetic screenshot
+  visually inspected and linked in the guide. Unrelated model responses are seeded;
+  vault/search/API/SQLite/browser and the process reopen are real implementations.
+- Real Windows child process reopened a 50-conversation vault with 20 saved turns
+  each and searched it in 674ms at final source. Key bytes preserved, no plaintext
+  phrase in vault files, no new index or model call. Earlier working-tree observation
+  was 414ms. Timing includes local vault read/search, not a universal performance,
+  memory-use, GPU or packaged/native-application restart claim.
+- Broader 261-test backend regression PASS in 152.152s at b60d809: history/hybrid/
+  streaming, canonical/financial grounding, owner/session/CSRF/privacy, tool registry,
+  native and release/browser inventories. Its receipt stays pinned to b60d809;
+  subsequent commits change only tests/test_user_data_browser.py. Production and
+  backend-test blob equivalence is recorded, with no CI/SHA attribution transfer.
+  Final-source 53 focused tests overlap these; they are not 314 unique tests.
+- Retained reproduction: one new test had five expected subtest failures (unsupported
+  POST returned 405). Early Chrome run: one PASS/one FAIL in 28.861s because its new
+  permission-loss assertion waited for a pending-disabled button. Fixed the wait to
+  observe actual content clearing; final working-tree two PASS in 31.718s. Broader
+  b60d809 Chrome: five PASS/one FAIL in 90.244s exposed the same pre-existing race in
+  the older outage test. Commits 65dccea and d1ba657 wait for cleanup AND retain the
+  disabled-control check. Failed receipts retained; no production security change.
+- Clean validation worktree F:/ALFRED_DEV/usability-search-check-b60d809 was advanced
+  without reset to final d1ba657. Source/privacy/dependency/migration preflight PASS;
+  full technical/promotion remain BLOCKED. Standalone receipts are not substituted
+  for owner/package/CI/recovery evidence. Final graph AST update PASS, no semantic API;
+  graph warns that unsupported files/empty-symbol modules are not indexed.
+- No owner runtime/data/key/model/document/backup/install or remote changes. No new
+  schema, dependency, inference policy, MCP service, plaintext index or activation.
+  Cache edit/hash preserved; baseline 85/143, extensions 0/13 unchanged. Full USE-03,
+  manual contrast, model quality and owner/CI/independent/package/release/3.0 remain.
+
+Implementation files (9): `apps/ml_engine/api/conversations.py`,
+`apps/ml_engine/api/urls.py`, `apps/ml_engine/services/conversation_history.py`,
+`docs/LOCAL_ASSISTANT_GUIDE.md`, `static/js/intelligence.js`,
+`templates/ai_insights.html`, `tests/browser_durations.json`,
+`tests/test_conversation_history.py`, `tests/test_user_data_browser.py`.
+Checkpoint-only files are listed in STATE.json. READY_FOR_NEXT; no next task selected.
+- `scripts/project_execution.py --check` PASS; generated views unchanged, with
+  85/143 original requirements and 0/13 extensions accepted.
+
 ## 2026-11-11 - history-outage page-only source recovery
 
 Source 9abff6e496dd009a6a1a7ef05fbe3dc92707f67d, base 8d2a78f43aff8fb81e70f39ddae9bdcf63877214.

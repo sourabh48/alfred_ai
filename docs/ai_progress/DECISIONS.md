@@ -1,5 +1,24 @@
 # Execution decisions
 
+## 2026-11-11 - private saved-message search
+
+- NEXT selects USE-03/private-message-search from the existing authorized usability
+  ledger. Canonical queue entries remain blocked by their actual recorded gates;
+  no original requirement or whole conversation capability is promoted.
+- Reuse ConversationHistory.list and the authenticated MemoryAPI lifecycle. Explicit
+  POST search scans at most 50 encrypted conversations/20 turns each, using literal
+  case-insensitive matching and a 128-character phrase. No model, fuzzy/semantic
+  index, transcript excerpts, extra persistence, schema or dependency is needed.
+- Return all owned metadata plus match flags, so nonmatching current conversations
+  do not appear deleted. Existing UI/history lifecycle preserves draft, expiry,
+  active revision conflicts and permission-loss clearing. Recheck both session and
+  consent after reading; invalid/corrupt records fail closed without replacement.
+- The 261-test receipt remains bound to b60d809. Later commits change only a browser
+  timing assertion; final d1ba657 has its own 53 focused and six Chrome receipts.
+  No CI check is transferred between SHAs, and tests overlap rather than add counts.
+- NO_UPSTREAM_ADOPTION. Existing vault/Django/JavaScript behavior is reused; no MCP,
+  provider activation, private-history availability change or external action.
+
 ## 2026-11-11 - independent page-only questions during history outage
 
 - USE-03/history-outage-page-only-sources is the single selected NEXT task; continue

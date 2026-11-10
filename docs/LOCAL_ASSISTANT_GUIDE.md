@@ -8,6 +8,8 @@ It scans at most 50 conversations with 20 turns each; expired or deleted history
 cannot be found. Search phrases clear on navigation/reload. Saved answers remain
 historical hypotheses, so reopen source records for current evidence.
 
+![Finding a saved answer on a synthetic account, with the unsent draft preserved](images/usability/private-message-search.png)
+
 If private history status is unavailable, page-only **Career application progress**
 and **Reviewed records from one document** can still use their selected local sources.
 Open **Private conversation history** and choose **Retry history status** to check

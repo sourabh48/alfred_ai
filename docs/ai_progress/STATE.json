@@ -5,29 +5,34 @@
     "workspace":  "F:/ALFRED/alfred_ai",
     "single_writer":  false,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "9abff6e496dd009a6a1a7ef05fbe3dc92707f67d",
-    "active_task_id":  "USE-03/history-outage-page-only-sources",
+    "recorded_at_head":  "d1ba65750f95b1102d4a2cc32cb19c040a48791e",
+    "active_task_id":  "USE-03/private-message-search",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
+                          "apps/ml_engine/api/conversations.py",
+                          "apps/ml_engine/api/urls.py",
+                          "apps/ml_engine/services/conversation_history.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
                           "static/js/intelligence.js",
                           "templates/ai_insights.html",
                           "tests/browser_durations.json",
+                          "tests/test_conversation_history.py",
                           "tests/test_user_data_browser.py"
                       ],
     "completed_steps":  [
-                            "Recovered 8d2a78f and preserved cache edit/hash; sole writer verified",
-                            "Reproduced UI blocking independent page-only reads after history status 503; root guard repaired without backend or financial changes",
-                            "Metadata retry preserves drafts/retention, clears cloud consent, respects active conversation conflicts and clears private data on permission loss",
-                            "Exact-source 252 backend PASS in 173.851s; 5 real Chrome PASS in 105.907s runner 134.891s; four Axe audits zero violations/manual contrast open",
-                            "Real Ollama first deadline failure: 1 FAIL in 32.770s retained; unchanged retry after other tests1PASS in 15.814s; no model settings/limits/assertions weakened",
-                            "Interrupted checks retained without final results and rerun; clean source/privacy/dependency/migration preflight and AST graph update PASS"
+                            "Recovered af2801d, verified no competing CLI writer and preserved cache edit/hash. Selected authorized usability exception; original queue blockers remain.",
+                            "Implemented explicit owner-scoped encrypted title/question/answer search with metadata-only match flags, no provider/index/query URL and existing consent/expiry/session checks.",
+                            "Final d1ba657: 53 focused backend PASS 41.470s; six Chrome PASS 80.043s (runner 96.891s), four new Axe audits zero violations/manual contrast open.",
+                            "Windows new-process capacity search at 50 conversations/20 turns PASS 674ms, unchanged key, no plaintext index.",
+                            "Broader 261 backend PASS 152.152s belongs to b60d809; production/backend-test blobs unchanged, receipt not relabelled.",
+                            "Initial endpoint reproduction and both browser timing failures retained; corrected waits observe cleanup and disabled controls, no production guard weakening.",
+                            "Final clean source/privacy/dependency/migration preflight and graph AST update PASS; no owner runtime/schema/dependency/remote changes."
                         ],
     "remaining_steps":  [
-                            "Current continue task complete; wait for next/sprint/explicit scope before selecting more work",
-                            "Model deadline reliability, manual contrast and full USE-03 remain unaccepted; retry does not repair keys/storage or resolve active conversation conflicts",
-                            "Owner/CI/independent/package/release/3.0 gates remain"
+                            "Current NEXT task complete; wait for next/sprint/explicit scope before selecting more work.",
+                            "Full USE-03, local-model reliability, manual contrast and owner history acceptance remain.",
+                            "Owner/CI/independent/package/release and 3.0 gates remain; no activation or integration approval inferred."
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -50,13 +55,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. Only next/sprint/explicit scope selects a new task after verifying Git/HEAD, canonical queue and sole writer; preserve materialized_cache.py/hash. USE-03/history-outage-page-only-sources is locally complete at 9abff6e. Review retained Ollama deadline failure/retry; do not infer model reliability, change model policy or activate owner runtime/MCP/retention/deployment gates.",
+    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. Only next/sprint/explicit scope selects more after Git/HEAD, canonical queue and single-writer checks; preserve materialized_cache.py/hash. USE-03/private-message-search is locally complete at d1ba657; do not repeat it. Exact test refs differ for broader b60d809 regression and final focused/browser receipts. Do not activate owner history/MCP/providers/runtime or change release/model policy gates.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "9abff6e496dd009a6a1a7ef05fbe3dc92707f67d",
-    "checkpoint_at":  "2026-11-10T21:40:25.7832218Z",
+    "implementation_source_head":  "d1ba65750f95b1102d4a2cc32cb19c040a48791e",
+    "checkpoint_at":  "2026-11-10T22:11:17.4242404Z",
     "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-history-check-9abff6e",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-search-check-b60d809",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -71,18 +76,22 @@
                                      "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
                                      "docs/ai_progress/TEST_EVIDENCE.md",
-                                     "docs/images/usability/history-status-retry.png"
+                                     "docs/images/usability/private-message-search.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "9abff6e496dd009a6a1a7ef05fbe3dc92707f67d",
+    "release_preflight_source_head":  "d1ba65750f95b1102d4a2cc32cb19c040a48791e",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
-    "last_completed_task_id":  "USE-03/history-outage-page-only-sources",
+    "last_completed_task_id":  "USE-03/private-message-search",
     "last_completed_files_changed":  [
+                                         "apps/ml_engine/api/conversations.py",
+                                         "apps/ml_engine/api/urls.py",
+                                         "apps/ml_engine/services/conversation_history.py",
                                          "docs/LOCAL_ASSISTANT_GUIDE.md",
                                          "static/js/intelligence.js",
                                          "templates/ai_insights.html",
                                          "tests/browser_durations.json",
+                                         "tests/test_conversation_history.py",
                                          "tests/test_user_data_browser.py"
                                      ],
     "sprint_implementation_sources":  [

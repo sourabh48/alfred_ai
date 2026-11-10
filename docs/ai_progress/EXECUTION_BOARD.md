@@ -1,5 +1,20 @@
 # Current execution board
 
+## Private message search - 2026-11-11
+
+USE-03/private-message-search LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source `d1ba65750f95b1102d4a2cc32cb19c040a48791e`,
+base `af2801d54b04acfc69bc39b27cc6bec775e731a1`. Bounded encrypted title/message
+search reuses existing history/consent; no plaintext index, provider or excerpts.
+Final-source 53 focused backend/6 Chrome PASS; four new Axe audits zero violations,
+manual contrast open. Broader 261 backend PASS at b60d809 is recorded separately.
+Windows new-process search at capacity PASS in 674ms, not a universal speed claim.
+Final clean source/privacy/dependency/migration preflight and AST graph update PASS.
+Owner/CI/independent/package/release/3.0 gates remain. No owner runtime or remote
+change; cache edit preserved. Baseline 85/143 and extensions 0/13 unchanged.
+READY_FOR_NEXT; no next task selected. Exact files, evidence and next instruction:
+docs/ai_progress/STATE.json, TEST_EVIDENCE.md and docs/EXECUTION_STATE.md.
+
 ## History-outage page-only source recovery - 2026-11-11
 
 USE-03/history-outage-page-only-sources LOCAL_ACCEPTED / COMMITTED_LOCAL on

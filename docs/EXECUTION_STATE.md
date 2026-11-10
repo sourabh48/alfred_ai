@@ -1,5 +1,36 @@
 # ALFRED execution state
 
+## Private message search - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-03/private-message-search on
+`work/usability-integration`, source `d1ba65750f95b1102d4a2cc32cb19c040a48791e`,
+base `af2801d54b04acfc69bc39b27cc6bec775e731a1`. Primary implementation:
+`b60d80981d9b7e6f544a74ada4eecc81ccfe7d8b`; subsequent commits only correct the
+older browser permission-loss wait, retaining its disabled-control assertion.
+Documentation HEAD: `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Owner-initiated search now checks retained titles/questions/answers in the existing
+encrypted vault. POST keeps phrases out of URLs; results contain metadata and
+match flags, with no excerpts or plaintext index. Existing owner/operator consent,
+expiry, session recheck, corruption/key-loss preservation and stale conflicts remain.
+Drafts survive retry; navigation/permission loss clears private search state.
+
+At final d1ba657: 53 focused backend PASS in 41.470s; six actual Chrome journeys
+PASS in 80.043s (runner 96.891s), zero failures/skips. Four new Axe audits zero
+violations; manual contrast remains. Real Windows process reopened/searched the
+50-conversation/20-turn synthetic vault in 674ms; not a universal performance bound.
+The broader 261-test regression PASS in 152.152s belongs to b60d809. Production and
+backend-test blobs are unchanged since it; its receipt is not relabelled as final-HEAD.
+Initial missing endpoint and both test-timing failures remain in retained evidence.
+Final clean source/privacy/dependency/migration preflight and AST graph update PASS;
+full technical/promotion/CI/independent/package/owner/release/3.0 gates remain open.
+
+No owner runtime/data/key/model/document/backup/install or remote changes. No schema,
+dependency or inference-policy change. Cache edit/hash preserved. Baseline 85/143,
+extensions 0/13 unchanged; full USE-03 remains partial. Exact files/receipts/limits:
+STATE.json and TEST_EVIDENCE.md. No next task or agent selected/launched.
+`continue` reports READY_FOR_NEXT and stops; only next/sprint/explicit scope selects more.
+
 ## History-outage page-only source recovery - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-03/history-outage-page-only-sources on

@@ -1,5 +1,19 @@
 # Known issues and gates
 
+## Private message search bounds - 2026-11-11
+
+Source d1ba65750f95b1102d4a2cc32cb19c040a48791e searches retained titles/questions/
+answers by literal case-insensitive phrase (128 characters maximum). Existing vault
+bounds remain 50 conversations, 20 turns each and 256KiB of JSON per conversation.
+This is explicit local search; no semantic/fuzzy matching, excerpts, plaintext index
+or retrieval of expired/deleted transcripts. Owner opt-in and operator availability
+remain required and were enabled only in synthetic fixtures, never in owner runtime.
+
+Capacity/restart timing of 674ms is one synthetic Windows observation, not a service
+latency guarantee or installed-app restart acceptance. Manual contrast, owner/CI/
+independent/package/release and 3.0 gates remain. No local-model reliability or GPU
+claim; the earlier Ollama deadline variation is unchanged and remains open.
+
 ## History-outage scope - 2026-11-11
 
 Source 9abff6e496dd009a6a1a7ef05fbe3dc92707f67d keeps page-only Career progress
