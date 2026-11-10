@@ -43,6 +43,19 @@ class ConversationCollectionAPI(MemoryAPI):
         return Response(ConversationHistory(memory_store()).create(request.user, data.get('title')), status=201)
 
 
+class ConversationSearchAPI(MemoryAPI):
+    def post(self, request):
+        data = self.payload(('query',))
+        if not isinstance(data.get('query'), str): raise ValueError()
+        current_session(request)
+        history = ConversationHistory(memory_store())
+        records = history.list(request.user, search=data['query'])
+        policy = history.policy(request.user)
+        if not policy['available'] or not policy['enabled']: raise ConversationPermission()
+        current_session(request)
+        return Response({'policy':policy, 'conversations':records, 'message_search':True})
+
+
 class ConversationDetailAPI(MemoryAPI):
     def get(self, request, identity):
         record = ConversationHistory(memory_store()).get(request.user, identity)

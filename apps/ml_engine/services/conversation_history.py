@@ -143,13 +143,28 @@ class ConversationHistory:
         with self.store._transaction() as db:
             return self._clear(db, _owner(user))
 
-    def list(self, user):
+    def list(self, user, *, search=None):
+        if search is not None:
+            if (not isinstance(search, str) or not search.strip() or len(search) > 128
+                    or any(ord(c) < 32 or ord(c) == 127 for c in search)):
+                raise ValueError('Use a search phrase of one to 128 characters.')
+            search = search.strip().casefold()
         owner = _owner(user)
         with self.store._transaction() as db:
             self._enabled(db, owner); self._expire(db, owner)
             records = [self._read(db, owner, *row) for row in self._rows(db, owner)]
-        return [{key: record[key] for key in ('id', 'title', 'created_at', 'updated_at', 'expires_at', 'revision')}
-                for record in sorted(records, key=lambda r:r['updated_at'], reverse=True)]
+        results = []
+        for record in sorted(records, key=lambda r:r['updated_at'], reverse=True):
+            item = {key: record[key] for key in ('id', 'title', 'created_at', 'updated_at', 'expires_at', 'revision')}
+            if search is not None:
+                texts = [record['title']]
+                for turn in record['turns']:
+                    if not isinstance(turn, dict) or any(not isinstance(turn.get(key), str) for key in ('query', 'answer')):
+                        raise RuntimeError('Private conversation verification failed; existing data is preserved.')
+                    texts.extend((turn['query'], turn['answer']))
+                item['matches_search'] = any(search in text.casefold() for text in texts)
+            results.append(item)
+        return results
 
     def create(self, user, title):
         title = _title(title)

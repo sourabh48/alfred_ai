@@ -49,6 +49,8 @@
         </form>
         <label for="conversationHistorySearch" class="form-label">Search saved titles on this page</label>
         <input id="conversationHistorySearch" type="search" class="form-control mb-2" maxlength="128" autocomplete="off" disabled aria-describedby="conversationHistoryMatches">
+        <button id="conversationHistorySearchMessages" class="btn btn-outline-primary btn-sm mb-2" type="button" disabled aria-describedby="conversationSearchHelp">Search saved messages</button>
+        <p id="conversationSearchHelp" class="small">Typing filters loaded titles. Search saved messages also checks retained questions and answers on this device, up to 50 conversations and 20 turns each. Search phrases are not saved or sent to models. Results are historical hypotheses; reopen sources for current evidence.</p>
         <p id="conversationHistoryMatches" class="small" role="status" aria-live="polite"></p>
         <ul id="conversationHistoryList" class="list-unstyled" aria-label="Your saved conversations"></ul>
     </details>
@@ -212,5 +214,5 @@
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
 <script src="/static/js/answer_markdown.js?v=1"></script>
-<script src="/static/js/intelligence.js?v=29"></script>
+<script src="/static/js/intelligence.js?v=30"></script>
 {% endblock %}

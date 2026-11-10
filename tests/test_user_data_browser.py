@@ -2596,6 +2596,103 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(history.policy(owner)['conversations'], 0)
         self.assertEqual(len(history.list(other)), 1)
 
+    def test_private_message_search_keyboard_reopen_privacy_and_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        local.reason.return_value = 'Synthetic hypothesis: fictional velvet otters enjoy dancing.'
+        self.enable_private_history_ui()
+        title = self.browser.find_element(self.By.ID, 'conversationHistoryTitle')
+        title.send_keys('Synthetic ordinary label')
+        self.ask_history_question('Describe a fictional animal hobby')
+        self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
+        saved = history.list(owner)[0]
+        history.create(owner, 'Synthetic other label')
+        self.memory_click('#conversationHistoryRefresh')
+        self.wait.until(lambda _: 'Showing 2 of 2' in self.text('conversationHistoryMatches'))
+        draft = self.browser.find_element(self.By.ID, 'intelligenceQuery'); draft.send_keys('Synthetic unsent draft')
+        search = self.browser.find_element(self.By.ID, 'conversationHistorySearch')
+        search.send_keys('VELVET')
+        self.wait.until(lambda _: 'Showing 0 of 2' in self.text('conversationHistoryMatches'))
+        calls = local.reason.call_count
+        self.browser.find_element(self.By.ID, 'conversationHistorySearchMessages').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Showing 1 of 2 saved conversations' in self.text('conversationHistoryMatches'))
+        self.wait.until(lambda _: not draft.get_property('readOnly'))
+        self.assertEqual(self.browser.execute_script('return document.activeElement.id'), 'conversationHistorySearchMessages')
+        self.assertEqual(draft.get_property('value'), 'Synthetic unsent draft')
+        self.assertIn('Synthetic ordinary label', self.text('conversationHistoryCurrent'))
+        self.assertEqual(local.reason.call_count, calls)
+        self.assertNotIn('VELVET', self.browser.current_url)
+        self.assertNotIn('VELVET', self.browser.execute_script("return JSON.stringify(localStorage)+JSON.stringify(sessionStorage)+JSON.stringify(performance.getEntriesByType('resource').map(e=>e.name))"))
+        self.assertEqual(history.get(owner, saved['id'])['revision'], 1)
+        self.capture('private-message-search')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'message-search-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On \u00b7 local only')
+        self.memory_click('#conversationHistoryPanel > summary')
+        self.assertEqual(self.browser.find_element(self.By.ID,'conversationHistorySearch').get_property('value'), '')
+        self.browser.find_element(self.By.ID,'conversationHistorySearch').send_keys('velvet')
+        self.memory_click('#conversationHistorySearchMessages')
+        self.wait.until(lambda _: 'Showing 1 of 2 saved conversations' in self.text('conversationHistoryMatches'))
+        self.memory_click('#conversationHistoryList li:not(.d-none) button:first-child')
+        self.wait.until(lambda _: 'Historical AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertIn('velvet otters', self.text('intelligenceAnswers'))
+        self.assertEqual(local.reason.call_count, calls)
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))")
+        self.assertEqual(self.browser.find_element(self.By.ID,'conversationHistorySearch').get_property('value'), '')
+        self.assertEqual(self.text('conversationHistoryMatches'), '')
+        self.assertTrue(self.browser.find_element(self.By.ID,'conversationHistorySearchMessages').get_property('disabled'))
+
+    def test_private_message_search_outage_retry_stale_conflict_and_permission_loss(self):
+        from django.db import OperationalError
+        from django.core.exceptions import PermissionDenied
+        from apps.ml_engine.api.conversations import ConversationSearchAPI
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        local.reason.return_value = 'Synthetic hypothesis about fictional glass foxes.'
+        self.enable_private_history_ui()
+        self.ask_history_question('Suggest a fictional hobby')
+        self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
+        saved = history.list(owner)[0]
+        draft = self.browser.find_element(self.By.ID,'intelligenceQuery'); draft.send_keys('Synthetic draft held on error')
+        search = self.browser.find_element(self.By.ID,'conversationHistorySearch'); search.send_keys('glass')
+        calls = local.reason.call_count
+        with patch.object(ConversationSearchAPI, 'post', side_effect=OperationalError('SYNTHETIC-SEARCH-PRIVATE-ERROR')):
+            self.memory_click('#conversationHistorySearchMessages')
+            self.wait.until(lambda _: 'unavailable' in self.text('conversationHistoryFeedback'))
+        self.wait.until(lambda _: not draft.get_property('readOnly'))
+        self.assertEqual(search.get_property('value'), 'glass')
+        self.assertEqual(draft.get_property('value'), 'Synthetic draft held on error')
+        self.assertNotIn('SYNTHETIC-SEARCH-PRIVATE-ERROR', self.text('conversationHistoryFeedback'))
+        self.memory_click('#conversationHistorySearchMessages')
+        self.wait.until(lambda _: 'Showing 1 of 1 saved conversations' in self.text('conversationHistoryMatches'))
+        history.rename(owner, saved['id'], 'Changed elsewhere', saved['revision'])
+        self.memory_click('#intelligenceForm button[type=submit]')
+        self.wait.until(lambda _: 'changed' in self.text('intelligenceFeedback').lower())
+        self.memory_click('#conversationHistorySearchMessages')
+        self.wait.until(lambda _: not draft.get_property('readOnly'))
+        self.memory_click('#intelligenceForm button[type=submit]')
+        self.wait.until(lambda _: 'Reopen' in self.text('intelligenceFeedback'))
+        self.assertEqual(draft.get_property('value'), 'Synthetic draft held on error')
+        self.assertEqual(local.reason.call_count, calls)
+        with patch.object(ConversationSearchAPI, 'post', side_effect=PermissionDenied('SYNTHETIC-SEARCH-SESSION-LOSS')):
+            self.memory_click('#conversationHistorySearchMessages')
+            self.wait.until(lambda _: search.get_property('value') == '')
+        self.assertEqual(search.get_property('value'), '')
+        self.assertEqual(draft.get_property('value'), '')
+        self.assertEqual(self.text('intelligenceAnswers'), '')
+
     def test_private_history_rename_search_stale_reopen_keyboard_and_privacy(self):
         from selenium.webdriver.common.keys import Keys
         history, local = self.private_history_fixture(); owner = self.scenario['user']

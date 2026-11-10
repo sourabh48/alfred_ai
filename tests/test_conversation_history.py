@@ -53,6 +53,163 @@ class ConversationHistoryTests(TestCase):
     def post(self, payload, client=None):
         return (client or self.client).post('/api/ai/personal-insights/', json.dumps(payload), content_type='application/json')
 
+    def test_saved_message_search_is_local_metadata_only_and_case_insensitive(self):
+        record = self.create()
+        question = self.question | {'query': 'A fictional walk along the Straße'}
+        generation, _ = self.history.prepare(self.alice, record['id'], 0, 'a'*32, question)
+        self.history.append(self.alice, record['id'], 0, 'a'*32, question, self.result, generation)
+        empty = self.history.create(self.alice, 'Another title')
+        foreign = self.create(self.bob)
+        before = self.history.get(self.alice, record['id'])
+        key = self.store.key_file.read_bytes()
+        for query, matched in (('STRASSE', {record['id']}), ('private-history-answer', {record['id']}),
+                ('another title', {empty['id']}), ('SYNTHETIC-SOURCE-NOT-RETAINED', set()), ('.*', set())):
+            with self.subTest(query=query), patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',
+                    side_effect=AssertionError('Search needs no model')):
+                response = self.client.post('/api/ai/conversations/search/', {'query':query}, content_type='application/json')
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('no-store', response['Cache-Control'])
+                records = response.json()['conversations']
+                self.assertEqual({item['id'] for item in records}, {record['id'], empty['id']})
+                self.assertNotIn(foreign['id'], str(response.json()))
+                self.assertEqual({item['id'] for item in records if item['matches_search']}, matched)
+                self.assertTrue(all(set(item) == {'id','title','created_at','updated_at','expires_at','revision','matches_search'} for item in records))
+                self.assertNotIn(question['query'], response.content.decode())
+                self.assertNotIn(self.result['answer'], response.content.decode())
+        self.assertEqual(self.history.get(self.alice, record['id']), before)
+        self.assertEqual(self.store.key_file.read_bytes(), key)
+        self.assertEqual(self.store.list_memories(self.alice), [])
+        for file in self.store.directory.iterdir():
+            if file.is_file(): self.assertNotIn(question['query'].encode(), file.read_bytes())
+        self.assertTrue(all('matches_search' not in item for item in self.history.list(self.alice)))
+
+    def test_message_search_validates_input_and_does_not_echo_private_terms(self):
+        self.create()
+        for query in (None, True, {}, [], '', ' '*3, 'x'*129, ' '*129+'x', 'secret\nterm', 'secret\x7fterm'):
+            with self.subTest(query=query), self.assertLogs('apps.ml_engine.api.memory', level='ERROR') as logs:
+                response = self.client.post('/api/ai/conversations/search/', {'query':query}, content_type='application/json')
+                self.assertEqual(response.status_code, 400)
+            self.assertNotIn('secret', response.content.decode() + str(logs.output))
+        for data in ({}, {'query':'valid', 'owner':self.bob.pk}):
+            self.assertEqual(self.client.post('/api/ai/conversations/search/', data, content_type='application/json').status_code, 400)
+
+    def test_message_search_requires_owner_optin_operator_and_csrf(self):
+        url = '/api/ai/conversations/search/'
+        payload = {'query':'private'}
+        self.assertEqual(Client().post(url, payload, content_type='application/json').status_code, 403)
+        self.assertEqual(self.client.post(url, payload, content_type='application/json').status_code, 403)
+        self.create()
+        with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False):
+            self.assertEqual(self.client.post(url, payload, content_type='application/json').status_code, 403)
+        client = Client(enforce_csrf_checks=True); client.force_login(self.alice)
+        self.assertEqual(client.post(url, payload, content_type='application/json').status_code, 403)
+        client.cookies[settings.CSRF_COOKIE_NAME] = 'a'*32
+        response = client.post(url, payload, content_type='application/json', HTTP_X_CSRFTOKEN='a'*32)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get(url, {'query':'private'}).status_code, 405)
+        self.history.configure(self.alice, enabled=False)
+        self.assertEqual(self.client.post(url, payload, content_type='application/json').status_code, 403)
+
+    def test_message_search_excludes_expired_deleted_and_foreign_records(self):
+        start = datetime.now(timezone.utc)
+        with patch('apps.ml_engine.services.conversation_history.datetime', wraps=datetime) as clock:
+            clock.now.return_value = start
+            self.create(); self.enable(days=1)
+            foreign = self.create(self.bob)
+            clock.now.return_value = start + timedelta(days=2)
+            self.assertEqual(self.history.list(self.alice, search='private'), [])
+            self.assertIsNotNone(self.history.get(self.bob, foreign['id']))
+        record = self.history.create(self.alice, 'Current')
+        self.history.delete(self.alice, record['id'])
+        self.assertEqual(self.history.list(self.alice, search='Current'), [])
+
+    def test_message_search_fails_closed_preserving_corrupt_vault_and_lost_keys(self):
+        record = self.create(); key = self.store.key_file.read_bytes()
+        with self.store._transaction() as db:
+            db.execute('UPDATE conversations SET record=? WHERE id=?', (b'synthetic-corruption', record['id']))
+        with self.assertRaises(RuntimeError): self.history.list(self.alice, search='private')
+        with self.store._transaction() as db:
+            self.assertEqual(db.execute('SELECT record FROM conversations WHERE id=?', (record['id'],)).fetchone()[0], b'synthetic-corruption')
+        self.store.key_file.unlink()
+        with self.assertRaises(RuntimeError): ConversationHistory(MemoryStore(self.store.directory)).list(self.alice, search='private')
+        self.assertFalse(self.store.key_file.exists())
+        self.store.key_file.write_bytes(key)
+
+    def test_message_search_rechecks_session_after_reading(self):
+        self.create()
+        original = ConversationHistory.list
+        def logout(history, user, **kwargs):
+            result = original(history, user, **kwargs)
+            Session.objects.all().delete()
+            return result
+        with patch.object(ConversationHistory, 'list', logout):
+            response = self.client.post('/api/ai/conversations/search/', {'query':'private'}, content_type='application/json')
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn('conversations', response.json())
+
+    def test_message_search_at_capacity_survives_new_process_without_plaintext_index(self):
+        from cryptography.fernet import Fernet
+        record = self.create()
+        marker = 'SYNTHETIC-CAPACITY-SEARCH-PHRASE'
+        ids = [record['id']] + [uuid4().hex for _ in range(49)]
+        with self.store._transaction() as db:
+            for index, identity in enumerate(ids):
+                copy = dict(record, id=identity, title='Synthetic capacity conversation',
+                    kind='assistant_conversation', schema=1, owner=_owner(self.alice),
+                    turns=[dict(query=marker if index == 0 else 'Other fictional question', answer='z'*8100) for _ in range(20)])
+                key = Fernet.generate_key()
+                db.execute('INSERT OR REPLACE INTO conversations VALUES(?,?,?,?)', (identity, _owner(self.alice),
+                    self.store._cipher(db).encrypt(key), Fernet(key).encrypt(json.dumps(copy).encode())))
+        key = self.store.key_file.read_bytes()
+        code = '''
+from django.conf import settings
+settings.configure(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True)
+from datetime import datetime
+from pathlib import Path
+from types import SimpleNamespace
+import sys, time
+from apps.ml_engine.services.persistent_memory import MemoryStore
+from apps.ml_engine.services.conversation_history import ConversationHistory
+owner=SimpleNamespace(pk=int(sys.argv[2]),created_at=datetime.fromisoformat(sys.argv[3]),is_authenticated=True)
+start=time.perf_counter()
+items=ConversationHistory(MemoryStore(Path(sys.argv[1]),embedder=object())).list(owner,search=sys.argv[4])
+assert len(items)==50 and [item['id'] for item in items if item['matches_search']]==[sys.argv[5]]
+print('SEARCH_CAPACITY_RESTART_PASS count=50 turns_each=20 elapsed_ms='+str(round((time.perf_counter()-start)*1000)))
+'''
+        child = subprocess.run([sys.executable, '-B', '-c', code, str(self.store.directory), str(self.alice.pk),
+            self.alice.created_at.isoformat(), marker, ids[0]], capture_output=True, text=True, timeout=30)
+        self.assertEqual(child.returncode, 0, child.stderr)
+        self.assertIn('SEARCH_CAPACITY_RESTART_PASS', child.stdout)
+        print(child.stdout.strip())
+        self.assertEqual(self.store.key_file.read_bytes(), key)
+        for file in self.store.directory.iterdir():
+            if file.is_file(): self.assertNotIn(marker.encode(), file.read_bytes())
+
+    def test_message_search_rejects_malformed_turns_and_preserves_source(self):
+        from cryptography.fernet import Fernet
+        record = self.create()
+        with self.store._transaction() as db:
+            wrapped, encrypted = db.execute('SELECT wrapped,record FROM conversations WHERE id=?', (record['id'],)).fetchone()
+            cipher = Fernet(self.store._cipher(db).decrypt(wrapped))
+            broken = json.loads(cipher.decrypt(encrypted)); broken['turns'] = [{'query':123,'answer':'invalid turn'}]
+            encrypted = cipher.encrypt(json.dumps(broken).encode())
+            db.execute('UPDATE conversations SET record=? WHERE id=?', (encrypted, record['id']))
+        with self.assertRaises(RuntimeError): self.history.list(self.alice, search='private')
+        with self.store._transaction() as db:
+            self.assertEqual(db.execute('SELECT record FROM conversations WHERE id=?', (record['id'],)).fetchone()[0], encrypted)
+
+    def test_message_search_rechecks_consent_after_reading(self):
+        self.create()
+        original = ConversationHistory.list
+        def revoke(history, user, **kwargs):
+            result = original(history, user, **kwargs)
+            history.configure(user, enabled=False)
+            return result
+        with patch.object(ConversationHistory, 'list', revoke):
+            response = self.client.post('/api/ai/conversations/search/', {'query':'private'}, content_type='application/json')
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn('conversations', response.json())
+
     def test_default_off_operator_gate_explicit_consent_and_strict_retention(self):
         self.assertFalse(self.history.policy(self.alice)['enabled'])
         self.assertIsNone(self.history.policy(self.alice)['retention_days'])

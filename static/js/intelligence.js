@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const historyTitle = document.getElementById("conversationHistoryTitle");
     const historyRename = document.getElementById("conversationHistoryRename");
     const historySearch = document.getElementById("conversationHistorySearch");
+    const historySearchMessages = document.getElementById("conversationHistorySearchMessages");
     const historyList = document.getElementById("conversationHistoryList");
     const historyFeedback = document.getElementById("conversationHistoryFeedback");
     const historyCurrent = document.getElementById("conversationHistoryCurrent");
@@ -37,6 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const sourceReset = document.getElementById("intelligenceSourcesReset");
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
+    let historyMessageMatches = null;
     let controlsLoading = true;
     let pageDialogue = [];
     let registeredTools = [];
@@ -197,6 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
         historyTitle.disabled = locked || !historyEnabled();
         historyRename.disabled = locked || !historyEnabled() || !conversation;
         historySearch.disabled = locked || !historyEnabled();
+        historySearchMessages.disabled = locked || !historyEnabled() || !historySearch.value.trim();
         historyClear.disabled = !active || pending || !historyPolicy?.conversations;
         historyDisable.disabled = !active || pending || !(historyPolicy?.enabled || historyPolicy?.conversations);
         historyList.querySelectorAll("button").forEach(button => { button.disabled = !active || pending; });
@@ -219,6 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
         answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); financialChoice.replaceChildren(); empty.hidden = false;
         document.getElementById("intelligenceFinancialDocumentContext").textContent = "";
         historyList.replaceChildren(); historyTitle.value = ""; historySearch.value = "";
+        historyMessageMatches = null;
         document.getElementById("conversationHistoryMatches").textContent = "";
         historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
@@ -230,6 +234,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function applyHistory(data) {
         historyPolicy = data.policy;
+        historyMessageMatches = data.message_search
+            ? new Set(data.conversations.filter(record => record.matches_search).map(record => record.id)) : null;
         if (!historyEnabled()) historySearch.value = "";
         if (conversation && (!historyEnabled() || !(data.conversations || []).some(record => record.id === conversation.id))) {
             clearConversation();
@@ -241,6 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
         historyList.replaceChildren();
         (data.conversations || []).forEach(record => {
             const item = document.createElement("li"); item.className = "d-flex flex-wrap gap-2 align-items-center mb-2";
+            item.dataset.conversationId = record.id;
             const open = document.createElement("button"); open.type = "button"; open.className = "btn btn-outline-primary btn-sm";
             open.textContent = record.title; open.setAttribute("aria-label", `Reopen ${record.title}`);
             open.addEventListener("click", () => historyRequest(`/api/ai/conversations/${record.id}/`, {}, saved => {
@@ -269,14 +276,23 @@ document.addEventListener("DOMContentLoaded", () => {
         const term = historySearch.value.trim().toLocaleLowerCase();
         let matches = 0;
         historyList.querySelectorAll("li").forEach(item => {
-            const match = item.firstElementChild.textContent.toLocaleLowerCase().includes(term);
+            const match = historyMessageMatches ? historyMessageMatches.has(item.dataset.conversationId)
+                : item.firstElementChild.textContent.toLocaleLowerCase().includes(term);
             item.classList.toggle("d-none", !match);
             if (match) matches++;
         });
         document.getElementById("conversationHistoryMatches").textContent = historyEnabled()
-            ? `Showing ${matches} of ${historyList.children.length} saved titles. Search stays on this page.` : "";
+            ? `Showing ${matches} of ${historyList.children.length} saved ${historyMessageMatches ? 'conversations. Titles and saved messages searched locally.' : 'titles. Search stays on this page.'}` : "";
     }
-    historySearch.addEventListener("input", filterHistory);
+    historySearch.addEventListener("input", () => { historyMessageMatches = null; filterHistory(); updateHistoryControls(); });
+    historySearchMessages.addEventListener('click', async () => {
+        if (!historyEnabled() || !historySearch.value.trim()) return;
+        await historyRequest('/api/ai/conversations/search/', {method:'POST',body:JSON.stringify({query:historySearch.value})}, data => {
+            applyHistory(data);
+            historyFeedback.textContent = 'Saved messages searched locally. Your draft is preserved.';
+        });
+        if (active && !historySearchMessages.disabled) historySearchMessages.focus();
+    });
     function dialogueSnippet(text) {
         const encoder = new TextEncoder(); let snippet = "", size = 0;
         for (const character of text) {

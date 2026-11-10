@@ -10,7 +10,7 @@ from .financial_evidence import FinancialEvidenceAPI, FinancialSourcePageAPI, Cl
 from .views import AlfredExplainAPI, AlfredPersonalInsightsAPI, EmotionalSpendAPI, MLRuntimeControlAPI, MLRuntimeStatusAPI
 from .memory import MemoryCollectionAPI, MemoryDetailAPI, MemoryRetentionAPI, MemoryResetAPI, MemoryRestoreAPI, MemoryRetrieveAPI, MemorySyncAPI, MemoryReasoningAPI, MemoryReasoningKeyAPI, MemoryLearningAPI
 from .memory import KnowledgeHubAPI
-from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI
+from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, ConversationDetailAPI, ConversationClearAPI, ConversationSearchAPI
 from .document_corpus import DocumentCorpusAPI, DocumentCorpusSearchAPI, DocumentCorpusDetailAPI, DocumentCorpusUploadAPI, DocumentCorpusOriginalAPI, DocumentCorpusQuestionAPI
 
 urlpatterns = [
@@ -34,6 +34,7 @@ urlpatterns = [
     path('statement-evidence/<int:identity>/', StatementEvidenceAPI.as_view()),
     path("conversations/policy/", ConversationPolicyAPI.as_view()),
     path("conversations/clear/", ConversationClearAPI.as_view()),
+    path("conversations/search/", ConversationSearchAPI.as_view()),
     path("conversations/", ConversationCollectionAPI.as_view()),
     path("conversations/<str:identity>/", ConversationDetailAPI.as_view()),
     path("memories/", MemoryCollectionAPI.as_view()),

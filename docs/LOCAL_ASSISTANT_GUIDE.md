@@ -1,5 +1,13 @@
 # Using the local assistant
 
+With approved local history enabled, type in **Search saved titles on this page**
+to filter titles immediately. Choose **Search saved messages** to also find text
+inside retained questions and answers, then reopen a matching conversation.
+Search stays on this device, uses no AI provider and creates no plaintext index.
+It scans at most 50 conversations with 20 turns each; expired or deleted history
+cannot be found. Search phrases clear on navigation/reload. Saved answers remain
+historical hypotheses, so reopen source records for current evidence.
+
 If private history status is unavailable, page-only **Career application progress**
 and **Reviewed records from one document** can still use their selected local sources.
 Open **Private conversation history** and choose **Retry history status** to check

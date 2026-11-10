@@ -10,6 +10,8 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_private_message_search_keyboard_reopen_privacy_and_accessibility": 13.843,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_private_message_search_outage_retry_stale_conflict_and_permission_loss": 13.391,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_page_only_career_survives_history_outage_and_status_retry_preserves_draft": 16.282,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_page_only_reviewed_document_survives_history_outage_with_current_sources": 16.172,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_history_status_retry_does_not_clear_a_saved_conversation_conflict": 13.063,
