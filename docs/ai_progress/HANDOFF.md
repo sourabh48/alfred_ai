@@ -8,11 +8,13 @@ and answer budgets b535299 are locally accepted. Exact files/tests/failures and
 privacy limits: STATE.json and TEST_EVIDENCE.md. Clean source preflight PASS;
 no CI dispatched and no deployment/release acceptance. Cache hash below unchanged.
 
-Next active scope USE-03/conversation-rename-search: extend existing encrypted
-ConversationHistory with revision-bound owner rename; filter bounded owned titles
-in-page without URL/search logs or plaintext indexing. Keep retention fixed from
-creation, policy/session gates, stale inference rejection and existing delete flow.
-Read current source first, run focused tests/actual Chrome, commit/checkpoint;
+Latest source a173b3e: conversation rename/search completed locally with85 backend,
+3 Chrome and1 actual Ollama continuity PASS; clean-source preflight PASS. No source
+schema/worker/package change. See new local-assistant guide and retained receipts.
+Next active scope USE-03/page-only-dialogue: reuse existing bounded unverified
+context for local general chat without retaining transcripts or permitting cloud
+disclosure. Clear it on New conversation/page lifecycle; reject mixing with saved
+history or financial scope. Read current source, test actual Chrome/Ollama, commit;
 then select another eligible slice only while this explicit sprint remains active.
 No Claude launch or independent review is claimed.
 

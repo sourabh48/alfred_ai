@@ -12,8 +12,12 @@
  manual contrast remains. Concise/detail/comparison/steps retain context/output/
  financial/source/deadline caps. Fixed real-model fiction-continuity refusal without
  promoting dialogue to facts. Clean-source privacy/dependency/migration preflight PASS.
-- Next active scope: USE-03/conversation-rename-search. Reuse encrypted history and
- revision-bound writes; search stays in the page, with no URL query or plaintext index.
+- Conversation controls source a173b3ef5de459ad946ddacda3c74afd5bf71da3:85 backend,
+ 3 Chrome and1 actual Ollama continuity PASS; four Axe audits zero violations/manual
+ contrast pending. Clean-source preflight PASS. Rename preserves keys/turns/expiry,
+ rejects stale revisions; title search never leaves the page. Guide screenshot updated.
+- Next active scope: USE-03/page-only-dialogue. Reuse bounded unverified local
+ general-chat context while history is off; never persist it or permit cloud use.
  Deeper knowledge readiness and manual/owner/package acceptance remain open.
 - No schema/dependency/runtime/keys/personal-data/remote changes. Baseline85/143,
   extensions0/13 unchanged. Exact tests under artifacts/readiness-sprint-20261110.

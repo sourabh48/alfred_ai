@@ -5,20 +5,19 @@
     "workspace":  "F:/ALFRED/alfred_ai",
     "single_writer":  true,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "b535299097686cbc7e12a71b844cc97a6305c4b9",
-    "active_task_id":  "USE-03/conversation-rename-search",
+    "recorded_at_head":  "a173b3ef5de459ad946ddacda3c74afd5bf71da3",
+    "active_task_id":  "USE-03/page-only-dialogue",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
-                          "apps/ml_engine/api/views.py",
-                          "apps/ml_engine/services/hybrid_intelligence.py",
+                          "apps/ml_engine/api/conversations.py",
+                          "apps/ml_engine/services/conversation_history.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
-                          "docs/images/usability/local-answer-style.png",
+                          "docs/images/usability/conversation-history-controls.png",
                           "static/js/intelligence.js",
                           "templates/ai_insights.html",
                           "tests/browser_durations.json",
                           "tests/test_conversation_history.py",
-                          "tests/test_hybrid_intelligence.py",
                           "tests/test_local_conversation_acceptance.py",
                           "tests/test_user_data_browser.py"
                       ],
@@ -26,12 +25,13 @@
                             "Guided readiness a78096e:8 backend/2 Chrome PASS; four Axe audits zero violations/manual contrast pending",
                             "Answer budgets b535299:167 backend/2 Chrome/2 actual Ollama acceptance PASS; four Axe audits zero violations/manual contrast pending",
                             "Fixed real-model fiction continuity refusal while preserving unverified-dialogue, financial, citation, context/output and deadline guards",
-                            "Clean exact-source/privacy/dependency/migration preflight PASS; release promotion remains BLOCKED"
+                            "Clean exact-source/privacy/dependency/migration preflight PASS; release promotion remains BLOCKED",
+                            "Conversation controls a173b3e:85 backend/3 Chrome/1 actual Ollama continuity PASS; current-source preflight PASS; four Axe audits zero violations/manual contrast pending"
                         ],
     "remaining_steps":  [
-                            "Implement owner revision-bound encrypted conversation rename and in-page title search",
-                            "Test stale/replay/ownership/CSRF/retention and actual keyboard/browser reopen; commit and checkpoint",
-                            "Continue another eligible scope only during explicit sprint; preserve external/owner/package/3.0 gates"
+                            "Add bounded local-only page dialogue without persistent transcripts; reuse hybrid validation",
+                            "Test no history/cloud disclosure, reset, outage retry and actual browser/Ollama continuity",
+                            "Commit and checkpoint before another explicit-sprint eligible scope"
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -54,13 +54,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "Resume USE-03/conversation-rename-search on current preparation branch. Preserve cache edit, inspect existing encrypted history/service/API/JS, use bounded title filtering without URL or plaintext index, and test revision-bound rename before selecting another scope.",
+    "next_exact_instruction":  "Implement USE-03/page-only-dialogue: reuse bounded hybrid conversation context for page-only general chat, reject cloud/saved-history mixing, clear JS context on new/pagehide and validate with isolated backend/Chrome/real Ollama tests.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "b535299097686cbc7e12a71b844cc97a6305c4b9",
-    "checkpoint_at":  "2026-11-10T10:11:26.8841289Z",
+    "implementation_source_head":  "a173b3ef5de459ad946ddacda3c74afd5bf71da3",
+    "checkpoint_at":  "2026-11-10T10:24:56.8590760Z",
     "active_task_state":  "IMPLEMENTING",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-sprint-check-b535299",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-controls-check-a173b3e",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -76,7 +76,7 @@
                                      "docs/ai_progress/TEST_EVIDENCE.md"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "b535299097686cbc7e12a71b844cc97a6305c4b9",
+    "release_preflight_source_head":  "a173b3ef5de459ad946ddacda3c74afd5bf71da3",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed."
 }

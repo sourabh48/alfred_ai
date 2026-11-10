@@ -16,7 +16,8 @@ Validated loan implementation:88c1df8; latest preservation follow-up:c2d1517.
 | USE-02 investment document preview / confirmation | LOCAL_ACCEPTED / COMMITTED_LOCAL | b42988b;272 backend plus45 overlapping follow-up PASS, Chrome/four Axe audits/native24 PASS, manual contrast open; clean-source preflight PASS |
 | USE-02 guided data readiness | LOCAL_ACCEPTED / COMMITTED_LOCAL | a78096e;8 backend/2 Chrome PASS, four Axe audits zero violations/manual contrast pending |
 | USE-03 task-aware answer budgets | LOCAL_ACCEPTED / COMMITTED_LOCAL | b535299;167 backend/2 Chrome/2 actual Ollama acceptance PASS; four Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
-| USE-03 conversation rename and search | IMPLEMENTING | Existing encrypted history, ownership, retention and revision binding; no plaintext index or new store |
+| USE-03 conversation rename and search | LOCAL_ACCEPTED / COMMITTED_LOCAL | a173b3e;85 backend/3 Chrome/1 actual Ollama PASS; four Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
+| USE-03 page-only follow-up context | IMPLEMENTING | Reuse bounded unverified dialogue for local general chat without history retention or cloud disclosure |
 | Remaining USE-01/02 journeys | QUEUED | Other imports, knowledge readiness and owner/package acceptance remain |
 | Remaining USE-03, USE-04, USE-05 | QUEUED | Follow the usability ledger; existing domain adapters/actions first |
 | USE-06 release and complete 2.0 acceptance | GATED | Exact-head CI, independent/owner/package/upgrade gates remain |

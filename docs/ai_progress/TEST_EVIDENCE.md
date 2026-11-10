@@ -1,5 +1,27 @@
 # Test evidence index
 
+Conversation controls source a173b3ef5de459ad946ddacda3c74afd5bf71da3:
+
+-85 backend PASS, zero failures/skips (22.315s): history/hybrid/UI/memory privacy
+ and browser-plan coverage. Initial73 overlap, not additional distinct cases.
+-3 actual Chrome journeys PASS (37.380s): rename/search/stale reopen/keyboard,
+ prior consent/delete/clear, operator gate/logout/cached-page privacy. Guide fixture
+ text cleanup followed; affected journey rerun PASS (16.769s, overlaps the3).
+ Four light/dark1440/390 Axe audits zero violations; gradient contrast incomplete.
+-1 actual Ollama continuity test PASS (11.047s): encrypted vault reopen, rename,
+ then fictional follow-up answered. Subprocess restart reads renamed encrypted
+ title/revision; no key regeneration, plaintext title index or memory promotion.
+-Concurrent renames accept only one revision; replay/stale append, cross-owner,
+ CSRF, invalid UTF-8 byte lengths/control characters, failed-write rollback and
+ expiry non-revival covered. Initial browser3 had1 test error: a double-encoded
+ separator in a new expectation. Fixed expectation, unchanged application passed.
+-Receipts under `artifacts/conversation-controls-20261110/`: backend-final.log,
+ browser-final.json, browser-guide.json, real-local.log and clean-source-preflight/.
+ Source/privacy/dependency/migration preflight PASS; promotion BLOCKED. No source
+ worker/scheduler/schema/dependency change, native/package drill not rerun.
+-Only synthetic accounts/prompts/vaults used. Existing owner runtime, keys, models,
+ media, backups, installation and cache edit untouched. No remote CI/push/PR/merge.
+
 Sprint2026-11-10, preparation branch work/usability-integration:
 
 - Guided readiness source a78096e119ecfe2a3a098dba227e49781bdb9f29:
