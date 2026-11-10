@@ -722,11 +722,14 @@ document.addEventListener("DOMContentLoaded", () => {
             throw new Error('Connection ended before validation. Your draft is preserved; retry when ready.');
         } catch (error) {
             if (active && ticket === generation) {
-                partial.dataset.status = 'partial'; label.textContent = 'Partial, unverified - not saved. Retry to request a complete answer.';
+                partial.dataset.status = 'partial'; label.textContent = payload.conversation_id
+                    ? 'Partial, unverified preview. A completed turn may already be saved; reopen history or retry safely.'
+                    : 'Partial, unverified - not saved. Retry to request a complete answer.';
                 if ([401,403,409].includes(error.status)) text.textContent = '';
             }
             if (controller.signal.aborted) throw Object.assign(new Error(timedOut
                 ? 'Local generation timed out. Your draft is preserved; retry when ready.'
+                : payload.conversation_id ? 'Local generation stopped. Your draft is preserved; a completed turn may already be saved. Reopen history or retry safely.'
                 : 'Local generation stopped. The partial preview is unverified and not saved; your draft is preserved.'),{code:timedOut ? 'local_stream_timeout' : 'local_stream_stopped'});
             throw error;
         } finally {
@@ -788,7 +791,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (requestToken?.fingerprint !== fingerprint) requestToken = {fingerprint, id:crypto.randomUUID().replaceAll("-", "")};
                 Object.assign(payload, {cloud_consent:false, conversation_id:conversation.id, conversation_revision:conversation.revision, request_id:requestToken.id});
             }
-            const result = payload.scope === 'general' && !payload.cloud_consent && !historyEnabled() && window.ReadableStream && window.AbortController
+            const result = payload.scope === 'general' && !payload.cloud_consent && window.ReadableStream && window.AbortController
                 ? await streamAnswer(payload,ticket)
                 : await Alfred.fetchJSON("/api/ai/personal-insights/", {method: "POST", body: JSON.stringify(payload)});
             if (!active || ticket !== generation) return;

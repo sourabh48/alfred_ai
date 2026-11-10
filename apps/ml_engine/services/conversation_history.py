@@ -250,7 +250,7 @@ class ConversationHistory:
                             for role, text in (('user', turn['query']), ('assistant', turn['answer']))])
         return context
 
-    def append(self, user, identity, revision, request_id, question, result, generation):
+    def append(self, user, identity, revision, request_id, question, result, generation, *, check=None):
         owner = _owner(user)
         if (result.get('provider') != 'ollama' or result.get('classification') != 'ai_generated_hypothesis'
                 or result.get('financial_authority') is not False or not isinstance(result.get('answer'), str)
@@ -269,6 +269,7 @@ class ConversationHistory:
                     financial_authority=False, sources=sources, narrative_withheld=bool(result.get('narrative_withheld')),
                     saved_at=datetime.now(timezone.utc).isoformat())
         with self.store._transaction() as db:
+            if check is not None: check()
             policy = self._enabled(db, owner); self._expire(db, owner)
             record = self._get(db, owner, identity)
             if record is None or policy['generation'] != generation: raise ConversationConflict('Private history policy changed.')
@@ -281,4 +282,5 @@ class ConversationHistory:
             wrapped = db.execute('SELECT wrapped FROM conversations WHERE id=? AND owner=?', (identity, owner)).fetchone()[0]
             cipher = Fernet(self.store._cipher(db).decrypt(wrapped))
             db.execute('UPDATE conversations SET record=? WHERE id=? AND owner=?', (cipher.encrypt(_encoded(record)), identity, owner))
+            if check is not None: check()
             return record['revision']

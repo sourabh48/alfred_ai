@@ -88,3 +88,65 @@ class NativeLocalStreamAcceptance(TransactionTestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
         print('ACTUAL_SYNTHETIC_NATIVE_CANCEL '+json.dumps(dict(seconds=round(time.monotonic()-started,3),
             worker_stopped=True,retained_turns=0)))
+
+    def saved_history(self):
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        self.enterContext(override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True))
+        history = ConversationHistory(MemoryStore(settings.ALFRED_MEMORY_DIR))
+        history.configure(self.owner, enabled=True, consent=True, days=7)
+        return history, history.create(self.owner, 'Synthetic native streamed story')
+
+    def test_actual_saved_stream_reopens_context_and_replays_once(self):
+        from uuid import uuid4
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        history, record = self.saved_history(); key = history.store.key_file.read_bytes()
+        def ask(payload):
+            start = time.monotonic(); types = []; final = None
+            with self.session.post(self.base+'/api/ai/personal-insights/stream/',json=payload,stream=True,timeout=(3,35)) as response:
+                response.raise_for_status()
+                for raw in response.iter_lines(chunk_size=1):
+                    event = json.loads(raw); types.append(event['type'])
+                    self.assertNotEqual(event['type'],'error',event)
+                    if event['type']=='final': final = event['result']
+            self.assertIsNotNone(final)
+            return final, types, round(time.monotonic()-start,3)
+        payload = dict(query="In this fictional scene, the robot's favorite color is cobalt. Reply with a short acknowledgement.",
+            scope='general',cloud_consent=False,answer_style='concise',conversation_id=record['id'],
+            conversation_revision=0,request_id=uuid4().hex)
+        first, events, first_seconds = ask(payload)
+        self.assertIn('delta',events); self.assertTrue(first['conversation_saved'])
+        reopened = ConversationHistory(MemoryStore(settings.ALFRED_MEMORY_DIR))
+        self.assertEqual(len(reopened.get(self.owner,record['id'])['turns']),1)
+        payload.update(query="In that fictional scene, what color did the robot like? Answer briefly.",
+            conversation_revision=1,request_id=uuid4().hex)
+        second, _, followup_seconds = ask(payload)
+        self.assertIn('cobalt',second['answer'].lower())
+        self.assertEqual(second['conversation_context_turns'],1)
+        with patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner.reason',side_effect=AssertionError('Replay must not infer again')):
+            replay, _, _ = ask(payload)
+        self.assertTrue(replay['historical'])
+        self.assertEqual(len(reopened.get(self.owner,record['id'])['turns']),2)
+        self.assertEqual(reopened.store.key_file.read_bytes(),key)
+        self.assertEqual(reopened.store.list_memories(self.owner),[])
+        print('ACTUAL_SYNTHETIC_SAVED_STREAM '+json.dumps(dict(first_seconds=first_seconds,
+            followup_seconds=followup_seconds,reopened_turns=2,replay_without_inference=True)))
+
+    def test_actual_saved_disconnect_cancels_without_appending(self):
+        from uuid import uuid4
+        history, record = self.saved_history()
+        payload = dict(query='Tell a long fictional story about a robot learning to dance in rain. Label it fiction.',
+            scope='general',cloud_consent=False,answer_style='detailed',conversation_id=record['id'],
+            conversation_revision=0,request_id=uuid4().hex)
+        response = self.session.post(self.base+'/api/ai/personal-insights/stream/',json=payload,stream=True,timeout=(3,35))
+        response.raise_for_status(); preview = False
+        for raw in response.iter_lines(chunk_size=1):
+            event = json.loads(raw)
+            self.assertNotEqual(event['type'],'error',event)
+            self.assertNotEqual(event['type'],'final','Cancel during active saved inference')
+            if event['type']=='delta': preview = True; break
+        self.assertTrue(preview)
+        stream = self.streams[-1]; self.assertTrue(stream.worker.is_alive())
+        started = time.monotonic(); response.close(); stream.worker.join(timeout=3)
+        self.assertFalse(stream.worker.is_alive())
+        self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
+        print('ACTUAL_SYNTHETIC_SAVED_CANCEL '+json.dumps(dict(seconds=round(time.monotonic()-started,3),retained_turns=0)))

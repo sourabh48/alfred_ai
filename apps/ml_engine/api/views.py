@@ -79,6 +79,9 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
     def post(self,request):
         data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','selected_records','cloud_consent','query_sensitivity',
                            'conversation_id','conversation_revision','request_id','answer_style','page_context'))
+        return self.answer(request, data)
+
+    def answer(self, request, data, *, stream=None):
         from ..services.hybrid_intelligence import answer_budget, validate_dialogue
         answer_budget('', data.get('scope', 'general'), data.get('answer_style', 'auto'))
         conversation_context = data.get('page_context', [])
@@ -94,6 +97,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
             current_session(request)
             if data.get('conversation_id') is not None: raise ValueError('This source is page-only; conversation persistence is not supported.')
         store = None if page_only_question else memory_store()
+        if stream is not None: store.embedder.cancellation = stream
         identity = data.get('conversation_id')
         history_fields = {'conversation_id','conversation_revision','request_id'}
         if identity is None and history_fields & set(data): raise ValueError()
@@ -115,19 +119,27 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 return Response({**saved, 'historical':True, 'conversation':{'id':identity, 'revision':record['revision']}})
             if data.get('scope', 'general') == 'general':
                 conversation_context = history.context(request.user, identity, data.get('conversation_revision'), generation)
+        local = {}
+        if stream is not None:
+            from ..services import hybrid_intelligence
+            local['local'] = hybrid_intelligence.OllamaReasoner(stream=stream)
         try:
             result = hybrid_answer(store,request.user,data.get('query'),scope=data.get('scope','general'),
                 document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
                 selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),selected_records=data.get('selected_records'),cloud_consent=data.get('cloud_consent',False),
                 query_sensitivity=data.get('query_sensitivity','sensitive'), conversation_context=conversation_context,
-                answer_style=data.get('answer_style','auto'))
+                answer_style=data.get('answer_style','auto'), **local)
         finally:
             if page_only_question: current_session(request)
         if identity is not None:
-            current_session(request)
+            def check_history():
+                if stream is not None: stream.check()
+                current_session(request)
+            check_history()
             revision = data.get('conversation_revision')
             if result['provider']!='local_evidence':
-                revision = history.append(request.user, identity, revision, data.get('request_id'), question, result, generation)
+                revision = history.append(request.user, identity, revision, data.get('request_id'), question, result, generation,
+                    check=check_history if stream is not None else None)
             result = {**result, 'conversation':{'id':identity, 'revision':revision}, 'conversation_saved':result['provider']!='local_evidence'}
         return Response(result)
 

@@ -117,18 +117,22 @@ private history remains a separate opt-in with retention and recovery controls.
 
 ![Local answer choices and conversation, using synthetic data](images/usability/local-answer-style.png)
 
-Page-only local general chat streams an **unverified preview** while generating.
+Local general chat streams an **unverified preview** with history on or off.
 Press **Stop generation** to cancel, including by keyboard. Stop, timeout or a
 broken connection preserves the draft and labels any preview **Partial, unverified**.
 It has no source links, memory promotion or history-save controls. Use **Retry**
 to request a complete answer. If the output limit is reached, choose Concise or
-narrow the question. Partial or interrupted responses never enter saved history.
+narrow the question. Partial previews never enter saved history. With approved
+history enabled, only completed, validated local answers are retained. If the final
+response is lost after saving, **Retry** the same draft to recover its saved answer
+without another turn or model call. A stopped connection may already have a completed
+turn saved; reopen history to check. Follow-ups use the same bounded local context.
 
 ![Unverified preview and Stop generation, using synthetic data](images/usability/local-stream.png)
 
 Figures and source-backed output are buffered until the complete response passes
 validation. Source links and accepted answer controls appear only after validation.
-Saved-history, domain and consented-fallback requests retain their complete-response
+Domain and consented-fallback requests retain their complete-response
 path in this slice; they have no streaming Stop control. History privacy and
 financial grounding rules still apply.
 

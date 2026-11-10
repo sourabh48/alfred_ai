@@ -2180,6 +2180,98 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn('99999',self.text('intelligenceAnswers'))
         self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(r=>r.name.includes('example.invalid'))"))
 
+    def test_saved_stream_progress_stop_retry_context_reopen_and_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        from apps.ml_engine.services.local_chat_stream import GenerationCancelled
+        history, _ = self.private_history_fixture(); owner = self.scenario['user']
+        self.enable_private_history_ui()
+        mode = {'wait':True}; streams = []; seen = []; stopped = threading.Event()
+        def factory(*, stream):
+            from unittest.mock import Mock
+            streams.append(stream); model = Mock()
+            def reason(payload, **kwargs):
+                seen.append(payload)
+                stream.offer(dict(type='delta',text='Synthetic saved preview <img src=x onerror="window.savedStreamLeak=true">'))
+                if mode['wait']:
+                    try:
+                        while True: stream.check(); time.sleep(.02)
+                    except GenerationCancelled: stopped.set(); raise
+                return 'Synthetic complete saved hypothesis.'
+            model.reason.side_effect = reason
+            return model
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',side_effect=factory))
+        def cleanup():
+            for stream in streams: stream.close(); stream.worker.join(timeout=3)
+        self.addCleanup(cleanup)
+        draft = self.browser.find_element(self.By.ID,'intelligenceQuery')
+        draft.send_keys('Tell a synthetic fictional story',Keys.CONTROL,Keys.ENTER)
+        self.wait.until(lambda _: 'Synthetic saved preview' in self.text('intelligenceAnswers'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.savedStreamLeak)'))
+        self.assertNotIn('AI hypothesis',self.text('intelligenceAnswers'))
+        self.capture('saved-general-stream')
+        self.browser.find_element(self.By.ID,'intelligenceStop').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Local generation stopped' in self.text('intelligenceFeedback'))
+        self.wait.until(lambda _: stopped.is_set())
+        self.assertEqual(draft.get_property('value'),'Tell a synthetic fictional story')
+        self.assertEqual(self.browser.execute_script('return document.activeElement.id'),'intelligenceQuery')
+        self.assertIn('may already be saved',self.text('intelligenceAnswers'))
+        saved = history.list(owner)[0]
+        self.assertEqual(history.get(owner,saved['id'])['turns'],[])
+        mode['wait'] = False; self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: draft.get_property('value') == '')
+        self.assertEqual(len(history.get(owner,saved['id'])['turns']),1)
+        self.ask_history_question('Continue that fictional story')
+        self.wait.until(lambda _: draft.get_property('value') == '')
+        self.assertEqual(len(seen[-1]['history']),2)
+        self.assertEqual(len(history.get(owner,saved['id'])['turns']),2)
+        self.assertEqual(history.store.list_memories(owner),[])
+        count = len(seen)
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On \u00b7 local only')
+        self.memory_click('#conversationHistoryPanel > summary')
+        self.memory_click('#conversationHistoryList li:first-child button:first-child')
+        self.wait.until(lambda _: 'Historical AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertEqual(len(seen),count)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings=[]; self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'saved-stream-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+
+    def test_saved_stream_lost_final_response_retries_without_duplicate_turn(self):
+        from apps.ml_engine.services.local_chat_stream import LocalChatStream, GenerationIncomplete
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        self.enable_private_history_ui()
+        original = LocalChatStream.offer; lose = {'once':True}
+        def lose_final(stream, event):
+            if event['type'] == 'final' and lose['once']:
+                lose['once'] = False
+                raise GenerationIncomplete('SYNTHETIC-LOST-FINAL-ACK')
+            return original(stream, event)
+        with patch.object(LocalChatStream,'offer',lose_final):
+            self.ask_history_question('Describe a synthetic fictional hobby')
+            self.wait.until(lambda _: 'Local output is incomplete' in self.text('intelligenceFeedback'))
+        saved = history.list(owner)[0]
+        self.assertEqual(len(history.get(owner,saved['id'])['turns']),1)
+        draft = self.browser.find_element(self.By.ID,'intelligenceQuery')
+        self.assertEqual(draft.get_property('value'),'Describe a synthetic fictional hobby')
+        self.assertIn('may already be saved',self.text('intelligenceAnswers'))
+        self.assertNotIn('SYNTHETIC-LOST-FINAL-ACK',self.text('intelligenceFeedback'))
+        calls = local.reason.call_count
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: draft.get_property('value') == '')
+        self.assertEqual(local.reason.call_count,calls)
+        self.assertEqual(len(history.get(owner,saved['id'])['turns']),1)
+        self.assertIn('Historical AI hypothesis',self.text('intelligenceAnswers'))
+
     def test_local_stream_progress_keyboard_stop_partial_retry_and_accessibility(self):
         from selenium.webdriver.common.keys import Keys
         from apps.ml_engine.services.local_chat_stream import GenerationCancelled, GenerationIncomplete

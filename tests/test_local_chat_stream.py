@@ -182,6 +182,137 @@ class LocalStreamAPITests(TransactionTestCase):
             for table in ('conversations','conversation_policies','memories','events'):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
 
+    def test_saved_stream_retains_validated_turn_and_replays_without_inference(self):
+        from uuid import uuid4
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True):
+            history = ConversationHistory(self.store)
+            history.configure(self.alice, enabled=True, consent=True, days=7)
+            record = history.create(self.alice, 'Synthetic streamed dialogue')
+            payload = dict(query='Synthetic mountain question', scope='general', conversation_id=record['id'],
+                conversation_revision=0, request_id=uuid4().hex)
+            events = self.events(self.post(payload))
+            self.assertEqual(events[-1]['type'], 'final')
+            self.assertEqual(events[-1]['result']['conversation'], {'id':record['id'],'revision':1})
+            saved = history.get(self.alice, record['id'])
+            self.assertEqual(len(saved['turns']), 1)
+            self.assertEqual(saved['turns'][0]['answer'], 'Synthetic local hypothesis.')
+            connections = len(self.connections)
+            replay = self.events(self.post(payload))[-1]['result']
+            self.assertTrue(replay['historical'])
+            self.assertEqual(len(self.connections), connections)
+            self.assertEqual(len(history.get(self.alice, record['id'])['turns']), 1)
+            payload.update(query='Tell me more',conversation_revision=1,request_id=uuid4().hex)
+            self.assertEqual(self.events(self.post(payload))[-1]['result']['conversation_context_turns'], 1)
+            self.assertEqual(self.store.list_memories(self.alice), [])
+
+    def saved_question(self):
+        from uuid import uuid4
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        self.enterContext(override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True))
+        history = ConversationHistory(self.store)
+        history.configure(self.alice, enabled=True, consent=True, days=7)
+        record = history.create(self.alice, 'Synthetic saved stream')
+        return history, dict(query='Synthetic mountain question', scope='general', conversation_id=record['id'],
+            conversation_revision=0, request_id=uuid4().hex)
+
+    def test_saved_stream_rejects_foreign_stale_expired_or_revoked_history_before_model(self):
+        from datetime import datetime, timedelta, timezone
+        history, payload = self.saved_question()
+        foreign = Client(); foreign.force_login(self.bob)
+        history.configure(self.bob, enabled=True, consent=True, days=7)
+        self.assertEqual(self.events(self.post(payload, client=foreign))[-1]['status'], 409)
+        with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False):
+            self.assertEqual(self.events(self.post(payload))[-1]['status'], 403)
+        history.rename(self.alice, payload['conversation_id'], 'Changed elsewhere', 0)
+        self.assertEqual(self.events(self.post(payload))[-1]['status'], 409)
+        with patch('apps.ml_engine.services.conversation_history.datetime', wraps=datetime) as clock:
+            clock.now.return_value = datetime.now(timezone.utc)+timedelta(days=8)
+            self.assertEqual(self.events(self.post(payload))[-1]['status'], 409)
+        history.configure(self.alice, enabled=False)
+        self.assertEqual(self.events(self.post(payload))[-1]['status'], 403)
+        self.assertEqual(self.connections, [])
+
+    def test_saved_stream_rejects_mixed_or_malformed_context(self):
+        _, payload = self.saved_question()
+        for changes in ({'page_context':[]}, {'conversation_id':None}, {'request_id':'invalid'},
+                {'conversation_revision':True}, {'conversation_revision':-1}, {'cloud_consent':True}, {'scope':'finance'}):
+            with self.subTest(changes=changes): self.assertEqual(self.post(payload | changes).status_code, 400)
+        self.assertEqual(self.streams, [])
+
+    def test_saved_stream_mutated_sources_consent_or_revision_cannot_be_saved(self):
+        for mutation in ('source', 'consent', 'revision'):
+            with self.subTest(mutation=mutation):
+                history, payload = self.saved_question()
+                identity = self.store.save_verified(self.alice, dict(statement='Synthetic mountain evidence'),
+                    dict(source='Synthetic review'), verified=True)
+                def changed():
+                    if mutation == 'source': self.store.delete_memory(self.alice, identity)
+                    elif mutation == 'consent': history.configure(self.alice, enabled=False)
+                    else: history.rename(self.alice, payload['conversation_id'], 'Changed during inference', 0)
+                self.hook = changed
+                events = self.events(self.post(payload))
+                self.assertEqual(events[-1]['type'], 'error')
+                self.assertIn(events[-1]['status'], (403,409))
+                self.assertNotIn('final', [item['type'] for item in events])
+                if mutation != 'consent': self.assertEqual(history.get(self.alice, payload['conversation_id'])['turns'], [])
+                else: self.assertEqual(history.policy(self.alice)['conversations'], 0)
+                self.store.delete_memory(self.alice, identity)
+
+    def test_saved_stream_disconnect_before_completion_retains_no_turn_and_can_retry(self):
+        history, payload = self.saved_question()
+        entered, release = Event(), Event()
+        self.hook = lambda: (entered.set(),release.wait(timeout=2))
+        response = self.post(payload)
+        self.assertTrue(entered.wait(timeout=2))
+        response.close(); release.set()
+        self.streams[-1].worker.join(timeout=2)
+        self.assertFalse(self.streams[-1].worker.is_alive())
+        self.assertEqual(history.get(self.alice, payload['conversation_id'])['turns'], [])
+        self.hook = None
+        self.assertEqual(self.events(self.post(payload))[-1]['result']['conversation']['revision'], 1)
+
+    def test_saved_stream_lost_final_ack_replays_one_persisted_turn(self):
+        history, payload = self.saved_question()
+        reached, release = Event(), Event()
+        original = LocalChatStream.offer
+        def hold_final(control, event):
+            if event['type'] == 'final': reached.set(); release.wait(timeout=3)
+            return original(control, event)
+        with patch.object(LocalChatStream, 'offer', hold_final):
+            response = self.post(payload)
+            self.assertTrue(reached.wait(timeout=2))
+            self.assertEqual(len(history.get(self.alice, payload['conversation_id'])['turns']), 1)
+            response.close(); release.set(); self.streams[-1].worker.join(timeout=2)
+        connections = len(self.connections)
+        replay = self.events(self.post(payload))[-1]['result']
+        self.assertTrue(replay['historical']); self.assertEqual(len(self.connections), connections)
+        self.assertEqual(len(history.get(self.alice, payload['conversation_id'])['turns']), 1)
+        changed = self.events(self.post(payload | {'query':'A different question'}))
+        self.assertEqual(changed[-1]['status'], 409)
+
+    def test_saved_stream_cancellation_after_sql_update_rolls_back(self):
+        from apps.ml_engine.services.conversation_history import _encoded
+        history, payload = self.saved_question()
+        def cancel(record):
+            if record['turns']: self.streams[-1].cancelled.set()
+            return _encoded(record)
+        with patch('apps.ml_engine.services.conversation_history._encoded', side_effect=cancel):
+            response = self.post(payload)
+            with closing(response): events = [json.loads(line) for line in response.streaming_content]
+            self.streams[-1].worker.join(timeout=2)
+        self.assertNotIn('final', [item['type'] for item in events])
+        saved = history.get(self.alice, payload['conversation_id'])
+        self.assertEqual(saved['turns'], []); self.assertEqual(saved['revision'], 0)
+
+    def test_saved_stream_session_revoked_during_inference_cannot_append(self):
+        history, payload = self.saved_question()
+        self.hook = lambda: Session.objects.filter(session_key=self.client.session.session_key).delete()
+        events = self.events(self.post(payload))
+        self.assertEqual(events[-1]['status'], 403)
+        self.streams[-1].worker.join(timeout=2)
+        self.assertEqual(history.get(self.alice, payload['conversation_id'])['turns'], [])
+
     def test_invalid_cloud_domain_history_and_privileged_context_rejected_before_inference(self):
         cases = [dict(query=''),dict(query='x'*1025),dict(query='Synthetic',scope='finance'),
             dict(query='Synthetic',cloud_consent=True),dict(query='Synthetic',conversation_id='a'*32),
