@@ -60,10 +60,12 @@ class LocalConversationAcceptance(TestCase):
             first = ask("In this fictional story the robot's favorite color is cobalt. Acknowledge that briefly.", 0)
             reopened = ConversationHistory(MemoryStore(Path(directory)/'vault'))
             self.assertEqual(len(reopened.get(owner, record['id'])['turns']), 1)
-            second = ask("What was the fictional robot's favorite color?", first['conversation']['revision'])
+            renamed = reopened.rename(owner,record['id'],'Synthetic renamed continuity',first['conversation']['revision'])
+            second = ask("What was the fictional robot's favorite color?", renamed['revision'])
             if 'cobalt' not in second['answer'].lower():
                 print('SYNTHETIC_FICTION_CONTINUITY '+json.dumps(dict(first=first['answer'],
                     second=second['answer'],context_turns=second['conversation_context_turns'])))
             self.assertIn('cobalt', second['answer'].lower())
             self.assertEqual(second['conversation_context_turns'], 1)
+            self.assertEqual(reopened.get(owner,record['id'])['title'],'Synthetic renamed continuity')
             self.assertEqual(reopened.store.list_memories(owner), [])

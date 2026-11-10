@@ -40,8 +40,15 @@
             <button id="conversationHistoryClear" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear all conversations</button>
         </div>
         <p id="conversationHistoryFeedback" class="small" role="status" aria-live="polite"></p>
-        <label for="conversationHistoryTitle" class="form-label">Title for the next saved conversation</label>
-        <input id="conversationHistoryTitle" class="form-control mb-2" maxlength="128" autocomplete="off" placeholder="Private conversation" disabled>
+        <form id="conversationTitleForm" data-live-refresh-hold="true">
+            <label for="conversationHistoryTitle" class="form-label">Title for the next or reopened conversation</label>
+            <input id="conversationHistoryTitle" class="form-control mb-2" maxlength="128" autocomplete="off" placeholder="Private conversation" disabled aria-describedby="conversationTitleHelp">
+            <button id="conversationHistoryRename" class="btn btn-outline-primary btn-sm mb-2" type="submit" disabled>Save conversation title</button>
+            <p id="conversationTitleHelp" class="small">Reopen a saved conversation to rename it. Saving a title keeps its original expiry and transcript.</p>
+        </form>
+        <label for="conversationHistorySearch" class="form-label">Search saved titles on this page</label>
+        <input id="conversationHistorySearch" type="search" class="form-control mb-2" maxlength="128" autocomplete="off" disabled aria-describedby="conversationHistoryMatches">
+        <p id="conversationHistoryMatches" class="small" role="status" aria-live="polite"></p>
         <ul id="conversationHistoryList" class="list-unstyled" aria-label="Your saved conversations"></ul>
     </details>
     <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
@@ -194,5 +201,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=18"></script>
+<script src="/static/js/intelligence.js?v=19"></script>
 {% endblock %}

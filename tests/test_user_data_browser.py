@@ -2337,6 +2337,78 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(history.policy(owner)['conversations'], 0)
         self.assertEqual(len(history.list(other)), 1)
 
+    def test_private_history_rename_search_stale_reopen_keyboard_and_privacy(self):
+        from selenium.webdriver.common.keys import Keys
+        history, local = self.private_history_fixture(); owner = self.scenario['user']
+        local.reason.return_value = 'Synthetic hypothesis: the fictional robot enjoys quiet outdoor dancing.'
+        self.enable_private_history_ui()
+        history.create(owner,'Synthetic other conversation')
+        self.ask_history_question('Synthetic initial conversation question')
+        self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
+        record = history.list(owner)[0]; original = history.get(owner,record['id'])
+        title = self.browser.find_element(self.By.ID,'conversationHistoryTitle')
+        new_title = 'Synthetic Rain <img src=x onerror="window.renameLeak=true">'
+        title.clear(); title.send_keys(new_title,Keys.ENTER)
+        self.wait.until(lambda _: 'Title saved locally' in self.text('conversationHistoryFeedback'))
+        self.wait.until(lambda _: new_title in self.text('conversationHistoryCurrent'))
+        renamed = history.get(owner,record['id'])
+        self.assertEqual(renamed['turns'],original['turns'])
+        self.assertEqual(renamed['expires_at'],original['expires_at'])
+        self.assertFalse(self.browser.execute_script('return Boolean(window.renameLeak)'))
+        search = self.browser.find_element(self.By.ID,'conversationHistorySearch')
+        calls = local.reason.call_count
+        search.send_keys('RAIN')
+        self.wait.until(lambda _: 'Showing 1 of 2' in self.text('conversationHistoryMatches'))
+        self.assertEqual(len([e for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#conversationHistoryList li') if e.is_displayed()]),1)
+        search.send_keys(' absent')
+        self.wait.until(lambda _: 'Showing 0 of 2' in self.text('conversationHistoryMatches'))
+        self.assertEqual(local.reason.call_count,calls)
+        self.assertNotIn('RAIN',self.browser.current_url)
+        self.assertNotIn('RAIN',self.browser.execute_script("return JSON.stringify(localStorage)+JSON.stringify(sessionStorage)+JSON.stringify(performance.getEntriesByType('resource').map(e=>e.name))"))
+        search.send_keys(Keys.CONTROL,'a',Keys.BACKSPACE)
+        self.wait.until(lambda _: 'Showing 2 of 2' in self.text('conversationHistoryMatches'))
+        history.rename(owner,record['id'],'Synthetic changed in another window',renamed['revision'])
+        draft = self.browser.find_element(self.By.ID,'intelligenceQuery'); draft.send_keys('Synthetic unsent follow-up')
+        title.clear(); title.send_keys('Synthetic stale edit',Keys.ENTER)
+        self.wait.until(lambda _: 'Reopen the conversation' in self.text('conversationHistoryFeedback'))
+        self.assertEqual(title.get_property('value'),'Synthetic stale edit')
+        self.assertEqual(draft.get_property('value'),'Synthetic unsent follow-up')
+        self.assertEqual(history.get(owner,record['id'])['title'],'Synthetic changed in another window')
+        self.memory_click('#conversationHistoryList li:first-child button:first-child')
+        self.wait.until(lambda _: title.get_property('value') == 'Synthetic changed in another window')
+        self.assertEqual(draft.get_property('value'),'Synthetic unsent follow-up')
+        draft.send_keys(Keys.CONTROL,Keys.ENTER)
+        self.wait.until(lambda _: len(history.get(owner,record['id'])['turns']) == 2)
+        self.wait.until(lambda _: not draft.get_property('readOnly'))
+        self.browser.refresh()
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On \u00b7 local only')
+        self.memory_click('#conversationHistoryPanel > summary')
+        self.assertEqual(self.browser.find_element(self.By.ID,'conversationHistorySearch').get_property('value'),'')
+        self.memory_click('#conversationHistoryList li:first-child button:first-child')
+        self.wait.until(lambda _: 'Historical AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertIn('Synthetic changed in another window',self.text('conversationHistoryCurrent'))
+        self.capture('history-rename-reopened')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'history-controls-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'history-controls-{width}-{theme}.png'))
+        self.browser.find_element(self.By.ID,'conversationHistorySearch').send_keys('Synthetic private search')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))")
+        self.assertEqual(self.browser.find_element(self.By.ID,'conversationHistorySearch').get_property('value'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'conversationHistoryTitle').get_property('value'),'')
+        self.assertEqual(self.text('conversationHistoryMatches'),'')
+
     def test_private_history_outage_stale_edit_and_clear_keep_drafts(self):
         from uuid import uuid4
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable

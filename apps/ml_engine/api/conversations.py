@@ -53,6 +53,11 @@ class ConversationDetailAPI(MemoryAPI):
             return Response({'detail':'Conversation was not found.'}, status=404)
         return Response(status=204)
 
+    def patch(self, request, identity):
+        data = self.payload(('title','revision'))
+        record = ConversationHistory(memory_store()).rename(request.user, identity, data.get('title'), data.get('revision'))
+        return Response(record) if record else Response({'detail':'Conversation was not found.'}, status=404)
+
 
 class ConversationClearAPI(MemoryAPI):
     def post(self, request):

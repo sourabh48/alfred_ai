@@ -137,6 +137,86 @@ class ConversationHistoryTests(TestCase):
                 self.assertEqual(self.post(self.question|{'answer_style':style}).status_code,400)
             vault.assert_not_called()
 
+    def test_rename_preserves_encryption_transcript_expiry_and_survives_reopen(self):
+        record = self.create(); payload = self.turn(record)
+        with patch('apps.ml_engine.api.views.hybrid_answer',return_value=self.result):
+            self.assertEqual(self.post(payload).status_code,200)
+        before = self.history.get(self.alice,record['id']); key = self.store.key_file.read_bytes()
+        title = 'SYNTHETIC-PRIVATE-RENAMED-TITLE'
+        response = self.client.patch('/api/ai/conversations/'+record['id']+'/',
+            dict(title=' '+title+' ',revision=1),content_type='application/json')
+        self.assertEqual(response.status_code,200); self.assertIn('no-store',response['Cache-Control'])
+        self.assertNotIn('turns',response.json())
+        reopened = ConversationHistory(MemoryStore(self.store.directory)).get(self.alice,record['id'])
+        self.assertEqual(reopened['title'],title); self.assertEqual(reopened['revision'],2)
+        for field in ('turns','created_at','expires_at'): self.assertEqual(reopened[field],before[field])
+        self.assertEqual(self.store.key_file.read_bytes(),key)
+        for file in self.store.directory.iterdir():
+            if file.is_file(): self.assertNotIn(title.encode(),file.read_bytes())
+        self.assertEqual(self.store.list_memories(self.alice),[])
+
+    def test_rename_validates_owner_csrf_policy_and_exact_revision_without_writes(self):
+        record = self.create(); url = '/api/ai/conversations/'+record['id']+'/'
+        data = dict(title='Synthetic new title',revision=0)
+        self.enable(self.bob); other = Client(); other.force_login(self.bob)
+        self.assertEqual(other.patch(url,data,content_type='application/json').status_code,404)
+        guarded = Client(enforce_csrf_checks=True); guarded.force_login(self.alice)
+        self.assertEqual(guarded.patch(url,data,content_type='application/json').status_code,403)
+        for change in ({'title':None},{'title':''},{'title':' '},{'title':'x'*129},{'title':'🌧'*33},
+                {'title':'bad\ntitle'},{'revision':True},{'revision':-1},{'revision':'0'},{'revision':None},{'owner':self.bob.pk}):
+            with self.subTest(change=change):
+                self.assertEqual(self.client.patch(url,data|change,content_type='application/json').status_code,400)
+        with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False):
+            self.assertEqual(self.client.patch(url,data,content_type='application/json').status_code,403)
+        self.assertEqual(self.history.get(self.alice,record['id']),record)
+        self.assertEqual(self.client.patch(url,data,content_type='application/json').status_code,200)
+        self.assertEqual(self.client.patch(url,data,content_type='application/json').status_code,409)
+        self.assertEqual(self.history.get(self.alice,record['id'])['revision'],1)
+
+    def test_concurrent_rename_only_accepts_one_revision(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        record = self.create(); barrier = Barrier(2)
+        def rename(title):
+            barrier.wait(timeout=5)
+            try:
+                self.history.rename(self.alice,record['id'],title,0)
+                return 'saved'
+            except ConversationConflict:
+                return 'stale'
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = list(pool.map(rename,('Synthetic title A','Synthetic title B')))
+        self.assertEqual(sorted(outcomes),['saved','stale'])
+        saved = self.history.get(self.alice,record['id'])
+        self.assertEqual(saved['revision'],1); self.assertEqual(saved['expires_at'],record['expires_at'])
+
+    def test_rename_during_inference_rejects_append_and_requires_reopen(self):
+        record = self.create(); payload = self.turn(record)
+        def infer(*args,**kwargs):
+            self.history.rename(self.alice,record['id'],'Synthetic changed during inference',0)
+            return self.result
+        with patch('apps.ml_engine.api.views.hybrid_answer',side_effect=infer):
+            self.assertEqual(self.post(payload).status_code,409)
+        saved = self.history.get(self.alice,record['id']); self.assertEqual(saved['turns'],[])
+        with patch('apps.ml_engine.api.views.hybrid_answer',return_value=self.result):
+            self.assertEqual(self.post(self.turn(saved)).status_code,200)
+        self.assertEqual(len(self.history.get(self.alice,record['id'])['turns']),1)
+
+    def test_rename_failure_rolls_back_and_expired_conversation_cannot_be_revived(self):
+        record = self.create()
+        from apps.ml_engine.services.conversation_history import _encoded
+        def encode(value):
+            if value['title'] == 'Synthetic failed title': raise ValueError('synthetic write failure')
+            return _encoded(value)
+        with patch('apps.ml_engine.services.conversation_history._encoded',side_effect=encode):
+            with self.assertRaises(ValueError):
+                self.history.rename(self.alice,record['id'],'Synthetic failed title',0)
+        self.assertEqual(self.history.get(self.alice,record['id']),record)
+        with patch('apps.ml_engine.services.conversation_history.datetime',wraps=datetime) as clock:
+            clock.now.return_value = datetime.fromisoformat(record['expires_at'])+timedelta(seconds=1)
+            self.assertIsNone(self.history.rename(self.alice,record['id'],'Synthetic expired title',0))
+        self.assertIsNone(self.history.get(self.alice,record['id']))
+
     def test_ciphertext_files_owner_tamper_and_no_sync_or_embedding(self):
         record = self.create(); identity = record['id']
         generation, _ = self.history.prepare(self.alice, identity, 0, 'a'*32, self.question)
@@ -265,6 +345,7 @@ class ConversationHistoryTests(TestCase):
         with restarted._transaction() as db: self.assertEqual(db.execute('SELECT * FROM memories').fetchall(), before)
         self.assertEqual(restarted.key_file.read_bytes(), key)
         record = self.create()
+        record = self.history.rename(self.alice,record['id'],'Synthetic restart rename',0)
         code = '''
 from django.conf import settings
 settings.configure(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True)
@@ -277,6 +358,7 @@ from apps.ml_engine.services.conversation_history import ConversationHistory
 owner=SimpleNamespace(pk=int(sys.argv[2]),created_at=datetime.fromisoformat(sys.argv[3]),is_authenticated=True)
 record=ConversationHistory(MemoryStore(Path(sys.argv[1]),embedder=object())).get(owner,sys.argv[4])
 assert record['id']==sys.argv[4]
+assert record['title']=='Synthetic restart rename' and record['revision']==1
 print('RESTART_PRIVATE_HISTORY_PASS')
 '''
         child = subprocess.run([sys.executable, '-B', '-c', code, str(self.store.directory), str(self.alice.pk),

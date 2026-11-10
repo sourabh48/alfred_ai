@@ -30,6 +30,12 @@ def _encoded(record):
     return encoded
 
 
+def _title(value):
+    if not isinstance(value, str) or not 1 <= len(value.strip().encode()) <= 128 or any(ord(c) < 32 for c in value):
+        raise ValueError('Use a bounded conversation title.')
+    return value.strip()
+
+
 class ConversationHistory:
     def __init__(self, store):
         self.store = store
@@ -146,14 +152,13 @@ class ConversationHistory:
                 for record in sorted(records, key=lambda r:r['updated_at'], reverse=True)]
 
     def create(self, user, title):
-        if not isinstance(title, str) or not 1 <= len(title.strip().encode()) <= 128 or any(ord(c) < 32 for c in title):
-            raise ValueError('Use a bounded conversation title.')
+        title = _title(title)
         owner = _owner(user)
         with self.store._transaction() as db:
             policy = self._enabled(db, owner); self._expire(db, owner)
             if len(self._rows(db, owner)) >= MAX_CONVERSATIONS: raise ValueError('Private conversation limit reached.')
             now = datetime.now(timezone.utc)
-            record = dict(kind='assistant_conversation', schema=1, owner=owner, id=uuid4().hex, title=title.strip(),
+            record = dict(kind='assistant_conversation', schema=1, owner=owner, id=uuid4().hex, title=title,
                 revision=0, turns=[], created_at=now.isoformat(), updated_at=now.isoformat(),
                 expires_at=(now+timedelta(days=policy['days'])).isoformat())
             key = Fernet.generate_key()
@@ -180,6 +185,21 @@ class ConversationHistory:
         if not valid_id(identity): raise ValueError('Choose a saved private conversation.')
         with self.store._transaction() as db:
             return db.execute('DELETE FROM conversations WHERE id=? AND owner=?', (identity, _owner(user))).rowcount
+
+    def rename(self, user, identity, title, revision):
+        title = _title(title)
+        if type(revision) is not int or revision < 0: raise ValueError('Choose the current conversation revision.')
+        owner = _owner(user)
+        with self.store._transaction() as db:
+            self._enabled(db, owner); self._expire(db, owner)
+            record = self._get(db, owner, identity)
+            if record is None: return None
+            if record['revision'] != revision: raise ConversationConflict('Conversation changed. Reopen it before renaming.')
+            record.update(title=title,revision=revision+1,updated_at=datetime.now(timezone.utc).isoformat())
+            wrapped = db.execute('SELECT wrapped FROM conversations WHERE id=? AND owner=?', (identity, owner)).fetchone()[0]
+            cipher = Fernet(self.store._cipher(db).decrypt(wrapped))
+            db.execute('UPDATE conversations SET record=? WHERE id=? AND owner=?', (cipher.encrypt(_encoded(record)), identity, owner))
+        return {key: record[key] for key in ('id','title','created_at','updated_at','expires_at','revision')}
 
     def prepare(self, user, identity, revision, request_id, question):
         if not valid_id(request_id) or type(revision) is not int or revision < 0: raise ValueError('Invalid conversation revision/request.')

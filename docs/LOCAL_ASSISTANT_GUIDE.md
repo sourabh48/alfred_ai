@@ -1,6 +1,6 @@
 # Using the local assistant
 
-Open **ALFRED Insights** from the sidebar. Under **Local answer style**, choose
+Open **AI Assistant** from the sidebar. Under **Local answer style**, choose
 Automatic, Concise, Detailed explanation, Comparison or Step by step. Enter your
 question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit
 requests for brevity, detail, comparisons or steps. Answers have bounded lengths
@@ -18,6 +18,16 @@ explicit consent with a retention period. Open the private-history panel to enab
 it when available. Saved conversations can be reopened after restarting ALFRED.
 The assistant uses a bounded selection of recent general-chat turns for follow-up
 questions. Reopened answers are labelled historical and their sources may be stale.
+
+Inside the private-history panel, **Search saved titles on this page** filters
+the saved conversation list as you type. It searches titles, without sending the
+search text to a server or model. Clear the search to see the full owned list.
+Reopen a conversation, edit its title and press **Save conversation title** (or
+Enter in the title field). This keeps the transcript and original expiry. If
+another window changed it, reopen the conversation before retrying; your unsent
+question remains in the composer.
+
+![Renamed conversation and local title search, using synthetic data](images/usability/conversation-history-controls.png)
 
 Conversation statements remain unverified dialogue. Saving a conversation never
 adds verified memory facts or changes your financial records. For document or

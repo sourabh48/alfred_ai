@@ -19,6 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const historyConsent = document.getElementById("conversationHistoryConsent");
     const historyDays = document.getElementById("conversationHistoryDays");
     const historyTitle = document.getElementById("conversationHistoryTitle");
+    const historyRename = document.getElementById("conversationHistoryRename");
+    const historySearch = document.getElementById("conversationHistorySearch");
     const historyList = document.getElementById("conversationHistoryList");
     const historyFeedback = document.getElementById("conversationHistoryFeedback");
     const historyCurrent = document.getElementById("conversationHistoryCurrent");
@@ -182,7 +184,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const locked = !active || pending || !historyPolicy?.available;
         historyConsent.disabled = locked; historyDays.disabled = locked;
         historyForm.querySelector("button").disabled = locked;
-        historyTitle.disabled = locked || !historyEnabled() || Boolean(conversation);
+        historyTitle.disabled = locked || !historyEnabled();
+        historyRename.disabled = locked || !historyEnabled() || !conversation;
+        historySearch.disabled = locked || !historyEnabled();
         historyClear.disabled = !active || pending || !historyPolicy?.conversations;
         historyDisable.disabled = !active || pending || !(historyPolicy?.enabled || historyPolicy?.conversations);
         historyList.querySelectorAll("button").forEach(button => { button.disabled = !active || pending; });
@@ -200,7 +204,9 @@ document.addEventListener("DOMContentLoaded", () => {
         resetSources();
         answers.replaceChildren(); documentChoice.replaceChildren(); statementChoice.replaceChildren(); financialChoice.replaceChildren(); empty.hidden = false;
         document.getElementById("intelligenceFinancialDocumentContext").textContent = "";
-        historyList.replaceChildren(); historyTitle.value = ""; historyConsent.checked = false; historyDays.value = "7";
+        historyList.replaceChildren(); historyTitle.value = ""; historySearch.value = "";
+        document.getElementById("conversationHistoryMatches").textContent = "";
+        historyConsent.checked = false; historyDays.value = "7";
         query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
         modelItems.replaceChildren(); modelLoaded=false; modelRefresh.disabled=true;
         document.getElementById('modelReadinessScope').textContent=''; modelStatus.textContent='Reopen to check current registry gates.';
@@ -210,6 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     function applyHistory(data) {
         historyPolicy = data.policy;
+        if (!historyEnabled()) historySearch.value = "";
         if (conversation && (!historyEnabled() || !(data.conversations || []).some(record => record.id === conversation.id))) {
             clearConversation();
             historyFeedback.textContent = "Conversation no longer available. Its displayed turns were cleared; your unsent draft is preserved.";
@@ -224,6 +231,7 @@ document.addEventListener("DOMContentLoaded", () => {
             open.textContent = record.title; open.setAttribute("aria-label", `Reopen ${record.title}`);
             open.addEventListener("click", () => historyRequest(`/api/ai/conversations/${record.id}/`, {}, saved => {
                 clearConversation(); conversation = saved;
+                historyTitle.value = saved.title;
                 saved.turns.forEach(turn => renderTurn(turn, turn, generation, true));
                 historyFeedback.textContent = "Historical hypotheses only. Reopen source records or ask again for current evidence. Your unsent draft is preserved.";
             }));
@@ -240,8 +248,29 @@ document.addEventListener("DOMContentLoaded", () => {
             age.textContent = `Expires ${new Date(record.expires_at).toLocaleString()}`;
             item.append(open, remove, age); historyList.append(item);
         });
+        filterHistory();
         updateHistoryControls();
     }
+    function filterHistory() {
+        const term = historySearch.value.trim().toLocaleLowerCase();
+        let matches = 0;
+        historyList.querySelectorAll("li").forEach(item => {
+            const match = item.firstElementChild.textContent.toLocaleLowerCase().includes(term);
+            item.classList.toggle("d-none", !match);
+            if (match) matches++;
+        });
+        document.getElementById("conversationHistoryMatches").textContent = historyEnabled()
+            ? `Showing ${matches} of ${historyList.children.length} saved titles. Search stays on this page.` : "";
+    }
+    historySearch.addEventListener("input", filterHistory);
+    document.getElementById("conversationTitleForm").addEventListener("submit", event => {
+        event.preventDefault();
+        if (!conversation || !historyEnabled()) return;
+        historyRequest(`/api/ai/conversations/${conversation.id}/`, {method:"PATCH",body:JSON.stringify({title:historyTitle.value,revision:conversation.revision})}, saved => {
+            conversation = {...conversation,...saved}; requestToken = null;
+            historyFeedback.textContent = "Title saved locally. The transcript and original expiry are unchanged.";
+        }, true);
+    });
     async function refreshHistory() {
         const ticket = generation;
         let data;
@@ -266,6 +295,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (active && ticket === generation) {
                 if ([401,403].includes(error.status)) forgetPrivatePage();
                 historyFeedback.textContent = error.message;
+                if (error.status === 409 && conversation) {
+                    historyBlocked = true;
+                    historyFeedback.textContent += " Reopen the conversation before another change. Your draft is preserved.";
+                }
             }
         }
         finally {
