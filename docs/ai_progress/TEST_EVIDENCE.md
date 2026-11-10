@@ -1,5 +1,55 @@
 # Test evidence index
 
+## 2026-11-11 - Career follow-up integrity
+
+Source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00, basee9e35b7a62484de2f95292a333fc9a5c58060232.
+Commands, source file blobs and receipt hashes: `artifacts/career-follow-up-20261111/`.
+Tests use synthetic runtime/media roots under `F:/ALFRED/dev-test-data/career-follow-up-20261111/`
+or temporary test directories, never owner data/config/keys.
+
+- Reproduction before the fix:10 tests,8 failed assertions/subtests and3 errors.
+  A bare applied stage acquired a guessed date; malformed date/history shapes raised
+  errors, including the real follow-up API path. `reproduction.log` retained.
+- Exact-source261 backend PASS234.462s, zero failures/skips: Career timing/API,
+  assistant, matching/discovery/intake/resume/interviews/money; typed registry,
+  hybrid/history/session/CSRF/private-memory, native runtime, release/browser inventory
+  and canonical-grounding regressions. Existing monetary algorithms/cadence unchanged.
+- Three exact-source real Chrome journeys PASS82.900s (runner103.484s), zero
+  failures/skips: malformed owned history remains visible/unavailable; valid due
+  opportunity still updates through actual UI and reopens; no foreign records or
+  hostile label execution; page-only Career assistant/history and saved matching/
+  missing-requirements abstention regressions. Real Django/SQLite/Chrome; unrelated
+  external providers isolated. No model-quality claim based on mocked responses.
+- Four history Axe audits, light/dark1440/390, zero automated violations and one
+  incomplete/manual contrast finding each. Screenshot visually inspected and in guide.
+- New tests enforce no guessed/missing/future/conflicting/out-of-order dates,
+  malformed/non-object/oversized histories, safe serializer shapes, API recovery,
+  no raw-date error disclosures, invalid-edit refusal without loss, and preservation
+  of existing provenance on valid explicit updates. Existing owner/revision/CSRF and
+  follow-up cadence tests remain. Assistant now reuses the canonical guard.
+- Working-tree focused43 PASS14.278s, then45 PASS17.525s after adding preservation
+  coverage; one working-tree Chrome PASS21.878s. These overlap the final coverage
+  and are not relabelled as exact-source acceptance.
+- Clean detached `F:/ALFRED_DEV/usability-followup-check-5a10279`: source/privacy/
+  dependency/migration preflight PASS. Technical/promotion release receipt remains
+  BLOCKED with package/owner/CI/recovery gates unfilled; local results are separate.
+  Graphify AST update PASS; no semantic API or provider activation.
+- No schema/dependency, owner database/key/model/media/backup/install or remote
+  changes. Cache edit/hash preserved. Historical repair is not automatic; damaged
+  records need a separate reviewed correction flow. Broader USE-04, model quality,
+  package/real-account/independent/CI/3.0 acceptance remain open. Baseline85/143 and
+  extensions0/13 unchanged. READY_FOR_NEXT; no next task selected.
+- `scripts/project_execution.py --check` PASS: generated views unchanged,85/143
+  original IDs and0/13 extensions remain accepted. Usability ledger USE-04/05 rows
+  reconciled to partial implementation using their retained receipts, without new acceptance.
+
+Implementation files (10): `apps/career/serializers.py`,
+`apps/career/services/application_tracker.py`, `apps/career/views.py`,
+`apps/ml_engine/services/career_evidence.py`, `docs/LOCAL_ASSISTANT_GUIDE.md`,
+`static/js/career.js`, `templates/career/list.html`, `tests/browser_durations.json`,
+`tests/test_career_applications.py`, `tests/test_user_data_browser.py`.
+Checkpoint-only files are listed in STATE.json.
+
 ## 2026-11-11 - recorded Career application progress
 
 Source7643c25426a1bc65dcc92a09bc3d50ad0e8a9d93, base05ac976828e913239f67c09ad21f15fc08e2262e.

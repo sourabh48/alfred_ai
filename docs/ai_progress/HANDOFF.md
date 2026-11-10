@@ -1,5 +1,31 @@
 # Codex / Claude checkpoint
 
+## Career follow-up integrity - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-04/career-follow-up-integrity locally on
+`work/usability-integration`. Source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00;
+basee9e35b7a62484de2f95292a333fc9a5c58060232. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Reproduced missing-date guesses and malformed-history read failures, then fixed
+shared Career validation. Lists and assistant now agree: unknown dates stay
+unavailable, invalid histories remain intact and edits to them are paused; valid
+opportunities remain usable. Valid explicit changes preserve source metadata.
+No new model/provider, calculation engine, schema, dependency or automatic repair.
+
+Exact-source261 backend PASS234.462s;3 actual Chrome PASS82.900s (runner103.484s),
+zero failures/skips. Four history light/dark1440/390 Axe audits zero violations;
+manual contrast remains. Clean source/privacy/dependency/migration preflight PASS.
+Technical/promotion, CI/independent/package/owner and3.0 gates remain open.
+No owner runtime/data/key/model/document/backup/installation or remote change.
+Existing cache edit/hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 preserved.
+
+Exact files/receipts: docs/ai_progress/STATE.json and TEST_EVIDENCE.md. Baseline85/143,
+extensions0/13 unchanged; full USE-04 remains partial. Historical correction remains
+a separate reviewed recovery flow, not an automatic rewrite. Codex stops after this
+checkpoint. No agent launch/independent audit. `continue` reports READY_FOR_NEXT and
+stops; only `next`, `sprint` or explicit scope selects more work. No next task selected.
+
 ## Career application progress - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-04/career-application-progress locally.

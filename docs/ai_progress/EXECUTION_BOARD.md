@@ -1,5 +1,18 @@
 # Current execution board
 
+## Career follow-up integrity - 2026-11-11
+
+USE-04/career-follow-up-integrity LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00,
+basee9e35b7a62484de2f95292a333fc9a5c58060232. Shared Career history validation
+repairs guessed dates/list crashes without rewriting invalid records. Exact-source
+261 backend/3 Chrome PASS; four history Axe audits zero violations/manual contrast
+open. Clean source/privacy/dependency/migration preflight PASS. No CI/push/PR/merge,
+owner-runtime or deployment change. Release/owner/package/independent/3.0 gates
+remain open. Baseline85/143, extensions0/13 unchanged. READY_FOR_NEXT, no next task.
+Exact files, receipts, limitations and next command: docs/ai_progress/STATE.json,
+TEST_EVIDENCE.md and docs/EXECUTION_STATE.md. Cache edit preserved.
+
 ## Career application progress - 2026-11-11
 
 USE-04/career-application-progress LOCAL_ACCEPTED / COMMITTED_LOCAL on

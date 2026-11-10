@@ -1,5 +1,24 @@
 # Execution decisions
 
+## 2026-11-11 - Career follow-up integrity repair
+
+- NEXT selects one bounded usability repair, USE-04/career-follow-up-integrity,
+  after reproducible missing-date guesses and malformed-history read failures.
+  Earlier queue entries remain approval/external-evidence blocked. This later-phase
+  exception repairs existing services, not AI-12/15/16 or parent Career acceptance.
+- NO_UPSTREAM_ADOPTION. Existing application_tracker cadence and Career Ops MIT
+  attribution/pin4df3d0525a0a466f6b08928a7c3bd23946cb410f are retained. Independently
+  validate source history rather than adding another scheduling/calculation engine.
+- Shared validation owns dates/shapes/chronology/current-stage consistency. Reads
+  return unavailable instead of inventing dates or failing the entire opportunity
+  list. The assistant's duplicate guard is removed in favor of this same service.
+- Invalid histories remain unchanged; updates reject with a generic review message.
+  UI shows affected records and pauses their edits, while valid records remain
+  usable. Historical correction needs a separate reviewed recovery flow; do not
+  silently discard raw histories or initialize fresh personal records.
+- Valid explicit edits preserve existing provenance fields. No schema/dependency,
+  model/provider/credential, sending, owner-runtime or financial-policy changes.
+
 ## 2026-11-11 - recorded Career progress in the assistant
 
 - NEXT selects exactly USE-04/career-application-progress under the authorized

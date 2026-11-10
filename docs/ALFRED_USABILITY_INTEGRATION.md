@@ -1,5 +1,18 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Career follow-up integrity - 2026-11-11
+
+USE-04/career-follow-up-integrity LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00,
+basee9e35b7a62484de2f95292a333fc9a5c58060232. Shared Career history validation
+repairs guessed dates/list crashes without rewriting invalid records. Exact-source
+261 backend/3 Chrome PASS; four history Axe audits zero violations/manual contrast
+open. Clean source/privacy/dependency/migration preflight PASS. No CI/push/PR/merge,
+owner-runtime or deployment change. Release/owner/package/independent/3.0 gates
+remain open. Baseline85/143, extensions0/13 unchanged. READY_FOR_NEXT, no next task.
+Exact files, receipts, limitations and next command: docs/ai_progress/STATE.json,
+TEST_EVIDENCE.md and docs/EXECUTION_STATE.md. Cache edit preserved.
+
 ## Career application progress - 2026-11-11
 
 USE-04/career-application-progress LOCAL_ACCEPTED / COMMITTED_LOCAL on
@@ -142,8 +155,8 @@ Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 | USE-01 Runtime and health | PARTIALLY_IMPLEMENTED | Authenticated diagnostics, selected database identity, schema inspection, instance-bound heartbeats and explicit synthetic local inference benchmark. Native drill and owner sign-in acceptance remain separate. |
 | USE-02 Onboarding and data sources | PARTIALLY_IMPLEMENTED | Data Sources Center links existing local workflows and reports owned saved-record/parser counts. Complete preview/duplicate/correction/confirmation journeys, knowledge readiness and source-level consent/freshness/deletion acceptance remain. |
 | USE-03 Conversation | PARTIALLY_IMPLEMENTED | Bounded local dialogue/history, styles, fiction continuity, rename/title search, page-only streaming/Stop and safe final-answer Markdown/tables validated. Current grounding retained; figures/source-backed output buffered. Saved-history/domain streaming, transcript-body search, advanced/nested Markdown, code colouring and broader UI/model routing remain. |
-| USE-04 Read-only tools / MCP | NOT_IMPLEMENTED | Reuse current domain adapters. External MCP server/source selection requested; no connection, credentials, private disclosure or cost-saving claim. MCP is a protocol, not a guarantee of free provider data. |
-| USE-05 Confirmed actions | NOT_IMPLEMENTED | Existing savings-goal proposal implementation retained; audit its exact security properties before extending it. |
+| USE-04 Read-only tools / MCP | PARTIALLY_IMPLEMENTED | Seven typed existing-domain read tools with owner/consent/output/deadline/audit controls; bounded Career progress and shared history integrity validated locally. Broader tools, cross-module orchestration and approved MCP transport remain. No external server, credentials, private disclosure or cost-saving claim. Source-specific receipts: ai_progress/TEST_EVIDENCE.md. |
+| USE-05 Confirmed actions | PARTIALLY_IMPLEMENTED | Bound savings-goal confirmation at0ca2168 has retained backend/Chrome/native replay evidence in ai_progress/TEST_EVIDENCE.md. Broader actions and owner/release acceptance remain; this checkpoint adds no action implementation or acceptance. |
 | USE-06 Windows release | NOT_IMPLEMENTED | Current-source package, clean-machine upgrade/rollback and six end-to-end journeys remain; installation replacement and owner-account tests need their explicit gates. |
 
 No complete USE scope has been accepted. No whole-codebase audit or Claude/Codex

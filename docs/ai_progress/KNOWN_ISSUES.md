@@ -1,5 +1,16 @@
 # Known issues and gates
 
+## Follow-up history recovery boundary - 2026-11-11
+
+Source5a10279b58a1e6ade4806a3d0225b1a15ddc9d00 repairs guessed follow-up dates
+and malformed-history list failures. Reads mark missing/invalid/future/conflicting
+histories unavailable; their original JSON is preserved and edits are paused.
+Other valid opportunities remain usable. No automatic historical repair or bulk
+rewrite is authorized or implemented. A separate reviewed correction flow is still
+needed for these legacy records. Lists scan at most300 recent opportunities and
+show at most20 unavailable names. Owner/package/CI/independent/release acceptance,
+manual contrast and3.0 gates remain open; baseline85/143, extensions0/13 unchanged.
+
 ## Career progress scope - 2026-11-11
 
 Source7643c25426a1bc65dcc92a09bc3d50ad0e8a9d93 adds the seventh tool,

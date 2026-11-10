@@ -31,6 +31,8 @@ pauses edits to that history. Other valid opportunities remain usable. The assis
 uses the same check. Refreshing or retrying does not replace the damaged history;
 historical correction requires a separately reviewed recovery process.
 
+![Synthetic Career history marked unavailable while a valid follow-up remains visible](images/usability/career-history-review.png)
+
 ![Recorded application progress on a synthetic account with history enabled and the Career snapshot kept page-only](images/usability/career-progress.png)
 
 To create a savings goal, ask "add a savings goal Bike of 1000.25". To report
