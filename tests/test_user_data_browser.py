@@ -5140,6 +5140,88 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.execute_script('document.getElementById("intelligenceToolPolicy").scrollIntoView({block:"center",behavior:"instant"})')
                 self.browser.save_screenshot(str(self.artifacts/f'tool-registry-{width}-{theme}.png'))
 
+    def test_domain_stream_stop_buffered_figures_retry_citation_and_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        from apps.ml_engine.services.local_chat_stream import GenerationCancelled
+        rows, _ = self.canonical_grounding_fixture(); row = rows['expense']
+        mode={'wait':True}; entered=threading.Event(); stopped=threading.Event(); streams=[]
+        def factory(*,stream):
+            from unittest.mock import Mock
+            streams.append(stream); model=Mock()
+            def reason(payload,**kwargs):
+                entered.set()
+                if mode['wait']:
+                    try:
+                        while True: stream.check(); time.sleep(.02)
+                    except GenerationCancelled: stopped.set(); raise
+                return 'Your balance is 999999.'
+            model.reason.side_effect=reason
+            return model
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',side_effect=factory))
+        def cleanup():
+            for stream in streams: stream.close(); stream.worker.join(timeout=3)
+        self.addCleanup(cleanup)
+        self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=expense&record_id={row.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'expense:{row.pk}')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        query=self.browser.find_element(self.By.ID,'intelligenceQuery'); query.send_keys('Explain this record',Keys.CONTROL,Keys.ENTER)
+        self.wait.until(lambda _: entered.is_set() and self.browser.find_element(self.By.ID,'intelligenceStop').is_displayed())
+        self.assertIn('Reading and validating local sources',self.text('intelligenceAnswers'))
+        self.assertNotIn('12.34',self.text('intelligenceAnswers'))
+        self.assertNotIn('999999',self.text('intelligenceAnswers'))
+        self.browser.find_element(self.By.ID,'intelligenceStop').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'Local generation stopped' in self.text('intelligenceFeedback'))
+        self.wait.until(lambda _: stopped.is_set())
+        self.assertEqual(query.get_property('value'),'Explain this record')
+        row.refresh_from_db(); self.assertEqual(str(row.amount),'12.34')
+        mode['wait']=False; self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Unsupported model figures were withheld' in self.text('intelligenceFeedback'))
+        self.wait.until(lambda _: query.get_property('value') == '')
+        self.assertIn('12.34',self.text('intelligenceAnswers'))
+        self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
+        self.assertNotIn('999999',self.text('intelligenceAnswers'))
+        self.capture('domain-source-validation')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings=[]; self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'domain-stream-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+        self.memory_click(f'#intelligenceAnswers a[href="/ai/financial-records/expense/{row.pk}/"]')
+        self.wait.until(lambda _: '12.34' in self.text('canonicalEvidence'))
+        self.browser.refresh(); self.wait.until(lambda _: '12.34' in self.text('canonicalEvidence'))
+
+    def test_domain_stream_rejects_premature_preview_then_recovers_offline_cards(self):
+        from apps.ml_engine.services.local_chat_stream import LocalChatStream
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        rows,local=self.canonical_grounding_fixture(); row=rows['expense']
+        self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=expense&record_id={row.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'expense:{row.pk}')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        original=LocalChatStream.offer
+        def injected(stream,event):
+            if event['type']=='final': original(stream,dict(type='delta',text='SYNTHETIC-PREMATURE-DOMAIN-TEXT'))
+            return original(stream,event)
+        with patch.object(LocalChatStream,'offer',injected):
+            self.ask_history_question('Explain this record')
+            self.wait.until(lambda _: 'Invalid unverified preview' in self.text('intelligenceFeedback'))
+        self.assertNotIn('SYNTHETIC-PREMATURE-DOMAIN-TEXT',self.text('intelligenceAnswers'))
+        self.assertNotIn('12.34',self.text('intelligenceAnswers'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Explain this record')
+        local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE-OUTAGE')
+        self.memory_click('#intelligenceRetry')
+        self.wait.until(lambda _: 'Recorded values ready. Local AI is unavailable' in self.text('intelligenceFeedback'))
+        self.assertIn('12.34',self.text('intelligenceAnswers'))
+        self.assertNotIn('SYNTHETIC-PRIVATE-OUTAGE',self.text('intelligenceAnswers'))
+        row.refresh_from_db(); self.assertEqual(str(row.amount),'12.34')
+
     def test_canonical_record_overview_during_real_socket_refusal_and_reopen(self):
         import socket
         from http.client import HTTPConnection

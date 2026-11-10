@@ -10,6 +10,8 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_domain_stream_stop_buffered_figures_retry_citation_and_accessibility": 10.078,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_domain_stream_rejects_premature_preview_then_recovers_offline_cards": 6.735,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_saved_stream_progress_stop_retry_context_reopen_and_accessibility": 13.188,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_saved_stream_lost_final_response_retries_without_duplicate_turn": 7.485,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_private_message_search_keyboard_reopen_privacy_and_accessibility": 13.843,

@@ -677,7 +677,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const partial = document.createElement('article'); partial.className = 'conversation-message mt-3';
         partial.dataset.status = 'generating'; partial.setAttribute('aria-live','off');
         const label = document.createElement('span'); label.className = 'conversation-label';
-        label.textContent = 'Unverified local preview - still generating. Figures and sources are buffered.';
+        label.textContent = payload.scope === 'general'
+            ? 'Unverified local preview - still generating. Figures and sources are buffered.'
+            : 'Reading and validating local sources. The answer stays buffered until checks complete.';
         const text = document.createElement('p'); partial.append(label,text); answers.append(partial); empty.hidden = true;
         let reader, timedOut = false, received = 0, buffer = '', preview = '';
         const timeout = setTimeout(() => { timedOut = true; controller.abort(); },33000);
@@ -704,7 +706,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (new TextEncoder().encode(line).length > 65536) throw new Error('Local stream frame exceeded its limit.');
                     const event = JSON.parse(line);
                     if (event.type === 'delta') {
-                        if (typeof event.text !== 'string' || /[\p{N}\p{Sc}]/u.test(event.text)) throw new Error('Invalid unverified preview.');
+                        if (payload.scope !== 'general' || typeof event.text !== 'string' || /[\p{N}\p{Sc}]/u.test(event.text)) throw new Error('Invalid unverified preview.');
                         preview += event.text;
                         if (new TextEncoder().encode(preview).length > 8192) throw new Error('Local preview exceeded its limit.');
                         text.textContent = preview;
@@ -713,7 +715,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (event.type === 'error') {
                         throw Object.assign(new Error(event.detail || 'Local output is incomplete. Your draft is preserved.'),{status:event.status,code:event.code,reference:event.error_id});
                     } else if (event.type === 'final') {
-                        if (!event.result || event.result.provider !== 'ollama' || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
+                        if (!event.result || !['ollama','local_evidence'].includes(event.result.provider) || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
                         partial.remove(); return event.result;
                     } else if (!['started','heartbeat'].includes(event.type)) throw new Error('Invalid local stream event.');
                 }
@@ -791,7 +793,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (requestToken?.fingerprint !== fingerprint) requestToken = {fingerprint, id:crypto.randomUUID().replaceAll("-", "")};
                 Object.assign(payload, {cloud_consent:false, conversation_id:conversation.id, conversation_revision:conversation.revision, request_id:requestToken.id});
             }
-            const result = payload.scope === 'general' && !payload.cloud_consent && window.ReadableStream && window.AbortController
+            const result = ['general','finance','financial_records','bank_statements','documents','travel'].includes(payload.scope) && !payload.cloud_consent && window.ReadableStream && window.AbortController
                 ? await streamAnswer(payload,ticket)
                 : await Alfred.fetchJSON("/api/ai/personal-insights/", {method: "POST", body: JSON.stringify(payload)});
             if (!active || ticket !== generation) return;

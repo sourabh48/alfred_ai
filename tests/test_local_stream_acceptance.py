@@ -150,3 +150,51 @@ class NativeLocalStreamAcceptance(TransactionTestCase):
         self.assertFalse(stream.worker.is_alive())
         self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
         print('ACTUAL_SYNTHETIC_SAVED_CANCEL '+json.dumps(dict(seconds=round(time.monotonic()-started,3),retained_turns=0)))
+
+    def test_actual_domain_output_is_buffered_and_uses_owned_canonical_values(self):
+        from datetime import date
+        from apps.expenses.models import Expense
+        row=Expense.objects.create(user=self.owner,amount='12.34',source='manual',category='utilities',transaction_date=date(2026,11,1))
+        payload=dict(query='Explain this record',scope='financial_records',record_type='expense',record_id=row.pk,
+            cloud_consent=False,answer_style='concise')
+        types=[]; final=None; started=time.monotonic()
+        with self.session.post(self.base+'/api/ai/personal-insights/stream/',json=payload,stream=True,timeout=(3,35)) as response:
+            response.raise_for_status()
+            for raw in response.iter_lines(chunk_size=1):
+                event=json.loads(raw); types.append(event['type'])
+                self.assertNotEqual(event['type'],'error',event)
+                if event['type']=='final': final=event['result']
+        self.assertIsNotNone(final); self.assertNotIn('delta',types)
+        self.assertEqual(final['provider'],'ollama'); self.assertFalse(final['financial_authority'])
+        self.assertEqual(final['sources'][0]['data']['amounts']['amount']['amount'],'12.34')
+        self.assertIsNone(final['sources'][0]['data']['amounts']['amount']['currency'])
+        row.refresh_from_db(); self.assertEqual(str(row.amount),'12.34')
+        print('ACTUAL_SYNTHETIC_DOMAIN_STREAM '+json.dumps(dict(seconds=round(time.monotonic()-started,3),
+            deltas=0,canonical_source=True,events=len(types))))
+
+    def test_actual_domain_request_can_disconnect_before_source_acceptance(self):
+        from datetime import date
+        from http.client import HTTPConnection
+        from threading import Event
+        from apps.expenses.models import Expense
+        row=Expense.objects.create(user=self.owner,amount='12.34',source='manual',category='utilities',transaction_date=date(2026,11,1))
+        ready=Event()
+        def connection(*args,**kwargs):
+            transport=HTTPConnection(*args,**kwargs); original=transport.getresponse
+            def response():
+                result=original(); ready.set(); return result
+            transport.getresponse=response
+            return transport
+        payload=dict(query='Explain this record with several careful qualitative points and no figures.',scope='financial_records',
+            record_type='expense',record_id=row.pk,cloud_consent=False,answer_style='detailed')
+        with patch('apps.ml_engine.services.local_chat_stream.HTTPConnection',side_effect=connection):
+            response=self.session.post(self.base+'/api/ai/personal-insights/stream/',json=payload,stream=True,timeout=(3,35))
+            response.raise_for_status()
+            self.assertTrue(ready.wait(timeout=25),'Actual Ollama request must return headers before disconnect')
+            stream=self.streams[-1]; self.assertTrue(stream.worker.is_alive())
+            started=time.monotonic(); response.close(); stream.worker.join(timeout=3)
+            self.assertFalse(stream.worker.is_alive())
+        row.refresh_from_db(); self.assertEqual(str(row.amount),'12.34')
+        store=MemoryStore(settings.ALFRED_MEMORY_DIR)
+        with store._transaction() as db: self.assertEqual(db.execute('SELECT COUNT(*) FROM conversations').fetchone()[0],0)
+        print('ACTUAL_SYNTHETIC_DOMAIN_CANCEL '+json.dumps(dict(seconds=round(time.monotonic()-started,3),worker_stopped=True)))

@@ -39,6 +39,7 @@ class LocalChatStream:
         self.queue = Queue(maxsize=8)
         self.lock = Lock()
         self.connection = None
+        self.allow_preview = True
         self.run, self.error, self.check_session = run, error, check_session
 
     def check(self):
@@ -125,7 +126,7 @@ class LocalChatStream:
         answer, pending, received, frames, final = '', b'', 0, 0, None
         context = json.loads(body['messages'][1]['content'])
         dialogue = context.get('query','')+' '+' '.join(turn['content'] for turn in context.get('history',[]))
-        preview = not context.get('sources') and not FINANCIAL_LANGUAGE.search(dialogue)
+        preview = self.allow_preview and not context.get('sources') and not FINANCIAL_LANGUAGE.search(dialogue)
         try:
             connection.connect()
             connection.auto_open = 0

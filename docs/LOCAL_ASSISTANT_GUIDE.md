@@ -132,9 +132,16 @@ turn saved; reopen history to check. Follow-ups use the same bounded local conte
 
 Figures and source-backed output are buffered until the complete response passes
 validation. Source links and accepted answer controls appear only after validation.
-Domain and consented-fallback requests retain their complete-response
-path in this slice; they have no streaming Stop control. History privacy and
-financial grounding rules still apply.
+Finance, saved financial records, statement evidence, verified loan closures and
+Travel preferences also support **Stop generation** during local processing.
+Their output stays buffered until source and answer checks finish. Stop preserves
+the draft; local source reads finish safely and late results are discarded. Reopen
+a citation to inspect the current record. Supported recorded-value questions can
+still return canonical source cards when Ollama is unavailable.
+
+Reviewed-record document questions and Career progress keep their fast page-only
+responses. Consented cloud fallback retains its complete-response path. History
+privacy and financial grounding rules still apply.
 
 If Ollama is unavailable, the draft remains in the composer. Open Settings →
 Diagnostics to check local inference, then use **Retry**. External fallback still
