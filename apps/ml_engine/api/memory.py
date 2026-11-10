@@ -32,6 +32,15 @@ class MemoryAPI(APIView):
         return response
 
     def handle_exception(self, exc):
+        from apps.ml_engine.services.assistant_tools import ToolInputError, ToolResultError, ToolDeadlineExceeded
+        if isinstance(exc, (ToolInputError, ToolResultError, ToolDeadlineExceeded)):
+            invalid = isinstance(exc, ToolInputError)
+            response = safe_error_response(exc,
+                'Selected local tool inputs are invalid. Re-select a current record and try again.' if invalid else
+                'The local source tool could not return validated evidence in time. Your draft is preserved; retry or review the source.',
+                logger_name=__name__, status_code=400 if invalid else 503)
+            response.data['code'] = 'local_tool_invalid' if invalid else 'local_tool_unavailable'
+            return response
         from apps.ml_engine.services.canonical_evidence import SourceSelectionConflict
         if isinstance(exc, SourceSelectionConflict):
             response=safe_error_response(exc,'Selected financial sources changed, are unavailable or duplicate one another. Refresh the source list and review your selection.',logger_name=__name__,status_code=409)

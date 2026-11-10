@@ -115,6 +115,14 @@ def _transaction_direction(data):
 
 def source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
     if scope=='general': return []
+    from .assistant_tools import execute_tool, tool_for_scope
+    arguments = dict(document_id=document_id, transaction_id=transaction_id, record_type=record_type,
+                     record_id=record_id, selected_documents=selected_documents, source_catalog=source_catalog,
+                     selected_records=selected_records)
+    return execute_tool(user, tool_for_scope(scope).name, {key: value for key, value in arguments.items() if value is not None}, consent=True)
+
+
+def _read_source_context(user,scope,document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None):
     if scope=='financial_document':
         from .canonical_evidence import document_record_sources
         return document_record_sources(user,record_type,document_id,selected_records,source_catalog)
@@ -228,7 +236,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     def revalidate():
         from django.http import Http404
         try: fresh=source_context(user,scope,document_id,transaction_id,record_type,record_id,selected_documents,source_catalog,selected_records)
-        except Http404 as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
+        except (Http404, PermissionError) as exc: raise MemoryConflict('Canonical source became inaccessible during inference.') from exc
         if fresh!=tools: raise MemoryConflict('Canonical source changed during inference.')
     field=requested_record_field(query,kind='expense' if scope=='bank_statements' else record_type) if scope in ('bank_statements','financial_records','financial_document') else None
     period_query=requested_record_field(query,kind='expense')=='statement_period' or bool(

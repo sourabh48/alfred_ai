@@ -1,5 +1,18 @@
 # Using the local assistant
 
+Under **Include local records**, choose the records to use for this question.
+The permission note names the selected read-only data tool. Expand **Available
+local read-only tools** to see the current catalogue. These tools read your own
+Finance records, reviewed statement/document evidence or saved Travel preferences;
+they do not make changes, book travel, trade or contact external providers.
+General chat keeps its existing verified-memory and conversation controls.
+
+If a local source read cannot return validated evidence within its budget, your
+question stays in the composer. Review or reload the source, then retry. Database
+and file reads finish safely; ALFRED discards late results. External MCP servers
+are not enabled by this catalogue. New actions still require their separate review
+and confirmation flow.
+
 To create a savings goal, ask "add a savings goal Bike of 1000.25". To report
 progress, ask "update Bike saved to 250.10". Review the name, amount and date in
 the proposal, then choose **Confirm** or **Cancel**. Proposals expire after ten

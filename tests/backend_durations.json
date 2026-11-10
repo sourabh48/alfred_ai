@@ -1,4 +1,5 @@
 {
+ "tests.test_assistant_tools": 1.795,
  "tests.test_local_chat_stream": 3.206,
  "tests.test_investment_review": 16.863,
  "tests.test_loan_import_review": 7.076,

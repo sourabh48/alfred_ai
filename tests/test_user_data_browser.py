@@ -4618,6 +4618,64 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
 
+    def test_registered_tools_permissions_real_reads_timeout_and_keyboard_accessibility(self):
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select
+        from apps.investments.models import Investment
+        from apps.mobility.models import TravelPreferenceProfile
+        from apps.ml_engine.services import assistant_tools
+        rows, local = self.canonical_grounding_fixture()
+        owner = self.scenario['user']
+        TravelPreferenceProfile.objects.create(user=owner, preferences={'terrain': 'synthetic mountains'})
+        before = list(Investment.objects.values())
+        execute = self.enterContext(patch.object(assistant_tools, 'execute_tool', wraps=assistant_tools.execute_tool))
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceToolsList li')) == 6)
+        panel = self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceToolsPanel summary')
+        self.browser.execute_script('arguments[0].scrollIntoView({block:"center"})', panel); panel.send_keys(Keys.ENTER)
+        self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceToolsPanel').get_property('open'))
+        self.assertIn('external MCP servers', self.text('intelligenceToolsPanel'))
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('financial_records')
+        Select(self.browser.find_element(self.By.ID,'intelligenceFinancial')).select_by_value(f'investment:{rows["investment"].pk}')
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceToolPolicy').get_attribute('data-tool'),'finance.record')
+        self.assertIn('does not change them or contact external providers',self.text('intelligenceToolPolicy'))
+        self.ask_history_question('Explain this record')
+        self.wait.until(lambda _: 'current value: 2,345.67' in self.text('intelligenceAnswers'))
+        self.assertGreaterEqual(sum(call.args[1] == 'finance.record' for call in execute.call_args_list),2)
+        self.assertNotIn('input_schema',json.dumps(local.reason.call_args.args[0]))
+        self.capture('local-tool-policy-and-financial-evidence')
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('travel')
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceToolPolicy').get_attribute('data-tool'),'travel.preferences')
+        self.ask_history_question('Explain my saved travel preferences')
+        self.wait.until(lambda _: 'synthetic mountains' in self.text('intelligenceAnswers'))
+        self.assertTrue(any(call.args[1] == 'travel.preferences' for call in execute.call_args_list))
+        self.assertEqual(list(Investment.objects.values()),before)
+        rendered = len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers > article'))
+        local.reason.reset_mock()
+        with patch('apps.ml_engine.services.hybrid_intelligence._read_source_context',
+                   side_effect=assistant_tools.ToolDeadlineExceeded('SYNTHETIC-PRIVATE-TOOL-FAILURE')):
+            self.ask_history_question('Explain my saved travel preferences')
+            self.wait.until(lambda _: 'local source tool could not return validated evidence' in self.text('intelligenceFeedback'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Explain my saved travel preferences')
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers > article')),rendered)
+        self.assertNotIn('SYNTHETIC-PRIVATE',self.text('intelligenceFeedback')); local.reason.assert_not_called()
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'tool-registry-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.execute_script('document.getElementById("intelligenceToolPolicy").scrollIntoView({block:"center",behavior:"instant"})')
+                self.browser.save_screenshot(str(self.artifacts/f'tool-registry-{width}-{theme}.png'))
+
     def test_canonical_record_overview_during_real_socket_refusal_and_reopen(self):
         import socket
         from http.client import HTTPConnection

@@ -37,6 +37,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
     let pageDialogue = [];
+    let registeredTools = [];
+    const toolPolicy = document.getElementById('intelligenceToolPolicy');
+    const toolList = document.getElementById('intelligenceToolsList');
     let streamRequest = null;
     const stopGeneration = document.getElementById('intelligenceStop');
     stopGeneration.addEventListener('click', () => streamRequest?.abort());
@@ -347,6 +350,12 @@ document.addEventListener("DOMContentLoaded", () => {
         localStatus.textContent = text; localStatus.dataset.state = state;
     }
     function updateScope(resetConsent = true) {
+        const tool = active ? registeredTools.find(item => item.scope === scope.value) : null;
+        toolPolicy.textContent = !active ? 'Tool access is unavailable. Sign in or reload to check your session.' : scope.value === 'general'
+            ? "Choose local records to include a module's evidence for this question."
+            : tool ? `Selected data tool: ${tool.title}. Reads only your records; does not change them or contact external providers.`
+            : 'Tool permission details are unavailable. Source reads still require server checks; reload to recheck permissions.';
+        toolPolicy.dataset.tool = tool?.name || '';
         scope.disabled = !active || pending;
         const documents = scope.value === "documents";
         document.getElementById("intelligenceDocumentField").classList.toggle("d-none", !documents);
@@ -370,20 +379,28 @@ document.addEventListener("DOMContentLoaded", () => {
         const ticket = generation;
         cloudAvailable = false; consent.checked = false; consent.disabled = true;
         // Cloud policy status must not gate independent owner-only source browsing.
-        const [insights, history, policy] = await Promise.all([
+        const [insights, history, policy, tools] = await Promise.all([
             Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"),
             Alfred.fetchJSON("/api/ai/conversations/").catch(error => {
                 // One local read retry covers transient cold-vault contention; auth errors never retry.
                 if (active && ticket === generation && error.status === 503) return Alfred.fetchJSON("/api/ai/conversations/");
                 throw error;
             }).then(data => ({data}), error => ({error})),
-            Alfred.fetchJSON("/api/ai/memories/reason/").then(data => ({data}), error => ({error}))
+            Alfred.fetchJSON("/api/ai/memories/reason/").then(data => ({data}), error => ({error})),
+            Alfred.fetchJSON('/api/ai/tools/').then(data => ({data}), error => ({error}))
         ]);
         if (!active || ticket !== generation) return;
-        if ([policy.error,history.error].some(error => error && [401,403].includes(error.status))) {
+        if ([policy.error,history.error,tools.error].some(error => error && [401,403].includes(error.status))) {
             forgetPrivatePage(); feedback.textContent = "Session or policy permission is no longer available. Sign in or reload before continuing."; return;
         }
         const reasoning = policy.data;
+        registeredTools = Array.isArray(tools.data?.tools) ? tools.data.tools : [];
+        toolList.replaceChildren();
+        registeredTools.forEach(tool => {
+            const item = document.createElement('li'); item.textContent = `${tool.title} · Read only · Your records only`;
+            toolList.append(item);
+        });
+        if (!registeredTools.length) { const item = document.createElement('li'); item.textContent = 'Tool permissions are unavailable. Reload to retry.'; toolList.append(item); }
         if (history.data) applyHistory(history.data);
         else {
             historyPolicy=null; historyBlocked=true; conversation=null; requestToken=null;

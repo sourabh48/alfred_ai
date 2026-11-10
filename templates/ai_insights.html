@@ -76,6 +76,12 @@
             <option value="financial_records">My canonical financial records</option>
             <option value="financial_document">Reviewed records from one document</option>
         </select>
+        <p id="intelligenceToolPolicy" class="small" role="status">Choose local records to include a module's evidence for this question.</p>
+        <details class="small mb-2" id="intelligenceToolsPanel">
+            <summary>Available local read-only tools</summary>
+            <ul id="intelligenceToolsList"><li>Loading tool permissions.</li></ul>
+            <p>These tools read only your records. They do not enable external MCP servers or automatic actions.</p>
+        </details>
         </div><div id="intelligenceDocumentField" class="d-none mb-2"><label for="intelligenceDocument" class="form-label">Verified evidence</label>
             <select id="intelligenceDocument" class="form-select" disabled required></select></div>
         <div id="intelligenceStatementField" class="d-none mb-2"><label for="intelligenceStatement" class="form-label">Source transaction</label>
@@ -204,5 +210,5 @@
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
 <script src="/static/js/answer_markdown.js?v=1"></script>
-<script src="/static/js/intelligence.js?v=26"></script>
+<script src="/static/js/intelligence.js?v=27"></script>
 {% endblock %}

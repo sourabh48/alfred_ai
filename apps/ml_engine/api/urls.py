@@ -1,5 +1,6 @@
 from django.urls import path
 from .assistant_actions import AssistantActionCancelAPI, AssistantActionConfirmAPI, AssistantActionProposeAPI
+from .assistant_tools import AssistantToolCatalogAPI
 from .speech import SpeechSpeakAPI, SpeechStatusAPI, SpeechTranscribeAPI
 from .chat_stream import LocalChatStreamAPI
 from .statements import StatementEvidenceAPI
@@ -13,6 +14,7 @@ from .conversations import ConversationPolicyAPI, ConversationCollectionAPI, Con
 from .document_corpus import DocumentCorpusAPI, DocumentCorpusSearchAPI, DocumentCorpusDetailAPI, DocumentCorpusUploadAPI, DocumentCorpusOriginalAPI, DocumentCorpusQuestionAPI
 
 urlpatterns = [
+    path('tools/', AssistantToolCatalogAPI.as_view()),
     path('document-corpus/', DocumentCorpusAPI.as_view()),
     path('document-corpus/search/', DocumentCorpusSearchAPI.as_view()),
     path('document-corpus/question/', DocumentCorpusQuestionAPI.as_view()),
