@@ -767,15 +767,22 @@ def career_follow_ups(request):
     """Follow-ups due or coming up across the owner's saved opportunities, earliest first."""
     today = timezone.localdate()
     rows = []
+    unavailable = []
     for analysis in CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]:
         payload = analysis.extracted_payload if isinstance(analysis.extracted_payload, dict) else {}
         follow_up = application_tracker.follow_up_status(payload.get("application"), today=today)
         if follow_up["status"] in {"due", "upcoming"}:
             rows.append({"id": analysis.pk, "job_title": analysis.job_title, "company": analysis.company,
                          "stage": payload["application"]["stage"], **follow_up})
+        elif follow_up['status'] == 'unavailable':
+            unavailable.append({'id':analysis.pk, 'job_title':analysis.job_title, 'company':analysis.company,
+                                'detail':follow_up['detail']})
     rows.sort(key=lambda row: (row["due_on"], row["id"]))
-    return Response({"today": today.isoformat(), "due": [row for row in rows if row["status"] == "due"],
-                     "upcoming": [row for row in rows if row["status"] == "upcoming"][:20]})
+    response = Response({"today": today.isoformat(), "due": [row for row in rows if row["status"] == "due"],
+                     "upcoming": [row for row in rows if row["status"] == "upcoming"][:20],
+                     'unavailable':unavailable[:20], 'unavailable_count':len(unavailable)})
+    response['Cache-Control'] = 'no-store, private'
+    return response
 
 
 class CareerResumeCompareView(APIView):

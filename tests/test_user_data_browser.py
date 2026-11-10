@@ -4618,6 +4618,64 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
 
+    def test_career_bad_history_does_not_hide_valid_followups_or_erase_records(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis
+        from apps.career.services.application_tracker import apply_change
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        owner = self.scenario['user']; today = timezone.localdate()
+        broken = CareerJobAnalysis.objects.create(user=owner, job_title='Synthetic history needing review',
+            company='<img src=x onerror="window.careerHistoryInjected=true">',
+            extracted_payload={'application':{'stage':'applied','history':123},'source':'SYNTHETIC-RETAINED'})
+        valid = CareerJobAnalysis.objects.create(user=owner, job_title='Valid Synthetic Opportunity',
+            extracted_payload={'application':apply_change({}, {'stage':'applied',
+                'on':(today-timedelta(days=10)).isoformat()}, today=today)})
+        other = get_user_model().objects.create_user(username='synthetic-followup-other')
+        CareerJobAnalysis.objects.create(user=other, job_title='OTHER-OWNER-SECRET',
+            extracted_payload={'application':{'stage':'applied'}})
+        before = broken.extracted_payload
+        self.login(); self.browser.get(self.live_server_url+'/career/')
+        self.wait.until(lambda _: 'Synthetic history needing review' in self.text('careerFollowUpsUnavailable'))
+        self.assertIn('Valid Synthetic Opportunity', self.text('careerFollowUpsDue'))
+        self.assertIn('No dates were guessed', self.text('careerFollowUpsUnavailable'))
+        self.assertNotIn('OTHER-OWNER', self.text('careerFollowUps'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.careerHistoryInjected)'))
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(broken.pk))
+        self.wait.until(lambda _: 'Unavailable: review' in self.text('careerApplicationFollowUp'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'careerApplicationSave').is_enabled())
+        self.assertEqual(self.browser.find_elements(self.By.ID,'careerFollowUpSent'), [])
+        self.capture('career-history-needs-review')
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(valid.pk))
+        self.assertTrue(self.browser.find_element(self.By.ID,'careerApplicationSave').is_enabled())
+        Select(self.browser.find_element(self.By.ID,'careerApplicationStage')).select_by_value('interview')
+        self.memory_click('#careerApplicationSave')
+        self.wait.until(lambda _: 'Saved.' in self.text('careerApplicationFeedback'))
+        valid.refresh_from_db()
+        self.assertEqual(valid.extracted_payload['application']['stage'], 'interview')
+        self.browser.refresh()
+        self.wait.until(lambda _: 'Synthetic history needing review' in self.text('careerFollowUpsUnavailable'))
+        broken.refresh_from_db(); self.assertEqual(broken.extracted_payload, before)
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(broken.pk))
+        self.wait.until(lambda _: 'Unavailable: review' in self.text('careerApplicationFollowUp'))
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'career-history-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'career-history-{width}-{theme}.png'))
+
     def test_career_application_progress_is_owned_page_only_offline_and_reopens(self):
         from datetime import timedelta
         from django.utils import timezone

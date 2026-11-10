@@ -489,7 +489,16 @@ function loadCareerFollowUps() {
             ? `<div class="alert alert-warning small mb-0" id="careerFollowUpsDue"><strong>Follow-ups due (${data.due.length})</strong><ul class="mb-0">${data.due.map(row).join("")}</ul>
                <div class="mt-1">ALFRED does not send anything. Mark a follow-up as sent only after you send it yourself.</div></div>`
             : (data.upcoming.length ? `<p class="small muted mb-0" id="careerFollowUpsNone">No follow-ups due today. Next: ${Alfred.escapeHtml(data.upcoming[0].due_on)}.</p>` : "");
-    }).catch(() => { target.replaceChildren(); });
+        const unavailable = data.unavailable || [];
+        if (unavailable.length) {
+            target.insertAdjacentHTML('beforeend', `<div class="alert alert-warning small mt-2 mb-0" id="careerFollowUpsUnavailable" role="status">
+                <strong>Follow-up dates need review (${Alfred.escapeHtml(String(data.unavailable_count))})</strong>
+                <p class="mb-1">These opportunities have missing, malformed or conflicting histories. No dates were guessed and saved records were not changed.
+                Select an affected opportunity below to inspect its recorded history. Editing is paused to preserve that history.</p>
+                <ul>${unavailable.map(item => `<li>${Alfred.escapeHtml(item.job_title || 'Role')} · ${Alfred.escapeHtml(item.company || 'Company not recorded')}</li>`).join('')}</ul>
+                <p class="mb-0">Checked up to the 300 most recently updated opportunities; showing ${unavailable.length} needing review.</p></div>`);
+        }
+    }).catch(() => { target.innerHTML = '<p class="small" role="status">Follow-ups could not load. Refresh this page to retry; saved records have not been changed.</p>'; });
 }
 
 function renderCareerApplication(item) {
@@ -512,7 +521,7 @@ function renderCareerApplication(item) {
                     <select class="form-select form-select-sm" id="careerApplicationStage">${CAREER_STAGES.map(stage => `<option value="${stage}">${careerStageLabel(stage)}</option>`).join("")}</select></div>
                 <div class="col-md-4"><label class="form-label small" for="careerApplicationDate">Date</label>
                     <input class="form-control form-control-sm" id="careerApplicationDate" type="date"></div>
-                <div class="col-md-3"><button class="btn btn-outline-primary btn-sm w-100" type="button" id="careerApplicationSave">Save stage</button></div>
+                <div class="col-md-3"><button class="btn btn-outline-primary btn-sm w-100" type="button" id="careerApplicationSave" ${follow.status === 'unavailable' ? 'disabled aria-describedby="careerApplicationFollowUp"' : ''}>Save stage</button></div>
             </div>
             <p class="small mt-2 mb-1" id="careerApplicationFollowUp">Current stage: <strong>${Alfred.escapeHtml(careerStageLabel(app.stage))}</strong>. ${Alfred.escapeHtml(follow.detail || "")}</p>
             ${["due", "upcoming"].includes(follow.status) ? `<button class="btn btn-outline-secondary btn-sm" type="button" id="careerFollowUpSent">I sent a follow-up today</button>` : ""}

@@ -13,6 +13,7 @@ CLOSED_STAGES = {"offer", "rejected", "discarded", "hired"}
 # stage: (days after entering the stage, days between follow-ups, most follow-ups before the lead goes cold)
 FOLLOW_UP_CADENCE = {"applied": (7, 7, 2), "responded": (1, 3, None), "assessment": (1, 3, None), "interview": (1, 3, None)}
 MAX_HISTORY = 60
+HISTORY_REVIEW = 'Unavailable: review missing, malformed or conflicting application history. Saved records have not been changed.'
 
 
 def _day(value, *, today: date, floor: date | None = None) -> date:
@@ -32,9 +33,47 @@ def _day(value, *, today: date, floor: date | None = None) -> date:
 
 def _clean(application) -> dict:
     application = application if isinstance(application, dict) else {}
+    def steps(key):
+        items = application.get(key)
+        if not isinstance(items, list):
+            return []
+        return [{**item, 'stage': item.get('stage') if item.get('stage') in STAGES else '',
+                 'on': item.get('on') if isinstance(item.get('on'), str) else ''}
+                for item in items[-MAX_HISTORY:] if isinstance(item, dict)]
     return {"stage": application.get("stage") if application.get("stage") in STAGES else "",
-            "history": [dict(item) for item in application.get("history") or [] if isinstance(item, dict)],
-            "follow_ups": [dict(item) for item in application.get("follow_ups") or [] if isinstance(item, dict)]}
+            "history": steps('history'), "follow_ups": steps('follow_ups')}
+
+
+def _validated(application, *, today):
+    application = {} if application is None else application
+    try:
+        if not isinstance(application, dict) or application.get('stage') not in (None, '', *STAGES):
+            raise ValueError()
+        for key in ('history', 'follow_ups'):
+            items = application.get(key, [])
+            if not isinstance(items, list) or len(items) > MAX_HISTORY:
+                raise ValueError()
+            days = []
+            for item in items:
+                if (not isinstance(item, dict) or item.get('stage') not in STAGES
+                        or not isinstance(item.get('on'), str)):
+                    raise ValueError()
+                day = date.fromisoformat(item['on'])
+                if day > today:
+                    raise ValueError()
+                days.append(day)
+            if days != sorted(days):
+                raise ValueError()
+        record = _clean(application)
+        if not record['stage'] and (record['history'] or record['follow_ups']):
+            raise ValueError()
+        if record['history'] and record['history'][-1]['stage'] != record['stage']:
+            raise ValueError()
+        if record['stage'] in FOLLOW_UP_CADENCE and not record['history']:
+            raise ValueError()
+        return record
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError(HISTORY_REVIEW) from None
 
 
 def _last_day(application) -> date | None:
@@ -46,7 +85,8 @@ def apply_change(application, payload: dict, *, today: date) -> dict:
     """Return a new application record after one owner change: a stage or a confirmed sent follow-up."""
     if not isinstance(payload, dict):
         raise ValueError("Send a stage or a sent follow-up.")
-    application = _clean(application)
+    original = application if isinstance(application, dict) else {}
+    application = _validated(application, today=today)
     wants_stage, wants_follow_up = "stage" in payload, payload.get("follow_up_sent") is True
     if wants_stage == wants_follow_up:
         raise ValueError("Send either a new stage or follow_up_sent: true, not both.")
@@ -63,26 +103,33 @@ def apply_change(application, payload: dict, *, today: date) -> dict:
         if application["stage"] not in FOLLOW_UP_CADENCE:
             raise ValueError("Follow-ups are tracked only while applied, responded, in an assessment or interviewing.")
         application["follow_ups"] = (application["follow_ups"] + [{"stage": application["stage"], "on": on.isoformat()}])[-MAX_HISTORY:]
-    return application
+    return {**original, **application}
 
 
 def follow_up_status(application, *, today: date) -> dict:
     """When the next follow-up is due for the current stage, or why none is."""
-    application = _clean(application)
+    unavailable = dict(status='unavailable', due_on=None, sent_in_stage=None, detail=HISTORY_REVIEW)
+    try:
+        application = _validated(application, today=today)
+    except ValueError:
+        return unavailable
     stage = application["stage"]
     if not stage:
         return {"status": "no_stage", "due_on": None, "sent_in_stage": 0, "detail": "Set a stage to track follow-ups."}
     if stage not in FOLLOW_UP_CADENCE:
         detail = "No follow-ups once the opportunity is closed." if stage in CLOSED_STAGES else "Follow-ups start once you apply."
         return {"status": "not_tracked", "due_on": None, "sent_in_stage": 0, "detail": detail}
-    entered = max((date.fromisoformat(item["on"]) for item in application["history"] if item.get("stage") == stage), default=today)
+    entered = max(date.fromisoformat(item["on"]) for item in application["history"] if item.get("stage") == stage)
     sent = sorted(date.fromisoformat(item["on"]) for item in application["follow_ups"]
                   if item.get("stage") == stage and item.get("on") and date.fromisoformat(item["on"]) >= entered)
     first, every, most = FOLLOW_UP_CADENCE[stage]
     if most is not None and len(sent) >= most:
         return {"status": "cold", "due_on": None, "sent_in_stage": len(sent),
                 "detail": f"{len(sent)} follow-ups sent with no reply recorded; treat this lead as cold."}
-    due = (sent[-1] + timedelta(days=every)) if sent else (entered + timedelta(days=first))
+    try:
+        due = (sent[-1] + timedelta(days=every)) if sent else (entered + timedelta(days=first))
+    except OverflowError:
+        return unavailable
     return {"status": "due" if due <= today else "upcoming", "due_on": due.isoformat(), "sent_in_stage": len(sent),
             "detail": f"Next follow-up {'due' if due <= today else 'from'} {due.isoformat()}."}
 

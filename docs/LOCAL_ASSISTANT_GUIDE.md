@@ -25,6 +25,12 @@ Career snapshots stay on the page even when conversation history is enabled.
 They work without a model and do not verify that an application or message was sent.
 No salary, contacts, resume text or job-description text is included.
 
+If Career shows **Follow-up dates need review**, inspect the affected opportunity's
+recorded history. ALFRED leaves incomplete or conflicting dates unresolved and
+pauses edits to that history. Other valid opportunities remain usable. The assistant
+uses the same check. Refreshing or retrying does not replace the damaged history;
+historical correction requires a separately reviewed recovery process.
+
 ![Recorded application progress on a synthetic account with history enabled and the Career snapshot kept page-only](images/usability/career-progress.png)
 
 To create a savings goal, ask "add a savings goal Bike of 1000.25". To report

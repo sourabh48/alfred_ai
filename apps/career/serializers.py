@@ -20,8 +20,9 @@ class CareerOpportunitySerializer(serializers.ModelSerializer):
     def get_application(self, obj):
         from django.utils import timezone
         payload = obj.extracted_payload if isinstance(obj.extracted_payload, dict) else {}
-        record = application_tracker._clean(payload.get('application'))
-        return {**record, 'follow_up': application_tracker.follow_up_status(record, today=timezone.localdate())}
+        application = payload.get('application')
+        return {**application_tracker._clean(application),
+                'follow_up': application_tracker.follow_up_status(application, today=timezone.localdate())}
 
     def get_match_freshness(self, obj):
         # The list shares one context, so the owner's current resume is read once per page.

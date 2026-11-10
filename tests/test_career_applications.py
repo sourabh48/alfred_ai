@@ -66,6 +66,44 @@ class FollowUpTimingTests(SimpleTestCase):
         self.assertEqual(same["status"], "current")
         self.assertEqual(tracker.match_freshness({}, current)["status"], "unknown")
 
+    def test_missing_stage_date_never_becomes_a_follow_up_from_today(self):
+        status = tracker.follow_up_status({'stage': 'applied'}, today=self.today)
+        self.assertEqual(status['status'], 'unavailable')
+        self.assertIsNone(status['due_on'])
+        self.assertIsNone(status['sent_in_stage'])
+
+    def test_malformed_or_conflicting_history_is_unavailable_and_cannot_be_overwritten(self):
+        from copy import deepcopy
+        valid = {'stage': 'applied', 'history': [{'stage': 'applied', 'on': '2026-11-01'}]}
+        invalid = [dict(valid, history=1), dict(valid, history=[True]),
+            dict(valid, history=[{'stage': 'applied', 'on': 'bad'}]),
+            dict(valid, history=[{'stage': [], 'on': '2026-11-01'}]),
+            dict(valid, history=[{'stage': 'applied', 'on': '2026-12-01'}]),
+            dict(valid, history=[{'stage': 'interview', 'on': '2026-11-01'}]),
+            dict(valid, follow_ups=[{'stage': 'applied', 'on': {}}]),
+            dict(valid, follow_ups=[{'stage': 'applied', 'on': '2026-12-01'}]),
+            dict(valid, history=[{'stage':'applied','on':'2026-11-02'}, {'stage':'applied','on':'2026-11-01'}]),
+            dict(valid, stage=''), dict(valid, stage=[]),
+            dict(valid, history=valid['history']*61)]
+        for record in invalid:
+            with self.subTest(record=record):
+                before = deepcopy(record)
+                self.assertEqual(tracker.follow_up_status(record, today=self.today)['status'], 'unavailable')
+                with self.assertRaisesMessage(ValueError, 'review'):
+                    tracker.apply_change(record, {'stage': 'interview'}, today=self.today)
+                self.assertEqual(record, before)
+
+    def test_valid_change_preserves_source_metadata_without_mutating_input(self):
+        from copy import deepcopy
+        record = self.at({'stage':'applied','on':'2026-11-01'})
+        record['provenance'] = {'source':'SYNTHETIC-RETAINED'}
+        record['history'][0]['source_note'] = 'Keep this evidence'
+        before = deepcopy(record)
+        changed = tracker.apply_change(record, {'stage':'interview'}, today=self.today)
+        self.assertEqual(changed['provenance'], record['provenance'])
+        self.assertEqual(changed['history'][0], record['history'][0])
+        self.assertEqual(record, before)
+
 
 class CareerApplicationApiTests(TestCase):
     def setUp(self):
@@ -100,6 +138,46 @@ class CareerApplicationApiTests(TestCase):
         self.analysis.refresh_from_db()
         self.assertNotIn("application", self.analysis.extracted_payload)
         self.assertEqual(self.client.get("/api/career/follow-ups/").json()["due"], [])
+
+    def test_corrupt_history_keeps_other_follow_ups_available_and_preserves_raw_record(self):
+        from copy import deepcopy
+        bad = {'stage': 'applied', 'history': [{'stage': 'applied', 'on': 'PRIVATE-MALFORMED-DATE'}]}
+        self.analysis.extracted_payload = {'application': bad, 'private_source': 'RETAIN-SYNTHETIC-EVIDENCE'}
+        self.analysis.save()
+        before = deepcopy(self.analysis.extracted_payload)
+        valid = CareerJobAnalysis.objects.create(user=self.owner, job_title='Valid Synthetic Opportunity',
+            extracted_payload={'application': tracker.apply_change({}, {'stage':'applied','on':
+                (timezone.localdate()-timedelta(days=10)).isoformat()}, today=timezone.localdate())})
+        response = self.client.get('/api/career/follow-ups/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row['id'] for row in response.json()['due']], [valid.pk])
+        self.assertEqual([row['id'] for row in response.json()['unavailable']], [self.analysis.pk])
+        self.assertNotIn('PRIVATE-', str(response.json()))
+        listed = self.client.get('/api/career/job-analyses/')
+        self.assertEqual(listed.status_code, 200)
+        row = next(row for row in listed.json()['results'] if row['id'] == self.analysis.pk)
+        self.assertEqual(row['application']['follow_up']['status'], 'unavailable')
+        self.assertEqual(self.post(self.analysis, {'stage':'interview'}).status_code, 400)
+        self.analysis.refresh_from_db()
+        self.assertEqual(self.analysis.extracted_payload, before)
+
+    def test_wrong_history_shapes_are_safe_to_list_and_refused_without_data_loss(self):
+        for application in ({'stage':'applied','history':123}, {'stage':[]},
+                {'stage':'applied','history':[{'stage':{},'on':'2026-11-01'}]}, ['PRIVATE-LEGACY']):
+            with self.subTest(application=application):
+                CareerJobAnalysis.objects.filter(pk=self.analysis.pk).update(extracted_payload={'application':application})
+                with self.assertNoLogs('django.request', level='ERROR'):
+                    listed = self.client.get('/api/career/job-analyses/')
+                    follow = self.client.get('/api/career/follow-ups/')
+                self.assertEqual(listed.status_code, 200)
+                self.assertEqual(follow.status_code, 200)
+                self.assertEqual(listed.json()['results'][0]['application']['follow_up']['status'], 'unavailable')
+                self.assertIn('no-store', follow['Cache-Control'])
+                denied = self.post(self.analysis, {'stage':'interview'})
+                self.assertEqual(denied.status_code, 400)
+                self.assertNotIn('PRIVATE-', str(denied.json()))
+                self.analysis.refresh_from_db()
+                self.assertEqual(self.analysis.extracted_payload['application'], application)
 
     def test_a_new_resume_marks_older_matches_stale_and_versions_compare(self):
         CareerProfile.objects.create(user=self.owner, role="Backend Engineer", experience_years=4, skills="Python")
