@@ -1,5 +1,41 @@
 # Test evidence index
 
+## 2026-11-11 - typed read-only tool registry
+
+Source334db14b6ef51b35ad2d4bb5ac21cd617f7600a7, base54eb7661083983fe1b03a5b8ba2ffa74534659a2.
+Receipts/hashes/commands: `artifacts/tool-registry-20261111/`. All data synthetic,
+isolated from the owner runtime. No application MCP server activated.
+
+- Exact-source296 backend PASS, zero failures/skips,280.947s: registry/schema,
+  canonical/statement/loan/investment/document grounding, history, currency, streaming,
+  session/CSRF, Windows native, browser planning, release validation and expensive-quota
+  contract. New twelve-case module is included in the measured release inventory.
+  Earlier focused52/12-case runs overlap, not additive.
+- Five exact-source real Chrome journeys PASS, zero failures/skips,157.192s
+  (runner wall187.438s): six-tool catalogue/selected policy, actual Finance and Travel
+  reads through the registry, timeout draft/no partial answer, keyboard/accessibility;
+  canonical correction/citations/mobile; unsupported/stale/foreign evidence;
+  real-adapter refused socket recovery; five-document selection/citation/privacy.
+- Four tool-panel Axe light/dark1440/390 audits zero violations; existing gradient
+  contrast incomplete/manual review pending. Recovery journey also runs its own
+  audits. Actual synthetic tool-panel screenshot visually inspected and added to guide.
+- One exact-source unmocked Ollama PASS30.466s: current reviewed investment records
+  preserve exact2345.67/120.05 source cards and citations through the registry.
+  No model response mocked; unrelated external domain providers isolated. This is
+  bounded availability/grounding evidence, not a speed or universal accuracy claim.
+- Registry tests enforce strict types/64-bit positive IDs/selection bounds/no owner
+  overrides, active owner/consent, foreign IDs, unknown write/execution tools, safe
+  JSON/result byte/citation boundaries, deadline rejection and redacted logs. SQL
+  observation confirms no finance-read DML; canonical values and unused vault intact.
+- Initial existing42-case regression run had two errors after deleting the owner
+  during inference: the new active-owner check raised PermissionError. Revalidation
+  now maps loss of access to the existing MemoryConflict path; all final races PASS.
+  Failure receipt retained; no checks or privacy/AI validation weakened.
+- Clean exact-source worktreeF:/ALFRED_DEV/usability-tools-check-334db14: source,
+  privacy, dependency and migration preflight PASS; technical/promotion BLOCKED,
+  no waivers. JS/diff/AST-only graph update PASS. No schema/dependency/owner runtime,
+  keys/weights/documents/backups/installation or CI/push/PR/merge/deployment changes.
+
 ## 2026-11-10 - evidence card metadata and action labels
 
 Scope base60595a99a28214933c7a7d874554a468eca550c8. Artifacts/evidence-card-20261110

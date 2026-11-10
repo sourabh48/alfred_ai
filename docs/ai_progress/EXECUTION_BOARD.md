@@ -1,5 +1,15 @@
 # Current execution board
 
+## Local tool registry - 2026-11-11
+
+USE-04/typed-read-only-tool-registry LOCAL_ACCEPTED / COMMITTED_LOCAL at
+334db14b6ef51b35ad2d4bb5ac21cd617f7600a7 (base54eb766). Six existing adapters now
+pass through typed owner/consent/output/deadline/audit controls and the actual chat UI.
+296 backend/5 Chrome/1 real Ollama PASS; clean source/privacy/dependency/migration
+preflight PASS. Full USE-04, MCP transport, owner/CI/package/independent/release gates
+remain open. No owner runtime or remote change. READY_FOR_NEXT, no further selection.
+Exact files/evidence: [STATE](STATE.json), [TEST_EVIDENCE](TEST_EVIDENCE.md).
+
 ## Codex continuation checkpoint - 2026-11-10
 
 CODEX_TO_CLAUDE_READY; no agent launched. Preparation branchwork/usability-integration;
@@ -70,7 +80,7 @@ Validated loan implementation:88c1df8; latest preservation follow-up:c2d1517.
 | USE-05 bound savings-goal confirmation | LOCAL_ACCEPTED / COMMITTED_LOCAL |0ca2168;136 backend/3 Chrome/actual native HTTP concurrency and restart; exact source preflight PASS |
 | USE-04 offline canonical record recovery | LOCAL_ACCEPTED / COMMITTED_LOCAL |ebbd056;226 backend/4 Chrome/1 unmocked Ollama; exact source preflight PASS |
 | USE-04 evidence card presentation | LOCAL_ACCEPTED / COMMITTED_LOCAL |e9808c2:53 backend/4 Chrome;30ab4d8:2 affected action Chrome; each source preflight PASS |
-| USE-04 typed read-only tool registry | SELECTED / NOT_IMPLEMENTED |Continue existing source adapters; no new remote MCP connections authorized |
+| USE-04 typed read-only tool registry | LOCAL_ACCEPTED / COMMITTED_LOCAL |334db14;296 backend/5 Chrome/1 real Ollama PASS; no MCP transport or remote activation |
 | USE-01 diagnostics; USE-02 inventory hub | COMMITTED_LOCAL | cba5b53; earlier synthetic evidence retained |
 | USE-03 bounded encrypted-history context | COMMITTED_LOCAL | 4019ee2; earlier synthetic and actual local-model evidence retained |
 | USE-02 statement preview / confirmation | LOCAL_ACCEPTED / COMMITTED_LOCAL | 0f35605; 157 backend, Chrome + four Axe audits, native19 PASS; clean-source preflight PASS |

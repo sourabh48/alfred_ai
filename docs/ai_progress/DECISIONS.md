@@ -1,5 +1,19 @@
 # Execution decisions
 
+## 2026-11-11 - bounded local read registry
+
+- Resume the explicitly selected usability task; earlier canonical queue acceptance
+  still needs owner/provider/package evidence. Original143/13-extension counts unchanged.
+- Wrap existing source_context adapters, retaining canonical services and post-model
+  source revalidation. Typed fields generate the advertised schemas. Model/document
+  text cannot select/register tools or override the authenticated owner.
+- Catalogue is authenticated, metadata-only and private/no-store. No execution API,
+  MCP transport, new remote server, credential, planner or financial write introduced.
+- Five-second deadline rejects late validated results without forcibly interrupting
+  SQLite/file reads. Audit logs contain fixed tool ID/outcome/time, no owner/payload.
+- NO_UPSTREAM_ADOPTION for this scope. Existing reference matrix/license boundaries
+  and canonical Decimal behavior preserved; no second financial/travel engine.
+
 ## 2026-11-10 - typed financial display only
 
 A source classification cannot turn every numeric metadata field into money.

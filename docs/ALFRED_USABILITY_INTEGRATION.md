@@ -1,5 +1,15 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Local tool registry - 2026-11-11
+
+USE-04/typed-read-only-tool-registry LOCAL_ACCEPTED / COMMITTED_LOCAL at
+334db14b6ef51b35ad2d4bb5ac21cd617f7600a7 (base54eb766). Six existing adapters now
+pass through typed owner/consent/output/deadline/audit controls and the actual chat UI.
+296 backend/5 Chrome/1 real Ollama PASS; clean source/privacy/dependency/migration
+preflight PASS. Full USE-04, MCP transport, owner/CI/package/independent/release gates
+remain open. No owner runtime or remote change. READY_FOR_NEXT, no further selection.
+Exact files/evidence: [STATE](ai_progress/STATE.json), [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md).
+
 ## Codex continuation checkpoint - 2026-11-10
 
 CODEX_TO_CLAUDE_READY; no agent launched. Preparation branchwork/usability-integration;

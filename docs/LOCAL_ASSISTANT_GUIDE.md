@@ -13,6 +13,8 @@ and file reads finish safely; ALFRED discards late results. External MCP servers
 are not enabled by this catalogue. New actions still require their separate review
 and confirmation flow.
 
+![Local read-only tool permissions and a retained question on a synthetic account](images/usability/local-tools.png)
+
 To create a savings goal, ask "add a savings goal Bike of 1000.25". To report
 progress, ask "update Bike saved to 250.10". Review the name, amount and date in
 the proposal, then choose **Confirm** or **Cancel**. Proposals expire after ten

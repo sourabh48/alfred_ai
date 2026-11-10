@@ -1,5 +1,15 @@
 # Known issues and gates
 
+## Registry scope and remaining gates
+
+The six local read tools at334db14 cover existing snapshots/records/statement and
+reviewed-document projections, verified closures and saved Travel preferences.
+Career, wider research/Travel scenarios, memory tools and autonomous cross-domain
+planning remain outside this bounded registry. No application MCP transport or
+trusted server is configured. Deadlines are cooperative and do not cancel SQLite
+or file reads. Full USE-04/release, manual contrast, independent/CI/package/owner
+acceptance and3.0 prerequisites remain open. No new task selected by this continue.
+
 ## Continuation after the bounded sprint
 
 Local action binding0ca2168, offline canonical recoveryebbd056 and evidence display

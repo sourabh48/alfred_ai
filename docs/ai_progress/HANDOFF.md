@@ -1,5 +1,34 @@
 # Codex / Claude checkpoint
 
+## Current continuation checkpoint - 2026-11-11
+
+READY_FOR_NEXT. USE-04/typed-read-only-tool-registry completed locally; this
+`continue` resumes only that selected task. No new task or agent selected/launched.
+Branchwork/usability-integration; source334db14b6ef51b35ad2d4bb5ac21cd617f7600a7,
+base54eb7661083983fe1b03a5b8ba2ffa74534659a2. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`. Last writer Codex;
+verify sole writer before another edit.
+
+Six existing Finance/Investment/statement/document/Travel preference read adapters
+now use strict typed inputs, active owner/consent checks, bounded validated outputs,
+cooperative deadlines and redacted auditing. Authenticated private/no-store catalogue
+is metadata-only; selected permissions appear in the actual assistant. Domain Decimal
+services, source signatures, ownership, revision revalidation and privacy/history
+controls remain authoritative. No new calculation engine, schema or dependency.
+
+Exact-source296 backend PASS280.947s;5 actual Chrome PASS157.192s (runner187.438s);
+1 unmocked Ollama PASS30.466s. Four tool-panel Axe audits zero violations;
+manual contrast remains. Source/privacy/dependency/migration preflight PASS;
+promotion/owner/CI/package/independent/3.0 gates remain open. Five seconds is a
+cooperative result deadline, not forced cancellation of synchronous SQLite/file reads.
+
+No owner runtime/data/key/model/backup/install or remote changes. Existing cache
+edit/hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 preserved.
+Baseline85/143 and extensions0/13 unchanged; full USE-04 remains partial. No MCP
+transport, remote servers, autonomous planner or new writes enabled. Exact files,
+source references and receipts: STATE/TEST_EVIDENCE. On `continue`, report
+READY_FOR_NEXT and stop. Only `next`, `sprint` or an explicit scope selects more work.
+
 ## Codex continuation checkpoint - 2026-11-10
 
 CODEX_TO_CLAUDE_READY for context continuity; no agent launch or independent audit.
