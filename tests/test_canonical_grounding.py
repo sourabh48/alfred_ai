@@ -1,5 +1,7 @@
 """Local assistant canonical-source races, privacy and compatibility, synthetic only."""
 from pathlib import Path
+from http.client import HTTPConnection
+import socket
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -14,7 +16,7 @@ from apps.expenses.services.financial_intelligence import resolve_canonical_fina
 from apps.investments.models import Investment
 from apps.loans.models import Loan
 from apps.ml_engine.services.canonical_evidence import record_source
-from apps.ml_engine.services.hybrid_intelligence import hybrid_answer
+from apps.ml_engine.services.hybrid_intelligence import hybrid_answer, OllamaReasoner
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict
 from tests import test_canonical_evidence as fixtures
@@ -38,6 +40,46 @@ class CanonicalGroundingTests(TestCase):
     def post(self, **changes):
         return self.client.post('/api/ai/personal-insights/',dict(query='Explain this record',scope='financial_records',
             record_type='expense',record_id=self.expense.pk)|changes,content_type='application/json')
+
+    def test_model_outage_still_returns_current_owned_record_cards(self):
+        self.local.reason.side_effect = EmbeddingUnavailable('SYNTHETIC-PRIVATE outage detail')
+        for kind, row in self.rows.items():
+            with self.subTest(kind=kind):
+                result = self.answer(kind)
+                self.assertEqual(result['provider'], 'local_evidence')
+                self.assertEqual(result['grounding'], 'canonical_record_overview')
+                self.assertEqual(result['sources'], [record_source(self.owner, kind, row.pk)])
+                self.assertNotIn('SYNTHETIC-PRIVATE', str(result))
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_model_outage_record_api_remains_usable(self):
+        self.local.reason.side_effect = EmbeddingUnavailable('SYNTHETIC-PRIVATE outage detail')
+        response = self.post()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['sources'][0]['data']['amounts']['amount']['amount'], '12.34')
+
+    def test_real_adapter_connection_refusal_keeps_exact_cards_without_cloud(self):
+        with socket.socket() as refused:
+            refused.bind(('127.0.0.1', 0))
+            def connection(host, port, **kwargs):
+                self.assertEqual((host, port), ('127.0.0.1', 11434))
+                return HTTPConnection(host, refused.getsockname()[1], **kwargs)
+            with patch('apps.ml_engine.services.local_embeddings.HTTPConnection', side_effect=connection):
+                result = self.answer(local=OllamaReasoner())
+        self.assertEqual(result['grounding'], 'canonical_record_overview')
+        self.assertEqual(result['sources'][0]['data']['amounts']['amount']['amount'], '12.34')
+        self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_outage_does_not_return_cards_changed_while_the_model_failed(self):
+        for kind, row in self.rows.items():
+            with self.subTest(kind=kind), transaction.atomic():
+                def changing(*args, **kwargs):
+                    type(row).objects.filter(pk=row.pk).delete()
+                    raise EmbeddingUnavailable('SYNTHETIC-PRIVATE failure after deletion')
+                self.local.reason.side_effect = changing
+                with self.assertRaises(MemoryConflict):
+                    self.answer(kind)
+                transaction.set_rollback(True)
 
     def test_each_domain_has_current_typed_provenance_and_local_only_context(self):
         for kind,row in self.rows.items():
@@ -137,7 +179,8 @@ class CanonicalGroundingTests(TestCase):
         self.assertEqual(self.post(cloud_consent=True,query_sensitivity='public').status_code,403)
         self.local.reason.assert_not_called()
         self.local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE F:/synthetic/financial.pdf')
-        response=self.post(query_sensitivity='public'); self.assertEqual(response.status_code,503)
+        response=self.post(query_sensitivity='public'); self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['grounding'],'canonical_record_overview')
         self.assertNotIn('SYNTHETIC-PRIVATE',response.content.decode())
         self.cloud.assert_not_called(); self.provider.assert_not_called()
         self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED); self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
@@ -186,5 +229,12 @@ class CanonicalGroundingTests(TestCase):
             record=history.create(self.owner,'Synthetic unsupported')
             payload.update(conversation_id=record['id'],request_id=uuid4().hex,query='Convert record to INR')
             self.assertEqual(self.post(**payload).status_code,200)
+            self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
+            record=history.create(self.owner,'Synthetic offline sources')
+            payload.update(conversation_id=record['id'], request_id=uuid4().hex, query='Explain this record')
+            self.local.reason.side_effect=EmbeddingUnavailable('Synthetic unavailable model')
+            response=self.post(**payload)
+            self.assertEqual(response.status_code,200)
+            self.assertFalse(response.json()['conversation_saved'])
             self.assertEqual(history.get(self.owner,record['id'])['turns'],[])
             history.configure(self.owner,enabled=False)

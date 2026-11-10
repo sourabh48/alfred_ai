@@ -455,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
         const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
         const label = document.createElement("span"); label.className = "conversation-label";
-        label.textContent = result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
+        label.textContent = result.grounding === "canonical_record_overview" ? "Recorded sources · AI unavailable" : result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
         const answer = result.provider !== 'local_evidence' && !result.narrative_withheld
             ? Alfred.renderAnswerMarkdown(result.answer) : document.createElement('p');
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
@@ -742,7 +742,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (result.conversation_context_turns) feedback.textContent += ` Used ${result.conversation_context_turns} recent local turn(s) as unverified follow-up context.`;
             if (result.narrative_withheld) feedback.textContent = `Unsupported model figures were withheld. Only source-card amounts are shown. ${result.retrieval_error?.detail || ''}`;
             if (result.provider === "local_evidence") {
-                if (["owner_confirmed_transaction_date", "owner_confirmed_transaction_classification", "owner_confirmed_statement_period", "owner_confirmed_transaction_direction"].includes(result.grounding)) {
+                if (result.grounding === "canonical_record_overview") {
+                    feedback.textContent = "Recorded values ready. Local AI is unavailable; review the current source cards. No cloud fallback was used and no conversation turn was saved.";
+                    setLocalStatus("Recorded sources · AI unavailable", "review");
+                    query.value = ""; requestToken = null; retry.hidden = true;
+                } else if (["owner_confirmed_transaction_date", "owner_confirmed_transaction_classification", "owner_confirmed_statement_period", "owner_confirmed_transaction_direction"].includes(result.grounding)) {
                     const label = result.grounding === "owner_confirmed_statement_period" ? "statement periods"
                         : result.grounding === "owner_confirmed_transaction_direction" ? "transaction directions"
                         : result.grounding === "owner_confirmed_transaction_date" ? "transaction dates" : "transaction classifications";

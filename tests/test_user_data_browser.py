@@ -4583,6 +4583,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_attribute('value'),'Synthetic unsent question')
             self.assertEqual(self.text('intelligenceAnswers'),'')
 
+    def test_canonical_record_overview_during_real_socket_refusal_and_reopen(self):
+        import socket
+        from http.client import HTTPConnection
+        from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
+        from apps.investments.models import Investment
+        # Redirect the real local adapter to a bound, non-listening test socket; owner Ollama stays untouched.
+        real_reasoner = OllamaReasoner()
+        rows, local = self.canonical_grounding_fixture()
+        row = rows['investment']; before = list(Investment.objects.values())
+        local.reason.side_effect = real_reasoner.reason
+        refused = self.enterContext(socket.socket()); refused.bind(('127.0.0.1', 0))
+        def connection(host, port, **kwargs):
+            self.assertEqual((host, port), ('127.0.0.1', 11434))
+            return HTTPConnection(host, refused.getsockname()[1], **kwargs)
+        self.enterContext(patch('apps.ml_engine.services.local_embeddings.HTTPConnection', side_effect=connection))
+        self.login(); assistant = self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=investment&record_id={row.pk}'
+        for _ in range(2):
+            self.browser.get(assistant)
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'investment:{row.pk}')
+            self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+            self.ask_history_question('Explain this record')
+            self.wait.until(lambda _: 'Recorded values ready. Local AI is unavailable' in self.text('intelligenceFeedback'))
+            self.assertIn('current value: 2,345.67 · Currency not recorded', self.text('intelligenceAnswers'))
+            self.assertIn('No model explanation or new calculation', self.text('intelligenceAnswers'))
+            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'), '')
+            self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceRetry').get_property('hidden'))
+            self.capture('canonical-offline-source-cards')
+            if local.reason.call_count == 1:
+                self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+                findings = []
+                self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+                for width in (1440, 390):
+                    self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+                    for theme in ('light','dark'):
+                        self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                        self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                        self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                        audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                        findings.append(dict(width=width,theme=theme,**audit))
+                        (self.artifacts/'offline-records-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                        self.assertEqual(audit['violations'],[])
+                        self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                        self.browser.execute_script('document.querySelector("#intelligenceAnswers > article").scrollIntoView({block:"start",behavior:"instant"})')
+                        self.browser.save_screenshot(str(self.artifacts/f'offline-records-{width}-{theme}.png'))
+                self.browser.execute_cdp_cmd('Emulation.clearDeviceMetricsOverride',{})
+            self.memory_click(f'#intelligenceAnswers a[href="/ai/financial-records/investment/{row.pk}/"]')
+            self.wait.until(lambda _: '2345.67' in self.text('canonicalEvidence'))
+            self.browser.refresh(); self.wait.until(lambda _: '2345.67' in self.text('canonicalEvidence'))
+        self.assertEqual(list(Investment.objects.values()), before)
+        self.assertEqual(local.reason.call_count, 2)
+
     def test_canonical_unsupported_stale_and_owner_only_citations_keep_drafts(self):
         from apps.investments.models import Investment
         from apps.ml_engine.services.canonical_evidence import record_source

@@ -12,7 +12,7 @@ from django.http import Http404
 from django.test import Client, TestCase, override_settings
 
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
-from apps.investments.models import InvestmentImportDocument
+from apps.investments.models import Investment, InvestmentImportDocument
 from apps.investments.services import document_evidence as investment_evidence
 from apps.loans.models import LoanImportDocument
 from apps.loans.services import document_evidence as loan_evidence
@@ -291,14 +291,33 @@ class FinancialSourceSelectionTests(TestCase):
         self.assertEqual(response.status_code,403); self.assertFalse(Session.objects.filter(session_key=key).exists())
         self.assertNotIn('SYNTHETIC-private',response.content.decode())
 
-    def test_document_question_local_outage_never_falls_back_or_changes_evidence(self):
+    def test_document_question_local_outage_retains_current_cards_without_cloud_or_changes(self):
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from apps.ml_engine.services.hybrid_intelligence import source_context
         _,page=self.document_question_fixture(); data=self.document_question_data(page)
+        expected=source_context(self.owner,'financial_document',document_id=data['document_id'],record_type=data['record_type'],
+            selected_records=data['selected_records'],source_catalog=data['source_catalog'])
+        before=list(Investment.objects.values())
         self.local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-private C:/sensitive/document.pdf')
         response=self.client.post('/api/ai/personal-insights/',data|{'query_sensitivity':'public'},content_type='application/json')
-        self.assertEqual(response.status_code,503)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['grounding'],'canonical_record_overview')
+        self.assertEqual(response.json()['sources'],expected)
+        self.assertEqual(list(Investment.objects.values()),before)
         self.assertNotIn('SYNTHETIC-private',response.content.decode()); self.assertNotIn('sensitive/document.pdf',response.content.decode())
         self.cloud.assert_not_called(); self.provider.assert_not_called()
+
+    def test_document_source_changed_during_model_failure_does_not_return_stale_cards(self):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        _,page=self.document_question_fixture(); data=self.document_question_data(page)
+        def changing(*args, **kwargs):
+            Investment.objects.filter(pk=page['items'][0]['record_id']).update(current_value='999.99')
+            raise EmbeddingUnavailable('SYNTHETIC-private failure')
+        self.local.reason.side_effect=changing
+        response=self.client.post('/api/ai/personal-insights/',data,content_type='application/json')
+        self.assertEqual(response.status_code,409)
+        self.assertNotIn('sources',response.json())
+        self.assertNotIn('SYNTHETIC-private',response.content.decode())
 
     def test_document_discovery_catalog_is_bounded_complete_and_does_not_extract_or_infer(self):
         for kind in ('loan','investment'):

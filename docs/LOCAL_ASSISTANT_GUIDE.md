@@ -16,6 +16,14 @@ amount. Clearing that audit makes its old proposals unavailable.
 
 ![Savings-goal review with synthetic values and an expiring Confirm card](images/usability/confirmed-action.png)
 
+If local AI is unavailable, supported requests such as **Explain this record**
+can still display current Finance, Loan, Investment, Budget or reviewed-statement
+source cards. Select the owned record under **Include local records**, then ask.
+ALFRED labels this as recorded evidence and supplies no model explanation or new
+calculation. Open a citation to inspect verification, dates, currency and limitations.
+Unsupported questions or changed evidence still require review; this recovery
+does not enable cloud access or save a conversation turn.
+
 Open **AI Assistant** from the sidebar. Under **Local answer style**, choose
 Automatic, Concise, Detailed explanation, Comparison or Step by step. Enter your
 question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit

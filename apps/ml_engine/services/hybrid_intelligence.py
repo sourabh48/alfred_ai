@@ -313,6 +313,16 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         answer=(local if local is not None else OllamaReasoner()).reason(payload,max_output_tokens=output_limit,deadline=time.monotonic()+30)
         if not isinstance(answer,str) or not answer.strip() or len(answer.encode())>8192: raise EmbeddingUnavailable('Invalid local answer.')
     except EmbeddingUnavailable:
+        kind = 'expense' if scope == 'bank_statements' else 'baseline' if scope == 'finance' else record_type
+        if (scope in ('bank_statements', 'financial_records', 'financial_document', 'finance')
+                and tools and supported_question(query, kind=kind)):
+            revalidate()
+            return {'answer':'Local AI is unavailable. Current recorded values and their evidence are shown in the source cards. '
+                        'No model explanation or new calculation is supplied. Review verification, currency, dates and limitations; '
+                        'owner-recorded values are not independent bank or broker authentication.',
+                'provider':'local_evidence','classification':'owner_recorded_fact','financial_authority':False,
+                'grounding':'canonical_record_overview','model_unavailable':True,'sources':tools,
+                'narrative_withheld':False,'context_omitted':0,'memory_retrieval_available':None}
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD),scope,query)

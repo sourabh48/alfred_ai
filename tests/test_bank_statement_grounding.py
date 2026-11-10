@@ -580,15 +580,18 @@ class BankStatementGroundingTests(TestCase):
                     StatementUpload.objects.filter(pk=self.upload.pk).update(**before)
         self.local.reason.assert_not_called(); self.cloud.assert_not_called()
 
-    def test_cloud_refused_and_outage_has_no_fallback_or_sensitive_error(self):
+    def test_cloud_refused_and_outage_retains_owned_cards_without_sensitive_error(self):
         self.confirm()
         response=self.post(cloud_consent=True,query_sensitivity='public')
         self.assertEqual(response.status_code,403); self.local.reason.assert_not_called()
         self.local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-SENSITIVE bank source path')
         response=self.post(query_sensitivity='public')
-        self.assertEqual(response.status_code,503)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['grounding'],'canonical_record_overview')
+        self.assertEqual(response.json()['sources'],source_context(self.owner,'bank_statements',transaction_id=self.row.pk))
+        self.assertNotIn('SYNTHETIC-SENSITIVE',response.content.decode())
         for private in ('SYNTHETIC-SENSITIVE','Synthetic September','10.01'):
-            self.assertNotIn(private,response.content.decode())
+            self.assertNotIn(private,response.json()['answer'])
         self.cloud.assert_not_called(); self.cloud_reason.assert_not_called()
 
     def test_raw_content_identifiers_filename_instructions_and_private_urls_not_in_model(self):
