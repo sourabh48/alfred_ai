@@ -1,5 +1,14 @@
 # Known issues and gates
 
+## Continuation after the bounded sprint
+
+Local action binding0ca2168, offline canonical recoveryebbd056 and evidence display
+e9808c2/30ab4d8 are accepted only within their recorded scopes. Typed tools and broad
+cross-module orchestration are selected next and remain NOT_IMPLEMENTED. No trusted
+application MCP server/source is configured; available host IDE/browser/Figma tools
+are not automatically exposed to ALFRED. Full onboarding/history streaming, manual
+contrast, independent/owner/CI/package/upgrade/release and3.0 gates remain open.
+
 ## Offline overview limits
 
 Bounded record recoveryebbd056 handles existing supported canonical finance,

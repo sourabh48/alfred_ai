@@ -1,5 +1,14 @@
 # Execution decisions
 
+## 2026-11-10 - typed financial display only
+
+A source classification cannot turn every numeric metadata field into money.
+Identifiers stay scalar text; monetary display uses the existing exact typed amount
+block and recorded currency, without changing currency or valuation policy. Known
+limitation strings use text-node lists; model/document HTML remains inert. Static
+review headings describe a review rather than asserting no save after an uncertain
+network reply. No upstream code adopted or new calculation engine introduced.
+
 ## 2026-11-10 - source cards survive local inference failure
 
 A supported canonical question may recover from EmbeddingUnavailable using only

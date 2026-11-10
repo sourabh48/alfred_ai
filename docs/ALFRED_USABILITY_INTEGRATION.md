@@ -1,5 +1,15 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Codex continuation checkpoint - 2026-11-10
+
+CODEX_TO_CLAUDE_READY; no agent launched. Preparation branchwork/usability-integration;
+latest source30ab4d8ac80c7fabcd5e31aca40edf4f71570b62. Bound actions, offline record
+recovery and evidence display are locally accepted within their recorded scopes.
+Tests/preflight remain bound to each exact source in [TEST_EVIDENCE](ai_progress/TEST_EVIDENCE.md)
+and [HANDOFF](ai_progress/HANDOFF.md); no CI/push/merge/install or owner runtime change.
+Typed read-only registry selected next, NOT_IMPLEMENTED. Cache edit preserved;
+baseline85/143, extensions0/13 and whole release/owner/3.0 gates unchanged.
+
 ## Sprint checkpoint - 2026-11-10 offline record recovery
 
 Codex sole writer; sprint continues on `work/usability-integration`. USE-04/offline-record-overview

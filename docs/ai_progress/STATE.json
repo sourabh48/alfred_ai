@@ -1,35 +1,28 @@
 {
     "schema":  1,
-    "active_agent":  "Codex",
-    "handoff_status":  "SPRINT_ACTIVE",
+    "active_agent":  null,
+    "handoff_status":  "CODEX_TO_CLAUDE_READY",
     "workspace":  "F:/ALFRED/alfred_ai",
-    "single_writer":  true,
+    "single_writer":  false,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "ebbd0560507706babbea20635ab74ed20b0cc831",
-    "active_task_id":  "USE-04/offline-record-overview",
+    "recorded_at_head":  "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62",
+    "active_task_id":  "USE-04/typed-read-only-tool-registry",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
-                          "apps/ml_engine/services/hybrid_intelligence.py",
-                          "docs/LOCAL_ASSISTANT_GUIDE.md",
-                          "static/js/intelligence.js",
-                          "templates/ai_insights.html",
-                          "tests/browser_durations.json",
-                          "tests/test_bank_statement_grounding.py",
-                          "tests/test_canonical_grounding.py",
-                          "tests/test_financial_source_selection.py",
-                          "tests/test_user_data_browser.py"
+
                       ],
     "completed_steps":  [
-                            "Reproduced model-outage503 for supported current owned records",
-                            "Reused current source cards with post-error revalidation; preserved privacy/session/history/unsupported-question gates",
-                            "Exact-source226 backend/4 Chrome/1 unmocked Ollama PASS; four recovery Axe audits zero violations/manual contrast open",
-                            "Clean source/privacy/dependency/migration preflight PASS; owner runtime and cache preserved"
+                            "Completed bound action safety0ca2168 with exact-source136 backend/3 Chrome and actual native HTTP concurrency/restart evidence",
+                            "Completed offline record recoveryebbd056 with226 backend/4 Chrome/1 actual Ollama; no source/session/history/cloud gates relaxed",
+                            "Completed evidence displaye9808c2 with53 backend/4 Chrome; no monetary formatter for IDs, readable inert limitations",
+                            "Completed review label follow-up30ab4d8 with2 affected actual Chrome; source preflight PASS; manual contrast and release gates remain",
+                            "Preserved cache edit and all owner runtime data; no CI/push/PR/merge/deployment or agent launch"
                         ],
     "remaining_steps":  [
-                            "Reproduce baseline record IDs incorrectly formatted as currency in shared source cards; bounded display fix next",
-                            "Typed registry, broader cross-module tools and actions/MCP sources remain incomplete",
-                            "Owner/independent/CI/package/upgrade/release/3.0 gates remain"
+                            "Implement selected typed read-only registry around existing source_context/canonical Finance/Travel/Documents adapters; no parallel calculation engine",
+                            "Keep application MCP disabled until trusted server/source and permissions are concretely reviewed; host tools do not supply app credentials",
+                            "Finish remaining USE scopes, exact-head CI/independent/package/owner acceptance and2.0 prerequisites before3.0"
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -52,13 +45,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "Active sprint: reproduce baseline source-card record ID formatted as INR; fix only metadata presentation, keeping canonical typed monetary rendering and calculations unchanged. Preserve cache and run affected browser/privacy checks before checkpoint.",
+    "next_exact_instruction":  "In F:/ALFRED/alfred_ai read AGENTS.md, docs/EXECUTION_STATE.md, docs/ai_progress/HANDOFF.md and STATE.json; verify actual branch/HEAD/sole writer and preserve materialized_cache.py hash. Resume selected USE-04/typed-read-only-tool-registry: inspect source_context/hybrid_answer/canonical_evidence and wrap existing reviewed local read adapters with input/output schemas, owner/consent/sensitivity/network/deadline/cache/side-effect/audit declarations, then wire through existing assistant and test synthetic ownership/source changes. Do not add a second financial/travel engine, activate unapproved MCP servers or modify owner runtime. No agent was launched.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "ebbd0560507706babbea20635ab74ed20b0cc831",
-    "checkpoint_at":  "2026-11-10T15:28:15.5152007Z",
-    "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
-    "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-offline-check-ebbd056",
+    "implementation_source_head":  "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62",
+    "checkpoint_at":  "2026-11-10T15:44:23.1439453Z",
+    "active_task_state":  "SELECTED / NOT_IMPLEMENTED",
+    "next_task_id":  "USE-04/typed-read-only-tool-registry",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-evidence-check-e9808c2",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -72,11 +65,23 @@
                                      "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
                                      "docs/ai_progress/TEST_EVIDENCE.md",
-                                     "docs/LOCAL_ASSISTANT_GUIDE.md",
                                      "docs/images/usability/offline-records.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "ebbd0560507706babbea20635ab74ed20b0cc831",
+    "release_preflight_source_head":  "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
-    "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed."
+    "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
+    "last_completed_task_id":  "USE-04/evidence-card-presentation",
+    "last_completed_files_changed":  [
+                                         "static/js/intelligence.js",
+                                         "templates/ai_insights.html",
+                                         "tests/browser_durations.json",
+                                         "tests/test_user_data_browser.py"
+                                     ],
+    "sprint_implementation_sources":  [
+                                          "0ca216859c8a4f5a75594e0cb88cc625c1abddb1",
+                                          "ebbd0560507706babbea20635ab74ed20b0cc831",
+                                          "e9808c27ad3b4dcdd80c09054e728f3df2dcc92f",
+                                          "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62"
+                                      ]
 }

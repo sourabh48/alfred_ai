@@ -1,5 +1,35 @@
 # Test evidence index
 
+## 2026-11-10 - evidence card metadata and action labels
+
+Scope base60595a99a28214933c7a7d874554a468eca550c8. Artifacts/evidence-card-20261110
+contains failed and passing receipts; source-manifest/commands.json pins each source.
+
+- Actual Chrome reproduction FAILED: record id1 appeared as INR1.00. Original
+  receipt/screenshot retained. Removed the generic default-currency formatter for
+  metadata; canonical typed amount rendering and all Python calculations unchanged.
+- Sourcee9808c27ad3b4dcdd80c09054e728f3df2dcc92f:53 backend PASS, zero failures/skips,
+  31.847s (intelligence/budget currency/Decimal, browser plan and Windows native).
+  Four real Chrome PASS, zero failures/skips,48.189s (runner wall60.61s): baseline ID,
+  readable limitations/malicious text inert, recorded USD2,345.67 unchanged, normal
+  multidomain correction, closure citations and real-socket-outage recovery/reopen.
+  Four light/dark1440/390 recovery Axe audits zero violations/manual contrast open.
+- Follow-up source30ab4d8ac80c7fabcd5e31aca40edf4f71570b62 changes ONLY the action
+  review heading and static cache version. Two affected actual Chrome journeys PASS,
+  zero failures/skips,30.225s (runner wall42.5s): confirm/cancel/Budgets reopen and
+  stale review/interrupted committed response/keyboard retry. Four action Axe audits
+  zero violations/manual contrast open. No backend checks transferred between SHAs.
+- Both exact-source source/privacy/dependency/migration preflights PASS. Clean
+  validation worktree F:/ALFRED_DEV/usability-evidence-check-e9808c2 moved safely from
+  contained clean e9808c2 to30ab4d8; receipts retain original candidates. Promotion
+  stays BLOCKED. No hosted CI, independent review or owner/package acceptance.
+- JS/diff/AST-only graph checks PASS. Guide recovery screenshot refreshed from real
+  synthetic Chrome and visually checked. No new dependencies/schema/owner runtime,
+  keys/models/media/backups/installation or remote writes. The author-email typo in
+  the immediately preceding unpublished presentation commit was corrected before
+  validation; the identical source tree is recorded at e9808c2, not the superseded
+  metadata object169b7be435bfbef42e8a5a7d0347d2a34de17886.
+
 ## 2026-11-10 - offline record overview
 
 Sourceebbd0560507706babbea20635ab74ed20b0cc831, basee2161012e94151d7c7933a1205520193c0b1211a.

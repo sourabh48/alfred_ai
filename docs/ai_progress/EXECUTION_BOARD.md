@@ -1,5 +1,15 @@
 # Current execution board
 
+## Codex continuation checkpoint - 2026-11-10
+
+CODEX_TO_CLAUDE_READY; no agent launched. Preparation branchwork/usability-integration;
+latest source30ab4d8ac80c7fabcd5e31aca40edf4f71570b62. Bound actions, offline record
+recovery and evidence display are locally accepted within their recorded scopes.
+Tests/preflight remain bound to each exact source in [TEST_EVIDENCE](TEST_EVIDENCE.md)
+and [HANDOFF](HANDOFF.md); no CI/push/merge/install or owner runtime change.
+Typed read-only registry selected next, NOT_IMPLEMENTED. Cache edit preserved;
+baseline85/143, extensions0/13 and whole release/owner/3.0 gates unchanged.
+
 ## Sprint checkpoint - 2026-11-10 offline record recovery
 
 Codex sole writer; sprint continues on `work/usability-integration`. USE-04/offline-record-overview
@@ -57,6 +67,10 @@ Validated loan implementation:88c1df8; latest preservation follow-up:c2d1517.
 
 | Bounded scope | State | Evidence / next dependency |
 | --- | --- | --- |
+| USE-05 bound savings-goal confirmation | LOCAL_ACCEPTED / COMMITTED_LOCAL |0ca2168;136 backend/3 Chrome/actual native HTTP concurrency and restart; exact source preflight PASS |
+| USE-04 offline canonical record recovery | LOCAL_ACCEPTED / COMMITTED_LOCAL |ebbd056;226 backend/4 Chrome/1 unmocked Ollama; exact source preflight PASS |
+| USE-04 evidence card presentation | LOCAL_ACCEPTED / COMMITTED_LOCAL |e9808c2:53 backend/4 Chrome;30ab4d8:2 affected action Chrome; each source preflight PASS |
+| USE-04 typed read-only tool registry | SELECTED / NOT_IMPLEMENTED |Continue existing source adapters; no new remote MCP connections authorized |
 | USE-01 diagnostics; USE-02 inventory hub | COMMITTED_LOCAL | cba5b53; earlier synthetic evidence retained |
 | USE-03 bounded encrypted-history context | COMMITTED_LOCAL | 4019ee2; earlier synthetic and actual local-model evidence retained |
 | USE-02 statement preview / confirmation | LOCAL_ACCEPTED / COMMITTED_LOCAL | 0f35605; 157 backend, Chrome + four Axe audits, native19 PASS; clean-source preflight PASS |

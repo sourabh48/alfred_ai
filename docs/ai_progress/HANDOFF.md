@@ -1,5 +1,37 @@
 # Codex / Claude checkpoint
 
+## Codex continuation checkpoint - 2026-11-10
+
+CODEX_TO_CLAUDE_READY for context continuity; no agent launch or independent audit.
+Codex stops writing after this checkpoint. Verify sole writer before resuming.
+Branch `work/usability-integration`; latest implementation30ab4d8ac80c7fabcd5e31aca40edf4f71570b62,
+presentation sourcee9808c27ad3b4dcdd80c09054e728f3df2dcc92f, base60595a99a28214933c7a7d874554a468eca550c8.
+Documentation HEAD: `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Completed USE-04/evidence-card-presentation: record IDs no longer acquire an INR
+label; only existing typed monetary cards display recorded currencies. Limitations
+use inert text lists; action headings no longer falsely say nothing saved after
+confirmation/lost response. No calculation, currency policy, backend or schema change.
+At e9808c2:53 backend PASS31.847s,4 Chrome PASS48.189s, four recovery Axe audits
+zero violations/manual contrast open. At30ab4d8:2 affected action Chrome PASS30.225s,
+four action Axe audits zero violations/manual contrast open. Receipts stay bound to
+their actual SHAs; no old checks transferred. Both clean preflights PASS; promotion BLOCKED.
+
+Sprint also completed bound actions0ca2168 and offline recoveryebbd056; earlier
+136/226 backend, actual Waitress/restart and unmocked Ollama evidence is retained
+separately in TEST_EVIDENCE. No new failing/skipped tests at final scope sources.
+No owner runtime/data/key/model/backup/install or remote changes. Cache edit/hash
+41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 remains unstaged.
+Baseline85/143 and extensions0/13 unchanged. Full2.0/3.0/CI/owner/package/independent
+acceptance remains open. Exact changed files and receipts: STATE/TEST_EVIDENCE.
+
+Next selected, NOT_IMPLEMENTED: USE-04/typed-read-only-tool-registry. Resume by
+reading source_context/hybrid_answer and existing canonical adapters; wrap reviewed
+local read services with typed schemas, owner/consent/privacy/network/deadline/cache/
+side-effect/audit declarations. Reuse current calculations and source revalidation.
+No application MCP server is approved/configured; host tools are not app connections.
+Keep external connections disabled and do not add a second financial/travel engine.
+
 ## Sprint checkpoint - 2026-11-10 offline record recovery
 
 Codex sole writer; sprint continues on `work/usability-integration`. USE-04/offline-record-overview
