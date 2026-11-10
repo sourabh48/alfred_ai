@@ -1,5 +1,19 @@
 # ALFRED execution state
 
+## Active sprint checkpoint -2026-11-10
+
+- Owner invoked `sprint`. Sole writer Codex; preserve cache hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9.
+- Guided readiness sourcea78096e119ecfe2a3a098dba227e49781bdb9f29 on work/usability-integration:
+ 8 backend and2 Chrome journeys PASS; four Axe audits zero violations/manual contrast pending.
+  Empty career profiles no longer count as populated; current confirmed reviews and
+  pending owner links guide the next setup action. GET does not open memory or run inference.
+- Next active scope: USE-03/task-aware-answer-budgets. Read existing hybrid/API/history/UI;
+  preserve money/citation/privacy bounds. Independent local chat improvement selected
+  while deeper knowledge readiness and manual/owner/package acceptance remain open.
+- No schema/dependency/runtime/keys/personal-data/remote changes. Baseline85/143,
+  extensions0/13 unchanged. Exact tests under artifacts/readiness-sprint-20261110.
+
+
 ## Current checkpoint - investment review, 2026-11-10
 
 - READY_FOR_NEXT. Current continuation task completed locally; no next task was
