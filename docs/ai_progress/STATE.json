@@ -5,14 +5,13 @@
     "workspace":  "F:/ALFRED/alfred_ai",
     "single_writer":  false,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "b9688647c776ce818a7ec4d2f218cd63639420a5",
-    "active_task_id":  "USE-03/saved-general-streaming",
+    "recorded_at_head":  "83f331994f9d672b852c105bc9970e4296ef794c",
+    "active_task_id":  "USE-03/cancellable-domain-chat",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
                           "apps/ml_engine/api/chat_stream.py",
-                          "apps/ml_engine/api/views.py",
-                          "apps/ml_engine/services/conversation_history.py",
+                          "apps/ml_engine/services/local_chat_stream.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
                           "static/js/intelligence.js",
                           "templates/ai_insights.html",
@@ -22,17 +21,19 @@
                           "tests/test_user_data_browser.py"
                       ],
     "completed_steps":  [
-                            "Recovered ba5d376 and verified writer/cache; selected authorized saved-general streaming gap while baseline queue blockers remain.",
-                            "Reused existing transport and shared history/context/save/replay; no schema/dependency/provider or model-policy change.",
-                            "Transactional cancellation/session guards roll back interrupted writes; UI reports possible completed saves on lost acknowledgements; same-request replay creates no duplicate.",
-                            "Exact b968864: 269 backend PASS in 148.147s; 6 Chrome PASS in 88.874s (runner 102.640s); four new Axe audits zero violations/manual contrast open.",
-                            "Exact b968864: 2 actual Waitress/Ollama PASS in 19.912s. Save/reopen/follow-up/replay and active cancel with zero retained turn; key unchanged, no verified facts.",
-                            "Clean source/privacy/dependency/migration preflight and AST graph update PASS; reproduction failure retained, no owner runtime or remote changes."
+                            "Recovered c1f850e, verified writer and preserved cache edit/hash; selected authorized domain-streaming usability gap.",
+                            "Reused existing source/answer/history paths for cancellable domain transport; disabled domain previews and retained canonical offline-card recovery.",
+                            "Primary 1aee878: 312 backend PASS in 168.217s; 8 Chrome PASS in 104.092s (runner 120.031s), four new Axe audits zero violations/manual contrast open.",
+                            "Final 83f3319: 2 actual Waitress/Ollama PASS in 2.701s, exact owned source, zero unverified deltas, worker cancel without writes.",
+                            "Test-only follow-up corrects unsupported native question; application/backend/browser blobs unchanged and receipts remain pinned to actual SHAs.",
+                            "All failed fixture/reproduction/native receipts retained, no calculation/validation/model-policy weakening.",
+                            "Final clean source/privacy/dependency/migration preflight and AST graph update PASS; no owner runtime/schema/dependency/remote changes."
                         ],
     "remaining_steps":  [
-                            "Current NEXT task complete; wait for next/sprint/explicit scope before choosing more.",
-                            "Domain streaming, full USE-03, manual contrast and broad model quality remain unaccepted; private-history availability/retention still require existing approvals and opt-in.",
-                            "Owner/CI/independent/package/release and 3.0 gates remain. Stop cannot reverse a completed commit; same-request retry/reopen handles uncertain acknowledgements."
+                            "Current NEXT task complete; wait for next/sprint/explicit scope before selecting more.",
+                            "Full USE-03, broad model quality, manual contrast, owner history/provider acceptance remain.",
+                            "Owner/CI/independent/package/release and 3.0 gates remain; no implicit activation or canonical integration.",
+                            "Read-only source calls finish safely before late results are discarded; Stop does not undo a completed saved turn. Unsupported record questions still abstain."
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -55,13 +56,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. Only next/sprint/explicit scope selects a new task after Git/HEAD, queue and writer checks; preserve materialized_cache.py/hash. USE-03/saved-general-streaming is locally complete at b968864 with exact backend/Chrome/real Waitress-Ollama receipts. Do not repeat it or infer full model/release acceptance. Owner history/runtime/MCP/provider, canonical integration and release/3.0 gates remain.",
+    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. Only next/sprint/explicit scope selects further work after Git/HEAD, queue and writer checks; preserve materialized_cache.py/hash. USE-03/cancellable-domain-chat is locally complete at 83f3319 (primary 1aee878); broader backend/browser and final native receipts remain separately pinned. Do not repeat it or infer full model/release acceptance. Owner runtime/history/MCP/provider, canonical integration and 3.0 gates remain.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "b9688647c776ce818a7ec4d2f218cd63639420a5",
-    "checkpoint_at":  "2026-11-10T22:35:04.0723618Z",
+    "implementation_source_head":  "83f331994f9d672b852c105bc9970e4296ef794c",
+    "checkpoint_at":  "2026-11-10T23:19:25.1210288Z",
     "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-saved-stream-check-b968864",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-domain-stream-check-1aee878",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -69,22 +70,23 @@
                                      "docs/ALFRED_USABILITY_INTEGRATION.md",
                                      "docs/CI_PIPELINE_STATE.md",
                                      "docs/EXECUTION_STATE.md",
+                                     "docs/LOCAL_ASSISTANT_GUIDE.md",
                                      "docs/ai_progress/DECISIONS.md",
                                      "docs/ai_progress/EXECUTION_BOARD.md",
                                      "docs/ai_progress/HANDOFF.md",
                                      "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
-                                     "docs/ai_progress/TEST_EVIDENCE.md"
+                                     "docs/ai_progress/TEST_EVIDENCE.md",
+                                     "docs/images/usability/domain-source-validation.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "b9688647c776ce818a7ec4d2f218cd63639420a5",
+    "release_preflight_source_head":  "83f331994f9d672b852c105bc9970e4296ef794c",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
-    "last_completed_task_id":  "USE-03/saved-general-streaming",
+    "last_completed_task_id":  "USE-03/cancellable-domain-chat",
     "last_completed_files_changed":  [
                                          "apps/ml_engine/api/chat_stream.py",
-                                         "apps/ml_engine/api/views.py",
-                                         "apps/ml_engine/services/conversation_history.py",
+                                         "apps/ml_engine/services/local_chat_stream.py",
                                          "docs/LOCAL_ASSISTANT_GUIDE.md",
                                          "static/js/intelligence.js",
                                          "templates/ai_insights.html",

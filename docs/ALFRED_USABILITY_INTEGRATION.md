@@ -1,5 +1,20 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Cancellable domain chat - 2026-11-11
+
+USE-03/cancellable-domain-chat LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, final source 83f331994f9d672b852c105bc9970e4296ef794c,
+base c1f850e229f5f3d21d9db802d6835a398196c6b5. Five existing local source scopes now
+support Stop/retry; domain answers remain fully buffered, with source and financial
+validation intact and canonical offline cards supported. Primary 1aee878 has 312
+backend/8 Chrome PASS; final 83f3319 has 2 actual Waitress/Ollama PASS, no skips.
+Four new Axe audits zero violations/manual contrast open. Final source/privacy/
+dependency/migration preflight and AST graph update PASS. No owner runtime/remote/
+calculation/schema/dependency/model-policy change; cache edit preserved. Baseline
+85/143, extensions 0/13 unchanged. Full USE-03 and owner/CI/independent/package/release/
+3.0 gates remain. READY_FOR_NEXT; no next task selected. Exact files/evidence and
+next command: docs/ai_progress/STATE.json and TEST_EVIDENCE.md.
+
 ## Saved general streaming - 2026-11-11
 
 USE-03/saved-general-streaming LOCAL_ACCEPTED / COMMITTED_LOCAL on
@@ -212,7 +227,7 @@ Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 | --- | --- | --- |
 | USE-01 Runtime and health | PARTIALLY_IMPLEMENTED | Authenticated diagnostics, selected database identity, schema inspection, instance-bound heartbeats and explicit synthetic local inference benchmark. Native drill and owner sign-in acceptance remain separate. |
 | USE-02 Onboarding and data sources | PARTIALLY_IMPLEMENTED | Data Sources Center links existing local workflows and reports owned saved-record/parser counts. Complete preview/duplicate/correction/confirmation journeys, knowledge readiness and source-level consent/freshness/deletion acceptance remain. |
-| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Bounded local dialogue/history, styles, fiction continuity, rename/title search, explicit encrypted saved-message search, page-only and consented saved-general streaming/Stop, and safe final-answer Markdown/tables validated locally. Current grounding retained; figures/source-backed output buffered. Domain streaming, advanced/nested Markdown, code colouring, broader UI/model routing and owner/release acceptance remain. |
+| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Bounded local dialogue/history, styles, fiction continuity, rename/title/message search, saved/page general streaming and cancellable buffered domain responses, and safe final-answer Markdown/tables validated locally. Current grounding retained; figures/source-backed output buffered. Cloud streaming, advanced/nested Markdown, code colouring, broader UI/model routing and owner/release acceptance remain. |
 | USE-04 Read-only tools / MCP | PARTIALLY_IMPLEMENTED | Seven typed existing-domain read tools with owner/consent/output/deadline/audit controls; bounded Career progress and shared history integrity validated locally. Broader tools, cross-module orchestration and approved MCP transport remain. No external server, credentials, private disclosure or cost-saving claim. Source-specific receipts: ai_progress/TEST_EVIDENCE.md. |
 | USE-05 Confirmed actions | PARTIALLY_IMPLEMENTED | Bound savings-goal confirmation at0ca2168 has retained backend/Chrome/native replay evidence in ai_progress/TEST_EVIDENCE.md. Broader actions and owner/release acceptance remain; this checkpoint adds no action implementation or acceptance. |
 | USE-06 Windows release | NOT_IMPLEMENTED | Current-source package, clean-machine upgrade/rollback and six end-to-end journeys remain; installation replacement and owner-account tests need their explicit gates. |

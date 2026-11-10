@@ -143,6 +143,8 @@ Reviewed-record document questions and Career progress keep their fast page-only
 responses. Consented cloud fallback retains its complete-response path. History
 privacy and financial grounding rules still apply.
 
+![Unsupported model figures withheld after local source validation, using a synthetic account](images/usability/domain-source-validation.png)
+
 If Ollama is unavailable, the draft remains in the composer. Open Settings →
 Diagnostics to check local inference, then use **Retry**. External fallback still
 requires its separate public-query consent; the answer-style selection controls

@@ -1,5 +1,20 @@
 # Known issues and gates
 
+## Cancellable domain response limits - 2026-11-11
+
+Final source 83f331994f9d672b852c105bc9970e4296ef794c adds Stop/retry to five existing
+local source scopes. Their output remains buffered until source/answer validation,
+including Travel with no saved profile. Local source reads finish safely; Stop does
+not forcibly interrupt SQLite/files. Existing 30-second/byte/context/token bounds
+and supported record-question grammar remain; unsupported questions abstain.
+
+Canonical offline recovery covers only previously supported recorded-value requests.
+Saved-turn completion/lost-acknowledgement rules remain: Stop cannot undo a completed
+commit; retry the same draft or reopen history. Career/reviewed-document deterministic
+responses and consented cloud fallback keep their existing complete-response paths.
+No owner history or provider activation occurred. Broad model quality/performance,
+manual contrast, CI/independent/owner/package/release and 3.0 gates remain open.
+
 ## Saved general stream bounds - 2026-11-11
 
 Source b9688647c776ce818a7ec4d2f218cd63639420a5 adds streaming only to consented

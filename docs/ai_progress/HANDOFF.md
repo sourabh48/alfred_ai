@@ -1,5 +1,38 @@
 # Codex / Claude checkpoint
 
+## Cancellable domain chat - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-03/cancellable-domain-chat on
+`work/usability-integration`, final source `83f331994f9d672b852c105bc9970e4296ef794c`,
+base `c1f850e229f5f3d21d9db802d6835a398196c6b5`. Primary implementation
+`1aee878b3b7305e0c2bed9a2549c774ba194d99f`; final change only corrects a native test
+question to the existing supported grammar. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Local Finance, financial records, bank statements, verified loan closures and Travel
+preferences now use existing source/answer/history services through cancellable
+transport. Every domain preview is disabled at server and client; only revalidated
+final answers or canonical offline cards appear. General preview, consent, source/
+session/revision/expiry/retention/cancellation/replay controls and 30-second deadline
+remain. Career and reviewed-record document responses stay fast/page-only; cloud
+responses keep their existing transport. No financial engine or calculation change.
+
+At primary 1aee878: 312 backend PASS in 168.217s; 8 Chrome PASS in 104.092s (runner 120.031s),
+zero failures/skips. At final 83f3319: 2 actual Waitress/Ollama PASS in 2.701s, buffered
+canonical reply 1.156s and stopped worker 0.406s. No unverified domain deltas, no source
+mutation. Earlier real reply 23.312s and failed unsupported-question cancellation
+fixture retained. Four new Axe audits zero violations; manual contrast remains.
+Final source/privacy/dependency/migration preflight and AST graph update PASS.
+Receipts retain their actual SHAs; production/backend/browser blobs unchanged after
+primary source. These are synthetic same-host observations, not broad quality/GPU/
+first-token/packaged or owner acceptance. Exact failures/commands/files: STATE and
+TEST_EVIDENCE; full technical/promotion/CI/independent/package/release/3.0 gates open.
+
+No personal runtime/data/key/model/document/backup/install or remote changes. Cache
+edit/hash preserved. No schema/dependency/model-policy change. Baseline 85/143 and
+extensions 0/13 unchanged; full USE-03 remains partial. No next task/agent selected.
+`continue` reports READY_FOR_NEXT and stops; only next/sprint/explicit scope selects more.
+
 ## Saved general streaming - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-03/saved-general-streaming on

@@ -1,5 +1,20 @@
 # Development CI and integration pipeline
 
+## Cancellable domain chat - 2026-11-11
+
+USE-03/cancellable-domain-chat LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, final source 83f331994f9d672b852c105bc9970e4296ef794c,
+base c1f850e229f5f3d21d9db802d6835a398196c6b5. Five existing local source scopes now
+support Stop/retry; domain answers remain fully buffered, with source and financial
+validation intact and canonical offline cards supported. Primary 1aee878 has 312
+backend/8 Chrome PASS; final 83f3319 has 2 actual Waitress/Ollama PASS, no skips.
+Four new Axe audits zero violations/manual contrast open. Final source/privacy/
+dependency/migration preflight and AST graph update PASS. No owner runtime/remote/
+calculation/schema/dependency/model-policy change; cache edit preserved. Baseline
+85/143, extensions 0/13 unchanged. Full USE-03 and owner/CI/independent/package/release/
+3.0 gates remain. READY_FOR_NEXT; no next task selected. Exact files/evidence and
+next command: docs/ai_progress/STATE.json and TEST_EVIDENCE.md.
+
 ## Saved general streaming - 2026-11-11
 
 USE-03/saved-general-streaming LOCAL_ACCEPTED / COMMITTED_LOCAL on

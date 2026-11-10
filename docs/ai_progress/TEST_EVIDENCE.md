@@ -1,5 +1,71 @@
 # Test evidence index
 
+## 2026-11-11 - cancellable buffered domain responses
+
+Primary source `1aee878b3b7305e0c2bed9a2549c774ba194d99f`, final source
+`83f331994f9d672b852c105bc9970e4296ef794c`, base
+`c1f850e229f5f3d21d9db802d6835a398196c6b5`. Commands/source blobs/receipt hashes:
+`artifacts/domain-stream-20261111/`. Synthetic isolated runtime/media/vaults under
+`F:/ALFRED/dev-test-data/domain-stream-20261111/` and temporary fixture roots only.
+
+- Primary-source 312 backend PASS in 168.217s, zero failures/skips: existing streaming,
+  history/consent/session/CSRF/privacy, typed tools, canonical/financial/statement
+  grounding, Career, native and release/browser inventories. New cases cover owned
+  exact cents/unknown currency, source mutation rejection, no generated-figure
+  acceptance, domain preview denial with no sources, foreign records, context/flag
+  injection, cancellation without writes, offline canonical cards, saved domain
+  turns without general-dialogue reuse, Finance/Travel, reviewed bank transactions
+  and verified closure IDs. Existing canonical calculations remain authoritative.
+- Eight primary-source actual Chrome journeys PASS in 104.092s, runner 120.031s, zero
+  failures/skips: domain keyboard Stop/draft/retry, withheld invented figures, exact
+  owned citation/reopen, premature-delta rejection and offline cards; earlier four-kind
+  canonical correction/citations/mobile, real socket-refusal recovery, reviewed bank
+  dates, private/public cloud-consent isolation, saved and unsaved general streaming.
+- Four new light/dark at 1440/390px Axe audits zero automated violations, one incomplete
+  contrast rule each. Current synthetic screenshot visually inspected and linked
+  in the guide; real browser actions/API/vault/source records, not screenshot-only
+  acceptance. Unrelated inference faults use controlled synthetic fixtures.
+- Final-source two actual Waitress/Ollama tests PASS in 2.701s with no model-output mock:
+  buffered local record answer, zero unverified deltas, exact owned 12.34 source with
+  unknown currency; active real chat HTTP request disconnect stops worker, preserves
+  record and creates no conversation. Reply total 1.156s, stop 0.406s are same-host
+  observations, not first-token/GPU/broad reliability/quality or packaged acceptance.
+- Initial exact native at primary source: one PASS/one FAIL in 49.034s. Real source reply
+  passed in 23.312s with zero deltas; cancellation fixture asked an unsupported extended
+  question, correctly abstaining before Ollama. Final test uses the existing supported
+  phrase with the same 25-second header check and 30-second application deadline.
+  Corrected working-tree cancellation PASS in 1.556s/stop 0.391s; then both final-source
+  tests PASS. Initial failed receipt retained. No model/source guard/assertion weakening.
+- Primary backend/browser receipts are not relabelled as final-HEAD. Only
+  tests/test_local_stream_acceptance.py changes after primary (one question string);
+  production, backend-test and browser-test blob equivalence is recorded. No CI/SHA
+  transfer. New native tests do not establish independent-host or installer readiness.
+- Retained development failures: initial reproduction had a nonexistent Expense.type
+  fixture argument; corrected reproduction proved 400 rejection of valid domain POST.
+  First 131-case run had two invalid-category fixture failures: canonical guard
+  correctly withheld amounts. Valid manual categories restored expected evidence;
+  corrected 166 backend PASS in 85.130s. Initial two Chrome errors expected Off despite
+  fixture explicitly disabling operator history; corrected fixture waits for honest
+  Unavailable status, then two Chrome PASS in 21.298s. Earlier runs overlap final coverage.
+- Clean F:/ALFRED_DEV/usability-domain-stream-check-1aee878 was advanced cleanly to
+  final 83f3319 without reset. Final source/privacy/dependency/migration preflight PASS;
+  full technical/promotion remain BLOCKED. Standalone checks do not replace release/
+  owner/CI/recovery evidence. AST graph update PASS, no semantic API; structural index
+  still excludes unsupported/empty-symbol files.
+- No personal runtime/account/data/key/model/document/backup/install or remote change.
+  Cache edit/hash preserved; no calculation/schema/dependency/model policy changed.
+  Baseline 85/143 and extensions 0/13 unchanged. Full USE-03, manual contrast, broad model
+  quality, independent/CI/owner/package/release/3.0 acceptance remain open.
+
+Implementation files (9): `apps/ml_engine/api/chat_stream.py`,
+`apps/ml_engine/services/local_chat_stream.py`, `docs/LOCAL_ASSISTANT_GUIDE.md`,
+`static/js/intelligence.js`, `templates/ai_insights.html`, `tests/browser_durations.json`,
+`tests/test_local_chat_stream.py`, `tests/test_local_stream_acceptance.py`,
+`tests/test_user_data_browser.py`. Checkpoint-only files in STATE.json.
+READY_FOR_NEXT; no next task selected.
+- `scripts/project_execution.py --check` PASS; generated views unchanged, with
+  85/143 original requirements and 0/13 extensions still accepted.
+
 ## 2026-11-11 - saved local general streaming
 
 Exact source `b9688647c776ce818a7ec4d2f218cd63639420a5`, base

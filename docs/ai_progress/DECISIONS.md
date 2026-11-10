@@ -1,5 +1,25 @@
 # Execution decisions
 
+## 2026-11-11 - cancellable buffered local domain responses
+
+- NEXT selects the authorized USE-03 domain-transport gap. Original queue items
+  retain their actual owner/external/dependency gates; no baseline ID is promoted.
+- Reuse AlfredPersonalInsightsAPI.answer for all local streamed scopes. Extend only
+  existing Finance, record, statement, verified closure and Travel-preference reads.
+  No new calculations/tools, providers, source authority or record-write capability.
+- Disable domain previews unconditionally, including empty-source cases, and reject
+  premature domain deltas in the browser. Keep existing source/citation/figure and
+  ownership revalidation before final acceptance. Accept validated local_evidence
+  finals so existing canonical offline recovery remains usable through this transport.
+- Preserve history rules, no cloud streaming, no injected domain page context, all
+  byte/token/concurrency/deadline bounds and cooperative source-read cancellation.
+  Career/reviewed-record document questions keep their current page-only path.
+- Keep primary 1aee878 backend/browser receipts separate from final 83f3319 native
+  receipts. The follow-up changes only an unsupported test question, with application,
+  backend and browser source blobs unchanged; no CI check is transferred between SHAs.
+- NO_UPSTREAM_ADOPTION. Reuse current Django/JavaScript/vault/canonical services;
+  no MCP activation, dependency, schema, currency/valuation or model-policy change.
+
 ## 2026-11-11 - stream saved local general conversations
 
 - NEXT selects USE-03/saved-general-streaming from the existing authorized usability
