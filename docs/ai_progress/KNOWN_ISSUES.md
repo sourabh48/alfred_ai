@@ -1,5 +1,19 @@
 # Known issues and gates
 
+## History-outage scope - 2026-11-11
+
+Source 9abff6e496dd009a6a1a7ef05fbe3dc92707f67d keeps page-only Career progress
+and selected reviewed-document questions usable during history-status failure.
+Retry checks status; it does not repair keys/storage, activate retention or resolve
+an active conversation revision conflict. Other modes continue to wait for known
+history status. Larger corpus/model quality, saved/domain streaming, manual
+contrast, owner/CI/independent/package/release and 3.0 gates remain open.
+
+At 9abff6e the real local reviewed-document test first reached the existing deadline
+and returned local evidence (1 FAIL in 32.770s). An unchanged retry after the other checks
+completed passed in 15.814s. Both receipts are retained; the cause of the availability
+variation is not established. No model policy, deadline or assertions changed.
+
 ## Reviewed recovery bounds - 2026-11-11
 
 Sourcee2deec85ae6b4dd9475b6d785852545cc5496317 adds manual preview/confirm/cancel

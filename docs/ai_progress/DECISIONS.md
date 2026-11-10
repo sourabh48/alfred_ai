@@ -1,5 +1,22 @@
 # Execution decisions
 
+## 2026-11-11 - independent page-only questions during history outage
+
+- USE-03/history-outage-page-only-sources is the single selected NEXT task; continue
+  finishes it. The usability exception fixes a reproduced UI blocker in existing
+  source paths; baseline approval/external-evidence gates are unchanged.
+- Career progress and reviewed records from one document already avoid conversation
+  storage at the API boundary. Their UI source readiness must not depend on a history
+  status object. Other modes still wait for known status and unresolved saved
+  conversation conflicts still require reopening. Server ownership, revisions,
+  consent, session and financial validation are unchanged.
+- Retry history status reuses the existing authenticated metadata GET and history
+  request lifecycle. It retains drafts and retention choices, clears cloud consent,
+  and cannot clear a conflict on an active saved conversation. Permission loss
+  still clears private page contents. No vault/key repair or activation is performed.
+- NO_UPSTREAM_ADOPTION. No new service, schema, dependency, model/provider, MCP
+  transport, financial calculation or personal-runtime write is introduced.
+
 ## 2026-11-11 - reviewed Career timeline recovery
 
 - NEXT selects USE-02/career-history-recovery under the authorized usability

@@ -1,5 +1,19 @@
 # Development CI and integration pipeline
 
+## History-outage page-only source recovery - 2026-11-11
+
+USE-03/history-outage-page-only-sources LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source 9abff6e496dd009a6a1a7ef05fbe3dc92707f67d,
+base 8d2a78f43aff8fb81e70f39ddae9bdcf63877214. Independent page-only questions work
+without history status; metadata retry preserves drafts/consent and conflict/auth guards.
+Exact-source 252 backend/5 Chrome PASS; four Axe audits zero violations/manual contrast
+open. Real Ollama 1 FAIL in 32.770s at deadline, unchanged retry 1 PASS in 15.814s; both retained.
+Clean source/privacy/dependency/migration preflight PASS; full release/CI/owner/package/
+independent/3.0 gates remain open. No owner runtime or remote changes; cache edit preserved.
+Baseline 85/143, extensions 0/13 unchanged. READY_FOR_NEXT; no next task selected.
+Exact files, receipts and next command: docs/ai_progress/STATE.json,
+TEST_EVIDENCE.md and docs/EXECUTION_STATE.md.
+
 ## Reviewed Career history recovery - 2026-11-11
 
 USE-02/career-history-recovery LOCAL_ACCEPTED / COMMITTED_LOCAL on

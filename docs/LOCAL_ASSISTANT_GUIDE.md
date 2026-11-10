@@ -7,6 +7,8 @@ again without losing your draft or changing retention consent. General chat wait
 for known status. A changed saved conversation must still be reopened before resuming.
 Source ownership, current revisions and sign-in remain required.
 
+![Retrying history status on a synthetic account without enabling retention or losing its draft](images/usability/history-status-retry.png)
+
 Under **Include local records**, choose the records to use for this question.
 The permission note names the selected read-only data tool. Expand **Available
 local read-only tools** to see the current catalogue. These tools read your own

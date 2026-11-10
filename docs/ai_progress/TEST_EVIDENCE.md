@@ -1,5 +1,56 @@
 # Test evidence index
 
+## 2026-11-11 - history-outage page-only source recovery
+
+Source 9abff6e496dd009a6a1a7ef05fbe3dc92707f67d, base 8d2a78f43aff8fb81e70f39ddae9bdcf63877214.
+Receipts/commands/source blobs/hashes: `artifacts/history-outage-20261111/`.
+All automated accounts, vaults, records and media synthetic under
+`F:/ALFRED/dev-test-data/history-outage-20261111/` or temporary fixture roots.
+
+- Exact-source 252 backend PASS in 173.851s, zero failures/skips: UI/status API,
+  Career source, history/hybrid/streaming, owner/session/CSRF/privacy, canonical
+  grounding/financial source selection, typed tools, native and release/browser
+  inventory regressions. Backend behavior and canonical Decimal services unchanged.
+- Five exact-source actual Chrome journeys PASS in 105.907s (runner 134.891s), zero
+  failures/skips: Career and selected reviewed-document questions during history 503;
+  exact recorded 2345.67/unknown currency/citation retained; general-mode gate and
+  draft preserved; keyboard metadata retry leaves retention off/count 0; permission
+  loss clears private content; retry leaves active saved-conversation conflict
+  blocked; previous canonical-picker and history consent/reopen/delete/clear/mobile
+  regression flows. Real SQLite/API/browser, with unrelated services isolated.
+- Four new Axe light/dark at 1440/390px audits zero automated violations and one manual
+  contrast incomplete item each. Current synthetic screenshot inspected and in guide.
+- One real Ollama test first returned local_evidence after the existing deadline:
+ 1 FAIL in 32.770s (`exact-ollama-9abff6e-resume.log`). Unchanged isolated retry after
+  other checks completed: 1 PASS in 15.814s (`exact-ollama-9abff6e-retry.log`). No model
+  response mocked, new model pulled, deadline changed or assertion weakened.
+  Cause of variation is unestablished; no universal performance/GPU/quality claim.
+- Initial exact-source backend/browser/Ollama sessions ended without final results
+  when the session resumed. Original incomplete logs retained; completed receipts
+  have `-resume` names. Completed preflight was reused at the same clean source.
+- Working-tree reproduction: initial test fixture lacked a timezone import, then
+  waited on a closed details panel; both fixture errors retained/corrected. The
+  corrected `reproduction-ui.log` reproduces the real Career submit block in 35.575s.
+  Early post-fix assertions incorrectly called consent-gated history.list with
+  retention off and expected a differently formatted classification label; tests
+  were corrected to check authorized metadata count 0 and the actual human label.
+  No production permission/validation code weakened. Final working-tree 3 Chrome
+  PASS in 52.842s overlaps the exact-source coverage and is not additive acceptance.
+- Clean detached `F:/ALFRED_DEV/usability-history-check-9abff6e`: source/privacy/
+  dependency/migration preflight PASS. Full technical/promotion remain BLOCKED;
+  standalone receipts are separate from CI/package/recovery/owner release evidence.
+  AST graph update PASS with no semantic API.
+- No backend/schema/dependency, owner runtime/data/key/model/document/backup/install
+  or remote change; cache edit/hash preserved. Full USE-03, model reliability,
+  independent/CI/package/owner/release/3.0 acceptance remain open. Baseline 85/143 and
+  extensions 0/13 unchanged. READY_FOR_NEXT; no next task selected.
+- `scripts/project_execution.py --check` PASS; generated views unchanged and
+  acceptance counts remain 85/143 original requirements and 0/13 extensions.
+
+Implementation files (5): `docs/LOCAL_ASSISTANT_GUIDE.md`, `static/js/intelligence.js`,
+`templates/ai_insights.html`, `tests/browser_durations.json`,
+`tests/test_user_data_browser.py`. Checkpoint-only files are listed in STATE.json.
+
 ## 2026-11-11 - reviewed Career history recovery
 
 Sourcee2deec85ae6b4dd9475b6d785852545cc5496317, base d33bd9f0884a5a7b7221c7a03315d77a7c363444.

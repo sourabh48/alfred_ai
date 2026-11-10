@@ -1,5 +1,35 @@
 # Codex / Claude checkpoint
 
+## History-outage page-only source recovery - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-03/history-outage-page-only-sources on
+`work/usability-integration`, source 9abff6e496dd009a6a1a7ef05fbe3dc92707f67d,
+base 8d2a78f43aff8fb81e70f39ddae9bdcf63877214. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+Reproduced a history-status outage blocking independent Career/reviewed-document
+questions in the real UI. Their existing page-only APIs now remain reachable;
+other modes still wait for known status. Metadata retry preserves drafts/retention,
+clears cloud consent and leaves active saved-conversation conflicts blocked.
+Permission loss still clears private contents. No backend/calculation, schema,
+dependency, key, model policy, canonical record or owner-runtime change.
+
+Exact-source 252 backend PASS in 173.851s; 5 Chrome PASS in 105.907s (runner 134.891s), zero
+failures/skips in those runs. Four new light/dark at 1440/390px Axe audits zero violations;
+manual contrast remains. Real Ollama first hit the existing deadline and returned
+local evidence (1 FAIL in 32.770s); unchanged retry after other checks completed PASS in 15.814s.
+Both retained; no universal latency/availability/GPU/quality claim. Earlier interrupted
+checks have no final result and were rerun without overwriting their logs.
+Clean source/privacy/dependency/migration preflight and AST graph update PASS;
+CI/independent/package/owner/release/3.0 gates remain open.
+
+No owner data/key/model/document/backup/install or remote change. Cache edit/hash
+41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 preserved.
+Exact files/receipts/limitations: docs/ai_progress/STATE.json and TEST_EVIDENCE.md.
+Baseline 85/143, extensions 0/13 unchanged; full USE-03 remains partial. Codex stops
+here; no next task or agent selected/launched. `continue` reports READY_FOR_NEXT
+and stops. Only next/sprint/explicit scope selects further work after Git/writer checks.
+
 ## Reviewed Career history recovery - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-02/career-history-recovery locally on

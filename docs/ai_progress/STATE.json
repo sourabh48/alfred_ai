@@ -5,36 +5,29 @@
     "workspace":  "F:/ALFRED/alfred_ai",
     "single_writer":  false,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "e2deec85ae6b4dd9475b6d785852545cc5496317",
-    "active_task_id":  "USE-02/career-history-recovery",
+    "recorded_at_head":  "9abff6e496dd009a6a1a7ef05fbe3dc92707f67d",
+    "active_task_id":  "USE-03/history-outage-page-only-sources",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
-                          "apps/career/history_review_api.py",
-                          "apps/career/services/history_review.py",
-                          "apps/career/urls.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
-                          "scripts/release_validation.py",
-                          "static/js/career.js",
-                          "templates/career/list.html",
-                          "tests/backend_durations.json",
+                          "static/js/intelligence.js",
+                          "templates/ai_insights.html",
                           "tests/browser_durations.json",
-                          "tests/test_career_history_review.py",
                           "tests/test_user_data_browser.py"
                       ],
     "completed_steps":  [
-                            "Recovered d33bd9f and preserved cache edit/hash; sole writer verified",
-                            "Implemented bounded owned source inspection/preview/confirm/cancel using existing action primitives and Career validation; exact original retained privately",
-                            "UI preview/cancel, explicit confirmation, lost-ack same-card retry and archive reopen work with inert text and keyboard focus",
-                            "Exact-source246 backend PASS233.041s;3 Chrome PASS138.196s runner164.672s; four recovery Axe audits zero violations/manual contrast open",
-                            "Actual private Windows file-SQLite concurrent confirmations false/true; pending review confirmed in new process then replayed true; one archive per record",
-                            "Initial native fixture refused by private-storage guard; new empty fixture protected with existing helper and rerun PASS; no security weakening",
-                            "Clean source/privacy/dependency/migration preflight and graph AST update PASS; no schema/dependency/owner runtime/remote changes"
+                            "Recovered 8d2a78f and preserved cache edit/hash; sole writer verified",
+                            "Reproduced UI blocking independent page-only reads after history status 503; root guard repaired without backend or financial changes",
+                            "Metadata retry preserves drafts/retention, clears cloud consent, respects active conversation conflicts and clears private data on permission loss",
+                            "Exact-source 252 backend PASS in 173.851s; 5 real Chrome PASS in 105.907s runner 134.891s; four Axe audits zero violations/manual contrast open",
+                            "Real Ollama first deadline failure: 1 FAIL in 32.770s retained; unchanged retry after other tests1PASS in 15.814s; no model settings/limits/assertions weakened",
+                            "Interrupted checks retained without final results and rerun; clean source/privacy/dependency/migration preflight and AST graph update PASS"
                         ],
     "remaining_steps":  [
-                            "Current NEXT task complete; wait for next/sprint/explicit scope before selecting more work",
-                            "Oversized/incompatible history and more than five retained timelines require separate review; no bulk or automatic repair",
-                            "Full usability, owner/CI/independent/package/release and3.0 gates remain"
+                            "Current continue task complete; wait for next/sprint/explicit scope before selecting more work",
+                            "Model deadline reliability, manual contrast and full USE-03 remain unaccepted; retry does not repair keys/storage or resolve active conversation conflicts",
+                            "Owner/CI/independent/package/release/3.0 gates remain"
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -57,13 +50,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. On next/sprint verify actual Git/HEAD, queue and sole writer, preserve cache edit/hash, then select one eligible bounded task; none selected now. USE-02/career-history-recovery is locally complete at e2deec8. Do not repeat it or touch owner runtime/MCP/provider/deployment gates without required authorization.",
+    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. Only next/sprint/explicit scope selects a new task after verifying Git/HEAD, canonical queue and sole writer; preserve materialized_cache.py/hash. USE-03/history-outage-page-only-sources is locally complete at 9abff6e. Review retained Ollama deadline failure/retry; do not infer model reliability, change model policy or activate owner runtime/MCP/retention/deployment gates.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "e2deec85ae6b4dd9475b6d785852545cc5496317",
-    "checkpoint_at":  "2026-11-10T21:02:06.9861347Z",
+    "implementation_source_head":  "9abff6e496dd009a6a1a7ef05fbe3dc92707f67d",
+    "checkpoint_at":  "2026-11-10T21:40:25.7832218Z",
     "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-recovery-check-e2deec8",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-history-check-9abff6e",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -78,24 +71,18 @@
                                      "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
                                      "docs/ai_progress/TEST_EVIDENCE.md",
-                                     "docs/images/usability/career-history-recovery.png"
+                                     "docs/images/usability/history-status-retry.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "e2deec85ae6b4dd9475b6d785852545cc5496317",
+    "release_preflight_source_head":  "9abff6e496dd009a6a1a7ef05fbe3dc92707f67d",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
-    "last_completed_task_id":  "USE-02/career-history-recovery",
+    "last_completed_task_id":  "USE-03/history-outage-page-only-sources",
     "last_completed_files_changed":  [
-                                         "apps/career/history_review_api.py",
-                                         "apps/career/services/history_review.py",
-                                         "apps/career/urls.py",
                                          "docs/LOCAL_ASSISTANT_GUIDE.md",
-                                         "scripts/release_validation.py",
-                                         "static/js/career.js",
-                                         "templates/career/list.html",
-                                         "tests/backend_durations.json",
+                                         "static/js/intelligence.js",
+                                         "templates/ai_insights.html",
                                          "tests/browser_durations.json",
-                                         "tests/test_career_history_review.py",
                                          "tests/test_user_data_browser.py"
                                      ],
     "sprint_implementation_sources":  [
