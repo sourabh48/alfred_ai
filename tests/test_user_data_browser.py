@@ -4583,6 +4583,41 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_attribute('value'),'Synthetic unsent question')
             self.assertEqual(self.text('intelligenceAnswers'),'')
 
+    def test_source_card_record_id_is_not_money_and_limitations_are_readable(self):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from apps.investments.models import Investment
+        rows, local = self.canonical_grounding_fixture()
+        local.reason.side_effect = EmbeddingUnavailable('Synthetic unavailable local model')
+        owner = self.scenario['user']
+        self.login(); self.browser.get(self.live_server_url+'/ai/insights/?scope=finance')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_property('value') == 'finance')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.browser.execute_script('''const original = Alfred.fetchJSON; Alfred.fetchJSON = async (...args) => {
+            const result = await original(...args);
+            if (args[0] === '/api/ai/personal-insights/' && result.sources?.[0]?.data?.limitations)
+                result.sources[0].data.limitations.push('<img src=x onerror="window.sourceCardLeak=true">');
+            return result; };''')
+        self.ask_history_question('Explain my baseline')
+        self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
+        evidence = self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers .conversation-evidence')
+        fact = next(item.text for item in evidence.find_elements(self.By.TAG_NAME,'p') if item.text.startswith('record id:'))
+        self.assertEqual(fact, f'record id: {owner.pk}')
+        self.assertTrue(evidence.find_elements(self.By.CSS_SELECTOR,'ul li'))
+        self.assertNotIn('limitations: [', evidence.text)
+        self.assertTrue(evidence.find_elements(self.By.CSS_SELECTOR,'.recorded-amount'))
+        self.assertIn('Currency not recorded', evidence.text)
+        self.assertIn('<img src=x onerror=', evidence.text)
+        self.assertFalse(evidence.find_elements(self.By.TAG_NAME,'img'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.sourceCardLeak)'))
+        self.capture('source-card-nonmonetary-id')
+        row = rows['investment']; Investment.objects.filter(pk=row.pk).update(currency='USD')
+        self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=investment&record_id={row.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'investment:{row.pk}')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.ask_history_question('Explain this record')
+        self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
+        self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
+
     def test_canonical_record_overview_during_real_socket_refusal_and_reopen(self):
         import socket
         from http.client import HTTPConnection

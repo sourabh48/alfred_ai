@@ -486,8 +486,17 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
                 if (["metric_states","amounts","document_sources","document_selection","applied_payment_source"].includes(key) || Object.hasOwn(source.data.amounts || {},key)) return;
                 const fact = document.createElement("p");
-                const monetary = source.classification === "canonical_financial_baseline" || key === "closure_amount";
-                const display = value === null ? "Not recorded" : monetary && typeof value === "number" ? Alfred.formatCurrency(value) : (typeof value === "object" ? JSON.stringify(value) : String(value));
+                if (key === 'limitations' && Array.isArray(value) && value.every(item => typeof item === 'string')) {
+                    fact.textContent = value.length ? 'limitations:' : 'limitations: None recorded';
+                    evidence.append(fact);
+                    if (value.length) {
+                        const list = document.createElement('ul');
+                        value.forEach(text => { const item = document.createElement('li'); item.textContent = text; list.append(item); });
+                        evidence.append(list);
+                    }
+                    return;
+                }
+                const display = value === null ? "Not recorded" : (typeof value === "object" ? JSON.stringify(value) : String(value));
                 const state = source.data.metric_states?.[key]?.status;
                 fact.textContent = `${key.replaceAll("_", " ")}: ${display}${state ? ` (${state})` : ""}`;
                 evidence.append(fact);
