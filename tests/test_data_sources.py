@@ -2,9 +2,11 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from alfred_ai.services.data_sources import data_sources_snapshot
-from apps.career.models import CareerResume
+from apps.career.models import CareerProfile, CareerResume
 from apps.expenses.models import BankAccount, StatementUpload
 from apps.mobility.models import TravelPreferenceProfile
+from apps.loans.models import LoanImportDocument
+from apps.investments.models import InvestmentImportDocument
 
 
 class DataSourcesTests(TestCase):
@@ -56,3 +58,60 @@ class DataSourcesTests(TestCase):
         self.assertFalse(finance['has_data'])
         self.assertEqual(finance['state'], 'Review needed')
         self.assertEqual(finance['imports']['awaiting_review'], 1)
+
+    def test_empty_career_profile_is_not_onboarding_readiness(self):
+        profile = CareerProfile.objects.create(user=self.owner, role='  ', skills='', experience_years=0)
+        result = data_sources_snapshot(self.owner)
+        self.assertEqual(result['populated'], 0)
+        career = next(source for source in result['sources'] if source['label'] == 'Career')
+        self.assertFalse(career['has_data'])
+        profile.role = 'Synthetic Developer'; profile.save()
+        self.assertTrue(next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label'] == 'Career')['has_data'])
+
+    def test_confirmed_reviews_and_bounded_owned_pending_links_are_distinct(self):
+        for model, label, prefix in ((StatementUpload, 'Finance', '/expenses/uploads/'),
+                (LoanImportDocument, 'Loans', '/loans/import-uploads/'),
+                (InvestmentImportDocument, 'Investments', '/investments/import-uploads/')):
+            model.objects.create(user=self.owner, parser_status='parsed', extracted_payload={})
+            model.objects.create(user=self.owner, parser_status='parsed',
+                extracted_payload={'import_review': {'state': 'confirmed', 'receipt': {'replayed': True}}})
+            pending = [model.objects.create(user=self.owner, parser_status='needs_review',
+                extracted_payload={'import_review': {'state': 'pending'}}) for _ in range(5)]
+            foreign = model.objects.create(user=self.other, parser_status='needs_review',
+                extracted_payload={'import_review': {'state': 'pending'}})
+            source = next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label'] == label)
+            self.assertEqual(source['imports']['confirmed'], 1)
+            self.assertEqual(source['imports']['awaiting_review'], 5)
+            self.assertEqual(len(source['reviews']), 3)
+            self.assertEqual(source['reviews'][0]['url'], f'{prefix}{pending[-1].pk}/review/')
+            self.assertNotIn(f'{prefix}{foreign.pk}/review/', [r['url'] for r in source['reviews']])
+
+    def test_next_setup_prioritizes_review_without_private_content_or_side_effects(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from django.test import override_settings
+        from unittest.mock import patch
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-source-readiness-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=root/'unopened-memory'))
+        pending = LoanImportDocument.objects.create(user=self.owner, file_name='SYNTHETIC-PRIVATE.pdf',
+            parser_status='needs_review', extracted_payload={'import_review': {'state': 'pending'}})
+        self.client.force_login(self.owner)
+        with patch('apps.ml_engine.services.persistent_memory.MemoryStore', side_effect=AssertionError('Memory must stay unopened')):
+            snapshot = data_sources_snapshot(self.owner)
+            self.assertEqual(snapshot['next_setup']['label'], 'Loans')
+            response = self.client.get('/data-sources/')
+        self.assertContains(response, f'/loans/import-uploads/{pending.pk}/review/')
+        self.assertNotContains(response, 'SYNTHETIC-PRIVATE')
+        self.assertFalse((root/'unopened-memory').exists())
+        self.assertEqual(LoanImportDocument.objects.filter(user=self.owner).count(), 1)
+
+    def test_database_failure_is_unavailable_with_a_safe_diagnostic_action(self):
+        from unittest.mock import patch
+        from django.db import DatabaseError
+        with patch.object(StatementUpload.objects, 'filter', side_effect=DatabaseError('synthetic unavailable')):
+            result = data_sources_snapshot(self.owner)
+        finance = result['sources'][0]
+        self.assertEqual(finance['state'], 'Unavailable')
+        self.assertFalse(finance['has_data'])
+        self.assertEqual(finance['reviews'], [])
+        self.assertEqual(result['next_setup']['next_action']['url'], '/settings/diagnostics/')

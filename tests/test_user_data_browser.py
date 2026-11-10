@@ -395,6 +395,49 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(audit['violations'], [])
         self.browser.save_screenshot(str(self.artifacts/'data-sources.png'))
 
+    def test_data_sources_guides_review_confirmation_and_updates_readiness(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.loans.models import Loan
+        from apps.loans.services.import_review import stage_loan_document
+        from tests.test_loan_import_review import extraction
+        self.login()
+        owner = self.scenario['user']
+        document = stage_loan_document(user=owner, parsed=extraction(),
+            upload_file=SimpleUploadedFile('synthetic-onboarding.pdf', b'%PDF synthetic onboarding source'))
+        before = Loan.objects.filter(user=owner).count()
+        self.browser.get(self.live_server_url+'/data-sources/')
+        self.wait.until(lambda _: 'Your next setup step' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        link = f'main a[href="/loans/import-uploads/{document.pk}/review/"]'
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
+        self.assertNotIn('synthetic-onboarding.pdf', self.browser.page_source)
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        audits = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('requestAnimationFrame(()=>requestAnimationFrame(arguments[0]))')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                result = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                audits.append(dict(width=width,theme=theme,**result))
+                (self.artifacts/'data-sources-guided-accessibility.json').write_text(json.dumps(audits,indent=2),encoding='utf-8')
+                self.assertEqual(result['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth>innerWidth'))
+                self.capture(f'data-sources-guided-{width}-{theme}')
+        self.memory_click(link)
+        self.memory_click('input[name="reviewed"]')
+        self.memory_click('button[value="confirm"]')
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME,'main').text)
+        self.assertEqual(Loan.objects.filter(user=owner).count(),before+1)
+        self.browser.get(self.live_server_url+'/data-sources/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'article'))
+        card = next(c for c in self.browser.find_elements(self.By.CSS_SELECTOR,'article') if c.find_element(self.By.TAG_NAME,'h2').text=='Loans')
+        counters = self.browser.execute_script('return Array.from(arguments[0].querySelectorAll("dt")).reduce((r,t)=>{r[t.textContent]=t.nextElementSibling.textContent;return r;},{});',card)
+        self.assertEqual(counters['Current reviews confirmed'],'1')
+        self.assertEqual(counters['Pending or awaiting review'],'0')
+        self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,link))
+
     def test_user_decimal_profile_save_and_reload_keeps_exact_owned_cents(self):
         from decimal import Decimal
         self.login()

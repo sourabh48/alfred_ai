@@ -7,6 +7,14 @@
     <p><strong>{{ populated }} of {{ total }} module groups contain saved data.</strong> Saved data and parsed files still need your review; this is not a verification score.</p>
     <a class="btn btn-outline-secondary" href="{% url 'data_sources' %}">Refresh source status</a>
 </section>
+<section class="surface-card mb-4" aria-labelledby="nextSetupTitle">
+    <h2 class="h4" id="nextSetupTitle">Your next setup step</h2>
+    {% if next_setup %}<p>{{ next_setup.label }}: {{ next_setup.state }}. This step follows your saved records and import state.</p>
+    <a class="btn btn-primary" href="{{ next_setup.next_action.url }}">{{ next_setup.next_action.label }}</a>
+    {% else %}<p>Each supported module group contains saved data. Review source freshness and permissions before relying on it.</p>
+    <a class="btn btn-outline-primary" href="/settings/diagnostics/">Check local AI readiness</a>{% endif %}
+    <p class="small mt-3 mb-0">This page reads your record counts only. It does not open private memory, run AI inference or change data. Memory consent and document readiness remain in their existing controls below.</p>
+</section>
 <section class="surface-card mb-4" aria-labelledby="gettingStartedTitle">
     <h2 class="h4" id="gettingStartedTitle">Get started</h2>
     <ol>
@@ -17,7 +25,7 @@
     </ol>
     <p class="mb-0">Direct bank connections and MCP providers are not configured here. Local file imports do not require a bank API subscription.</p>
 </section>
-<p class="alert alert-info" role="status">Bank statements are extracted for review first. Open Review extracted rows in Expenses, correct the preview and explicitly confirm before transactions or account balances change.</p>
+<p class="alert alert-info" role="status">Bank, loan and investment files are extracted for review first. Correct the preview and explicitly confirm before creating records. Linking loan or investment sources preserves existing records.</p>
 <section class="row g-3 mb-4" aria-label="Your data sources">
 {% for source in sources %}
     <div class="col-12 col-xl-6"><article class="surface-card h-100">
@@ -29,10 +37,14 @@
         <dl class="row mt-3">
             <dt class="col-sm-7">Uploaded files</dt><dd class="col-sm-5">{{ source.imports.total }}</dd>
             <dt class="col-sm-7">Parsed files (not verified)</dt><dd class="col-sm-5">{{ source.imports.parsed }}</dd>
+            {% if 'confirmed' in source.imports %}<dt class="col-sm-7">Current reviews confirmed</dt><dd class="col-sm-5">{{ source.imports.confirmed }}</dd>{% endif %}
             <dt class="col-sm-7">Pending or awaiting review</dt><dd class="col-sm-5">{{ source.imports.awaiting_review }}</dd>
             <dt class="col-sm-7">Failed files</dt><dd class="col-sm-5">{{ source.imports.failed }}</dd>
             <dt class="col-sm-7">Last parsed file update</dt><dd class="col-sm-5">{{ source.imports.last_parsed|default:"Not recorded" }}</dd>
         </dl>
+        {% if source.reviews %}<p class="fw-semibold">Recent uploads awaiting review</p><ul>
+            {% for review in source.reviews %}<li class="mb-2"><a href="{{ review.url }}">Review source saved {{ review.uploaded_at|date:"j M Y, H:i" }}</a></li>{% endfor %}
+        </ul>{% endif %}
         {% endif %}
         <p class="small">{{ source.provenance }} Counts cover only your account. Record acceptance and rejection totals are not inferred from parser status. Freshness of balances and public evidence must be checked in the source screen.</p>
         {% for label, url in source.links %}<a class="btn btn-outline-primary mb-2" href="{{ url }}">{{ label }}</a> {% endfor %}
