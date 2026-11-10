@@ -570,7 +570,7 @@ document.addEventListener("DOMContentLoaded", () => {
         feedback.textContent = "ALFRED is processing locally.";
         const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
         button.textContent = "Thinking…";
-        const payload = {query: query.value, scope: scope.value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
+        const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);
         if (scope.value === "financial_document") {

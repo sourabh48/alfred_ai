@@ -50,6 +50,13 @@
         <p class="small">This conversation stays on this page unless you explicitly enable private history. Save only facts you have checked.</p></div>
     <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
     <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
+        <label class="form-label" for="intelligenceAnswerStyle">Local answer style</label>
+        <select id="intelligenceAnswerStyle" class="form-select mb-2" aria-describedby="intelligenceAnswerStyleHelp">
+            <option value="auto">Automatic</option><option value="concise">Concise</option>
+            <option value="detailed">Detailed explanation</option><option value="comparison">Comparison</option>
+            <option value="steps">Step by step</option>
+        </select>
+        <p class="small" id="intelligenceAnswerStyleHelp">Local answers stay within a bounded length and deadline. Financial and document replies keep stricter limits and source validation.</p>
         <label for="intelligenceQuery" class="form-label">Your question</label>
         <textarea id="intelligenceQuery" class="form-control mb-3" rows="3" maxlength="1024" required autocomplete="off" placeholder="Ask a question…" aria-describedby="intelligencePrivacy"></textarea>
         <p class="small" id="intelligenceActionHint">You can also say “add a savings goal Emergency fund of 1 lakh by March 2027” or “update Emergency fund saved to 25000”. ALFRED shows the change and saves it only when you press Confirm.</p>
@@ -187,5 +194,5 @@
 
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
-<script src="/static/js/intelligence.js?v=17"></script>
+<script src="/static/js/intelligence.js?v=18"></script>
 {% endblock %}

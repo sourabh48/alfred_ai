@@ -116,6 +116,27 @@ class ConversationHistoryTests(TestCase):
             mismatch = self.post({**payload, 'query':'Changed request'})
             self.assertEqual(mismatch.status_code, 409); model.assert_not_called()
 
+    def test_answer_style_is_bound_to_saved_request_and_auto_keeps_legacy_replay(self):
+        for style in ('detailed','auto'):
+            record = self.create(); payload = self.turn(record,answer_style=style)
+            with patch('apps.ml_engine.api.views.hybrid_answer',return_value=self.result) as model:
+                self.assertEqual(self.post(payload).status_code,200)
+                self.assertEqual(model.call_args.kwargs['answer_style'],style)
+                replay = payload if style == 'detailed' else {k:v for k,v in payload.items() if k != 'answer_style'}
+                self.assertEqual(self.post(replay).status_code,200)
+                self.assertEqual(model.call_count,1)
+                self.assertEqual(self.post(payload|{'answer_style':'concise'}).status_code,409)
+                self.assertEqual(model.call_count,1)
+            turn = self.history.get(self.alice,record['id'])['turns'][0]
+            if style == 'detailed': self.assertEqual(turn['answer_style'],style)
+            else: self.assertNotIn('answer_style',turn)
+
+    def test_invalid_answer_style_does_not_open_private_vault(self):
+        with patch('apps.ml_engine.api.views.memory_store') as vault:
+            for style in (None,True,{},[],'unbounded'):
+                self.assertEqual(self.post(self.question|{'answer_style':style}).status_code,400)
+            vault.assert_not_called()
+
     def test_ciphertext_files_owner_tamper_and_no_sync_or_embedding(self):
         record = self.create(); identity = record['id']
         generation, _ = self.history.prepare(self.alice, identity, 0, 'a'*32, self.question)

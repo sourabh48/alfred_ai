@@ -2014,6 +2014,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
         from unittest.mock import Mock
         from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         from tests.test_persistent_memory import SyntheticEmbeddings
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-browser-synthetic-')))
@@ -2029,6 +2030,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: 'Ollama available' in self.text('intelligenceLocalStatus'))
         self.assertEqual(self.text('intelligenceCloudStatus'), 'OpenAI disabled')
+        style = self.browser.find_element(self.By.ID, 'intelligenceAnswerStyle')
+        self.assertEqual(Select(style).first_selected_option.get_attribute('value'), 'auto')
+        style.send_keys(Keys.HOME, Keys.ARROW_DOWN, Keys.ARROW_DOWN, Keys.ENTER)
+        self.assertEqual(Select(style).first_selected_option.get_attribute('value'), 'detailed')
         question = self.browser.find_element(self.By.ID, 'intelligenceQuery')
         question.send_keys('Synthetic outage draft', Keys.CONTROL, Keys.ENTER)
         self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
@@ -2038,6 +2043,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.side_effect = None; local.reason.return_value = 'Synthetic hypothesis <img src=x onerror="window.uiLeak=true">'
         self.memory_click('#intelligenceRetry')
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
+        self.assertEqual(local.reason.call_args.kwargs['max_output_tokens'], 1024)
+        self.assertEqual(local.reason.call_args.args[0]['response_style'], 'detailed')
         self.assertFalse(self.browser.execute_script('return Boolean(window.uiLeak)'))
         self.assertIn('Insufficient evidence', self.text('intelligenceAnswers'))
         self.browser.execute_script("document.getElementById('alfredMainScroll').scrollTo({top:0,behavior:'instant'}); window.scrollTo({top:0,behavior:'instant'})")
@@ -2049,6 +2056,21 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)"""
         self.wait.until(lambda _: self.browser.execute_script(contrast)>4.5)
         self.capture('ui-a-conversation-dark')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings = []
+        self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
+        for width in (1440, 390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'answer-style-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'answer-style-{width}-{theme}.png'))
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride', {'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
         self.addCleanup(self.browser.execute_cdp_cmd, 'Emulation.clearDeviceMetricsOverride', {})
         self.memory_click('#intelligenceNew')
@@ -2253,6 +2275,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_private_history_consent_reload_delete_clear_disable_and_mobile(self):
         from django.contrib.auth import get_user_model
+        from selenium.webdriver.support.ui import Select
         history, local = self.private_history_fixture(); owner = self.scenario['user']
         self.assertFalse(history.policy(owner)['enabled'])
         self.ask_history_question('Synthetic unsaved question')
@@ -2262,12 +2285,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceAnswers'), '')
         title = 'Synthetic <img src=x onerror="window.historyLeak=true">'
         self.browser.find_element(self.By.ID, 'conversationHistoryTitle').send_keys(title)
+        Select(self.browser.find_element(self.By.ID, 'intelligenceAnswerStyle')).select_by_value('steps')
         self.ask_history_question('Synthetic private saved question')
         self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
         self.wait.until(lambda _: bool(self.browser.find_elements(self.By.CSS_SELECTOR, '#conversationHistoryList button')))
         self.assertTrue(self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').get_property('disabled'))
         self.assertEqual(len(history.list(owner)), 1)
         self.assertEqual(len(history.get(owner, history.list(owner)[0]['id'])['turns']), 1)
+        self.assertEqual(history.get(owner, history.list(owner)[0]['id'])['turns'][0]['answer_style'], 'steps')
+        self.assertEqual(local.reason.call_args.kwargs['max_output_tokens'], 768)
         self.assertEqual(history.store.list_memories(owner), [])
         calls = local.reason.call_count
         self.browser.refresh()

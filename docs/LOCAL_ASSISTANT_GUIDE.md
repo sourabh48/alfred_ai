@@ -1,0 +1,26 @@
+# Using the local assistant
+
+Open **ALFRED Insights** from the sidebar. Under **Local answer style**, choose
+Automatic, Concise, Detailed explanation, Comparison or Step by step. Enter your
+question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit
+requests for brevity, detail, comparisons or steps. Answers have bounded lengths
+and deadlines; detailed financial and document replies have a stricter limit.
+
+![Local answer choices and conversation, using synthetic data](images/usability/local-answer-style.png)
+
+If Ollama is unavailable, the draft remains in the composer. Open Settings →
+Diagnostics to check local inference, then use **Retry**. External fallback still
+requires its separate public-query consent; the answer-style selection controls
+local generation. Generation is currently delivered as a complete answer.
+
+Private conversation history requires both local operator authorization and your
+explicit consent with a retention period. Open the private-history panel to enable
+it when available. Saved conversations can be reopened after restarting ALFRED.
+The assistant uses a bounded selection of recent general-chat turns for follow-up
+questions. Reopened answers are labelled historical and their sources may be stale.
+
+Conversation statements remain unverified dialogue. Saving a conversation never
+adds verified memory facts or changes your financial records. For document or
+financial questions, select the owned source and inspect its evidence cards.
+Unsupported numeric or currency claims are withheld from AI prose. Check missing
+evidence rather than treating a longer answer as greater certainty.
