@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const historyCurrent = document.getElementById("conversationHistoryCurrent");
     const historyClear = document.getElementById("conversationHistoryClear");
     const historyDisable = document.getElementById("conversationHistoryDisable");
+    const historyRefresh = document.getElementById("conversationHistoryRefresh");
     const sourcePanel = document.getElementById("intelligenceSources");
     const sourceItems = document.getElementById("intelligenceSourceItems");
     const sourceStatus = document.getElementById("intelligenceSourcesStatus");
@@ -36,6 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const sourceReset = document.getElementById("intelligenceSourcesReset");
     let active = true, generation = 0, cloudAvailable = false, pending = false;
     let historyPolicy = null, conversation = null, requestToken = null, historyBlocked = false;
+    let controlsLoading = true;
     let pageDialogue = [];
     let registeredTools = [];
     const toolPolicy = document.getElementById('intelligenceToolPolicy');
@@ -188,6 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     const historyEnabled = () => Boolean(historyPolicy?.available && historyPolicy.enabled);
     function updateHistoryControls() {
+        historyRefresh.disabled = !active || pending || controlsLoading;
         const locked = !active || pending || !historyPolicy?.available;
         historyConsent.disabled = locked; historyDays.disabled = locked;
         historyForm.querySelector("button").disabled = locked;
@@ -326,6 +329,15 @@ document.addEventListener("DOMContentLoaded", () => {
             answers.setAttribute("aria-busy", "false"); newConversation.disabled = !active; updateHistoryControls();
         }
     }
+    historyRefresh.addEventListener('click', async () => {
+        historyPolicy = null; consent.checked = false;
+        await historyRequest('/api/ai/conversations/', {}, data => {
+            applyHistory(data);
+            if (!conversation) historyBlocked = false;
+            historyFeedback.textContent = 'History status refreshed. Your draft and retention choices are preserved.';
+        });
+        if (active) historyRefresh.focus();
+    });
     historyForm.addEventListener("submit", event => {
         event.preventDefault();
         historyRequest("/api/ai/conversations/policy/", {method:"PUT", body:JSON.stringify({enabled:true, consent:historyConsent.checked, days:Number(historyDays.value)})}, () => {
@@ -375,7 +387,7 @@ document.addEventListener("DOMContentLoaded", () => {
             : historyEnabled() ? "New local conversation · saved only after a successful local answer" : "Page-only conversation";
         ensureSources();
         if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
-        consent.disabled = scope.value !== "general" || !cloudAvailable || historyEnabled();
+        consent.disabled = scope.value !== "general" || !cloudAvailable || !historyPolicy || historyEnabled();
     }
     async function refreshControls() {
         const ticket = generation;
@@ -408,7 +420,7 @@ document.addEventListener("DOMContentLoaded", () => {
             historyPolicy=null; historyBlocked=true; conversation=null; requestToken=null;
             historyList.replaceChildren(); updateHistoryControls();
             document.getElementById('conversationHistoryStatus').textContent='Unavailable · reload to recheck';
-            historyFeedback.textContent='History is unavailable. Sources remain browsable; reload before asking a question. Your draft is preserved.';
+            historyFeedback.textContent='History is unavailable. Page-only Career and reviewed-document questions can still use selected local sources. Retry history status before using conversation modes. Your draft is preserved.';
         }
         documentChoice.replaceChildren(new Option("Choose verified evidence", ""));
         (insights.assistant_documents || []).forEach(item => documentChoice.append(new Option(item.label, item.id)));
@@ -714,7 +726,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async event => {
         event.preventDefault();
         if (pending) return;
-        if (!historyPolicy || (!["financial_document","career"].includes(scope.value) && historyBlocked)) { feedback.textContent = "Reopen the saved conversation or reload local history status before sending. Your draft is preserved."; return; }
+        if (!["financial_document","career"].includes(scope.value) && (!historyPolicy || historyBlocked)) { feedback.textContent = "Reopen the saved conversation or reload local history status before sending. Your draft is preserved."; return; }
         if ((scope.value === "financial_document" && !picker) || (["financial_records","financial_document"].includes(scope.value) && picker && (picker.loading || picker.blocked || ((picker.explicit || picker.count > 5) && !picker.selected.size)))) {
             feedback.textContent = "Choose current reviewed source documents, or refresh the source list before sending. Your draft is preserved."; return;
         }
@@ -832,7 +844,8 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) { if (active && ticket === generation) feedback.textContent = error.message; }
         finally { button.disabled = false; }
     });
-    refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
+    refreshControls().catch(error => { if (active) feedback.textContent = error.message; })
+        .finally(() => { controlsLoading = false; updateHistoryControls(); });
     window.addEventListener("pagehide", () => {
         forgetPrivatePage();
         document.getElementById("intelligenceMemorySensitivity").value = "sensitive";
@@ -840,9 +853,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("pageshow", event => {
         active = true;
         if (event.persisted) {
+            controlsLoading = true; historyRefresh.disabled = true;
             modelRefresh.disabled=modelPending;
             if (modelPanel.open) refreshModelReadiness();
-            refreshControls().catch(error => { if (active) feedback.textContent = error.message; });
+            refreshControls().catch(error => { if (active) feedback.textContent = error.message; })
+                .finally(() => { controlsLoading = false; updateHistoryControls(); });
         }
     });
 });

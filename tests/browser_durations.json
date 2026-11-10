@@ -10,6 +10,9 @@
                          ],
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_page_only_career_survives_history_outage_and_status_retry_preserves_draft": 16.282,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_page_only_reviewed_document_survives_history_outage_with_current_sources": 16.172,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_history_status_retry_does_not_clear_a_saved_conversation_conflict": 13.063,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_history_recovery_review_cancel_lost_ack_retry_and_retention": 18.812,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_bad_history_does_not_hide_valid_followups_or_erase_records": 15.797,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_application_progress_is_owned_page_only_offline_and_reopens": 13.0,

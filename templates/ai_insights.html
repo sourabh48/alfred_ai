@@ -36,6 +36,7 @@
             <button class="btn btn-outline-primary btn-sm" type="submit" disabled>Save history choice</button>
         </form>
         <div class="d-flex flex-wrap gap-2 my-3">
+            <button id="conversationHistoryRefresh" class="btn btn-outline-secondary btn-sm" type="button" disabled>Retry history status</button>
             <button id="conversationHistoryDisable" class="btn btn-outline-secondary btn-sm" type="button" disabled>Disable and clear history</button>
             <button id="conversationHistoryClear" class="btn btn-outline-danger btn-sm" type="button" disabled>Clear all conversations</button>
         </div>
@@ -211,5 +212,5 @@
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
 <script src="/static/js/answer_markdown.js?v=1"></script>
-<script src="/static/js/intelligence.js?v=28"></script>
+<script src="/static/js/intelligence.js?v=29"></script>
 {% endblock %}

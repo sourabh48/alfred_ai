@@ -1,5 +1,12 @@
 # Using the local assistant
 
+If private history status is unavailable, page-only **Career application progress**
+and **Reviewed records from one document** can still use their selected local sources.
+Open **Private conversation history** and choose **Retry history status** to check
+again without losing your draft or changing retention consent. General chat waits
+for known status. A changed saved conversation must still be reopened before resuming.
+Source ownership, current revisions and sign-in remain required.
+
 Under **Include local records**, choose the records to use for this question.
 The permission note names the selected read-only data tool. Expand **Available
 local read-only tools** to see the current catalogue. These tools read your own

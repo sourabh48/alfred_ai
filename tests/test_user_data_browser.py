@@ -4618,6 +4618,96 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
 
+    def test_page_only_career_survives_history_outage_and_status_retry_preserves_draft(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from django.db import OperationalError
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support.ui import Select
+        from rest_framework.exceptions import PermissionDenied
+        from apps.career.models import CareerJobAnalysis
+        from apps.career.services.application_tracker import apply_change
+        from apps.ml_engine.api.conversations import ConversationCollectionAPI
+        history,local=self.private_history_fixture()
+        owner=self.scenario['user']
+        CareerJobAnalysis.objects.create(user=owner,job_title='Synthetic outage opportunity',extracted_payload={
+            'application':apply_change({}, {'stage':'applied','on':(timezone.localdate()-timedelta(days=10)).isoformat()},today=timezone.localdate())})
+        with patch.object(ConversationCollectionAPI,'get',side_effect=OperationalError('SYNTHETIC-HISTORY-FAILURE')):
+            self.browser.get(self.live_server_url+'/ai/insights/?scope=career')
+            self.memory_click('#conversationHistoryPanel > summary')
+            self.wait.until(lambda _: 'History is unavailable' in self.text('conversationHistoryFeedback'))
+            self.ask_history_question('Summarize my application progress')
+            self.wait.until(lambda _: 'Recorded Career progress ready' in self.text('intelligenceFeedback'))
+            self.assertIn('Synthetic outage opportunity',self.text('intelligenceAnswers'))
+            self.assertNotIn('SYNTHETIC-HISTORY-FAILURE',self.text('conversationHistoryFeedback'))
+            self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
+            count=len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers > article'))
+            Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('general')
+            self.ask_history_question('KEEP MY DRAFT DURING STATUS RECOVERY')
+            self.wait.until(lambda _: 'Reopen the saved conversation' in self.text('intelligenceFeedback'))
+            self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers > article')),count)
+        self.browser.find_element(self.By.ID,'conversationHistoryRefresh').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'History status refreshed' in self.text('conversationHistoryFeedback'))
+        self.assertEqual(self.text('conversationHistoryStatus'),'Off')
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'KEEP MY DRAFT DURING STATUS RECOVERY')
+        self.assertFalse(history.policy(owner)['enabled']); self.assertEqual(history.policy(owner)['conversations'],0)
+        local.reason.assert_not_called()
+        self.assertEqual(self.browser.switch_to.active_element.get_attribute('id'),'conversationHistoryRefresh')
+        self.capture('page-only-history-outage-recovery')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings=[]; self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'history-outage-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'history-outage-{width}-{theme}.png'))
+        with patch.object(ConversationCollectionAPI,'get',side_effect=PermissionDenied('SYNTHETIC-PERMISSION-LOSS')):
+            self.memory_click('#conversationHistoryRefresh')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_property('disabled'))
+        self.assertEqual(self.text('intelligenceAnswers'),'')
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
+
+    def test_page_only_reviewed_document_survives_history_outage_with_current_sources(self):
+        from django.db import OperationalError
+        from apps.ml_engine.api.conversations import ConversationCollectionAPI
+        document,records,service,local=self.financial_document_question_fixture()
+        with patch.object(ConversationCollectionAPI,'get',side_effect=OperationalError('SYNTHETIC-HISTORY-FAILURE')):
+            self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_document&record_type=investment&document_id={document.pk}')
+            self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceSourceItems input'))>0)
+            self.memory_click('#intelligenceSourceItems input')
+            self.ask_history_question('Explain selected records')
+            self.wait.until(lambda _: '2,345.67' in self.text('intelligenceAnswers'))
+            self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
+            self.assertIn('Owner-reviewed document fields',self.text('intelligenceAnswers'))
+            self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
+            self.assertTrue(any('/documents/investments/' in link.get_attribute('href') for link in self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers a')))
+            self.assertEqual(local.reason.call_count,1)
+            self.capture('page-only-document-history-outage')
+
+    def test_history_status_retry_does_not_clear_a_saved_conversation_conflict(self):
+        history,local=self.private_history_fixture()
+        self.enable_private_history_ui()
+        self.ask_history_question('Synthetic saved question')
+        self.wait.until(lambda _: 'Synthetic historical hypothesis' in self.text('intelligenceAnswers'))
+        record=history.list(self.scenario['user'])[0]
+        history.rename(self.scenario['user'],record['id'],'Changed elsewhere',record['revision'])
+        self.ask_history_question('Synthetic stale revision question')
+        self.wait.until(lambda _: 'Reopen this conversation' in self.text('intelligenceFeedback'))
+        self.memory_click('#conversationHistoryRefresh')
+        self.wait.until(lambda _: 'History status refreshed' in self.text('conversationHistoryFeedback'))
+        calls=local.reason.call_count
+        self.ask_history_question('Keep this blocked draft')
+        self.wait.until(lambda _: 'Reopen the saved conversation' in self.text('intelligenceFeedback'))
+        self.assertEqual(local.reason.call_count,calls)
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Keep this blocked draft')
+
     def test_career_history_recovery_review_cancel_lost_ack_retry_and_retention(self):
         from datetime import timedelta
         from django.utils import timezone
