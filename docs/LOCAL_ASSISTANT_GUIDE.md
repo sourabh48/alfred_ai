@@ -25,6 +25,8 @@ Career snapshots stay on the page even when conversation history is enabled.
 They work without a model and do not verify that an application or message was sent.
 No salary, contacts, resume text or job-description text is included.
 
+![Recorded application progress on a synthetic account with history enabled and the Career snapshot kept page-only](images/usability/career-progress.png)
+
 To create a savings goal, ask "add a savings goal Bike of 1000.25". To report
 progress, ask "update Bike saved to 250.10". Review the name, amount and date in
 the proposal, then choose **Confirm** or **Cancel**. Proposals expire after ten

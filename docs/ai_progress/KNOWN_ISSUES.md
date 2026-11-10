@@ -1,5 +1,16 @@
 # Known issues and gates
 
+## Career progress scope - 2026-11-11
+
+Source7643c25426a1bc65dcc92a09bc3d50ad0e8a9d93 adds the seventh tool,
+career.applications. Its snapshot covers at most300 most recently updated owned
+opportunities; only3 recent details appear and omitted records are counted.
+Stages/follow-ups are saved reports, not verified submissions or employer responses.
+Missing/malformed dates remain unresolved. Profile/resume analysis, job search,
+match/gap explanations, broader tools/orchestration and application MCP transport
+remain outside this slice. No model-quality or entire USE-04 acceptance is claimed.
+Manual contrast, independent/CI/package/owner/release acceptance and3.0 gates remain.
+
 ## Registry scope and remaining gates
 
 The six local read tools at334db14 cover existing snapshots/records/statement and

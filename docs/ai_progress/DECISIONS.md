@@ -1,5 +1,25 @@
 # Execution decisions
 
+## 2026-11-11 - recorded Career progress in the assistant
+
+- NEXT selects exactly USE-04/career-application-progress under the authorized
+  usability milestone. Earlier queue gates are unchanged. This prerequisite
+  exception connects existing deterministic services only; AI-12/15/16, Career
+  quality, owner/package/provider acceptance and original143/13 counts are not promoted.
+- NO_UPSTREAM_ADOPTION. Reuse ALFRED's application_tracker unchanged, including its
+  Career Ops MIT attribution/pin4df3d0525a0a466f6b08928a7c3bd23946cb410f.
+  No upstream code/dependency/runtime was imported; matrix/architecture boundaries stand.
+- Career profile auto-syncs unreviewed extraction. Exclude it rather than presenting
+  it as verified personal facts. Read only owned saved application reports; no
+  salary, contacts, raw resume/JD, private job URLs, provider calls or canonical writes.
+- Use the existing stage/timing service, but require recorded valid stage dates:
+  its legacy missing-date fallback must not become assistant evidence. Malformed
+  dates remain unavailable. Bound the scan to300 and recent details to3, with
+  explicit omission counts. A valid saved stage does not prove external submission.
+- Revalidate owned snapshots before returning. Career is page-only even with
+  history enabled, uses no model/vault and rechecks the current session before/after.
+  No new schema, calculation engine, paid API or application MCP server is introduced.
+
 ## 2026-11-11 - bounded local read registry
 
 - Resume the explicitly selected usability task; earlier canonical queue acceptance

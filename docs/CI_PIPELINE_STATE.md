@@ -1,5 +1,17 @@
 # Development CI and integration pipeline
 
+## Career application progress - 2026-11-11
+
+USE-04/career-application-progress LOCAL_ACCEPTED / COMMITTED_LOCAL on
+`work/usability-integration`, source7643c25426a1bc65dcc92a09bc3d50ad0e8a9d93,
+base05ac976828e913239f67c09ad21f15fc08e2262e. Exact-source337 backend/3 Chrome PASS;
+four Career Axe audits zero violations/manual contrast open. Clean source/privacy/
+dependency/migration preflight PASS. No CI/push/PR/merge/deployment or owner runtime
+changes; technical/promotion/owner/package/independent/3.0 gates remain BLOCKED.
+Baseline85/143, extensions0/13 unchanged; full USE-04 remains partial. READY_FOR_NEXT,
+no next task selected. Exact files, receipts and next command: docs/ai_progress/STATE.json,
+docs/ai_progress/TEST_EVIDENCE.md and docs/EXECUTION_STATE.md. Cache edit preserved.
+
 ## Local tool registry - 2026-11-11
 
 USE-04/typed-read-only-tool-registry LOCAL_ACCEPTED / COMMITTED_LOCAL at

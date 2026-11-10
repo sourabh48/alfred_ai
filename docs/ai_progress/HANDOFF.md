@@ -1,5 +1,32 @@
 # Codex / Claude checkpoint
 
+## Career application progress - 2026-11-11
+
+READY_FOR_NEXT. Codex completed USE-04/career-application-progress locally.
+Branch `work/usability-integration`; implementation source
+`7643c25426a1bc65dcc92a09bc3d50ad0e8a9d93`, base
+`05ac976828e913239f67c09ad21f15fc08e2262e`. Documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+
+The seventh typed read tool exposes owned recorded application stages and existing
+follow-up timing through the assistant and a Career entry link. Snapshot scan300,
+recent details3, explicit omissions/unresolved dates; stages do not verify external
+submissions. Sources are re-read before acceptance. Page-only even with retention
+enabled; no model, provider, memory vault, canonical write, new schema or dependency.
+
+Exact-source337 backend PASS208.716s;3 actual Chrome PASS58.771s (runner73.985s).
+Four Career light/dark1440/390 Axe audits zero violations; manual contrast remains.
+Clean source/privacy/dependency/migration preflight PASS; technical/promotion,
+independent/CI/package/owner and3.0 gates remain open. No owner runtime, keys,
+models, documents, backups, installation or remote changes. The existing cache
+edit/hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9 is preserved.
+
+Exact files/receipts: STATE.json and TEST_EVIDENCE.md in docs/ai_progress.
+Baseline85/143 and extensions0/13 unchanged; full USE-04 remains partial. Codex stops
+writing at this checkpoint. No Claude launch or independent audit is claimed.
+`continue`: report READY_FOR_NEXT and stop. Only `next`, `sprint` or an explicit
+scope selects further work after Git/queue/sole-writer checks. No next task selected.
+
 ## Current continuation checkpoint - 2026-11-11
 
 READY_FOR_NEXT. USE-04/typed-read-only-tool-registry completed locally; this
