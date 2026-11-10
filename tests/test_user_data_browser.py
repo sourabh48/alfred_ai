@@ -4618,6 +4618,73 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
 
+    def test_career_history_recovery_review_cancel_lost_ack_retry_and_retention(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from django.db import OperationalError
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis
+        from apps.career.services import history_review
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        owner=self.scenario['user']
+        original={'stage':'applied','history':'PRIVATE-LEGACY-HISTORY','note':'<img src=x onerror="window.recoveryInjected=true">'}
+        row=CareerJobAnalysis.objects.create(user=owner,job_title='Synthetic timeline recovery',
+            extracted_payload={'application':original,'unrelated':'RETAIN-THIS-SOURCE'})
+        self.login(); self.browser.get(self.live_server_url+'/career/')
+        self.wait.until(lambda _: str(row.pk) in [option.get_attribute('value') for option in self.browser.find_elements(self.By.CSS_SELECTOR,'#careerOutcomeAnalysis option')])
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(row.pk))
+        self.memory_click('#careerHistoryReviewOpen')
+        self.wait.until(lambda _: 'Review an explicit stage' in self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-feedback]').text)
+        Select(self.browser.find_element(self.By.ID,'careerRecoveryStage')).select_by_value('applied')
+        self.browser.execute_script('arguments[0].value=arguments[1]',self.browser.find_element(self.By.ID,'careerRecoveryDate'),(timezone.localdate()-timedelta(days=10)).isoformat())
+        self.memory_click('#careerHistoryReviewHost form button[type=submit]')
+        self.wait.until(lambda _: 'Preview ready' in self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-feedback]').text)
+        row.refresh_from_db(); self.assertEqual(row.extracted_payload['application'],original)
+        self.assertEqual(self.browser.switch_to.active_element.get_attribute('data-confirm'),'')
+        self.memory_click('#careerHistoryReviewHost [data-cancel]')
+        self.wait.until(lambda _: 'Review cancelled' in self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-feedback]').text)
+        row.refresh_from_db(); self.assertEqual(row.extracted_payload['application'],original)
+        self.memory_click('#careerHistoryReviewHost form button[type=submit]')
+        self.wait.until(lambda _: 'Preview ready' in self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-feedback]').text)
+        confirm=history_review.confirm
+        def lost_ack(*args,**kwargs):
+            confirm(*args,**kwargs)
+            raise OperationalError('SYNTHETIC-ACK-LOST')
+        with patch.object(history_review,'confirm',side_effect=lost_ack):
+            self.memory_click('#careerHistoryReviewHost [data-confirm]')
+            self.wait.until(lambda _: 'review could not finish' in self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-feedback]').text)
+        row.refresh_from_db(); self.assertEqual(len(row.extracted_payload['application_history_recoveries']),1)
+        self.memory_click('#careerHistoryReviewHost [data-confirm]')
+        self.wait.until(lambda _: 'Recovery saved' in self.text('careerApplicationFeedback'))
+        self.assertTrue(self.browser.find_element(self.By.ID,'careerApplicationSave').is_enabled())
+        self.browser.refresh()
+        self.wait.until(lambda _: str(row.pk) in [option.get_attribute('value') for option in self.browser.find_elements(self.By.CSS_SELECTOR,'#careerOutcomeAnalysis option')])
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(row.pk))
+        self.memory_click('#careerHistoryReviewOpen')
+        self.wait.until(lambda _: 'Retained history is available' in self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-feedback]').text)
+        self.memory_click('#careerHistoryReviewHost details:nth-of-type(2) > summary')
+        self.assertIn('PRIVATE-LEGACY-HISTORY',self.browser.find_element(self.By.CSS_SELECTOR,'#careerHistoryReviewHost [data-archives]').text)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.recoveryInjected)'))
+        row.refresh_from_db()
+        self.assertEqual(row.extracted_payload['application_history_recoveries'][0]['previous_application'],original)
+        self.assertEqual(row.extracted_payload['unrelated'],'RETAIN-THIS-SOURCE')
+        self.capture('career-history-recovered-and-retained')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        findings=[]; self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
+        for width in (1440,390):
+            self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',dict(width=width,height=1100,deviceScaleFactor=1,mobile=False))
+            for theme in ('light','dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]',theme)
+                self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+                self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+                audit=self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done({violations:r.violations,incomplete:r.incomplete}));")
+                findings.append(dict(width=width,theme=theme,**audit))
+                (self.artifacts/'career-recovery-accessibility.json').write_text(json.dumps(findings,indent=2),encoding='utf-8')
+                self.assertEqual(audit['violations'],[])
+                self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+                self.browser.save_screenshot(str(self.artifacts/f'career-recovery-{width}-{theme}.png'))
+
     def test_career_bad_history_does_not_hide_valid_followups_or_erase_records(self):
         from datetime import timedelta
         from django.utils import timezone

@@ -1,7 +1,9 @@
 from django.urls import path
+from .history_review_api import CareerHistoryReviewAPI
 from .views import CareerApplicationView, CareerJobMatchView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, career_dashboard, career_projection
 
 urlpatterns = [
+    path('job-analyses/<int:pk>/history-review/', CareerHistoryReviewAPI.as_view()),
     path("", CareerProfileView.as_view()),
     path("dashboard/", career_dashboard, name="career_dashboard"),
     path("projection/", career_projection, name="career_projection"),

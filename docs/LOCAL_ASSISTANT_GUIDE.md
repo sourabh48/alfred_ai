@@ -25,11 +25,21 @@ Career snapshots stay on the page even when conversation history is enabled.
 They work without a model and do not verify that an application or message was sent.
 No salary, contacts, resume text or job-description text is included.
 
-If Career shows **Follow-up dates need review**, inspect the affected opportunity's
-recorded history. ALFRED leaves incomplete or conflicting dates unresolved and
-pauses edits to that history. Other valid opportunities remain usable. The assistant
-uses the same check. Refreshing or retrying does not replace the damaged history;
-historical correction requires a separately reviewed recovery process.
+If Career shows **Follow-up dates need review**, select the affected opportunity,
+then choose **Review retained history and recovery**. Inspect the current source.
+Choose a stage and an explicit date you can confirm, then select **Preview recovery**.
+Review the new timeline and choose **Confirm recovery and retain original**, or
+**Cancel review**. Nothing is sent to employers.
+
+Confirmation starts a new owner-reported timeline. The exact original history stays
+under **Prior retained timelines**; its older follow-ups do not count in the new
+timeline. Reopen **Review retained history** to inspect it. Normal stage editing
+becomes available after recovery. These reports are not independently verified.
+
+Reviews expire after ten minutes and reject changed records or changed fields.
+If confirmation is interrupted, retry the same card or reload Career. Each review
+can save only once. Recovery supports at most five retained timelines and a bounded
+source size; larger or incompatible records stay intact for separate review.
 
 ![Synthetic Career history marked unavailable while a valid follow-up remains visible](images/usability/career-history-review.png)
 

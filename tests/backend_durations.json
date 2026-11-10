@@ -1,4 +1,5 @@
 {
+ "tests.test_career_history_review": 1.5,
  "tests.test_career_assistant": 0.996,
  "tests.test_assistant_tools": 1.795,
  "tests.test_local_chat_stream": 3.206,

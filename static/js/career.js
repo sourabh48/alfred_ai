@@ -494,7 +494,7 @@ function loadCareerFollowUps() {
             target.insertAdjacentHTML('beforeend', `<div class="alert alert-warning small mt-2 mb-0" id="careerFollowUpsUnavailable" role="status">
                 <strong>Follow-up dates need review (${Alfred.escapeHtml(String(data.unavailable_count))})</strong>
                 <p class="mb-1">These opportunities have missing, malformed or conflicting histories. No dates were guessed and saved records were not changed.
-                Select an affected opportunity below to inspect its recorded history. Editing is paused to preserve that history.</p>
+                Use the Opportunity selector to inspect retained history and review a recovery. Normal editing is paused to preserve that history.</p>
                 <ul>${unavailable.map(item => `<li>${Alfred.escapeHtml(item.job_title || 'Role')} · ${Alfred.escapeHtml(item.company || 'Company not recorded')}</li>`).join('')}</ul>
                 <p class="mb-0">Checked up to the 300 most recently updated opportunities; showing ${unavailable.length} needing review.</p></div>`);
         }
@@ -526,6 +526,8 @@ function renderCareerApplication(item) {
             <p class="small mt-2 mb-1" id="careerApplicationFollowUp">Current stage: <strong>${Alfred.escapeHtml(careerStageLabel(app.stage))}</strong>. ${Alfred.escapeHtml(follow.detail || "")}</p>
             ${["due", "upcoming"].includes(follow.status) ? `<button class="btn btn-outline-secondary btn-sm" type="button" id="careerFollowUpSent">I sent a follow-up today</button>` : ""}
             ${history || sent ? `<details class="small mt-2"><summary>History</summary><ul class="mb-0">${history}${sent}</ul></details>` : ""}
+            <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="careerHistoryReviewOpen">Review retained history${follow.status === 'unavailable' ? ' and recovery' : ''}</button>
+            <div id="careerHistoryReviewHost"></div>
             <div id="careerApplicationFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>
         </div>`;
     if (app.stage) document.getElementById("careerApplicationStage").value = app.stage;
@@ -543,6 +545,98 @@ function renderCareerApplication(item) {
         send({stage: document.getElementById("careerApplicationStage").value, ...(on ? {on} : {})});
     });
     document.getElementById("careerFollowUpSent")?.addEventListener("click", () => send({follow_up_sent: true}));
+    document.getElementById('careerHistoryReviewOpen').addEventListener('click', () => {
+        const host = document.getElementById('careerHistoryReviewHost');
+        if (host.childElementCount) { host.hidden = !host.hidden; return; }
+        renderCareerHistoryReview(item, host);
+    });
+}
+
+function renderCareerHistoryReview(item, host) {
+    const panel = document.createElement('section'); panel.className='border rounded p-3 mt-3';
+    panel.setAttribute('aria-label','Retained timeline review'); host.append(panel);
+    panel.innerHTML=`<h5 class="h6">Retained application history</h5>
+        <button type="button" class="btn btn-outline-secondary btn-sm mb-2" data-reload>Reload retained history</button>
+        <p role="status" class="small" data-feedback>Loading private history…</p>
+        <details><summary>Current recorded source</summary><pre class="text-wrap" style="overflow-wrap:anywhere" data-source></pre></details>
+        <details><summary>Prior retained timelines</summary><pre class="text-wrap" style="overflow-wrap:anywhere" data-archives></pre></details>
+        <form data-recovery hidden class="mt-3">
+            <p class="small">Review a new timeline using a stage and date you confirm. The exact prior history stays retained.
+            Earlier follow-ups remain in that archive and do not count in the new timeline. Nothing is sent to employers.</p>
+            <label class="form-label" for="careerRecoveryStage">Reviewed stage</label>
+            <select class="form-select mb-2" id="careerRecoveryStage" required><option value="">Choose a stage</option>${CAREER_STAGES.map(stage=>`<option value="${stage}">${careerStageLabel(stage)}</option>`).join('')}</select>
+            <label class="form-label" for="careerRecoveryDate">Reviewed stage date</label>
+            <input class="form-control mb-2" id="careerRecoveryDate" type="date" required>
+            <button class="btn btn-outline-primary" type="submit">Preview recovery</button>
+        </form>
+        <section data-proposal hidden class="mt-3" aria-label="Recovery awaiting confirmation">
+            <p class="small" data-summary></p>
+            <button type="button" class="btn btn-primary" data-confirm>Confirm recovery and retain original</button>
+            <button type="button" class="btn btn-outline-secondary" data-cancel>Cancel review</button>
+        </section>`;
+    const url=`/api/career/job-analyses/${item.id}/history-review/`, form=panel.querySelector('form');
+    const feedback=panel.querySelector('[data-feedback]'), card=panel.querySelector('[data-proposal]');
+    let source=null, proposal=null, pending=false, focusAfter=null;
+    const post=body=>Alfred.fetchJSON(url,{method:'POST',body:JSON.stringify(body)});
+    function controls() {
+        panel.setAttribute('aria-busy',String(pending));
+        panel.querySelectorAll('button').forEach(button=>button.disabled=pending);
+        form.querySelectorAll('input,select,button').forEach(control=>control.disabled=pending||Boolean(proposal));
+    }
+    async function run(work) {
+        if(pending) return;
+        pending=true; controls();
+        try { await work(); }
+        catch(error) {
+            if(!panel.isConnected) return;
+            if([401,403].includes(error.status)) { panel.replaceChildren(document.createTextNode('Sign in again before viewing private history.')); return; }
+            feedback.textContent=`${error.message} Your reviewed values are kept on this page; retry the same card or reload retained history.`;
+        } finally {
+            pending=false;
+            if(panel.isConnected) { controls(); if(focusAfter?.isConnected) focusAfter.focus(); }
+            focusAfter=null;
+        }
+    }
+    async function load() {
+        if(proposal) { await post({mode:'cancel',proposal_id:proposal.proposal_id}); proposal=null; }
+        const data=await Alfred.fetchJSON(url);
+        if(!panel.isConnected) return;
+        source=data; card.hidden=true; form.hidden=!data.can_recover;
+        panel.querySelector('[data-source]').textContent=JSON.stringify(data.application,null,2);
+        panel.querySelector('[data-archives]').textContent=JSON.stringify(data.recoveries,null,2);
+        feedback.textContent=data.can_recover ? 'Review an explicit stage and date. Preview does not change the current timeline.'
+            : 'Retained history is available above. Recovery is unavailable for a valid timeline or when review bounds are reached.';
+    }
+    panel.querySelector('[data-reload]').addEventListener('click',()=>run(load));
+    form.addEventListener('submit',event=>{
+        event.preventDefault();
+        const fields={stage:panel.querySelector('#careerRecoveryStage').value,on:panel.querySelector('#careerRecoveryDate').value};
+        run(async()=>{
+            const data=await post({mode:'preview',revision:source.revision,fields});
+            if(!panel.isConnected) return;
+            proposal=data; card.hidden=false;
+            panel.querySelector('[data-summary]').textContent=`${careerStageLabel(data.fields.stage)} from ${data.fields.on}. ${data.detail} Review expires ${new Date(data.expires_at).toLocaleString()}.`;
+            feedback.textContent='Preview ready. No timeline change until you confirm.';
+            focusAfter=panel.querySelector('[data-confirm]');
+        });
+    });
+    panel.querySelector('[data-cancel]').addEventListener('click',()=>run(async()=>{
+        await post({mode:'cancel',proposal_id:proposal.proposal_id});
+        if(!panel.isConnected) return;
+        proposal=null; card.hidden=true; feedback.textContent='Review cancelled. The original timeline was not changed.';
+        focusAfter=form.querySelector('button[type=submit]');
+    }));
+    panel.querySelector('[data-confirm]').addEventListener('click',()=>run(async()=>{
+        await post({mode:'confirm',proposal_id:proposal.proposal_id,fields:proposal.fields,confirmed:true});
+        if(!panel.isConnected) return;
+        await loadCareerOpportunities(careerOpportunityPage);
+        const select=document.getElementById('careerOutcomeAnalysis');
+        if([...select.options].some(option=>option.value===String(item.id))) {
+            select.value=String(item.id); select.dispatchEvent(new Event('change'));
+            showCareerFeedback('careerApplicationFeedback','Recovery saved. The original history is retained.','success');
+        }
+    }));
+    run(load);
 }
 
 function renderCareerInterviewPrep(item) {
