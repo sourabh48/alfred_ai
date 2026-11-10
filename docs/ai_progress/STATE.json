@@ -1,39 +1,33 @@
 {
     "schema":  1,
-    "active_agent":  null,
-    "handoff_status":  "READY_FOR_NEXT",
+    "active_agent":  "Codex",
+    "handoff_status":  "SPRINT_ACTIVE",
     "workspace":  "F:/ALFRED/alfred_ai",
-    "single_writer":  false,
+    "single_writer":  true,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "83f331994f9d672b852c105bc9970e4296ef794c",
-    "active_task_id":  "USE-03/cancellable-domain-chat",
+    "recorded_at_head":  "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
+    "active_task_id":  "USE-02/knowledge-source-readiness",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
-                          "apps/ml_engine/api/chat_stream.py",
-                          "apps/ml_engine/services/local_chat_stream.py",
+                          "alfred_ai/data_sources_views.py",
+                          "alfred_ai/services/data_sources.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
-                          "static/js/intelligence.js",
-                          "templates/ai_insights.html",
+                          "templates/data_sources.html",
                           "tests/browser_durations.json",
-                          "tests/test_local_chat_stream.py",
-                          "tests/test_local_stream_acceptance.py",
+                          "tests/test_data_sources.py",
                           "tests/test_user_data_browser.py"
                       ],
     "completed_steps":  [
-                            "Recovered c1f850e, verified writer and preserved cache edit/hash; selected authorized domain-streaming usability gap.",
-                            "Reused existing source/answer/history paths for cancellable domain transport; disabled domain previews and retained canonical offline-card recovery.",
-                            "Primary 1aee878: 312 backend PASS in 168.217s; 8 Chrome PASS in 104.092s (runner 120.031s), four new Axe audits zero violations/manual contrast open.",
-                            "Final 83f3319: 2 actual Waitress/Ollama PASS in 2.701s, exact owned source, zero unverified deltas, worker cancel without writes.",
-                            "Test-only follow-up corrects unsupported native question; application/backend/browser blobs unchanged and receipts remain pinned to actual SHAs.",
-                            "All failed fixture/reproduction/native receipts retained, no calculation/validation/model-policy weakening.",
-                            "Final clean source/privacy/dependency/migration preflight and AST graph update PASS; no owner runtime/schema/dependency/remote changes."
+                            "Recovered d182204; verified writer, cache hash and source; scoped graph queries and internal reuse, NO_UPSTREAM_ADOPTION.",
+                            "Explicit authenticated CSRF-protected readiness action returns owned counts/timestamps/retention only; no auto vault/key creation or external calls.",
+                            "Exact source: 99 backend PASS in 37.487s; 3 Chrome PASS in 23.856s (runner 36.203s). Four new Axe audits zero violations; manual contrast open.",
+                            "Clean detached source/privacy/dependency/migration preflight PASS; initial incomplete-checkout refusal and fixture failures retained.",
+                            "No owner runtime, schema, financial, dependency or remote changes. GitHub MCP read-only canonical branch lookup succeeded."
                         ],
     "remaining_steps":  [
-                            "Current NEXT task complete; wait for next/sprint/explicit scope before selecting more.",
-                            "Full USE-03, broad model quality, manual contrast, owner history/provider acceptance remain.",
-                            "Owner/CI/independent/package/release and 3.0 gates remain; no implicit activation or canonical integration.",
-                            "Read-only source calls finish safely before late results are discarded; Stop does not undo a completed saved turn. Unsupported record questions still abstain."
+                            "Authorized sprint continues safe preparation; inspect/reproduce expired import-review navigation before selecting next bounded leaf.",
+                            "Full USE-02, manual contrast, owner/CI/independent/package/release/canonical integration/3.0 gates remain."
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
     "ci_run_ids":  [
@@ -56,13 +50,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. Only next/sprint/explicit scope selects further work after Git/HEAD, queue and writer checks; preserve materialized_cache.py/hash. USE-03/cancellable-domain-chat is locally complete at 83f3319 (primary 1aee878); broader backend/browser and final native receipts remain separately pinned. Do not repeat it or infer full model/release acceptance. Owner runtime/history/MCP/provider, canonical integration and 3.0 gates remain.",
+    "next_exact_instruction":  "During current authorized sprint inspect expired bank/loan/investment review navigation, reproduce any mismatch and select only a bounded eligible usability task. Preserve existing confirmation/expiry controls and cache edit/hash. No owner runtime or remote mutation; canonical development branch remains development/alfred-integrated with integration gates.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "83f331994f9d672b852c105bc9970e4296ef794c",
-    "checkpoint_at":  "2026-11-10T23:19:25.1210288Z",
+    "implementation_source_head":  "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
+    "checkpoint_at":  "2026-11-10T23:38:02.3287957Z",
     "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-domain-stream-check-1aee878",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-knowledge-check-90f1ee9",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -77,28 +71,27 @@
                                      "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
                                      "docs/ai_progress/TEST_EVIDENCE.md",
-                                     "docs/images/usability/domain-source-validation.png"
+                                     "docs/images/usability/knowledge-readiness.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "83f331994f9d672b852c105bc9970e4296ef794c",
+    "release_preflight_source_head":  "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
-    "last_completed_task_id":  "USE-03/cancellable-domain-chat",
+    "last_completed_task_id":  "USE-02/knowledge-source-readiness",
     "last_completed_files_changed":  [
-                                         "apps/ml_engine/api/chat_stream.py",
-                                         "apps/ml_engine/services/local_chat_stream.py",
+                                         "alfred_ai/data_sources_views.py",
+                                         "alfred_ai/services/data_sources.py",
                                          "docs/LOCAL_ASSISTANT_GUIDE.md",
-                                         "static/js/intelligence.js",
-                                         "templates/ai_insights.html",
+                                         "templates/data_sources.html",
                                          "tests/browser_durations.json",
-                                         "tests/test_local_chat_stream.py",
-                                         "tests/test_local_stream_acceptance.py",
+                                         "tests/test_data_sources.py",
                                          "tests/test_user_data_browser.py"
                                      ],
     "sprint_implementation_sources":  [
                                           "0ca216859c8a4f5a75594e0cb88cc625c1abddb1",
                                           "ebbd0560507706babbea20635ab74ed20b0cc831",
                                           "e9808c27ad3b4dcdd80c09054e728f3df2dcc92f",
-                                          "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62"
+                                          "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62",
+                                          "90f1ee90a9487e1d36a88cf9443825f083e0ca60"
                                       ]
 }

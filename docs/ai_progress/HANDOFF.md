@@ -1,5 +1,19 @@
 # Codex / Claude checkpoint
 
+## Active sprint - explicit knowledge readiness, 2026-11-11
+
+Codex remains single writer; no Claude launched. USE-02/knowledge-source-readiness
+locally complete at 90f1ee90a9487e1d36a88cf9443825f083e0ca60, base d1822044.
+Exact-source 99 backend/3 Chrome PASS, four new Axe audits zero violations/manual
+contrast open; clean source/privacy/dependency/migration preflight PASS.
+Metadata-only explicit check reuses encrypted services and existing expiry rules;
+normal page load leaves vault unopened. No key/data/runtime/remote changes;
+unrelated cache edit/hash preserved. No new migrations or dependencies.
+Current sprint selection, exact files/receipts and executable instruction: STATE.json
+and TEST_EVIDENCE.md. Do not repeat accepted slices or activate owner storage.
+Canonical development/integration and release/owner/independent/3.0 gates remain.
+
+
 ## Cancellable domain chat - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-03/cancellable-domain-chat on

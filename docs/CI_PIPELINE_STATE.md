@@ -1,5 +1,19 @@
 # Development CI and integration pipeline
 
+## Explicit knowledge readiness - 2026-11-11
+
+USE-02/knowledge-source-readiness LOCAL_ACCEPTED / COMMITTED_LOCAL (not PUSHED):
+source 90f1ee90a9487e1d36a88cf9443825f083e0ca60, base d18220443e62dfaa1bbc13d903dc93ece449a5ac,
+work/usability-integration preparation. 99 backend/3 Chrome PASS at exact source;
+source/privacy/dependency/migration preflight PASS; no remote CI run IDs. GitHub MCP
+read-only canonical branch lookup succeeded, no updates. Canonical development remains
+development/alfred-integrated; existing closed PRs untouched. Cumulative source/reviews/
+protection/owner authorization and full release gates remain, no integration claim.
+Rollback: retained parent/source commits and detached clean validation worktree
+F:/ALFRED_DEV/usability-knowledge-check-90f1ee9; no runtime changes. Evidence: STATE
+and TEST_EVIDENCE. Sprint continues safe preparation, no master/publication action.
+
+
 ## Cancellable domain chat - 2026-11-11
 
 USE-03/cancellable-domain-chat LOCAL_ACCEPTED / COMMITTED_LOCAL on

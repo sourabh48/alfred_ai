@@ -9,6 +9,8 @@ add or remove consented sources, and **Memory, privacy and retention** for facts
 retention controls. An unavailable vault needs existing recovery controls and its
 protected key backup; the check never creates replacement keys.
 
+![Local knowledge readiness using synthetic data](images/usability/knowledge-readiness.png)
+
 With approved local history enabled, type in **Search saved titles on this page**
 to filter titles immediately. Choose **Search saved messages** to also find text
 inside retained questions and answers, then reopen a matching conversation.

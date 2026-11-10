@@ -1,5 +1,31 @@
 # Test evidence index
 
+## 2026-11-11 - explicit local knowledge readiness
+
+USE-02/knowledge-source-readiness, Codex, work/usability-integration; source
+90f1ee90a9487e1d36a88cf9443825f083e0ca60, base d18220443e62dfaa1bbc13d903dc93ece449a5ac.
+Exact-source 99 backend PASS in 37.487s; 3 real Chrome journeys PASS in 23.856s.
+Synthetic Windows/DPAPI vaults and actual text extraction; embedding fixture only
+seeds facts, no model quality/inference claim. Ownership, authentication/CSRF,
+strict actions, missing/corrupt keys, absent-vault preservation, expiry, unchanged
+retention/key bytes, metadata-only output, keyboard/reopen/recovery covered.
+Four new light/dark desktop/mobile Axe audits zero violations; manual contrast open.
+Clean detached source/privacy/dependency/migration preflight PASS. Full technical
+and promotion remain BLOCKED; local receipts are not remote CI or release evidence.
+
+Retained receipts: artifacts/knowledge-readiness-20261111/{repro.log,focused.log,
+backend.log,exact-backend.log,browser.log,browser-report.json,exact-browser.log,
+exact-browser-report.json,preflight-checkout-incomplete.log,preflight.log,
+clean-source-preflight.*,graph-update.log,final-graph-update.log} and browser subdirs.
+Reproduction 2 FAIL before implementation; first focused run 13 PASS/1 fixture ERROR
+because advancing time expired the session. The corrected test checks service expiry
+directly. Preflight first refused an incomplete worktree checkout; rerun only after
+checkout completion PASS. No gates, validation, retention or model policies weakened.
+Uncommitted pre-formatting runs: 99 backend PASS/3 Chrome PASS, retained separately.
+Exact source files: STATE.json; commands/manifests retained alongside receipts.
+No migration, dependency, financial-calculation, owner runtime or remote changes.
+
+
 ## 2026-11-11 - cancellable buffered domain responses
 
 Primary source `1aee878b3b7305e0c2bed9a2549c774ba194d99f`, final source

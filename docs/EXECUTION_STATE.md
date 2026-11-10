@@ -1,5 +1,21 @@
 # ALFRED execution state
 
+## Active sprint - 2026-11-11
+
+Codex remains single writer on work/usability-integration. USE-02/knowledge-source-readiness
+LOCAL_ACCEPTED / COMMITTED_LOCAL at 90f1ee90a9487e1d36a88cf9443825f083e0ca60,
+base d18220443e62dfaa1bbc13d903dc93ece449a5ac. Explicit metadata-only checks reuse
+encrypted services and existing expiry/source rules; normal GET leaves vault closed.
+Exact-source 99 backend PASS (37.487s), 3 Chrome PASS (23.856s; runner 36.203s),
+four new Axe audits zero violations/manual contrast open. Clean source/privacy/
+dependency/migration preflight PASS; full technical/promotion gates remain blocked.
+No personal runtime/data/key/schema/calculation/dependency/remote changes. Cache
+edit/hash preserved. Baseline 85/143 and extensions 0/13 unchanged; parent USE-02
+partial. NO_UPSTREAM_ADOPTION. Canonical development remains development/alfred-integrated;
+preparation is not integration. Exact files, failures/receipts: STATE/TEST_EVIDENCE.
+Sprint continues: inspect expired financial-review navigation as a bounded authorized
+usability gap, reproduce before editing; preserve all existing confirmation controls.
+
 ## Cancellable domain chat - 2026-11-11
 
 READY_FOR_NEXT. Codex completed USE-03/cancellable-domain-chat on

@@ -1,5 +1,15 @@
 # Current execution board
 
+## Explicit knowledge source readiness - 2026-11-11
+
+USE-02/knowledge-source-readiness LOCAL_ACCEPTED / COMMITTED_LOCAL, source
+90f1ee90a9487e1d36a88cf9443825f083e0ca60, work/usability-integration. Metadata-only
+explicit local vault check; 99 backend/3 Chrome PASS, four new Axe audits zero
+violations/manual contrast open. No owner runtime, schema or remote change.
+Full USE-02 and release/integration gates remain. Sprint continues safe preparation;
+current selection/files/next command in STATE.json, receipts in TEST_EVIDENCE.md.
+
+
 ## Cancellable domain chat - 2026-11-11
 
 USE-03/cancellable-domain-chat LOCAL_ACCEPTED / COMMITTED_LOCAL on

@@ -1,5 +1,15 @@
 # Known issues and gates
 
+## Local knowledge readiness limits - 2026-11-11
+
+USE-02/knowledge-source-readiness is metadata-only and explicitly requested.
+Normal GET remains unopened/unverified. The check reuses existing expiry/source
+invalidation; it does not verify document claims, readiness of models, global consent
+or full onboarding. Missing/corrupt vault/key state stays unavailable with recovery
+links and no replacement keys. Manual contrast, owner/independent/package/release,
+canonical integration, approved MCP transport and 3.0 gates remain. No new migrations.
+
+
 ## Cancellable domain response limits - 2026-11-11
 
 Final source 83f331994f9d672b852c105bc9970e4296ef794c adds Stop/retry to five existing

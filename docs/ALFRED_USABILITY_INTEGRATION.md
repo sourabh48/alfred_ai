@@ -1,5 +1,18 @@
 # ALFRED_USABILITY_INTEGRATION
 
+## Explicit knowledge source readiness - 2026-11-11
+
+USE-02/knowledge-source-readiness LOCAL_ACCEPTED / COMMITTED_LOCAL at source
+90f1ee90a9487e1d36a88cf9443825f083e0ca60 on work/usability-integration. Existing
+Data Sources now offers an explicit local metadata-only vault check and recovery
+links. Exact-source 99 backend/3 Chrome PASS; four new Axe audits zero violations,
+manual contrast open. Source/privacy/dependency/migration preflight PASS; no owner
+runtime/schema/financial/remote changes. Full USE-02 remains partial, baseline
+85/143 and extensions 0/13 unchanged. Sprint continues safe preparation; canonical
+integration, owner/CI/independent/package/release/3.0 gates remain. Exact files and
+receipts: ai_progress/STATE.json and TEST_EVIDENCE.md.
+
+
 ## Cancellable domain chat - 2026-11-11
 
 USE-03/cancellable-domain-chat LOCAL_ACCEPTED / COMMITTED_LOCAL on

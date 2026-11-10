@@ -1,5 +1,19 @@
 # Execution decisions
 
+## 2026-11-11 - explicit metadata-only knowledge readiness
+
+USE-02/knowledge-source-readiness reuses MemoryStore and DocumentCorpus behind an
+authenticated CSRF-protected action in the existing Data Sources view. No additional
+endpoint/framework/index/network call; no automatic vault/key initialization or new
+consent/retention setting. Existing expiry/source rules apply only on explicit check.
+NO_UPSTREAM_ADOPTION: internal metadata navigation, no reference algorithms selected.
+Preparation remains on work/usability-integration; development/alfred-integrated is
+the canonical development branch, with integration/review gates unchanged. GitHub MCP
+read-only branch lookup succeeded; no remote source/check/review acceptance inferred.
+Baseline queue blockers justify only this already-authorized usability leaf; parent
+USE-02, 85/143 baseline and 0/13 extensions remain unchanged.
+
+
 ## 2026-11-11 - cancellable buffered local domain responses
 
 - NEXT selects the authorized USE-03 domain-transport gap. Original queue items
