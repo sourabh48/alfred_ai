@@ -1,5 +1,18 @@
 # Development CI and integration pipeline
 
+## Page-only local streaming source -2026-11-10
+
+Source0712fa2ede3c6fb4051ec3654232e05e0a7d9479, base0842d0e11a2988db2dd2883fbcdca47b7df55f7a:
+LOCAL_ACCEPTED / COMMITTED_LOCAL on work/usability-integration.239 exact-source
+backend PASS (140.274s),28 caller regressions PASS (12.486s),4 exact-source Chrome
+PASS (63.325s),2 actual native Waitress/Ollama PASS (16.387s). New16-case protocol
+module is in the existing measured backend shards; real-model acceptance remains
+explicit opt-in as before. No required skip/coverage policy weakened. Clean
+source/privacy/dependency/migration preflight PASS. Zero automated active-Stop Axe
+violations; manual contrast open. No CI IDs/push/PR/merge/installation/publication.
+Source acceptance does not pass packaging, owner, independent or release gates;
+promotion remains BLOCKED. READY_FOR_NEXT under `continue`; no automatic new scope.
+
 ## Usability sprint source -2026-11-10
 
 Sourcec365a38a707d45da87eada1c348fafcfd8da0a04, base1265ff736b78d753a8bf73360b350acc5326a46b:

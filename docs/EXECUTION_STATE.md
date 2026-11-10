@@ -1,5 +1,31 @@
 # ALFRED execution state
 
+## Current continuation checkpoint -2026-11-10
+
+- READY_FOR_NEXT. Selected USE-03 local streaming/cancellation slice completed
+ locally, bounded to unsaved local general chat. This `continue` selected no new task.
+ Last writer Codex; no Claude launch or independent audit. Next agent verifies sole writer.
+- Branchwork/usability-integration; source0712fa2ede3c6fb4051ec3654232e05e0a7d9479,
+ base0842d0e11a2988db2dd2883fbcdca47b7df55f7a. Resolve documentation HEAD with
+ `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+- Progressive unverified text, keyboard Stop/focus recovery, cancel/disconnect,
+ timeout/output-limit recovery and draft-preserving retry are implemented. Current
+ hybrid grounding/model digest/owner sources and final numeric guards reused.
+ Figures, currency/number words, financial dialogue and source-backed text buffer
+ until final validation. Partial output never enters history or verified memory.
+-239 exact-source backend PASS (140.274s),28 caller regressions PASS (12.486s),
+ 4 exact-source Chrome PASS (63.325s),2 actual Waitress/Ollama PASS (16.387s).
+ Four active-Stop light/dark1440/390 Axe audits zero violations; manual contrast open.
+ Actual final greeting: first text1.203s/complete1.515s; active disconnect worker
+ stopped0.015s. Synthetic data only; not a universal performance/accuracy claim.
+- Clean exact-source/privacy/dependency/migration preflight PASS. No CI/push/PR/
+ merge/package/deployment. Existing cache hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9
+ preserved and unstaged. No owner data/config/key/model/backup/installation changes.
+- Saved-history/domain/cloud paths keep complete responses; broader streaming,
+ manual/owner/package/independent/CI and3.0 gates remain. Baseline85/143,
+ extensions0/13 unchanged. On `continue`, report READY_FOR_NEXT and stop; `next`,
+ explicit scope or `sprint` selects subsequent work. Exact files/receipts in STATE/HANDOFF.
+
 ## Context handoff checkpoint -2026-11-10
 
 - CODEX_TO_CLAUDE_READY. Codex stops writing after this checkpoint; no Claude

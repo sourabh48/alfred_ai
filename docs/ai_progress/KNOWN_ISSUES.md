@@ -13,8 +13,10 @@
 - Conversation continuity is bounded general local dialogue only. Saved encrypted
   history still requires its operator/owner gates. Bounded answer stylesb535299,
   revision-bound rename/title searcha173b3e and page-only dialoguec365a38 accepted
-  locally. Title search covers titles, not transcript bodies. Streaming, cancellation,
-  Markdown/tables and broader model routing remain. No full assistant parity claim.
+  locally. Title search covers titles, not transcript bodies. Page-only local general
+  streaming/cancellation0712fa2 is locally accepted; saved-history/domain/cloud
+  streaming, Markdown/tables and broader model routing remain. Source-backed/financial
+  output is buffered for final validation. No full assistant parity claim.
 - Existing savings-goal action flow still requires scoped hardening review before extension.
 - No application MCP server/source connection is configured. Host tools available
   to Codex do not automatically become tools available inside ALFRED.

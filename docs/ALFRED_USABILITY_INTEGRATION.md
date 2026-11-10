@@ -6,6 +6,14 @@ implementation, synthetic acceptance, owner acceptance and release remain distin
 
 ## Current execution
 
+Latest continuation: page-only local general streaming/cancellation source
+0712fa2ede3c6fb4051ec3654232e05e0a7d9479 LOCAL_ACCEPTED / COMMITTED_LOCAL.
+239 exact-source backend,28 caller regressions,4 exact-source Chrome and2 actual
+Waitress/Ollama tests PASS; four active-Stop Axe audits zero violations/manual
+contrast pending. Clean source/privacy/dependency/migration preflight PASS.
+READY_FOR_NEXT; no next task selected under `continue`. Saved-history/domain
+streaming and full USE-03/release acceptance remain. Exact receipts below/in evidence.
+
 Preparation branch `work/usability-integration`, base
 `a9947bc88d8e96255949c0652892c2cb7d9ab2da`. No push, PR, installation replacement,
 personal-data migration or publication is authorized by this checkpoint.
@@ -44,7 +52,7 @@ Continuity index: [ai_progress](ai_progress/MASTER_ROADMAP.md).
 | --- | --- | --- |
 | USE-01 Runtime and health | PARTIALLY_IMPLEMENTED | Authenticated diagnostics, selected database identity, schema inspection, instance-bound heartbeats and explicit synthetic local inference benchmark. Native drill and owner sign-in acceptance remain separate. |
 | USE-02 Onboarding and data sources | PARTIALLY_IMPLEMENTED | Data Sources Center links existing local workflows and reports owned saved-record/parser counts. Complete preview/duplicate/correction/confirmation journeys, knowledge readiness and source-level consent/freshness/deletion acceptance remain. |
-| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Three recent local general-chat turns from ephemeral page dialogue or separately consented encrypted history. Bounded styles, fiction continuity and revision-bound rename/title search validated; current grounding retained. Streaming/cancellation, transcript-body search, Markdown/tables and broader UI/model routing remain. |
+| USE-03 Conversation | PARTIALLY_IMPLEMENTED | Three recent local general-chat turns from page dialogue or separately consented encrypted history. Bounded styles, fiction continuity, rename/title search and page-only local streaming/Stop validated. Current grounding retained; figures/source-backed output buffered. Saved-history/domain streaming, transcript-body search, Markdown/tables and broader UI/model routing remain. |
 | USE-04 Read-only tools / MCP | NOT_IMPLEMENTED | Reuse current domain adapters. External MCP server/source selection requested; no connection, credentials, private disclosure or cost-saving claim. MCP is a protocol, not a guarantee of free provider data. |
 | USE-05 Confirmed actions | NOT_IMPLEMENTED | Existing savings-goal proposal implementation retained; audit its exact security properties before extending it. |
 | USE-06 Windows release | NOT_IMPLEMENTED | Current-source package, clean-machine upgrade/rollback and six end-to-end journeys remain; installation replacement and owner-account tests need their explicit gates. |

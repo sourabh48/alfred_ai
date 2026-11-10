@@ -1,6 +1,6 @@
 # Current execution board
 
-Writer state after checkpoint: CODEX_TO_CLAUDE_READY; Codex stops writing.
+Writer state after checkpoint: READY_FOR_NEXT; Codex stops after this continuation.
 No automated Claude launch or independent audit is claimed.
 No concurrent writer is authorized in `F:/ALFRED/alfred_ai`.
 Preparation branch: `work/usability-integration`.
@@ -18,7 +18,7 @@ Validated loan implementation:88c1df8; latest preservation follow-up:c2d1517.
 | USE-03 task-aware answer budgets | LOCAL_ACCEPTED / COMMITTED_LOCAL | b535299;167 backend/2 Chrome/2 actual Ollama acceptance PASS; four Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
 | USE-03 conversation rename and search | LOCAL_ACCEPTED / COMMITTED_LOCAL | a173b3e;85 backend/3 Chrome/1 actual Ollama PASS; four Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
 | USE-03 page-only follow-up context | LOCAL_ACCEPTED / COMMITTED_LOCAL | c365a38;117 focused backend/2 Chrome/1 actual Ollama PASS; consolidated194 backend and3 affected exact-source Chrome PASS; clean-source preflight PASS |
-| USE-03 local streaming and cancellation | SELECTED_NOT_STARTED | Next agent verifies sole writer then traces the existing loopback transport, hybrid source validation and history lifecycle; no new implementation yet |
+| USE-03 page-only local streaming and cancellation | LOCAL_ACCEPTED / COMMITTED_LOCAL | 0712fa2;239 backend/28 caller/4 exact-source Chrome/2 actual Waitress-Ollama PASS; four active-Stop Axe audits zero violations/manual contrast pending; clean-source preflight PASS |
 | Remaining USE-01/02 journeys | QUEUED | Other imports, knowledge readiness and owner/package acceptance remain |
 | Remaining USE-03, USE-04, USE-05 | QUEUED | Follow the usability ledger; existing domain adapters/actions first |
 | USE-06 release and complete 2.0 acceptance | GATED | Exact-head CI, independent/owner/package/upgrade gates remain |

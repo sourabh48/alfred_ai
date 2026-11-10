@@ -1,5 +1,20 @@
 # Execution decisions
 
+-2026-11-10 continuation: reuse OllamaReasoner/hybrid_answer for bounded page-only
+ streaming. No second reasoning/financial engine. Native Waitress remains four
+ threads; at most two transient inference workers/eight queued frames each. The
+ same30s deadline, fixed loopback model/digest checks,8192 context/4096byte supplied
+ context/8192byte answer apply. No schema/dependency or owner runtime change.
+- Stop/disconnect closes the active local socket; cancellation never becomes cloud
+ fallback. Preview lacks figures/number words/currency and is suppressed for
+ financial dialogue or owned-source context. Final hybrid revalidation and narrative
+ guard decide acceptance; partial output has no save/promotion/citation controls.
+- Saved-history, domain and public-fallback requests retain the existing complete
+ path. Streaming endpoint rejects those inputs and never appends transcripts. The
+ shared financial/currency regexes are reused without changing their final verdicts.
+- Current `continue` completes one bounded task and stops READY_FOR_NEXT. No next
+ task was selected and no agent was launched. Baseline/extension acceptance unchanged.
+
 - Sprint2026-11-10 completed four local slices without changing the canonical
   baseline: guided readinessa78096e, answer budgetsb535299, conversation controls
   a173b3e and page dialoguec365a38. No new store, schema or dependency introduced.

@@ -1,5 +1,39 @@
 # Codex / Claude checkpoint
 
+## READY_FOR_NEXT -2026-11-10 streaming continuation
+
+Current `continue` completed the selected bounded page-only local streaming/
+cancellation task; no next task selected. Codex stops writing after checkpoint.
+No Claude agent was launched; detected Claude processes were Desktop/MCP, not a
+Code CLI writer. Next writer rechecks Git/status/cache/ownership before edits.
+
+Branchwork/usability-integration; source0712fa2ede3c6fb4051ec3654232e05e0a7d9479;
+base0842d0e11a2988db2dd2883fbcdca47b7df55f7a. Resolve documentation HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+Preserve unstaged alfred_ai/services/materialized_cache.py, SHA256
+41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9.
+
+Implemented: same-origin CSRF/session NDJSON endpoint for unsaved local general
+chat, bounded transient inference/socket cancellation, safe progressive preview,
+Stop/keyboard focus, partial/draft/retry/timeout/output-limit/navigation recovery.
+Existing hybrid model/digest/source/financial checks own final acceptance. Figures,
+number words, currency, financial dialogue and source-backed output stay buffered.
+Partial responses never enter history, facts or page follow-up context. Saved-history,
+domain and public-cloud-fallback paths retain complete responses. No parallel AI or
+financial engine, new schema/dependency or owner runtime mutation.
+
+Evidence:239 exact-source backend +28 caller regressions +4 exact-source Chrome
++2 actual native Waitress/Ollama PASS, distinct suites/overlaps detailed in evidence.
+Four active-Stop Axe audits zero violations/manual contrast remains. Source/privacy/
+dependency/migration preflight PASS; promotion BLOCKED. Guide/current synthetic
+screenshot updated. Exact files in STATE, commands/receipt hashes under
+artifacts/local-stream-20261110/. Independent/owner/CI/package/upgrade gates remain.
+
+On `continue`, report READY_FOR_NEXT and stop. `next`, explicit scope or a new
+`sprint` selects further work from canonical trackers/usability ledger; do not
+automatically begin saved-history streaming, tools/actions or3.0. Baseline85/143,
+extensions0/13 unchanged. Prior stop/handoff instructions below are historical.
+
 ## CODEX_TO_CLAUDE_READY -2026-11-10 final sprint checkpoint
 
 Codex stops writing after this checkpoint. No Claude agent has been launched and

@@ -1,5 +1,45 @@
 # Test evidence index
 
+Page-only local streaming source0712fa2ede3c6fb4051ec3654232e05e0a7d9479,
+base0842d0e11a2988db2dd2883fbcdca47b7df55f7a (preparation branch):
+
+-239 exact-source backend PASS,zero failures/skips,140.274s: protocol/hybrid/history/
+ UI, canonical/statement/loan/investment grounding, currency, memory privacy/reasoning,
+ native-runtime and release-validation inventory. Additional28 caller regression
+ PASS/zero failures/skips,12.486s: document questions, research packets and diagnostics.
+ Earlier60/208-case and16-case module runs overlap; do not sum repeated suites.
+-4 exact-source actual Chrome journeys PASS/zero skips,63.325s; runner complete=true:
+ streaming/keyboard Stop/focus/partial/retry/navigation/context exclusion, existing
+ saved-history lifecycle, explicit public-fallback privacy, owned memory citations/
+ reviewed save. Four active-Stop light/dark1440/390 Axe audits zero violations;
+ gradient contrast remains incomplete/manual. Earlier3/4/1 runs overlap.
+-2 actual native Waitress/Ollama tests PASS,16.387s, on isolated synthetic WSGI
+ listener/account/vault. Exact-source greeting first text1.203s,complete1.515s,
+ 15 events/32 answer bytes. Disconnect interrupted an asserted-active long inference;
+ worker stopped0.015s and retained zero conversations/policies/facts/events. These
+ are measured samples, not universal model speed/quality or GPU-utilization claims.
+ `/api/ps` reported qwen3.5:4b,8192 context,size/VRAM3375397600bytes.
+-Protocol cases cover malformed/truncated/oversized/wrong-model/tool frames, expiry,
+ length limit, Unicode/word figures, bounded capacity, owner/session/CSRF, source
+ withdrawal, socket shutdown and safe failure. Partial text is not accepted or used
+ in follow-up context. Existing final narrative guard remains authoritative.
+-Initial expanded Chrome4 run had1 observer error: missing explicit cloud_consent
+ kwarg on the new shared-service call. Caller made explicitly local and observer
+ adapted to both transports; final4 PASS. Failed receipts retained. No assertion or
+ security policy suppressed. No skipped run accepted. Final screenshots are synthetic.
+-Clean exact-source preflight PASS for source/privacy/dependencies/migration drift;
+ promotion BLOCKED. JS syntax/diff whitespace/AST-only graph update PASS. No new
+ migrations/dependencies/Node backend. Native listener remains four Waitress threads;
+ Huey/scheduler/install/backup/owner runtime untouched. No real-account acceptance,
+ installer/upgrade, full release suite, hosted CI or independent audit claimed.
+-Receipts under `artifacts/local-stream-20261110/`: backend-exact-source.log,
+ caller-regression.log,browser-exact-source.json,real-native-exact-source.log,
+ clean-source-preflight/release.json. Source/receipt hashes and exact commands are
+ recorded in source-manifest.json/commands.json. Clean worktree retained at
+ F:/ALFRED_DEV/usability-stream-check-0712fa2. Existing cache hash unchanged.
+-Transport contract checked against [official Ollama streaming documentation](https://docs.ollama.com/api/streaming)
+ on2026-11-10. No upstream implementation copied or external provider activated.
+
 Final sprint checkpoint sourcec365a38a707d45da87eada1c348fafcfd8da0a04:
 
 -194 consolidated backend PASS, zero failures/skips,89.900s. Exact configured SDK
