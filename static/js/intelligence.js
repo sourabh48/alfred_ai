@@ -526,7 +526,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const userLabel = document.createElement("span"); userLabel.className = "conversation-label"; userLabel.textContent = "You";
         const question = document.createElement("p"); question.textContent = text; userMessage.append(userLabel, question);
         const reply = document.createElement("div"); reply.className = "conversation-message mt-3";
-        const label = document.createElement("span"); label.className = "conversation-label"; label.textContent = "Proposed action · no model used · nothing saved yet";
+        const label = document.createElement("span"); label.className = "conversation-label"; label.textContent = "Action review · no model used";
         const summary = document.createElement("p"); summary.textContent = result.proposal ? result.proposal.summary : result.detail;
         reply.append(label, summary); row.append(userMessage, reply);
         if (result.proposal) {
