@@ -5,33 +5,30 @@
     "workspace":  "F:/ALFRED/alfred_ai",
     "single_writer":  true,
     "branch":  "work/usability-integration",
-    "recorded_at_head":  "0ca216859c8a4f5a75594e0cb88cc625c1abddb1",
-    "active_task_id":  "USE-05/bound-savings-goal-confirmation",
+    "recorded_at_head":  "ebbd0560507706babbea20635ab74ed20b0cc831",
+    "active_task_id":  "USE-04/offline-record-overview",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "files_changed":  [
-                          "apps/ml_engine/api/assistant_actions.py",
-                          "apps/ml_engine/api/urls.py",
-                          "apps/ml_engine/services/assistant_actions.py",
-                          "apps/reports/services.py",
+                          "apps/ml_engine/services/hybrid_intelligence.py",
                           "docs/LOCAL_ASSISTANT_GUIDE.md",
                           "static/js/intelligence.js",
                           "templates/ai_insights.html",
-                          "tests/backend_durations.json",
                           "tests/browser_durations.json",
-                          "tests/test_assistant_actions.py",
+                          "tests/test_bank_statement_grounding.py",
+                          "tests/test_canonical_grounding.py",
+                          "tests/test_financial_source_selection.py",
                           "tests/test_user_data_browser.py"
                       ],
     "completed_steps":  [
-                            "Reproduced arbitrary amount, replay and stale overwrite defects with three failing synthetic regressions",
-                            "Reused redacted server audit bindings and transactional single-use claim/Decimal write/receipt; added expiry, revision, ownership, cancellation and safe retry",
-                            "Exact-source136 backend and3 real Chrome PASS; four Axe audits zero violations/manual contrast open",
-                            "Actual native Waitress/file-SQLite simultaneous201/200 and process-restart replay200; one canonical goal and one receipt",
-                            "Clean exact-source preflight PASS; cache and owner runtime preserved"
+                            "Reproduced model-outage503 for supported current owned records",
+                            "Reused current source cards with post-error revalidation; preserved privacy/session/history/unsupported-question gates",
+                            "Exact-source226 backend/4 Chrome/1 unmocked Ollama PASS; four recovery Axe audits zero violations/manual contrast open",
+                            "Clean source/privacy/dependency/migration preflight PASS; owner runtime and cache preserved"
                         ],
     "remaining_steps":  [
-                            "Continuous sprint: inspect existing canonical record explanation when local model unavailable; select a proven read-only repair",
-                            "Broader typed tools/new controlled actions and saved/domain streaming remain",
+                            "Reproduce baseline record IDs incorrectly formatted as currency in shared source cards; bounded display fix next",
+                            "Typed registry, broader cross-module tools and actions/MCP sources remain incomplete",
                             "Owner/independent/CI/package/upgrade/release/3.0 gates remain"
                         ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
@@ -55,13 +52,13 @@
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "In the active sprint, inspect hybrid_answer and the canonical financial record overview path with synthetic unavailable Ollama; implement a bounded deterministic read-only repair if reproduced. Preserve cache edit and current action safety. Do not claim full USE-04/05 or release acceptance.",
+    "next_exact_instruction":  "Active sprint: reproduce baseline source-card record ID formatted as INR; fix only metadata presentation, keeping canonical typed monetary rendering and calculations unchanged. Preserve cache and run affected browser/privacy checks before checkpoint.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "0ca216859c8a4f5a75594e0cb88cc625c1abddb1",
-    "checkpoint_at":  "2026-11-10T15:06:21.7792752Z",
+    "implementation_source_head":  "ebbd0560507706babbea20635ab74ed20b0cc831",
+    "checkpoint_at":  "2026-11-10T15:28:15.5152007Z",
     "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
     "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-actions-check-0ca2168",
+    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-offline-check-ebbd056",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "unattended_claude_write_handoff_verified":  false,
@@ -76,10 +73,10 @@
                                      "docs/ai_progress/STATE.json",
                                      "docs/ai_progress/TEST_EVIDENCE.md",
                                      "docs/LOCAL_ASSISTANT_GUIDE.md",
-                                     "docs/images/usability/confirmed-action.png"
+                                     "docs/images/usability/offline-records.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "0ca216859c8a4f5a75594e0cb88cc625c1abddb1",
+    "release_preflight_source_head":  "ebbd0560507706babbea20635ab74ed20b0cc831",
     "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
     "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed."
 }

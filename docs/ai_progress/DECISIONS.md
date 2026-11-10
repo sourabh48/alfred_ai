@@ -1,5 +1,13 @@
 # Execution decisions
 
+## 2026-11-10 - source cards survive local inference failure
+
+A supported canonical question may recover from EmbeddingUnavailable using only
+current owner-scoped source cards after the same source revalidation. This does
+not accept failed model prose, introduce calculations, infer currency, bypass
+source selection/session checks, use cloud fallback or persist a turn. Normal
+successful inference behavior stays intact. No upstream adoption or second engine.
+
 ## 2026-11-10 - existing action safety before further tool expansion
 
 - The existing savings-goal action was already reachable. Reproduced financial-write

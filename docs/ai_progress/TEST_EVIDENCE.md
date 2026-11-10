@@ -1,5 +1,34 @@
 # Test evidence index
 
+## 2026-11-10 - offline record overview
+
+Sourceebbd0560507706babbea20635ab74ed20b0cc831, basee2161012e94151d7c7933a1205520193c0b1211a.
+Receipts: `artifacts/offline-records-20261110/`, hashes/argv in source-manifest/commands.json.
+
+- Reproduction:2 tests FAILED (one assertion and5 domain subtest errors): supported
+  Explain-this-record returned503/raised EmbeddingUnavailable despite current local data.
+- Exact-source226 backend PASS, zero failures/skips,108.714s: canonical/statement/
+  loan/investment/document grounding, history, currency, hybrid, action, native and
+  browser-plan checks. Old broad171-case run had one obsolete503 expectation for
+  reviewed documents; replaced with exact-card equality, no mutation/cloud disclosure
+  and a new stale-source-during-error409 regression. Failed receipt retained.
+-4 exact-source real Chrome PASS, zero failures/skips,61.562s (runner wall74.0s):
+  adapter TCP refusal/card recovery/citation/reopen; stale/foreign/unsupported drafts;
+  multidomain record correction; hardened action keyboard/retry regression.
+  Normal local adapter was redirected ONLY inside synthetic tests to a bound,
+  non-listening loopback socket. Actual refusal path exercised; owner Ollama untouched.
+- Four recovery light/dark1440/390 Axe audits zero violations, one gradient contrast
+  incomplete each/manual review pending. Action regression also ran its four audits.
+  Genuine synthetic screenshot in guide was visually inspected; no real account used.
+-1 exact-source unmocked Ollama PASS10.474s: selected reviewed investment records
+  retain exact2345.67/120.05 cards and owned citations. No provider/model response
+  mocked; unrelated external domain providers isolated. This is bounded acceptance,
+  not universal answer-quality/performance evidence.
+- Clean detachedF:/ALFRED_DEV/usability-offline-check-ebbd056 source/privacy/
+  dependency/migration preflight PASS; technical/promotion BLOCKED, no waivers.
+  JS/diff/AST graph update PASS. No migrations/dependencies, owner runtime/keys/
+  models/documents/backups/installation, CI/push/PR/merge/deployment changes.
+
 ## 2026-11-10 - bound savings-goal actions
 
 Source0ca216859c8a4f5a75594e0cb88cc625c1abddb1; base378e8ab5b38bf60c0db466b371e4774d0e1d2c72.

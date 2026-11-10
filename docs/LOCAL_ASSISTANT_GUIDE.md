@@ -24,6 +24,8 @@ calculation. Open a citation to inspect verification, dates, currency and limita
 Unsupported questions or changed evidence still require review; this recovery
 does not enable cloud access or save a conversation turn.
 
+![Current synthetic investment evidence recovered during a local adapter connection refusal](images/usability/offline-records.png)
+
 Open **AI Assistant** from the sidebar. Under **Local answer style**, choose
 Automatic, Concise, Detailed explanation, Comparison or Step by step. Enter your
 question and press **Ask ALFRED**, or Ctrl+Enter. Automatic follows explicit

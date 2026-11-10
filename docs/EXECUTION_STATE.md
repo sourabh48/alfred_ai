@@ -1,5 +1,23 @@
 # ALFRED execution state
 
+## Sprint checkpoint - 2026-11-10 offline record recovery
+
+Codex sole writer; sprint continues on `work/usability-integration`. USE-04/offline-record-overview
+LOCAL_ACCEPTED / COMMITTED_LOCAL, sourceebbd0560507706babbea20635ab74ed20b0cc831,
+basee2161012e94151d7c7933a1205520193c0b1211a. Supported owned record questions now
+retain revalidated canonical cards when local inference fails, without invented
+explanations, calculations, cloud disclosure or saved turns. Unsupported/stale/
+foreign/expired-session evidence still rejects. Full USE-04 registry/orchestration remains.
+
+Exact-source226 backend PASS108.714s;4 Chrome PASS61.562s (runner wall74.0s);
+1 unmocked Ollama PASS10.474s. Four recovery Axe audits zero violations/manual
+contrast open; action-audit regression also passes. Clean source/privacy/dependency/
+migration preflight PASS; release gates remain BLOCKED. No schema, owner runtime,
+key, weights, media, backup, installation or remote changes. Baseline85/143 and
+extensions0/13 unchanged. Cache edit/hash preserved. Exact files/receipts: STATE and
+TEST_EVIDENCE. Next: reproduce misleading currency formatting of baseline record IDs
+in the shared source-card renderer, then apply a bounded presentation repair.
+
 ## Sprint checkpoint - 2026-11-10 bound savings-goal actions
 
 Codex is the sole writer; active sprint continues. Preparation branch

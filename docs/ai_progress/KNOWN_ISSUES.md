@@ -1,5 +1,14 @@
 # Known issues and gates
 
+## Offline overview limits
+
+Bounded record recoveryebbd056 handles existing supported canonical finance,
+statement, loan, investment/budget and reviewed-document questions. It supplies
+source cards, without a model explanation. It does not repair vault/key errors,
+answer unsupported scenarios or activate arbitrary tools/MCP/cloud providers.
+Timeouts remain bounded by the existing local deadline. Full USE-04 and release
+acceptance remain open. Source-card baseline metadata currency bug selected next.
+
 ## Bound actions - remaining scope
 
 The locally accepted savings-goal hardening0ca2168 fixes server binding, expiry,
