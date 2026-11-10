@@ -1,6 +1,27 @@
 # ALFRED execution state
 
-## Active sprint checkpoint -2026-11-10
+## Context handoff checkpoint -2026-11-10
+
+- CODEX_TO_CLAUDE_READY. Codex stops writing after this checkpoint; no Claude
+ launch or independent final audit. Next agent must verify sole writer before edits.
+- Branch work/usability-integration; implementation source
+ c365a38a707d45da87eada1c348fafcfd8da0a04. Resolve the subsequent documentation
+ HEAD using `git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+- Four completed sprint slices: guided readinessa78096e, task-aware budgets and
+ fiction contextb535299, encrypted rename/title searcha173b3e, page-only contextc365a38.
+ Final consolidated194 backend PASS (89.900s);3 exact-source Chrome PASS (51.857s),
+ plus2 page-dialogue journeys. Actual Ollama styles/saved/page continuity PASS.
+ Automated Axe zero violations/manual contrast open. No summed overlapping counts.
+- Clean exact-source/privacy/dependency/migration preflight PASS; no CI/push/PR/
+ merge/deploy/package/owner-runtime changes. Existing cache edit/hash below preserved.
+- Next selected, not started: USE-03/local-streaming-cancellation. Begin with the
+ existing local transport/hybrid/API/UI and preserve bounded context, money/citation
+ validation, history/session revalidation and local-only privacy. No new backend.
+- Baseline85/143/extensions0/13 unchanged. Required owner/independent/CI/package/
+ upgrade/manual accessibility and3.0 prerequisites remain. Exact changed paths,
+ test/failure receipts and next executable instruction are in STATE/HANDOFF.
+
+## Earlier active sprint checkpoint -2026-11-10
 
 - Owner invoked `sprint`. Sole writer Codex; preserve cache hash41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9.
 - Guided readiness sourcea78096e119ecfe2a3a098dba227e49781bdb9f29 on work/usability-integration:

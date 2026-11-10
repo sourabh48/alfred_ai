@@ -1,5 +1,58 @@
 # Codex / Claude checkpoint
 
+## CODEX_TO_CLAUDE_READY -2026-11-10 final sprint checkpoint
+
+Codex stops writing after this checkpoint. No Claude agent has been launched and
+no independent audit is claimed. Verify Git status/HEAD and the absence of another
+writer before claiming the sole-writer role. Never reset/clean/stash existing work.
+
+Branchwork/usability-integration, sourcec365a38a707d45da87eada1c348fafcfd8da0a04;
+sprint base1265ff736b78d753a8bf73360b350acc5326a46b. Documentation checkpoint HEAD:
+`git log -1 --format=%H -- docs/ai_progress/STATE.json`.
+Only unrelated dirty path must remain alfred_ai/services/materialized_cache.py,
+SHA25641C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9.
+
+Completed source commits: a78096e guided owned-data readiness; b535299 bounded
+styles and real-model fictional continuity; a173b3e encrypted revision-bound rename
+and in-page title search; c365a38 unsaved local general-chat dialogue. Preserve prior
+statement/loan/investment slices. No schema/dependency/canonical money engine change.
+New end-user guide with actual synthetic screenshots: docs/LOCAL_ASSISTANT_GUIDE.md.
+
+Final evidence:194 consolidated backend PASS/zero skips/failures,3 exact-source
+Chrome journeys PASS,2 additional page-dialogue Chrome journeys with identical
+source blobs; actual Ollama styles, renamed-vault and page-only follow-ups PASS.
+Scoped runs overlap; do not sum. Automated Axe zero violations, manual gradient
+contrast remains. Preflight source/privacy/dependency/migration PASS atc365a38;
+release promotion BLOCKED. Retained clean worktree:
+F:/ALFRED_DEV/usability-page-check-c365a38. Receipts/hashes: TEST_EVIDENCE and
+artifacts/page-dialogue-20261110/source-manifest.json. No remote CI IDs.
+
+Next selected scope, not started: **USE-03/local-streaming-cancellation**.
+
+1. Read AGENTS.md, current STATE/requirements/usability ledger. Verify cache and sole
+   writer. Read the configured SDK via the Python-tools MCP before Python commands.
+2. Trace OllamaReasoner/local_embeddings._request, hybrid_answer/source revalidation,
+   AlfredPersonalInsightsAPI, conversation_history and intelligence.js. Current
+   inference is stream=False. Reuse this path; do not build another AI/finance engine.
+3. Implement a bounded local streaming path, initially local general chat if needed.
+   Keep fixed installed loopback model/digest checks,8192 context/4096byte supplied
+   payload/8192byte answer, task budgets/30s deadline, no tools or silent writes.
+   Treat partial text as unverified; never emit unchecked financial claims as accepted
+   answers. Preserve citation/current-source validation before final acceptance.
+4. Reuse authenticated CSRF/session/no-store protections. Stop/disconnect/timeout must
+   cancel the inference transport, preserve the draft/partial status and never append
+   incomplete answers to history. Recheck live session/owner/policy/revisions before
+   saved-history append. Keep page dialogue out of all cloud requests and retention.
+5. Use isolated synthetic tests, real Chrome and actual Ollama cancellation/broken
+   connection acceptance, then scoped commit/diff/privacy/preflight/checkpoint.
+   Resume another task only under an active sprint or explicit next/scope instruction.
+
+No production/runtime data, keys, installed models, documents, backups or installation
+changed. No activation of history retention, MCP application server, cloud provider,
+PR/push/master/publication/installer or3.0 approval. Baseline85/143,extensions0/13.
+CLAUDE_FINAL_REVIEW_READY remains NO. Historical active/stop instructions below
+are superseded by this final handoff.
+
 ## Active sprint2026-11-10 (supersedes the historical stop below)
 
 Owner explicitly invoked sprint; Codex remains sole writer. Source b535299 on

@@ -1,5 +1,21 @@
 # Development CI and integration pipeline
 
+## Usability sprint source -2026-11-10
+
+Sourcec365a38a707d45da87eada1c348fafcfd8da0a04, base1265ff736b78d753a8bf73360b350acc5326a46b:
+LOCAL_ACCEPTED / COMMITTED_LOCAL on preparation branchwork/usability-integration.
+Four slices: guided readinessa78096e, budgets/fiction contextb535299, private
+conversation controlsa173b3e, page dialoguec365a38.194 consolidated backend PASS
+(89.900s);3 affected exact-source Chrome PASS (51.857s).2 page-dialogue journeys
+and actual Ollama styles/saved/page continuity receipts retained separately; no
+summed overlapping counts. Source/privacy/dependency/migration preflight PASS.
+No remote CI IDs, push, PR, master integration, installer or deployment. Historical
+CI does not validate this source. Native worker/package journeys not rerun for
+these UI/read-only/context changes. Owner/independent/manual accessibility/package/
+upgrade/release gates remain; promotion BLOCKED. CODEX_TO_CLAUDE_READY is context
+continuity only. See current STATE/TEST_EVIDENCE; older stop/next statements below
+are historical. No baseline/extension acceptance changed.
+
 ## Investment usability source -2026-11-10
 
 Sourceb42988b4ceeab3cfa07dec0a4ad9b345d2f3ec77, base407789e56cba37210938e182c0e44564289374df:

@@ -1,5 +1,35 @@
 # Test evidence index
 
+Final sprint checkpoint sourcec365a38a707d45da87eada1c348fafcfd8da0a04:
+
+-194 consolidated backend PASS, zero failures/skips,89.900s. Exact configured SDK
+ command/synthetic runtime are retained in `artifacts/page-dialogue-20261110/`;
+ `sprint-consolidated-backend.log` covers data sources, hybrid/history/UI, canonical/
+ statement/loan/investment grounding, currency, memory privacy/reasoning/browser plan.
+ This supersedes overlapping focused counts for the final consolidated source.
+-3 actual Chrome journeys PASS at exact sourcec365a38 (51.857s): keyboard/style/
+ outage retry, consent/save/reopen/delete/clear, rename/search/stale reopen/privacy.
+ `sprint-final-browser.json` complete=true. Eight full-page Axe audits on assistant
+ and history controls: zero violations, gradient contrast remains incomplete.
+-Page dialogue focused117 backend PASS (51.983s);2 actual Chrome journeys PASS
+ (33.601s): bounded Unicode, max-three pairs, retry without duplication, New/
+ pagehide/reload reset, no local/session storage or retained history, and omission
+ from synthetic consented cloud fallback. Mock provider only for browser failures;
+ no real external provider called. These suites overlap the final194.
+-Actual Ollama page-only follow-up1 PASS (13.948s), history authorization disabled;
+ no conversations/policies/memory facts/events retained. Earlier actual-model styles
+ and renamed-vault continuity evidence remains distinct below. No general accuracy
+ guarantee or first-token benchmark claim. All accounts/prompts/data synthetic.
+-Clean exact-source privacy/dependency/migration preflight PASS; promotion BLOCKED.
+ JS syntax, diff whitespace and AST-only graph update PASS. Incorrect preliminary
+ validation worktree ref resolved no checkout; corrected exact SHA used. No source
+ changes or owner runtime impact from that setup attempt. No remote CI dispatched.
+-Runtime media paths are synthetic; no migrations/dependencies, key regeneration,
+ owner database/config/document/model/backup/install writes. Unrelated cache hash
+ remains41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9.
+ Native/package/owner/manual/independent/whole-suite release acceptance not claimed.
+-Receipt hashes and cumulative source paths: `artifacts/page-dialogue-20261110/source-manifest.json`.
+
 Conversation controls source a173b3ef5de459ad946ddacda3c74afd5bf71da3:
 
 -85 backend PASS, zero failures/skips (22.315s): history/hybrid/UI/memory privacy

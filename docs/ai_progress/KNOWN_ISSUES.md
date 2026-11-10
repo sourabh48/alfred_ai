@@ -1,8 +1,8 @@
 # Known issues and gates
 
-- **USE-02 bounded repair accepted locally:** bank statements now stage previews
-  before canonical writes, including retries. Source0f35605 and evidence are indexed.
-  Loan review is also accepted locally at88c1df8; other modules still need their own confirmation work. Next is investments.
+- **USE-02 bounded repairs accepted locally:** statements0f35605, loans88c1df8
+  and investmentsb42988b stage owned previews before confirmed canonical writes.
+  Broader real-document/provider/owner/package acceptance remains separate.
 - Statement limits: 2000 rows /8 MiB structured extraction,100 rows/page,24-hour
   extraction lifetime,30-minute confirmation token. Edited previews are protected
   from retry overwrite; re-upload the retained original for an expired edited draft.
@@ -10,8 +10,11 @@
   Those require separately reviewed domain actions. No second money engine introduced.
 - Source-center hub is partial onboarding: saved/parser counts are not verification;
   knowledge readiness and complete confirmation/correction journeys remain.
-- Conversation continuity is bounded general local dialogue only. Streaming,
-  cancellation, search/rename, answer budgets and broader model routing remain.
+- Conversation continuity is bounded general local dialogue only. Saved encrypted
+  history still requires its operator/owner gates. Bounded answer stylesb535299,
+  revision-bound rename/title searcha173b3e and page-only dialoguec365a38 accepted
+  locally. Title search covers titles, not transcript bodies. Streaming, cancellation,
+  Markdown/tables and broader model routing remain. No full assistant parity claim.
 - Existing savings-goal action flow still requires scoped hardening review before extension.
 - No application MCP server/source connection is configured. Host tools available
   to Codex do not automatically become tools available inside ALFRED.

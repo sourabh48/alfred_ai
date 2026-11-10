@@ -1,5 +1,19 @@
 # Execution decisions
 
+- Sprint2026-11-10 completed four local slices without changing the canonical
+  baseline: guided readinessa78096e, answer budgetsb535299, conversation controls
+  a173b3e and page dialoguec365a38. No new store, schema or dependency introduced.
+- Recent page dialogue is ephemeral, unverified local general-chat context. It is
+  bounded to three pairs/768bytes per message/4096byte model payload and cleared on
+  new/page lifecycle. It cannot mix with saved history or financial scope, and is
+  omitted from consented cloud fallback. Transcript retention remains opt-in.
+- Rename reuses encrypted records and keys, increments the existing revision and
+  preserves original expiry/turns. Concurrent/stale changes are rejected. Title
+  search filters the existing bounded owned list in-page; no plaintext index or
+  search URL/log is introduced. Full transcript search is not implemented.
+- Context handoff after final checks is CODEX_TO_CLAUDE_READY. No automation has
+  launched Claude, no independent audit occurred, and final/release readiness stays NO.
+
 2026-11-09 owner instruction authorizes a continuous scoped 2.0 sprint, then 3.0
 only after 2.0 acceptance and required release/branch approvals. It supersedes
 stop-after-one-task selection for this active execution; safety gates remain.
