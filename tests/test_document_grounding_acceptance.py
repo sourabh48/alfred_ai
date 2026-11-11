@@ -60,7 +60,7 @@ class DocumentGroundingAcceptanceTests(TestCase):
                 row.delete() if deleted else row.update(verification_status='rejected')
                 return 'SYNTHETIC-STALE-ANSWER'
             self.local.reason.side_effect=revoking
-            with self.assertRaises(PermissionError): self.answer()
+            with self.assertRaises(MemoryConflict): self.answer()
             if not deleted: LoanClosureDocument.objects.filter(pk=document_id).update(verification_status='verified')
 
     def test_contradictory_verified_closure_evidence_requires_review_before_inference(self):

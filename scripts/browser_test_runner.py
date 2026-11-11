@@ -7,6 +7,7 @@ import json
 import os
 import platform
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import subprocess
 import sys
 import time
@@ -14,6 +15,7 @@ import unittest
 from unittest.mock import patch
 
 from django.conf import settings
+from django.db import connections
 from django.test.runner import DiscoverRunner
 from django.test.utils import iter_test_cases
 from scripts.browser_test_plan import plan_tests
@@ -44,6 +46,7 @@ class BrowserTestRunner(DiscoverRunner):
         self.durations_file, self.collect_only = browser_durations_file, browser_collect_only
         self.selected, self.plan = [], None
         self.test_database = ''
+        self.database_directory = None
 
     def timed(self, key, function):
         @wraps(function)
@@ -77,12 +80,31 @@ class BrowserTestRunner(DiscoverRunner):
         return self.test_suite(case for case in cases if case.id() in selected)
 
     def setup_databases(self, **kwargs):
-        result = self.timed('database_setup', super().setup_databases)(**kwargs)
+        config = connections['default'].settings_dict
+        if config['ENGINE'].endswith('sqlite3') and not config['TEST'].get('NAME'):
+            # Stream workers and HTTP threads need separate connections, as in the real file-backed runtime.
+            self.database_directory = TemporaryDirectory(prefix='alfred-browser-sqlite-', ignore_cleanup_errors=True)
+            self.database_test_settings = config['TEST']
+            self.database_test_settings['NAME'] = str(Path(self.database_directory.name) / 'synthetic.sqlite3')
+        try:
+            result = self.timed('database_setup', super().setup_databases)(**kwargs)
+        except BaseException:
+            self.cleanup_database_directory()
+            raise
         self.test_database = str(settings.DATABASES['default']['NAME'])
         return result
 
     def teardown_databases(self, *args, **kwargs):
-        return self.timed('database_teardown', super().teardown_databases)(*args, **kwargs)
+        try:
+            return self.timed('database_teardown', super().teardown_databases)(*args, **kwargs)
+        finally:
+            self.cleanup_database_directory()
+
+    def cleanup_database_directory(self):
+        if self.database_directory is not None:
+            self.database_test_settings['NAME'] = None
+            self.database_directory.cleanup()
+            self.database_directory = None
 
     def get_resultclass(self):
         owner = self

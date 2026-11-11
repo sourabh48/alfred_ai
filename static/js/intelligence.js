@@ -724,10 +724,13 @@ document.addEventListener("DOMContentLoaded", () => {
             throw new Error('Connection ended before validation. Your draft is preserved; retry when ready.');
         } catch (error) {
             if (active && ticket === generation) {
-                partial.dataset.status = 'partial'; label.textContent = payload.conversation_id
-                    ? 'Partial, unverified preview. A completed turn may already be saved; reopen history or retry safely.'
-                    : 'Partial, unverified - not saved. Retry to request a complete answer.';
                 if ([401,403,409].includes(error.status)) text.textContent = '';
+                if (!text.textContent.trim()) partial.remove();
+                else {
+                    partial.dataset.status = 'partial'; label.textContent = payload.conversation_id
+                        ? 'Partial, unverified preview. A completed turn may already be saved; reopen history or retry safely.'
+                        : 'Partial, unverified - not saved. Retry to request a complete answer.';
+                }
             }
             if (controller.signal.aborted) throw Object.assign(new Error(timedOut
                 ? 'Local generation timed out. Your draft is preserved; retry when ready.'
@@ -810,7 +813,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else if (result.grounding === "canonical_record_overview") {
                     feedback.textContent = "Recorded values ready. Local AI is unavailable; review the current source cards. No cloud fallback was used and no conversation turn was saved.";
                     setLocalStatus("Recorded sources · AI unavailable", "review");
-                    query.value = ""; requestToken = null; retry.hidden = true;
+                    retry.hidden = false;
                 } else if (["owner_confirmed_transaction_date", "owner_confirmed_transaction_classification", "owner_confirmed_statement_period", "owner_confirmed_transaction_direction"].includes(result.grounding)) {
                     const label = result.grounding === "owner_confirmed_statement_period" ? "statement periods"
                         : result.grounding === "owner_confirmed_transaction_direction" ? "transaction directions"
@@ -837,6 +840,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 feedback.textContent = `${error.message}${error.reference ? ` Reference: ${error.reference}` : ""}`;
                 retry.hidden = error.status === 409 || error.status === 429 || error.status === 400;
                 if (picker && (error.code === "financial_sources_changed" || (picker.documentMode && [404,409].includes(error.status)))) {
+                    answers.replaceChildren(); empty.hidden = false;
                     picker.blocked = true; sourceStatus.textContent = "Selected evidence changed or is unavailable. Refresh the source list and select current revisions. Your draft is preserved.";
                 } else if (error.status === 409 && conversation) {
                     historyBlocked = true; feedback.textContent += " Reopen this conversation to review newer turns; your draft is preserved.";

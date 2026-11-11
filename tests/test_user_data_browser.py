@@ -3591,7 +3591,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         question='Explain this statement record'
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys(question)
         self.memory_click('#intelligenceForm button')
-        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        self.wait.until(lambda _: 'AI unavailable' in self.text('intelligenceLocalStatus'))
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
         self.assertNotIn('SYNTHETIC-PRIVATE-DETAIL',self.text('intelligenceFeedback'))
         current=evidence(owner,row.pk); review(owner,row.pk,revision=current['revision'],confirm=True,revoke=True)
@@ -3841,7 +3841,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click(f'#intelligenceSourceItems input[value="{records[0].pk}"]')
         local.reason.side_effect=EmbeddingUnavailable('SYNTHETIC-PRIVATE-OCR C:/private/source.pdf')
         self.memory_click('#intelligenceForm button[type="submit"]')
-        self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
+        self.wait.until(lambda _: 'AI unavailable' in self.text('intelligenceLocalStatus'))
         self.assertEqual(draft.get_property('value'),'Explain selected records')
         self.assertIn('1/3 selected',self.text('intelligenceSourcesStatus'))
         self.assertNotIn('SYNTHETIC-PRIVATE-OCR',self.text('intelligenceFeedback'))
@@ -4893,11 +4893,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/?scope=finance')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_property('value') == 'finance')
         self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
-        self.browser.execute_script('''const original = Alfred.fetchJSON; Alfred.fetchJSON = async (...args) => {
-            const result = await original(...args);
-            if (args[0] === '/api/ai/personal-insights/' && result.sources?.[0]?.data?.limitations)
-                result.sources[0].data.limitations.push('<img src=x onerror="window.sourceCardLeak=true">');
-            return result; };''')
+        from apps.ml_engine.services import hybrid_intelligence
+        original_read = hybrid_intelligence._read_source_context
+        def injected_limitations(*args, **kwargs):
+            sources = original_read(*args, **kwargs)
+            for source in sources:
+                if source.get('data', {}).get('limitations'):
+                    source['data']['limitations'].append('<img src=x onerror="window.sourceCardLeak=true">')
+            return sources
+        self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence._read_source_context', side_effect=injected_limitations))
         self.ask_history_question('Explain my baseline')
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         evidence = self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers .conversation-evidence')
@@ -5276,6 +5280,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=expense&record_id={row.pk}')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'expense:{row.pk}')
         self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#intelligenceForm button[type="submit"]').is_enabled())
         query=self.browser.find_element(self.By.ID,'intelligenceQuery'); query.send_keys('Explain this record',Keys.CONTROL,Keys.ENTER)
         self.wait.until(lambda _: entered.is_set() and self.browser.find_element(self.By.ID,'intelligenceStop').is_displayed())
         self.assertIn('Reading and validating local sources',self.text('intelligenceAnswers'))
@@ -5873,7 +5878,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.memory_click('#uploadInvestmentPdfBtn')
             # The parser may take up to its configured limit on a busy machine.
             WebDriverWait(self.browser, settings.ALFRED_UPLOAD_PARSER_SECONDS + 10).until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).count() == count)
-            self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
+            document = InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).latest('pk')
+            self.assertEqual(document.extracted_payload['import_review']['state'], 'pending')
+            self.assertEqual(len(document.extracted_payload['import_review']['candidate']), 2)
+            self.confirm_investment_upload(document)
             self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
             self.wait.until(lambda _: pdf.name in self.text('investmentImportList'))
         rows = Investment.objects.filter(user=owner, asset_name=ASSET)
@@ -5899,6 +5907,38 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.capture('investment-pdf-accounts-390px')
 
+    def confirm_investment_upload(self, document):
+        from apps.investments.models import Investment
+        from selenium.webdriver.support.ui import Select
+        from selenium.webdriver.support import expected_conditions as EC
+        owner = self.scenario['user']
+        before = list(Investment.objects.filter(user=owner).values())
+        self.browser.get(self.live_server_url+f'/investments/import-uploads/{document.pk}/review/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'investmentReview0-currency'))
+        for index, row in enumerate(document.extracted_payload['import_review']['candidate']):
+            Select(self.browser.find_element(self.By.ID, f'investmentReview{index}-currency')).select_by_value('INR')
+            for name in ('monthly_sip','annual_return_rate'):
+                field = self.browser.find_element(self.By.ID, f'investmentReview{index}-{name}')
+                field.clear(); field.send_keys('0')
+            matches = Investment.objects.filter(user=owner, asset_name__iexact=row['asset_name'],
+                institution__iexact=row.get('institution') or '', account_number__iexact=row.get('account_number') or '')
+            if matches.count() == 1:
+                Select(self.browser.find_element(self.By.ID, f'investmentReviewAction{index}')).select_by_value('link')
+                Select(self.browser.find_element(self.By.ID, f'investmentReviewTarget{index}')).select_by_value(str(matches.get().pk))
+        for field in self.browser.find_elements(self.By.CSS_SELECTOR, 'input[type="checkbox"][name*="-reviewed-"]'):
+            self.browser.execute_script('arguments[0].scrollIntoView({block:"center"})', field)
+            field.click()
+        save = self.browser.find_element(self.By.CSS_SELECTOR, 'button[value="save"]')
+        self.memory_click('button[value="save"]')
+        self.wait.until(EC.staleness_of(save))
+        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'button[value="confirm"]').is_enabled())
+        self.assertEqual(list(Investment.objects.filter(user=owner).values()), before)
+        self.memory_click('input[name="reviewed"]')
+        self.memory_click('button[value="confirm"]')
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.browser.get(self.live_server_url+'/investments/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'investmentPdfFiles'))
+
     def test_investment_broker_style_tables_reimport_and_reopen_with_source_notes(self):
         from decimal import Decimal
         from apps.investments.models import Investment, InvestmentImportDocument
@@ -5916,7 +5956,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(pdf))
                 self.memory_click('#uploadInvestmentPdfBtn')
                 self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=name).count() == count)
-                self.wait.until(lambda _: '2 investment record(s)' in self.text('investmentImportStatus'))
+                document = InvestmentImportDocument.objects.filter(user=owner, file_name=pdf.name).latest('pk')
+                self.assertEqual(document.extracted_payload['import_review']['state'], 'pending')
+                self.assertEqual(len(document.extracted_payload['import_review']['candidate']), 2)
+                self.confirm_investment_upload(document)
                 self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'uploadInvestmentPdfBtn').is_enabled())
             document = InvestmentImportDocument.objects.filter(user=owner, file_name=name).latest('pk')
             self.assertEqual(document.parser_status, 'parsed')

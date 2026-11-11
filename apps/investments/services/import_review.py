@@ -82,6 +82,8 @@ def stage_investment_document(*, user, parsed, upload_file=None, existing=None):
     document.parser_status = 'needs_review' if rows or document.extracted_text else 'failed'
     document.summary = 'Extraction saved for review. No canonical investment records were changed.'
     payload = deepcopy(document.extracted_payload or {})
+    if isinstance(parsed.get('payload'), dict) and 'layout_review' in parsed['payload']:
+        payload['layout_review'] = deepcopy(parsed['payload']['layout_review'])
     previous = payload.get('import_review', {})
     if previous.get('state') == 'confirmed':
         receipts = payload.setdefault('import_review_receipts', [])

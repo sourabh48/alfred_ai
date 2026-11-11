@@ -29,6 +29,15 @@ def extraction(**changes):
 
 
 class InvestmentReviewTests(TestCase):
+    def test_review_serializer_keeps_layout_status_without_raw_extracted_payload(self):
+        from apps.investments.serializers import InvestmentImportDocumentSerializer
+        layout = {'status':'needs_review','reason':'Check uncertain amounts','raw':'SYNTHETIC-PRIVATE-SOURCE'}
+        document = self.stage({**extraction(), 'payload':{'layout_review':layout}})
+        self.assertEqual(document.extracted_payload['layout_review'], layout)
+        payload = InvestmentImportDocumentSerializer(document).data['extracted_payload']
+        self.assertEqual(payload, {'review_state':'pending','layout_review':{
+            'status':'needs_review','reason':'Check uncertain amounts'}})
+
     def test_saving_other_fields_preserves_estimates_until_explicit_field_review(self):
         document = self.stage()
         document.extracted_payload['import_review']['candidate'][0]['field_status']['invested_amount'] = 'estimated'

@@ -79,7 +79,8 @@ def data_sources_snapshot(user):
                 documents = document_model.objects.filter(user=user)
                 source['imports'] = documents.aggregate(
                     total=Count('pk'), parsed=Count('pk', filter=Q(parser_status='parsed')),
-                    awaiting_review=Count('pk', filter=Q(parser_status__in=['pending', 'needs_review'])
+                    awaiting_review=Count('pk', filter=(Q(parser_status__in=['pending', 'needs_review']) &
+                        (Q(extracted_payload__import_review__state__isnull=True) | ~Q(extracted_payload__import_review__state='confirmed')))
                         | Q(extracted_payload__import_review__state='pending')),
                     failed=Count('pk', filter=Q(parser_status='failed')),
                     last_parsed=Max(timestamp, filter=Q(parser_status='parsed')))

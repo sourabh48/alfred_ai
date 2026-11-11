@@ -114,4 +114,7 @@ class InvestmentImportDocumentSerializer(serializers.ModelSerializer):
             data['review_state'] = review.get('state')
             data['review_url'] = f'/investments/import-uploads/{instance.pk}/review/'
             data['extracted_payload'] = {'review_state': review.get('state')}
+            layout = (instance.extracted_payload or {}).get('layout_review')
+            if isinstance(layout, dict):
+                data['extracted_payload']['layout_review'] = {key: layout[key] for key in ('status', 'reason') if key in layout}
         return data

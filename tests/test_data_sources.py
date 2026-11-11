@@ -10,6 +10,20 @@ from apps.investments.models import InvestmentImportDocument
 
 
 class DataSourcesTests(TestCase):
+    def test_confirmed_reviews_are_not_pending_even_when_parser_needs_review(self):
+        for model, label in ((StatementUpload,'Finance'), (LoanImportDocument,'Loans'),
+                             (InvestmentImportDocument,'Investments')):
+            model.objects.create(user=self.owner, parser_status='needs_review',
+                extracted_payload={'import_review':{'state':'confirmed'}})
+            model.objects.create(user=self.owner, parser_status='pending')
+            source = next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label']==label)
+            self.assertEqual(source['imports']['awaiting_review'], 1)
+            self.assertEqual(source['imports']['confirmed'], 1)
+            model.objects.filter(user=self.owner, parser_status='pending').delete()
+            source = next(s for s in data_sources_snapshot(self.owner)['sources'] if s['label']==label)
+            self.assertEqual(source['imports']['awaiting_review'], 0)
+            self.assertNotEqual(source['state'], 'Review needed')
+
     def setUp(self):
         self.owner = get_user_model().objects.create_user(username='synthetic-source-owner')
         self.other = get_user_model().objects.create_user(username='synthetic-source-other')

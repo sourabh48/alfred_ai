@@ -55,6 +55,32 @@ def duplicate_execution_suite():
 
 
 class BrowserTestRunnerTests(SimpleTestCase):
+    def test_live_database_uses_an_owned_temporary_file_and_cleans_up_on_failure(self):
+        import sqlite3
+        from contextlib import closing
+        from unittest.mock import patch
+        from django.db import connections
+        from django.test.runner import DiscoverRunner
+        config = connections['default'].settings_dict
+        original_database = config['NAME']
+        runner = self.runner()
+        self.addCleanup(runner.cleanup_database_directory)
+        with patch.dict(config['TEST'], NAME=None), patch.object(DiscoverRunner, 'setup_databases', return_value=[]):
+            runner.setup_databases()
+            path = Path(config['TEST']['NAME'])
+            self.assertNotEqual(str(path), str(original_database))
+            with closing(sqlite3.connect(path)) as first:
+                first.execute('CREATE TABLE synthetic (value TEXT)')
+                first.execute("INSERT INTO synthetic VALUES ('owned-test-only')")
+                first.commit()
+            with closing(sqlite3.connect(path)) as second:
+                self.assertEqual(second.execute('SELECT value FROM synthetic').fetchone()[0], 'owned-test-only')
+            with patch.object(DiscoverRunner, 'teardown_databases', side_effect=RuntimeError('synthetic teardown failure')):
+                with self.assertRaises(RuntimeError): runner.teardown_databases([])
+            self.assertFalse(path.exists())
+            self.assertIsNone(config['TEST']['NAME'])
+            self.assertEqual(config['NAME'], original_database)
+
     def runner(self, profile=False, **options):
         folder = self.enterContext(TemporaryDirectory(prefix='alfred-browser-accounting-'))
 

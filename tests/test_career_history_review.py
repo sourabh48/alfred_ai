@@ -16,6 +16,16 @@ from apps.reports.models import OperationalLog
 
 
 class CareerHistoryReviewTests(TestCase):
+    def test_history_review_log_serialization_redacts_server_bindings(self):
+        from apps.reports.services import operational_logging_service
+        self.prepare()
+        entry = OperationalLog.objects.get(user=self.owner, scope='career_history_review')
+        self.assertIn('binding', entry.payload)
+        public = operational_logging_service.serialize(entry)['payload']
+        self.assertTrue(set(public) <= {'action','state','expires_at','confirmed_at','goal_id'})
+        for key in ('binding','target_binding','revision','proposal_id'):
+            self.assertNotIn(key, public)
+
     def setUp(self):
         self.owner = get_user_model().objects.create_user(username='synthetic-history-review')
         self.other = get_user_model().objects.create_user(username='synthetic-history-review-other')
