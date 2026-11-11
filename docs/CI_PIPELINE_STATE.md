@@ -1,5 +1,23 @@
 # Development CI and integration pipeline
 
+## Master merge repair checkpoint - 2026-11-11
+
+LOCAL_ACCEPTED / MERGE_BLOCKED. Code cd2117e8c584a8ddff164fec4ee2eedae2cc1d37,
+work/master-review-fixes-20261111; base a583407, master c730360, canonical dev b929775.
+No canonical integration, PR reopen, deployment or protection/Pages change.
+186 focused backend PASS; Chrome loan/statement PASS plus unchanged investment
+PASS alone after retained timeout. Exact receipts, skips, revisions and next command
+are in EXECUTION_STATE and ai_progress/STATE.json / TEST_EVIDENCE.md.
+
+Prior exact-source CI42991191022/a583407 is pending at this checkpoint. Never
+transfer its checks to the newer source. Current checkpoint needs clean full-range
+preflight, final independent review and full exact-head CI before master readiness.
+Actual a583407 static review completed; reproduced P3 repairs need delta review.
+Pages publishes master:/docs; final concrete documentation scope needs explicit
+owner authorization. Full release/owner/package/3.0 gates stay separate.
+Rollback: retained source/base commits and all clean preparation worktrees; no owner
+runtime or schemas changed. Preserve root cache/dirty notes. Continue only this merge.
+
 ## Expiry-aware source review navigation - 2026-11-11
 
 USE-02/expired-review-navigation LOCAL_ACCEPTED / COMMITTED_LOCAL, source

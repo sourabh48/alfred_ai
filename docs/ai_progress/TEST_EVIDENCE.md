@@ -1,5 +1,29 @@
 # Test evidence index
 
+## Master merge repair checkpoint - 2026-11-11
+
+Code cd2117e8c584a8ddff164fec4ee2eedae2cc1d37, base a583407, Codex single writer.
+Latest identical precommit source blobs: 186 backend PASS121.376s, zero skips.
+Three Chrome import journeys: loan/statement PASS in a3-test run with investment
+parser timeout (2PASS/1ERROR,76.008s); unchanged investment alone PASS24.821s.
+All failures are retained. No timeout, security, ownership or Decimal gate weakened.
+
+Earlier a583407:73 backend PASS16.836s;6 Chrome PASS76.730s;16 Axe audits zero
+violations, manual contrast open. Local backend shard0:582 tests470.241s,exit0,
+1 skip; gate BLOCKED, not accepted. CI42991191022 is still pending at a583407.
+Earlier CI42949697353/c762b15 and42957164599/7ade4a5 failed; never transfer receipts.
+Actual independent a583407 static review completed with no code P1/P2 and five P3,
+three conditional. Reproduced source-row/queue/worker findings fixed in cd2117e;
+current delta needs review. Full-range current-source CI/preflight remains required.
+
+Local ignored receipts in main artifacts/master-merge-20261111/: review-races-repro,
+review-queue-repro, review-fixes-backend-final logs; review-fixes-browser/ and
+review-fixes-investment-alone/; recovery-preflight/; claude-a583407-review-response.json.
+Tests use synthetic isolated data and real Chrome/local services; model responses
+in these UI fixtures are synthetic, not real Ollama quality evidence. No owner,
+package, installer, real-account or deployment acceptance is claimed. Exact changed
+paths, source identities, gates and next command are in STATE.json / EXECUTION_STATE.
+
 ## 2026-11-11 - expiry-aware import review navigation
 
 USE-02/expired-review-navigation, Codex, work/usability-integration; source

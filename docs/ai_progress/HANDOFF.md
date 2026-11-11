@@ -1,5 +1,21 @@
 # Codex / Claude checkpoint
 
+## Master merge repair checkpoint - 2026-11-11
+
+Codex single writer. Resume MASTER_MERGE at F:/ALFRED_DEV/master-review-fixes-20261111,
+branch work/master-review-fixes-20261111, code cd2117e8c584a8ddff164fec4ee2eedae2cc1d37.
+Checkpoint commit resolves via git log -1 --format=%H -- docs/ai_progress/STATE.json.
+Read EXECUTION_STATE and STATE.json for exact files, receipts, skips and next command.
+No Claude writer or automated transfer was launched; actual read-only review ran.
+Root F:/ALFRED/alfred_ai retains its original cache edit and uncommitted checkpoints.
+Do not reset, clean, stash, stage wholesale or touch the owner runtime.
+
+186 focused backend PASS and three import journeys passed (one retained timeout
+followed by unchanged isolated PASS). Current source still needs preflight, final
+review and exact-head CI. Prior CI42991191022 belongs to a583407. Final public
+Pages scope requires explicit owner approval; master remains c730360. Continue only
+this merge. Baseline85/143, extensions0/13 and release/3.0 gates remain unchanged.
+
 ## Completed usability sprint - 2026-11-11
 
 READY_FOR_NEXT. Codex completed knowledge-source-readiness (90f1ee9, docs801b0c9)

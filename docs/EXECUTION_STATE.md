@@ -1,5 +1,62 @@
 # ALFRED execution state
 
+## Master merge repair checkpoint - 2026-11-11
+
+Codex single writer; active task MASTER_MERGE/usability-integration. Code source
+cd2117e8c584a8ddff164fec4ee2eedae2cc1d37 on work/master-review-fixes-20261111,
+F:/ALFRED_DEV/master-review-fixes-20261111, base a5834070ce77c71ee0c4a040aba65f0bfd89d86e.
+The checkpoint commit resolves with git log -1 --format=%H -- docs/ai_progress/STATE.json.
+Master is c7303600e195863aede4ed8ccc005dc06fa04bc7; canonical development remains
+b929775dc2baaf1e2d2bc0680abd29c2ac3703f1. No canonical merge or PR reopen occurred.
+
+Latest slice: queue compare-and-swap rejects a stale statement object; owner edits
+supersede queued/running retries; worker/batch retries preserve edited drafts and
+continue eligible uploads. Loan/investment confirmation binds original evidence
+through the stable review-row position, preserving raw Decimal values after edits.
+Multiple rows linked to one record retain explicitly unknown original values.
+No canonical calculation engine, schemas, dependencies or owner records changed.
+Exact changed paths are in STATE.json; originals/branches/worktrees remain retained.
+
+Synthetic evidence on identical precommit source blobs: 186 backend PASS in121.376s,
+no skips; loan and statement Chrome journeys PASS in a three-test run whose
+investment journey timed out during concurrent backend work; that unchanged
+investment journey passed alone in24.821s. The failed run is retained (3 tests,
+2 PASS/1 ERROR,76.008s). No timeout or security check was weakened. Earlier a583407
+repair: 73 backend PASS16.836s, 6 Chrome PASS76.730s, 16 Axe audits zero violations;
+manual contrast remains open. Local a583407 backend shard0:582 tests, exit0,1 skip,
+470.241s; the release gate correctly reports BLOCKED, not accepted. Full GitHub
+CI42991191022 is still pending at a583407, not this newer source. Earlier failed
+runs42949697353/c762b15 and42957164599/7ade4a5 remain separate.
+
+Actual independent read-only Claude review of the cumulative delta at a583407
+completed with no code P1/P2 and five P3 findings (three conditional). Reproduced
+queue/provenance issues were fixed in cd2117e; the current delta needs re-review.
+Source fingerprint enforcement and safe MemoryConflict HTTP409 were verified;
+XSS tests assert rendered literal text and no image execution. The actual portfolio
+parser always supplies layout_review, so the conditional stale-layout finding is
+not reproduced. Pre-fingerprint statement previews and initial unconfirmed-upload
+learning limitations are recorded in KNOWN_ISSUES; no automatic backfill/repair.
+AI-14 is unaccepted. Baseline85/143 and extensions0/13 are unchanged.
+
+MERGE_BLOCKED: exact-source full CI, completed independent/project review and
+explicit public Pages publication approval. Pages uses master:/docs. The new
+KNOWN_ISSUES/checkpoint docs change the publication scope; request approval for the
+final concrete diff after validation. Application deployment remains separate.
+No owner runtime/data/key/model/backups/installation or migrations were modified.
+Root F:/ALFRED/alfred_ai retains its preexisting cache edit (SHA256
+41C88BDBB1C03AD218EDE0190C62C9370C01717842FAE6ADCEE368A6D4E2BAE9) and local checkpoint
+edits; never reset, stash or stage them wholesale. No concurrent Claude writer ran.
+
+Evidence: local ignored artifacts/master-merge-20261111/ in the main workspace:
+review-races-repro.log, review-queue-repro.log, review-fixes-backend-final.log,
+review-fixes-browser/, review-fixes-investment-alone/, recovery-preflight/,
+claude-a583407-review-response.json. These are synthetic; no real-account or package
+acceptance is claimed. Next: check this tracker, commit, validate a clean full-range
+preflight, re-review the current delta, push preparation source and dispatch exact-
+head CI. Recheck all gates and Pages consent before any canonical/master merge.
+Continue resumes only this merge; do not select another feature.
+
+
 ## Usability sprint checkpoint - 2026-11-11
 
 READY_FOR_NEXT. Codex completed two locally accepted USE-02 leaves on

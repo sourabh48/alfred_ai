@@ -1,65 +1,15 @@
 {
     "schema":  1,
-    "active_agent":  null,
-    "handoff_status":  "READY_FOR_NEXT",
-    "workspace":  "F:/ALFRED/alfred_ai",
-    "single_writer":  false,
-    "branch":  "work/usability-integration",
-    "recorded_at_head":  "0d34a7e753e783cf602e65b72e978897e64ec8ed",
-    "active_task_id":  "USE-02/expired-review-navigation",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
-    "files_changed":  [
-                          "alfred_ai/services/data_sources.py",
-                          "docs/LOCAL_ASSISTANT_GUIDE.md",
-                          "templates/data_sources.html",
-                          "tests/browser_durations.json",
-                          "tests/test_data_sources.py",
-                          "tests/test_user_data_browser.py"
-                      ],
-    "completed_steps":  [
-                            "Recovered 801b0c9 after completing knowledge readiness; preserved single-writer/cache and owner runtime; reproduced hidden expired-review status.",
-                            "Added expiry-aware metadata to existing three-item owned pending-review links; retained source review authority, edited drafts and no automatic retry/deadline extension. NO_UPSTREAM_ADOPTION.",
-                            "Exact source 0d34a7e: 77 backend PASS in 65.499s; 3 Chrome PASS in 33.650s (runner50.000s), zero failures/skips. Four new Axe audits zero violations/manual contrast open.",
-                            "Clean detached source/privacy/dependency/migration preflight and AST graph update PASS; commands, failures, source manifests and synthetic screenshots retained.",
-                            "Two sprint leaves committed locally, no migration/dependency/calculation/owner-runtime/remote change; baseline85/143 and extensions0/13 unchanged."
-                        ],
-    "remaining_steps":  [
-                            "Both sprint leaves locally complete; no next task selected or writer active.",
-                            "Full USE-02, manual contrast, owner/CI/independent/package/release/canonical integration/approved MCP/3.0 gates remain.",
-                            "Latest three review labels are page-load metadata; source confirmation services still validate exact tokens, revisions, evidence and expiry."
-                        ],
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",
-    "ci_run_ids":  [
-
-                   ],
-    "ci_status":  "NOT_RUN_LOCAL_ONLY",
     "pending_migrations_added_by_this_scope":  [
 
                                                ],
-    "blockers":  [
-                     "Owner installation and real-account acceptance pending",
-                     "Independent release review pending",
-                     "MCP application server/source not selected"
-                 ],
-    "approvals_pending":  [
-                              "Owner installation replacement/deployment",
-                              "Required canonical integration/release gates",
-                              "3.0 branch and release prerequisite"
-                          ],
     "preserve_unrelated_dirty_paths":  [
                                            "alfred_ai/services/materialized_cache.py"
                                        ],
-    "next_exact_instruction":  "On continue report READY_FOR_NEXT and stop. On next/sprint recover branch/HEAD/dirty cache/writer/queue, then inspect remaining USE-02 Career/Travel onboarding readiness and select one eligible uncompleted leaf from authorized usability scope. Preserve accepted import/AI services, owner runtime and all integration/release/3.0 gates; canonical development remains development/alfred-integrated.",
     "last_active_agent":  "Codex",
-    "implementation_source_head":  "0d34a7e753e783cf602e65b72e978897e64ec8ed",
-    "checkpoint_at":  "2026-11-10T23:47:53.6453625Z",
-    "active_task_state":  "LOCAL_ACCEPTED / COMMITTED_LOCAL",
-    "next_task_id":  null,
-    "clean_validation_worktree":  "F:/ALFRED_DEV/usability-expiry-check-0d34a7e",
-    "claude_cli_available":  true,
-    "claude_agent_launched":  false,
-    "unattended_claude_write_handoff_verified":  false,
     "checkpoint_files_changed":  [
                                      "docs/ALFRED_USABILITY_INTEGRATION.md",
                                      "docs/CI_PIPELINE_STATE.md",
@@ -75,9 +25,6 @@
                                      "docs/images/usability/review-expiry.png"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
-    "release_preflight_source_head":  "0d34a7e753e783cf602e65b72e978897e64ec8ed",
-    "release_preflight_status":  "SOURCE_PRIVACY_DEPENDENCIES_MIGRATIONS_PASS; PROMOTION_BLOCKED",
-    "identity_note":  "Executing agent is Codex; no Claude launch or independent audit is claimed.",
     "last_completed_task_id":  "USE-02/expired-review-navigation",
     "last_completed_files_changed":  [
                                          "alfred_ai/services/data_sources.py",
@@ -94,5 +41,74 @@
                                           "30ab4d8ac80c7fabcd5e31aca40edf4f71570b62",
                                           "90f1ee90a9487e1d36a88cf9443825f083e0ca60",
                                           "0d34a7e753e783cf602e65b72e978897e64ec8ed"
-                                      ]
+                                      ],
+    "clean_validation_worktree":  "F:/ALFRED_DEV/master-review-fixes-20261111",
+    "uncommitted_fix_paths":  [
+
+                              ],
+    "checkpoint_at":  "2026-11-11T14:48:50.6404742+05:30",
+    "release_preflight_status":  "PRIOR_SOURCE_PREFLIGHT_PASS; CURRENT_SOURCE_NOT_RUN",
+    "ci_status":  "PRIOR_SOURCE_CI_PENDING; NEW_CHECKPOINT_CI_NOT_REQUESTED",
+    "unattended_claude_write_handoff_verified":  false,
+    "single_writer":  true,
+    "branch":  "work/master-review-fixes-20261111",
+    "blockers":  [
+                     "Current exact-source full CI and final independent/project review pending",
+                     "Explicit public master:/docs Pages publication approval pending",
+                     "Full release/owner/runtime/package/3.0 gates remain separate"
+                 ],
+    "active_task_state":  "LOCAL_ACCEPTED / MERGE_BLOCKED",
+    "workspace":  "F:/ALFRED_DEV/master-review-fixes-20261111",
+    "approvals_pending":  [
+                              "Explicit public documentation publication for final master merge scope",
+                              "Application deployment/installation replacement and real-account release gates remain separate"
+                          ],
+    "files_changed":  [
+                          "apps/expenses/services/statement_lifecycle.py",
+                          "apps/expenses/services/statement_review.py",
+                          "apps/expenses/tasks.py",
+                          "apps/investments/services/document_evidence.py",
+                          "apps/investments/services/import_review.py",
+                          "apps/loans/services/document_evidence.py",
+                          "apps/loans/services/import_review.py",
+                          "docs/ai_progress/KNOWN_ISSUES.md",
+                          "tests/test_investment_review.py",
+                          "tests/test_loan_import_review.py",
+                          "tests/test_statement_review.py"
+                      ],
+    "active_task_id":  "MASTER_MERGE/usability-integration",
+    "fix_commits":  [
+                        "7e15c1434d153a154088ad3afcc28d9c96f2a6eb",
+                        "7ade4a580e17169c4398ad15b73b671c6ae082ff",
+                        "a5834070ce77c71ee0c4a040aba65f0bfd89d86e",
+                        "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37"
+                    ],
+    "release_preflight_source_head":  "a5834070ce77c71ee0c4a040aba65f0bfd89d86e",
+    "handoff_status":  "MERGE_PREPARATION",
+    "fix_workspace":  "F:/ALFRED_DEV/master-review-fixes-20261111",
+    "implementation_source_head":  "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37",
+    "completed_steps":  [
+                            "Reproduced and repaired stale queue lost edits, superseded workers and source-row provenance misattribution; repeated links remain ambiguous.",
+                            "186 backend PASS121.376s, no skips, on identical precommit blobs. Two Chrome journeys passed, investment timed out under concurrent work and passed unchanged alone24.821s.",
+                            "Actual independent a583407 static review completed; no code P1/P2, five P3; current fixes require follow-up."
+                        ],
+    "identity_note":  "Codex single writer; actual read-only Claude CLI review completed at a583407, no Claude writer/development handoff launched.",
+    "recorded_at_head":  "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37",
+    "publication_consent":  "PENDING_FOR_FINAL_SCOPE",
+    "claude_cli_available":  true,
+    "claude_agent_launched":  false,
+    "next_task_id":  null,
+    "fix_branch":  "work/master-review-fixes-20261111",
+    "active_agent":  "Codex",
+    "next_exact_instruction":  "Continue MASTER_MERGE only: validate final checkpoint source, re-review current delta, push preparation ref and dispatch exact-head CI; preserve root cache/notes and master until all gates and final Pages approval pass.",
+    "remaining_steps":  [
+                            "Clean full-range source/privacy/dependency/migration preflight and AST update at final checkpoint source.",
+                            "Independent review of current delta and exact-source full CI; preserve all failed/skipped evidence.",
+                            "Explicit Pages approval for final concrete cumulative diff; then recheck source/base/protection/reviews/rollback, integrate safely and verify post-merge CI."
+                        ],
+    "ci_run_ids":  [
+                       42949697353,
+                       42957164599,
+                       42991191022
+                   ]
 }
