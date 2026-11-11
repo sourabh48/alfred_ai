@@ -1,5 +1,25 @@
 # ALFRED execution state
 
+## PR #22 master integration - 2026-11-11
+
+- Merged: PR #22 fast-forwarded master c730360 -> f8b11fd (exact PR head; PR run 43048075205 green on all 11 jobs).
+  Gates: no new migrations, no secrets, same 34 docs files as the owner's Pages approval, independent review of
+  bc9c158..f8b11fd found no blocking defects. Pages build after merge: success.
+- CI fixes: Linux job no longer apt-installs portaudio19-dev (only built PyAudio, removed in 5f6bb76; the fetch hung
+  and failed 3 runs); new browser test added to tests/browser_durations.json.
+- Career: weak/failed resume extractions no longer fill the profile; owner may confirm them via
+  POST /api/career/resumes/<pk>/use-details/ (fills empty fields, keeps every owner-saved skill).
+- Post-merge runs at f8b11fd and f22a928 failed backend shard 1 in
+  test_hybrid_intelligence (answer-style deadline check). Cause: on Windows Python 3.12 the monotonic clock ticks
+  every ~15 ms, so (t+30)-t is evaluated and exceeds 30 in floating point when runner uptime is just below 2**n s.
+  Reproduced with a frozen clock at 2018.001 s. Fixed in 3754390 (also test_gemini_development): assert
+  deadline <= monotonic()+timeout. Master CI run 43064748533 at 3754390: all 11 jobs green. Backend shard logs are
+  now uploaded (f22a928).
+- Branch audit: all named development branches are ancestors of master; agent/browser-regression-maturity-gate is
+  patch-equivalent; wip/project-dashboard-manifest-20261104 (owner-marked unfinished) awaits owner decision.
+- Next: AWIE/Scrapling licence, dependency and security review before any code.
+- Not accepted: no USE scope, release, packaging or real-account acceptance is claimed. Baseline/extension counts unchanged.
+
 ## Closing master merge correction - 2026-11-11
 
 Codex single writer; MASTER_MERGE on work/master-review-fixes-20261111 in the
