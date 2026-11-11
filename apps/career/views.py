@@ -26,7 +26,7 @@ from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
-from .services import application_tracker
+from .services import application_kit, application_tracker
 from .services.resume_intelligence import ParsedResume
 
 
@@ -947,3 +947,111 @@ def _career_dashboard_payload(request) -> dict:
         "compensation_benchmark": compensation_benchmark,
         "opportunity_outcome_learning": _career_outcome_learning_payload(request.user),
     }
+
+
+def _owned_analysis(request, pk):
+    return CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
+
+
+def _draft_sources(user):
+    return (CareerResume.objects.filter(user=user).order_by("-created_at", "-id").first(),
+            CareerProfile.objects.filter(user=user).first())
+
+
+class CareerTriageView(APIView):
+    """Career Ops triage on the owner's brief; saves only the score on this opportunity."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        analysis = _owned_analysis(request, pk)
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not isinstance(analysis.extracted_payload, dict):
+            return Response({"detail": "This opportunity has no saved job match."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            brief = application_kit.clean_brief(request.data.get("brief") if isinstance(request.data, dict) else None)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        profile = CareerProfile.objects.filter(user=request.user).first()
+        result = application_kit.triage(analysis, brief, profile_role=getattr(profile, "role", ""), today=timezone.localdate())
+        updated = CareerJobAnalysis.objects.filter(pk=analysis.pk, user=request.user, updated_at=analysis.updated_at,
+            extracted_payload=analysis.extracted_payload).update(extracted_payload={**analysis.extracted_payload, "triage": result},
+                                                                 updated_at=timezone.now())
+        if not updated:
+            return Response({"detail": "This opportunity changed. Reload it before scoring again."}, status=status.HTTP_409_CONFLICT)
+        analysis.refresh_from_db()
+        return Response({"opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def career_triage_brief(request):
+    """The brief used for the owner's most recent triage, so the form starts from it."""
+    for analysis in CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]:
+        triage = analysis.extracted_payload.get("triage") if isinstance(analysis.extracted_payload, dict) else None
+        if isinstance(triage, dict) and isinstance(triage.get("brief"), dict):
+            return Response({"brief": triage["brief"]})
+    return Response({"brief": None})
+
+
+class CareerApplicationKitView(APIView):
+    """Read-only CV, cover letter or email drafts from the owner's CV and this saved match. Nothing is sent or stored."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        analysis = _owned_analysis(request, pk)
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        resume, profile = _draft_sources(request.user)
+        kind = request.query_params.get("type", "")
+        if kind == "cv":
+            return Response(application_kit.tailored_cv(analysis, resume, profile))
+        if kind == "cover":
+            return Response(application_kit.cover_letter(analysis, resume, profile, today=timezone.localdate()))
+        if kind == "email":
+            triage = analysis.extracted_payload.get("triage") if isinstance(analysis.extracted_payload, dict) else None
+            try:
+                return Response(application_kit.email_draft(analysis, resume, profile, kind=request.query_params.get("kind", ""),
+                                                            triage_score=(triage or {}).get("score")))
+            except ValueError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Choose cv, cover or email."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CareerOfferPrepView(APIView):
+    """Clause walk and pay comparison for pasted offer text; the text is not stored or sent anywhere."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        analysis = _owned_analysis(request, pk)
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        data = request.data if isinstance(request.data, dict) else {}
+        offered = data.get("offered") if isinstance(data.get("offered"), dict) and data["offered"].get("amount") not in (None, "") else None
+        try:
+            return Response(application_kit.offer_prep(analysis, offer_text=data.get("offer_text") if isinstance(data.get("offer_text"), str) else "",
+                                                       offered=offered, profile=CareerProfile.objects.filter(user=request.user).first()))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def career_patterns(request):
+    return Response(application_kit.patterns(CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]))
+
+
+def career_tailored_cv_print(request, pk):
+    """Printable single-column CV page; the browser's Save as PDF keeps its text selectable."""
+    from django.contrib.auth.views import redirect_to_login
+    from django.http import Http404
+    from django.shortcuts import render
+    if not request.user.is_authenticated:
+        return redirect_to_login(request.get_full_path())
+    analysis = _owned_analysis(request, pk)
+    if analysis is None:
+        raise Http404
+    resume, profile = _draft_sources(request.user)
+    return render(request, "career/tailored_cv_print.html", {"cv": application_kit.tailored_cv(analysis, resume, profile), "analysis": analysis})

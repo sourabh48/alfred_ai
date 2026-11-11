@@ -5133,6 +5133,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').get_attribute('data-checked-on') == today.isoformat())
         self.assertFalse(self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').is_displayed())
 
+    def test_career_application_kit_triage_drafts_and_offer_reading(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from tests.test_career_application_kit import CV, JD, analysis
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        owner = self.scenario['user']
+        CareerResume.objects.create(user=owner, uploaded_file=SimpleUploadedFile('kit-cv.txt', b'cv'), file_name='kit-cv.txt',
+            parser_status='parsed', extracted_text=CV.replace('Mentored three junior engineers', 'Mentored <img src=x onerror="window.kitInjected=true"> engineers'),
+            extracted_payload={'role': 'Backend Engineer', 'experience_years': 5, 'skills': ['Python', 'Django', 'SQL']})
+        item = CareerJobAnalysis.objects.create(user=owner, job_url='https://jobs.example.test/kit', job_title='Senior Backend Engineer',
+            company='Synthetic Kit Corp', location='Pune', extracted_text=JD, extracted_payload=analysis().extracted_payload)
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#careerOutcomeAnalysis option[value="{item.pk}"]'))
+        Select(self.browser.find_element(self.By.ID, 'careerOutcomeAnalysis')).select_by_value(str(item.pk))
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerKit'))
+        self.browser.execute_script("document.getElementById('careerKit').open = true")
+        for field, value in (('careerTriageRoles', 'Backend Engineer'), ('careerTriageLocations', 'Pune'),
+                             ('careerTriageFloor', '2000000'), ('careerTriageCurrency', 'INR'), ('careerTriageFlags', 'rockstar')):
+            box = self.browser.find_element(self.By.ID, field); box.clear(); box.send_keys(value)
+        self.memory_click('#careerTriageScore')
+        self.wait.until(lambda _: '/5 · PASS' in self.text('careerTriageResult'))
+        item.refresh_from_db()
+        self.assertEqual(item.extracted_payload['triage']['red_flags'], ['rockstar'])
+        self.memory_click('#careerKitCv')
+        self.wait.until(lambda _: 'SELECTED ACHIEVEMENTS' in self.browser.find_element(self.By.ID, 'careerKitText').get_property('value'))
+        self.assertTrue(self.browser.find_element(self.By.ID, 'careerKitPrint').get_attribute('href').endswith(f'/career/job-analyses/{item.pk}/tailored-cv/'))
+        Select(self.browser.find_element(self.By.ID, 'careerKitEmailKind')).select_by_value('follow_up')
+        self.memory_click('#careerKitEmail')
+        self.wait.until(lambda _: 'Following up' in self.text('careerKitDraft'))
+        self.browser.find_element(self.By.ID, 'careerOfferText').send_keys(
+            'Your annual CTC is INR 2,800,000. You agree to a non-compete for 12 months. This letter is the entire agreement.')
+        self.memory_click('#careerOfferRead')
+        self.wait.until(lambda _: 'Questions for your lawyer' in self.text('careerOfferResult'))
+        self.assertIn('no verdict', self.text('careerOfferResult'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
+        self.memory_click('#careerPatternsLoad')
+        self.wait.until(lambda _: 'Not enough data yet' in self.text('careerPatternsPanel'))
+        self.browser.execute_script("document.getElementById('careerKit').scrollIntoView({block:'start'})")
+        self.capture('career-application-kit')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+            audit = self.browser.execute_async_script("const done=arguments[0];axe.run('#careerKit',{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done(r.violations));")
+            self.assertEqual(audit, [], theme)
+        self.browser.get(self.live_server_url + f'/career/job-analyses/{item.pk}/tailored-cv/')
+        self.assertIn('Save as PDF', self.browser.execute_script('return document.body.innerText'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
+
     def test_career_bad_history_does_not_hide_valid_followups_or_erase_records(self):
         from datetime import timedelta
         from django.utils import timezone

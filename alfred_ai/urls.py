@@ -41,6 +41,8 @@ from .views import (
     signup_view,
 )
 
+from apps.career.views import career_tailored_cv_print
+
 urlpatterns = [
     path("media/<path:path>", private_media, name="private_media"),
     path("admin/", admin.site.urls),
@@ -97,6 +99,7 @@ urlpatterns = [
     path("investments/", investments_view, name="investments"),
     path("family/", family_view, name="family"),
     path("career/", career_view, name="career"),
+    path("career/job-analyses/<int:pk>/tailored-cv/", career_tailored_cv_print, name="career_tailored_cv_print"),
     path("behavioral/", behavioral_view, name="behavioral"),
     path("relationship/", relationship_view, name="relationship"),
     path("risk/", risk_view, name="risk"),

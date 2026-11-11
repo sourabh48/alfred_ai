@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("careerOpeningCountryFilter")?.addEventListener("change", updateCareerOpeningFilters);
     document.getElementById("careerOpeningStateFilter")?.addEventListener("change", updateCareerOpeningFilters);
     document.getElementById("careerOutcomesReload").addEventListener("click", () => loadCareerOpportunities(careerOpportunityPage));
+    document.getElementById("careerPatternsLoad").addEventListener("click", loadCareerPatterns);
     document.getElementById("careerOutcomeAnalysis").addEventListener("change", event => {
         renderCareerOutcomeForm(careerOpportunities.find(item => String(item.id) === event.target.value));
     });
@@ -676,9 +677,139 @@ function renderCareerInterviewPrep(item) {
         </details>`;
 }
 
+// Career Ops workflows (career-ops 775861b, MIT): triage, CV-grounded drafts and offer reading. ALFRED sends nothing.
+let careerTriageBrief;
+const careerList = value => (value || []).join(", ");
+const careerSplit = value => value.split(",").map(part => part.trim()).filter(Boolean);
+
+function renderCareerApplicationKit(item) {
+    const target = document.getElementById("careerApplicationKitPanel");
+    if (!item) { target.replaceChildren(); return; }
+    const triage = item.triage;
+    const dims = triage ? triage.dimensions.map(dim => `<li>${Alfred.escapeHtml(dim.key.replace("_", " "))}: ${dim.score === null ? "left out" : `${dim.score}/5`} (weight ${Math.round(dim.weight * 100)}%). ${Alfred.escapeHtml(dim.reason)}</li>`).join("") : "";
+    const field = (id, label, help = "") => `<div class="col-md-6"><label class="form-label small" for="${id}">${label}</label><input class="form-control form-control-sm" id="${id}" ${help ? `aria-describedby="${id}Help"` : ""}>${help ? `<div class="form-text" id="${id}Help">${help}</div>` : ""}</div>`;
+    target.innerHTML = `
+        <details class="surface-card p-3 mb-3" id="careerKit">
+            <summary class="fw-semibold">Application kit</summary>
+            <p class="small muted mt-2">Built only from your CV and this saved job match. Drafts are for you to check and send yourself; ALFRED sends, submits and applies for nothing.</p>
+            <h4 class="h6">Triage</h4>
+            <div id="careerTriageResult" role="status">${triage ? `<p class="small mb-1"><strong>${triage.score === null ? "Not scored" : `${triage.score}/5`} · ${Alfred.escapeHtml(triage.verdict)}</strong> on ${Alfred.escapeHtml(triage.scored_on)}. ${Alfred.escapeHtml(triage.reason || "")}</p><ul class="small">${dims}</ul><p class="small muted">${Alfred.escapeHtml(triage.basis)}</p>` : `<p class="small muted">Not triaged yet.</p>`}</div>
+            <form id="careerTriageForm" class="row g-2 mb-3">
+                ${field("careerTriageRoles", "Target roles", "Comma separated. Empty uses your profile role.")}
+                ${field("careerTriageLocations", "Locations you accept", "Comma separated.")}
+                ${field("careerTriageFloor", "Yearly pay floor")}
+                ${field("careerTriageCurrency", "Pay floor currency", "Three letters, such as INR. Pay in another currency is left out, never converted.")}
+                ${field("careerTriageDq", "Hard disqualifiers", "Phrases in a job description that rule it out, comma separated.")}
+                ${field("careerTriageFlags", "Red flags", "Phrases that lower the score by 0.5 each.")}
+                ${field("careerTriagePriority", "Priority companies", "Always pass, comma separated.")}
+                <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="careerTriageRemote"><label class="form-check-label small" for="careerTriageRemote">Remote roles are fine for me</label></div></div>
+                <div class="col-12"><button class="btn btn-outline-primary btn-sm" type="submit" id="careerTriageScore">Score this opportunity</button></div>
+            </form>
+            <h4 class="h6">Drafts</h4>
+            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitCv">Tailored CV</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitCover">Cover letter</button>
+                <div><label class="form-label small mb-0" for="careerKitEmailKind">Email type</label>
+                    <select class="form-select form-select-sm" id="careerKitEmailKind">
+                        <option value="hr_application">Application to HR or a recruiter</option><option value="referral_request">Referral request</option>
+                        <option value="cold_application">Speculative application</option><option value="follow_up">Follow-up on an application</option>
+                        <option value="process_stuck">Application process broke</option><option value="confirmed_time_noshow">Missed confirmed call</option></select></div>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitEmail">Email draft</button>
+            </div>
+            <div id="careerKitDraft" aria-live="polite"></div>
+            <h4 class="h6 mt-3">Offer reading</h4>
+            <form id="careerOfferForm" class="row g-2">
+                <div class="col-12"><label class="form-label small" for="careerOfferText">Offer letter or contract text</label>
+                    <textarea class="form-control form-control-sm" id="careerOfferText" rows="4" aria-describedby="careerOfferTextHelp"></textarea>
+                    <div class="form-text" id="careerOfferTextHelp">Read on this computer only. It is not stored or sent anywhere.</div></div>
+                ${field("careerOfferAmount", "Offered pay (optional)")}
+                <div class="col-md-3"><label class="form-label small" for="careerOfferCurrency">Currency</label><input class="form-control form-control-sm" id="careerOfferCurrency" value="INR"></div>
+                <div class="col-md-3"><label class="form-label small" for="careerOfferPeriod">Per</label><select class="form-select form-select-sm" id="careerOfferPeriod"><option>year</option><option>month</option><option>week</option><option>day</option><option>hour</option></select></div>
+                <div class="col-12"><button class="btn btn-outline-secondary btn-sm" type="submit" id="careerOfferRead">Read offer</button></div>
+            </form>
+            <div id="careerOfferResult" class="mt-2" aria-live="polite"></div>
+            <div id="careerKitFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>
+        </details>`;
+    const setBrief = brief => {
+        if (!brief) return;
+        for (const [id, key] of [["careerTriageRoles", "target_roles"], ["careerTriageLocations", "locations"], ["careerTriageDq", "hard_dq"], ["careerTriageFlags", "red_flags"], ["careerTriagePriority", "priority_companies"]])
+            document.getElementById(id).value = careerList(brief[key]);
+        document.getElementById("careerTriageFloor").value = brief.pay_floor || "";
+        document.getElementById("careerTriageCurrency").value = brief.pay_currency || "";
+        document.getElementById("careerTriageRemote").checked = !!brief.remote_ok;
+    };
+    if (triage?.brief) setBrief(triage.brief);
+    else if (careerTriageBrief !== undefined) setBrief(careerTriageBrief);
+    else Alfred.fetchJSON("/api/career/triage-brief/").then(data => { careerTriageBrief = data.brief; if (document.getElementById("careerTriageForm")) setBrief(data.brief); }).catch(() => {});
+    const fail = error => showCareerFeedback("careerKitFeedback", error.message, "danger");
+    document.getElementById("careerTriageForm").addEventListener("submit", event => {
+        event.preventDefault();
+        const value = id => document.getElementById(id).value;
+        const brief = {target_roles: careerSplit(value("careerTriageRoles")), locations: careerSplit(value("careerTriageLocations")),
+            hard_dq: careerSplit(value("careerTriageDq")), red_flags: careerSplit(value("careerTriageFlags")),
+            priority_companies: careerSplit(value("careerTriagePriority")), pay_floor: value("careerTriageFloor").trim(),
+            pay_currency: value("careerTriageCurrency").trim(), remote_ok: document.getElementById("careerTriageRemote").checked};
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/triage/`, {method: "POST", body: JSON.stringify({brief})}).then(data => {
+            careerTriageBrief = brief;
+            const index = careerOpportunities.findIndex(row => row.id === item.id);
+            if (index >= 0) careerOpportunities[index] = data.opportunity;
+            renderCareerOutcomeForm(data.opportunity);
+            document.getElementById("careerKit").open = true;
+        }).catch(fail);
+    });
+    const showDraft = (data, extra = "") => {
+        const host = document.getElementById("careerKitDraft");
+        if (!data.available) { host.innerHTML = `<p class="small" role="status">${Alfred.escapeHtml(data.reason)}</p>`; return; }
+        host.innerHTML = `${data.subject ? `<p class="small mb-1"><strong>Subject:</strong> <span id="careerKitSubject">${Alfred.escapeHtml(data.subject)}</span></p>` : ""}
+            <label class="form-label small" for="careerKitText">Draft (select all and copy)</label>
+            <textarea class="form-control form-control-sm font-monospace" id="careerKitText" rows="14" readonly></textarea>
+            <ul class="small mt-2 mb-1">${data.notes.map(note => `<li>${Alfred.escapeHtml(note)}</li>`).join("")}</ul>${extra}`;
+        document.getElementById("careerKitText").value = data.text;
+    };
+    const draft = (query, extra) => Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/kit/?${query}`).then(data => showDraft(data, extra)).catch(fail);
+    document.getElementById("careerKitCv").addEventListener("click", () => draft("type=cv", `<a class="small" id="careerKitPrint" href="/career/job-analyses/${item.id}/tailored-cv/" target="_blank" rel="noopener">Open printable CV (save as PDF)</a>`));
+    document.getElementById("careerKitCover").addEventListener("click", () => draft("type=cover"));
+    document.getElementById("careerKitEmail").addEventListener("click", () => draft(`type=email&kind=${encodeURIComponent(document.getElementById("careerKitEmailKind").value)}`));
+    document.getElementById("careerOfferForm").addEventListener("submit", event => {
+        event.preventDefault();
+        const amount = document.getElementById("careerOfferAmount").value.trim();
+        const body = {offer_text: document.getElementById("careerOfferText").value,
+            offered: amount ? {amount, currency: document.getElementById("careerOfferCurrency").value.trim(), period: document.getElementById("careerOfferPeriod").value} : null};
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/offer-prep/`, {method: "POST", body: JSON.stringify(body)}).then(data => {
+            const list = (items, render) => items.length ? `<ul class="small">${items.map(render).join("")}</ul>` : `<p class="small muted">None.</p>`;
+            const clause = entry => `<li><strong>${Alfred.escapeHtml(entry.label)}</strong>${entry.quotes.length ? `<ul>${entry.quotes.map(quote => `<li>"${Alfred.escapeHtml(quote)}"</li>`).join("")}</ul>` : ": not mentioned."}</li>`;
+            const pay = row => `<li>${Alfred.escapeHtml(row.label)}: ${Alfred.escapeHtml(row.amount ? `${row.currency} ${row.amount}` : row.detail)}${row.gap ? ` · ${Alfred.escapeHtml(row.gap_label)}: ${Alfred.escapeHtml(row.currency)} ${Alfred.escapeHtml(row.gap)}` : ""}</li>`;
+            document.getElementById("careerOfferResult").innerHTML = `<div id="careerOfferReport">
+                <p class="small"><strong>${Alfred.escapeHtml(data.disclaimer)}</strong></p>
+                <h5 class="h6">What the offer says</h5>${list(data.clause_walk, clause)}
+                ${data.pay.length ? `<h5 class="h6">Pay</h5>${list(data.pay, pay)}` : ""}
+                <h5 class="h6">Questions for your lawyer</h5>${list(data.lawyer_questions, text => `<li>${Alfred.escapeHtml(text)}</li>`)}
+                <h5 class="h6">Items to raise with the employer</h5>${list(data.raise_with_employer, text => `<li>${Alfred.escapeHtml(text)}</li>`)}</div>`;
+        }).catch(fail);
+    });
+}
+
+function loadCareerPatterns() {
+    const target = document.getElementById("careerPatternsPanel");
+    return Alfred.fetchJSON("/api/career/patterns/").then(data => {
+        if (!data.available) { target.innerHTML = `<p class="small" id="careerPatternsUnavailable" role="status">${Alfred.escapeHtml(data.reason)}</p>`; return; }
+        const rows = (items, render) => items.map(render).join("");
+        target.innerHTML = `<div class="surface-card p-3" id="careerPatterns">
+            <p class="small muted">${Alfred.escapeHtml(data.basis)}</p>
+            <p class="small">Sent: ${data.sent}. Moved forward: ${data.conversion_rate}% of sent. Of decided (${data.decided}): ${data.decided_rate === null ? "no decisions yet" : `${data.decided_rate}% positive`}.</p>
+            <table class="table table-sm small"><caption>Stages you recorded</caption><thead><tr><th scope="col">Stage</th><th scope="col">Count</th><th scope="col">Share</th></tr></thead>
+            <tbody>${rows(data.funnel, row => `<tr><td>${Alfred.escapeHtml(careerStageLabel(row.stage))}</td><td>${row.count}</td><td>${row.percent}%</td></tr>`)}</tbody></table>
+            ${data.score_vs_outcome.length ? `<table class="table table-sm small"><caption>Triage score by outcome</caption><thead><tr><th scope="col">Outcome</th><th scope="col">Average</th><th scope="col">Range</th><th scope="col">Count</th></tr></thead>
+            <tbody>${rows(data.score_vs_outcome, row => `<tr><td>${Alfred.escapeHtml(row.group)}</td><td>${row.average}/5</td><td>${row.min}-${row.max}</td><td>${row.count}</td></tr>`)}</tbody></table>` : ""}
+            ${data.top_gaps.length ? `<p class="small mb-0">Skills most often missing where you were rejected or withdrew: ${Alfred.escapeHtml(data.top_gaps.map(gap => `${gap.skill} (${gap.count})`).join(", "))}.</p>` : ""}
+        </div>`;
+    }).catch(() => { target.innerHTML = '<p class="small" role="status">Patterns could not load. Try again.</p>'; });
+}
+
 function renderCareerOutcomeForm(item) {
     renderCareerApplication(item);
     renderCareerInterviewPrep(item);
+    renderCareerApplicationKit(item);
     const target = document.getElementById("careerOutcomeFormPanel");
     if (!item) { target.replaceChildren(); return; }
     const saved = item.outcome || {}, evidence = item.salary_evidence || {};

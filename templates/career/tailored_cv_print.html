@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailored CV - {{ analysis.job_title|default:"Role" }}</title>
+<style>
+  body { margin: 0; background: #fff; color: #111; font: 11pt/1.45 Arial, Helvetica, sans-serif; }
+  main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem; }
+  .cv { white-space: pre-wrap; margin: 0; font: inherit; }
+  .help { border: 1px solid #555; padding: .75rem 1rem; margin-bottom: 1.5rem; }
+  .help a { color: #0645ad; }
+  @media print { .help { display: none; } main { padding: 0; } @page { margin: 18mm; } }
+</style>
+</head>
+<body>
+<main>
+  {% if cv.available %}
+  <section class="help" aria-label="How to save this CV">
+    <p><strong>To save a PDF:</strong> press Ctrl+P and choose "Save as PDF". The text stays selectable, so applicant tracking systems can read it.</p>
+    <ul>{% for note in cv.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+    <p><a href="/career/">Back to Career</a></p>
+  </section>
+  <pre class="cv">{{ cv.text }}</pre>
+  {% else %}
+  <p>{{ cv.reason }}</p>
+  <p><a href="/career/">Back to Career</a></p>
+  {% endif %}
+</main>
+</body>
+</html>

@@ -11,11 +11,12 @@ class CareerOpportunitySerializer(serializers.ModelSerializer):
     interview_prep = serializers.SerializerMethodField()
     application = serializers.SerializerMethodField()
     match_freshness = serializers.SerializerMethodField()
+    triage = serializers.SerializerMethodField()
 
     class Meta:
         model = CareerJobAnalysis
         fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence','interview_prep',
-                  'application','match_freshness')
+                  'application','match_freshness','triage')
 
     def get_application(self, obj):
         from django.utils import timezone
@@ -23,6 +24,10 @@ class CareerOpportunitySerializer(serializers.ModelSerializer):
         application = payload.get('application')
         return {**application_tracker._clean(application),
                 'follow_up': application_tracker.follow_up_status(application, today=timezone.localdate())}
+
+    def get_triage(self, obj):
+        triage = obj.extracted_payload.get('triage') if isinstance(obj.extracted_payload, dict) else None
+        return triage if isinstance(triage, dict) else None
 
     def get_match_freshness(self, obj):
         # The list shares one context, so the owner's current resume is read once per page.
