@@ -486,9 +486,12 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         for index, field in enumerate(self.selenium.find_elements(self.By.CSS_SELECTOR, 'select[name$="-action"]')):
             self.Select(field).select_by_value('create' if index == 0 else 'skip')
         save = self.selenium.find_element(self.By.CSS_SELECTOR, 'button[value="save"]')
+        revision = self.selenium.find_element(self.By.NAME, 'revision').get_attribute('value')
         self.selenium.execute_script("arguments[0].scrollIntoView({block:'center'})", save)
         save.click()
-        self.wait.until(self.EC.staleness_of(save))
+        self.wait.until(lambda _: self.selenium.execute_script(
+            "return document.querySelector('input[name=revision]')?.value === arguments[0]",
+            str(int(revision) + 1)))
         self.wait.until(self.EC.presence_of_element_located((self.By.ID, 'investmentReview0-currency')))
         self.wait.until(lambda _: self.selenium.find_element(self.By.ID, 'investmentReview0-currency')
                         .get_attribute('value') == 'INR' and
@@ -498,7 +501,8 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self.selenium.execute_script("arguments[0].scrollIntoView({block:'center'})", checkbox)
         checkbox.click()
         self.selenium.find_element(self.By.CSS_SELECTOR, 'button[value="confirm"]').click()
-        self.wait.until(lambda _: 'Investment review confirmed.' in self.selenium.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: self.selenium.execute_script(
+            "return document.querySelector('main')?.innerText.includes('Investment review confirmed.')"))
         document.refresh_from_db()
         self.assertEqual(document.extracted_payload['import_review']['state'], 'confirmed')
 
@@ -577,6 +581,9 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
 
     def test_investment_review_rounds_money_and_preserves_source_evidence(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
+        from scripts.exercise_materialized_cache_traffic import _offline_fixture_patches
+
+        self.enterContext(_offline_fixture_patches())
         document = InvestmentImportDocument.objects.create(
             user=self.user, file_name="checked-investment.pdf", parser_status="needs_review",
             uploaded_file=SimpleUploadedFile('checked-investment.pdf', b'%PDF synthetic retained source'),

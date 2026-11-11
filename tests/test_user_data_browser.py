@@ -7835,6 +7835,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_travel_packing_keyboard_crud_autosave_reopen_and_offline_retry(self):
         from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.support import expected_conditions as EC
         session=self.packing_fixture()
         self.login();self.browser.set_window_size(1440,1200)
         self.browser.get(self.live_server_url+f'/mobility/?session={session.pk}')
@@ -7859,20 +7860,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         session.plan.refresh_from_db()
         item=next(i for i in session.plan.planning_state['_packing_checklist']['items'] if i['label']=='Synthetic <b>literal</b> gloves')
         selector=f'[data-packing-item="{item["id"]}"]'
-        toggle=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]')
+        checkbox=(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]')
+        toggle=self.wait.until(EC.element_to_be_clickable(checkbox))
         toggle.send_keys(Keys.SPACE)
         self.wait.until(lambda _: '1 of' in self.text('packingStatus'))
-        from selenium.common.exceptions import ElementNotInteractableException
-
-        def toggle_again(_):
-            # The checklist redraws after saving, so its new checkbox can be briefly not ready for keys.
-            try:
-                self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[type="checkbox"]').send_keys(Keys.SPACE)
-                return True
-            except ElementNotInteractableException:
-                return False
-        self.wait.until(toggle_again)
+        self.wait.until(EC.element_to_be_clickable(checkbox)).send_keys(Keys.SPACE)
         self.wait.until(lambda _: '0 of' in self.text('packingStatus'))
+        # The response renders before list refresh finishes; wait before opening an edit draft.
+        self.wait.until(EC.element_to_be_clickable((self.By.ID,'plannerSend')))
         self.memory_click(selector+' summary')
         field=self.browser.find_element(self.By.CSS_SELECTOR,selector+' input[name="label"]')
         field.clear();field.send_keys('Synthetic corrected gloves',Keys.ENTER)
