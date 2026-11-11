@@ -125,3 +125,43 @@ class CareerResumeUploadTests(TestCase):
         self.assertEqual(payload["extracted_payload"]["extraction_method"], "isolated_rapidocr_pdf")
         self.assertEqual(payload["extracted_payload"]["extraction_review"]["ocr_pages"][0]["page"], 1)
         self.assertNotIn("OCR fallback is not active", payload["weaknesses"])
+
+
+class CareerResumeUseDetailsTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="career_owner", password="Pass12345!")
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def resume(self, user, status="needs_review", payload=None):
+        return CareerResume.objects.create(user=user, file_name="resume.pdf", parser_status=status, parse_confidence=0.4,
+                                           extracted_payload={"role": "Data Analyst", "experience_years": 4, "skills": ["Python", "SQL"]} if payload is None else payload)
+
+    def test_owner_confirmation_fills_only_empty_fields_and_is_recorded(self):
+        from apps.career.models import CareerProfile
+
+        CareerProfile.objects.create(user=self.user, role="Owner Typed Role", experience_years=0, skills="Excel")
+        resume = self.resume(self.user)
+        response = self.client.post(f"/api/career/resumes/{resume.pk}/use-details/", data="{}", content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        profile = CareerProfile.objects.get(user=self.user)
+        self.assertEqual(profile.role, "Owner Typed Role")  # owner-entered value kept
+        self.assertEqual(profile.experience_years, 4)
+        self.assertTrue(all(skill in profile.skills for skill in ("Excel", "Python", "SQL")))
+        resume.refresh_from_db()
+        self.assertTrue(resume.extracted_payload["profile_confirmed_at"])
+        again = self.client.post(f"/api/career/resumes/{resume.pk}/use-details/", data="{}", content_type="application/json")
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(CareerProfile.objects.get(user=self.user).skills, profile.skills)  # replay changes nothing
+
+    def test_other_owners_clean_and_empty_resumes_are_refused(self):
+        from apps.career.models import CareerProfile
+
+        other = get_user_model().objects.create_user(username="career_other", password="Pass12345!")
+        foreign = self.resume(other)
+        self.assertEqual(self.client.post(f"/api/career/resumes/{foreign.pk}/use-details/").status_code, 404)
+        self.assertFalse(CareerProfile.objects.filter(user=other).exists())
+        self.assertEqual(self.client.post(f"/api/career/resumes/{self.resume(self.user, status='parsed').pk}/use-details/").status_code, 409)
+        self.assertEqual(self.client.post(f"/api/career/resumes/{self.resume(self.user, payload={}).pk}/use-details/").status_code, 400)
+        self.client.logout()
+        self.assertIn(self.client.post(f"/api/career/resumes/{foreign.pk}/use-details/").status_code, (401, 403))

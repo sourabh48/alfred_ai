@@ -392,8 +392,28 @@ function renderResumePanel(resume) {
                 ${linksBlock}
             </div>
             ${extractionNotes}
+            ${resume.parser_status !== "parsed" && (payload.role || payload.experience_years || (payload.skills || []).length) ? `
+            <div class="mt-3">
+                ${payload.profile_confirmed_at ? `<div class="muted small">You confirmed these details for your profile.</div>` : `
+                <div class="muted small mb-2">This read was weak, so your profile was not changed. If the details above are right, you can use them; empty profile fields are filled and skills are added.</div>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="careerResumeUseDetails">Use these details in my profile</button>`}
+                <div id="careerResumeUseFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>
+            </div>` : ""}
         </div>
     `);
+    const useButton = document.getElementById("careerResumeUseDetails");
+    if (useButton) useButton.addEventListener("click", () => {
+        useButton.disabled = true;
+        Alfred.fetchJSON(`/api/career/resumes/${resume.id}/use-details/`, {method: "POST", body: "{}"})
+            .then(data => {
+                showCareerFeedback("careerResumeUseFeedback", data.detail, "success");
+                loadCareerDashboard();
+            })
+            .catch(error => {
+                useButton.disabled = false;
+                showCareerFeedback("careerResumeUseFeedback", error.message, "danger");
+            });
+    });
 }
 
 function renderCareerBulletList(value) {

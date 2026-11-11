@@ -27,6 +27,7 @@ from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
 from .services import application_tracker
+from .services.resume_intelligence import ParsedResume
 
 
 def _career_error_response(exc, message, *, field="detail", status_code=status.HTTP_400_BAD_REQUEST):
@@ -437,6 +438,29 @@ class CareerResumeUploadView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class CareerResumeUseDetailsView(APIView):
+    """The owner confirms a resume kept for review; its shown details then fill the profile like a clean parse."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        resume = get_object_or_404(CareerResume, pk=pk, user=request.user)
+        payload = resume.extracted_payload if isinstance(resume.extracted_payload, dict) else {}
+        if resume.parser_status == "parsed":
+            return Response({"detail": "This resume was read cleanly; its details are already in use."}, status=status.HTTP_409_CONFLICT)
+        if not any(payload.get(field) for field in ("role", "experience_years", "skills")):
+            return Response({"detail": "Nothing usable was extracted. Enter your details in the profile instead."}, status=status.HTTP_400_BAD_REQUEST)
+        profile = _get_profile(request.user)
+        # Same rules as a clean parse: fill empty role/experience, merge skills; never overwrite owner-entered values.
+        resume_intelligence.apply_to_profile(profile, ParsedResume(
+            resume.parser_status, resume.parse_confidence, "", payload, "", [], []))
+        if not payload.get("profile_confirmed_at"):
+            resume.extracted_payload = {**payload, "profile_confirmed_at": timezone.now().isoformat()}
+            resume.save(update_fields=["extracted_payload"])
+        return Response({"detail": "Your profile now uses these resume details.",
+                         "resume": CareerResumeSerializer(resume, context={"request": request}).data,
+                         "profile": CareerProfileSerializer(profile).data})
 
 
 class CareerRecruiterMatchView(APIView):

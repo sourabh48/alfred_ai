@@ -299,8 +299,9 @@ jobs:
       - uses: browser-actions/setup-chrome@v1
       - name: Install browser system dependencies
         run: |
-          # A stalled mirror hung this step for 9 minutes (run 43033970326); retry stalled fetches instead.
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+          # An unreachable runner package source hung this step ~9 minutes and failed it (runs 43033970326, 43037992047).
+          # Refresh with bounded retries; an incomplete refresh is a warning, but the install below must still succeed.
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update || echo "::warning::apt index refresh was incomplete; installing from the indexes that did refresh"
           sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y portaudio19-dev
           python -m pip install pip==26.2.2
           python -m pip install -r requirements.txt

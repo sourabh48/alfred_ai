@@ -1102,6 +1102,21 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual((row.last_salary, row.experience_years), (Decimal('12345.67'), 4.5))
         self.capture('career-decimal-salary-reload')
 
+    def test_weak_resume_details_reach_the_profile_only_after_owner_confirms(self):
+        from apps.career.models import CareerProfile, CareerResume
+        owner = self.scenario['user']
+        CareerResume.objects.create(user=owner, file_name='weak-synthetic.pdf', parser_status='needs_review', parse_confidence=0.4,
+                                    extracted_payload={'skills': ['Kotlin'], 'experience_years': 3})
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerResumeUseDetails'))
+        self.assertNotIn('Kotlin', CareerProfile.objects.get(user=owner).skills or '')
+        self.memory_click('#careerResumeUseDetails')
+        # The dashboard reloads after the save; read the panel in one page script so an old node is never probed.
+        self.wait.until(lambda _: self.browser.execute_script(
+            "return document.getElementById('careerResumePanel')?.innerText.includes('You confirmed these details')"))
+        self.assertIn('Kotlin', CareerProfile.objects.get(user=owner).skills)
+        self.capture('career-weak-resume-confirmed')
+
     def memory_evaluation_fixture(self):
         from unittest.mock import Mock
         from apps.ml_engine.services.persistent_memory import MemoryStore
