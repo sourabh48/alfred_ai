@@ -384,7 +384,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn("Prepare browser artifact directory", workflow)
         self.assertIn("ci-setup.json", workflow)
         self.assertIn("Install browser system dependencies", workflow)
-        self.assertIn("portaudio19-dev", workflow)
+        self.assertNotIn("apt-get", workflow)  # no system packages are needed since PyAudio was removed
         windows_job = workflow.split("\n  selenium-shards:\n", 1)[1].split("\n  selenium:\n", 1)[0]
         self.assertIn("runs-on: windows-latest", windows_job)
         self.assertIn("run_browser_regressions.py --browser Chrome --require-browser", windows_job)
@@ -398,7 +398,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn('scripts/browser_test_plan.py', aggregate)
         self.assertIn('--require-ci', aggregate)
         linux_job = workflow.split("\n  linux-secure-failure:\n", 1)[1]
-        self.assertIn("runs-on: ubuntu-24.04", linux_job)
+        self.assertIn("runs-on: ubuntu-latest", linux_job)
         self.assertIn("manage.py test tests.test_memory_platform", linux_job)
         self.assertIn("--require-browser --proof-label ci-linux-portable", linux_job)
         self.assertIn("Validate CI browser proof summary", workflow)

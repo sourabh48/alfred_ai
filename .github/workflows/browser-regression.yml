@@ -285,8 +285,7 @@ jobs:
           if-no-files-found: error
 
   linux-secure-failure:
-    # Pinned: apt failed on every run after ubuntu-latest began moving to Ubuntu 26 (runs 43033970326, 43037992047, 43039748169).
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -300,10 +299,7 @@ jobs:
       - uses: browser-actions/setup-chrome@v1
       - name: Install browser system dependencies
         run: |
-          # An unreachable runner package source hung this step ~9 minutes and failed it (runs 43033970326, 43037992047).
-          # Refresh with bounded retries; an incomplete refresh is a warning, but the install below must still succeed.
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update || echo "::warning::apt index refresh was incomplete; installing from the indexes that did refresh"
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y portaudio19-dev
+          # No apt packages: portaudio19-dev only built PyAudio, removed from requirements in 5f6bb76; its apt fetch hung and failed this job.
           python -m pip install pip==26.2.2
           python -m pip install -r requirements.txt
       - name: Verify unsupported private storage fails closed on Linux
