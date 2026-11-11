@@ -53,6 +53,21 @@ class CareerResumeUploadTests(TestCase):
         stored = CareerResume.objects.get()
         self.assertEqual(stored.parser_status, "needs_review")
 
+    def test_weak_resume_extraction_never_fills_the_profile(self):
+        from apps.career.models import CareerProfile
+        from apps.career.services.resume_intelligence import ParsedResume
+
+        weak = ParsedResume("needs_review", 0.4, "Python SQL", {"role": "Guessed Role", "experience_years": 9, "skills": ["Python", "SQL"]}, "", [], [])
+        with patch("apps.career.views.resume_intelligence.parse", return_value=weak):
+            response = self.client.post("/api/career/resumes/upload/", data={"resume": SimpleUploadedFile("resume.pdf", b"x", content_type="application/pdf")})
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("profile was not changed", response.json()["detail"])
+        profile = CareerProfile.objects.get(user=self.user)
+        self.assertNotEqual(profile.role, "Guessed Role")
+        self.assertFalse(profile.experience_years)
+        self.assertNotIn("Python", profile.skills or "")
+        self.assertEqual(CareerResume.objects.get().extracted_payload["skills"], ["Python", "SQL"])  # kept for review
+
     @patch("apps.career.services.resume_intelligence.extract_document_text")
     def test_scanned_resume_ocr_text_is_parsed_with_role_and_skills(self, mock_extract_document_text):
         mock_extract_document_text.return_value = ExtractedDocumentText(

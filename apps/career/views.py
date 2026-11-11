@@ -399,7 +399,9 @@ class CareerResumeUploadView(APIView):
         )
         resume_intelligence.record_parse_outcome(request.user, resume_file.name, parsed)
         profile = _get_profile(request.user)
-        resume_intelligence.apply_to_profile(profile, parsed)
+        if parsed.parser_status == "parsed":
+            # A weak or failed extraction is kept for review; it never fills the owner's profile on its own.
+            resume_intelligence.apply_to_profile(profile, parsed)
         if parsed.parser_status != "parsed":
             operational_logging_service.log(
                 user=request.user,
@@ -427,7 +429,7 @@ class CareerResumeUploadView(APIView):
                 "detail": (
                     "Resume uploaded and parsed."
                     if parsed.parser_status == "parsed"
-                    else "Resume uploaded, but Alfred needs review because the text was weak, scanned, or in an unusual format."
+                    else "Resume uploaded, but Alfred needs review because the text was weak, scanned, or in an unusual format. Your profile was not changed."
                 ),
                 "resume": CareerResumeSerializer(resume, context={"request": request}).data,
                 "profile": CareerProfileSerializer(profile).data,

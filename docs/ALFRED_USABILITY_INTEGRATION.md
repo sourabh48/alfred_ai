@@ -281,11 +281,12 @@ older generated queue having no eligible baseline task.
   30-second budget and sends fixed synthetic text only to 127.0.0.1:11434.
 - Source counts never relabel parsed files as accepted or verified records.
   Unknown freshness, acceptance/rejection totals and knowledge readiness are explicit.
-- Proven remaining USE-02 blocker: `apply_parsed_statement_upload` directly creates
-  canonical transactions and updates the account balance before a separate review.
-  The source center states this explicitly. Next implementation must stage/review
-  imports before canonical writes, including retries and background callers;
-  do not treat the navigation hub as acceptance of that import contract.
+- Statement, loan and investment uploads (including retries) now stage a reviewed
+  preview; `apply_parsed_statement_upload` no longer posts money before confirmation.
+- A resume upload whose extraction is weak or failed (`needs_review`/`failed`) no
+  longer fills the career profile's role, experience or skills; the extraction is
+  kept for review and the response says the profile was not changed. Clean parses
+  still fill only empty fields and merge skills, as before.
 
 ## Runtime identity and evidence
 
