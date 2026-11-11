@@ -791,14 +791,14 @@ Read [EXECUTION_STATE](EXECUTION_STATE.md) for source-bound task state and resum
 [requirements](ALFRED_2_0_REQUIREMENTS.md) own intent and [queue](EXECUTION_QUEUE.md)
 owns deterministic selection. Work happens on `master` only; there is no open integration PR.
 
-- **PR/CI:** master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
+- **PR/CI:** master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). No Pages or deployment change.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
 IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 6 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 3 | COMPLETE_VERIFIED: 85
 
-PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Branch protection needs signed-in GitHub access (RUNTIME-12). No Pages or deployment change.
+PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). No Pages or deployment change.
 
 Extensions: **0/13 accepted**; separate source-bound story ledger.
 
@@ -3241,6 +3241,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: PR/manual browser workflow exists; Pages run is not backend acceptance. Fresh M15 backend CI/required checks not confirmed. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: M20 publish approved CI changes and verify actual remote checks.
 - SCOPED_INSPECTION 2026-11-06: the Browser Regression workflow runs on every master push (Linux secure-failure, four measured Windows backend shards, three measured Selenium shards); results are read through the public GitHub API, for example run 42141398727 at 1a36f53. Branch protection and rulesets need signed-in GitHub access, which this machine lacks (gh is not installed).
+- 2026-11-12 (owner approved): repository ruleset 27070437 "Protect master" is active on the default branch with two rules, deletion and non_fast_forward, and no bypass actors; read back through the public rulesets API. Before it, master had no classic protection and no ruleset. Actions settings read: default workflow token read-only, first-time contributor approval on, actions not SHA-pinned. Required status checks and pull requests are deliberately unset (direct pushes of finished work); adding them needs an owner decision. Workflow actions moved to their Node 24 releases in local commit 7c4f7a2, not yet run on GitHub.
 
 ### RUNTIME-13 — M20 automated source/finance/privacy/backup gates
 
