@@ -1,5 +1,26 @@
 # Known issues and gates
 
+## Master merge review limits - 2026-11-11
+
+Pending statement reviews created before source fingerprint binding in 7e15c14
+cannot be confirmed without a retained matching fingerprint. Existing drafts and
+corrections remain stored. Re-upload and explicitly review the new preview; copy
+needed corrections from the preserved old draft. No automatic fingerprint backfill,
+personal-data repair or migration is authorized by this source change.
+
+Initial unconfirmed loan/investment uploads currently omit parser-learning counters;
+retry/correction learning remains. AI-14 is not accepted, and this limitation must
+not be described as a complete learning pipeline. Monetary calculations and
+confirmation gates remain canonical. Historical checkpoint claims apply only to
+their pinned source. Statement originals are now fingerprint-bound.
+
+The review-row provenance fix affects future confirmations. Older immutable evidence
+receipts are not rewritten; an affected older import requires owner review of its
+original document. No real-account or packaged-runtime acceptance is claimed.
+Master integration still requires exact-source CI, independent/project review and
+explicit approval for the public master:/docs Pages publication. No release,
+application deployment, private-history activation or 3.0 approval is implied.
+
 ## Expiry-aware review navigation limits - 2026-11-11
 
 The center now labels deadlines for only the latest three owned pending reviews per

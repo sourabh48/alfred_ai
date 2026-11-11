@@ -261,8 +261,8 @@ def confirm_loan_review(document, *, token):
     payload['import_review']['state'] = 'confirming'
     if not LoanImportDocument.objects.filter(pk=document.pk, extracted_payload=document.extracted_payload).update(extracted_payload=payload):
         raise LoanReviewConflict('Another request changed this review.')
-    linked, created = [], []
-    for row in review['candidate']:
+    linked, created, originals = [], [], {}
+    for index, row in enumerate(review['candidate']):
         if row['action'] == 'skip': continue
         if row['action'] == 'link':
             linked.append(Loan.objects.get(pk=row['target_id'], user=document.user))
@@ -271,8 +271,10 @@ def confirm_loan_review(document, *, token):
             if errors: raise LoanReviewConflict('The reviewed loan fields are no longer valid.')
             loan = serializer.save(user=document.user)
             linked.append(loan); created.append(loan)
+        # Edited identities cannot identify the immutable source row; repeated links remain ambiguous.
+        originals[linked[-1].pk] = {} if linked[-1].pk in originals else review['original'][index]
     document.linked_loans.add(*linked)
-    capture_import(document, linked, extraction=review['original'])
+    capture_import(document, linked, originals=originals)
     receipt = dict(document_id=document.pk, created_count=len(created), linked_count=len(linked), replayed=False)
     payload['import_review'].update(state='confirmed', confirmed_at=timezone.now().isoformat(),
         confirmed_token=sha256(token.encode()).hexdigest(), receipt=receipt)

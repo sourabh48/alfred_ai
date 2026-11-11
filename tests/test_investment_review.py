@@ -29,6 +29,32 @@ def extraction(**changes):
 
 
 class InvestmentReviewTests(TestCase):
+    def test_two_review_rows_linked_to_one_holding_leave_original_values_ambiguous(self):
+        from apps.investments.models import InvestmentDocumentEvidence
+        existing = Investment.objects.create(user=self.owner, **extraction(invested_amount='30000', current_value='31000', monthly_sip='100')['investments'][0])
+        parsed = extraction()
+        parsed['investments'].append(extraction(account_number='SYNTHETIC-OTHER')['investments'][0])
+        document = self.stage(parsed)
+        before = list(Investment.objects.values())
+        edit_investment_review(document, revision=0, edits=[{'index': 1, 'action': 'link', 'target_id': existing.pk}])
+        document.refresh_from_db()
+        self.assertEqual(self.confirm(document).status_code, 200)
+        self.assertEqual(list(Investment.objects.values()), before)
+        self.assertEqual(InvestmentDocumentEvidence.objects.get(investment=existing).source_values, {})
+
+    def test_corrected_identity_keeps_its_own_source_row_after_another_row_is_skipped(self):
+        from apps.investments.models import InvestmentDocumentEvidence
+        parsed = extraction()
+        parsed['investments'].insert(0, extraction(account_number='SYNTHETIC-OTHER', invested_amount='20000')['investments'][0])
+        document = self.stage(parsed)
+        edit_investment_review(document, revision=0, edits=[{'index': 0, 'action': 'skip'},
+            {'index': 1, 'account_number': 'SYNTHETIC-OTHER'}])
+        document.refresh_from_db()
+        self.assertEqual(self.confirm(document).status_code, 200)
+        investment = Investment.objects.get()
+        self.assertEqual(investment.invested_amount, Decimal('10000.02'))
+        self.assertEqual(InvestmentDocumentEvidence.objects.get(investment=investment).source_values['invested_amount'], '10000.015')
+
     def test_review_serializer_keeps_layout_status_without_raw_extracted_payload(self):
         from apps.investments.serializers import InvestmentImportDocumentSerializer
         layout = {'status':'needs_review','reason':'Check uncertain amounts','raw':'SYNTHETIC-PRIVATE-SOURCE'}

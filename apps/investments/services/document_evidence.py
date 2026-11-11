@@ -20,20 +20,22 @@ def capture_import(document, rows, *, extraction=None, originals=None):
     for row in rows:
         if row.user_id != document.user_id:
             raise ValueError('Investment evidence ownership mismatch.')
-        values = (originals or {}).get(row.pk, {})
-        if extraction is not None:
+        values, candidates = {}, []
+        if originals is not None:
+            original = originals.get(row.pk)
+            if isinstance(original, dict): candidates = [original]
+        elif extraction is not None:
             candidates = [item for item in extraction if isinstance(item, dict)
                 and item.get('asset_name') == row.asset_name and (item.get('institution') or '') == row.institution
                 and item.get('account_number', '') == row.account_number]
-            if len(candidates) == 1:
-                values = {}
-                for field in FIELDS:
-                    value = candidates[0].get(field)
-                    if value is None or isinstance(value, (bool, list, dict)) or len(str(value)) > 80:
-                        continue
-                    try: investment_money(value)
-                    except ValueError: continue
-                    values[field] = str(value)
+        if len(candidates) == 1:
+            for field in FIELDS:
+                value = candidates[0].get(field)
+                if value is None or isinstance(value, (bool, list, dict)) or len(str(value)) > 80:
+                    continue
+                try: investment_money(value)
+                except ValueError: continue
+                values[field] = str(value)
         InvestmentDocumentEvidence.objects.get_or_create(document=document, original_investment_id=row.pk,
             defaults={'investment':row, 'source_values':values})
 

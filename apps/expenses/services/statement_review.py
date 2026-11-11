@@ -195,6 +195,9 @@ def edit_statement_preview(upload, *, revision, edits, account_number=None):
                     raise ValueError('Choose debit or credit.')
                 row[field] = value
     review['revision'] += 1
+    retry = upload.extracted_payload.get('background_retry', {})
+    if retry.get('state') in ('queued', 'running'):
+        retry.update(state='superseded', resolution='owner_review_saved')
     upload.save(update_fields=['extracted_payload', 'account_number'])
     return upload
 

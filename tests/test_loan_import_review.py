@@ -30,6 +30,36 @@ def extraction(**changes):
 
 
 class LoanImportReviewTests(TestCase):
+    def test_two_review_rows_linked_to_one_loan_leave_original_values_ambiguous(self):
+        from apps.loans.models import LoanDocumentEvidence
+        existing = Loan.objects.create(user=self.owner, **extraction(principal='30000', remaining_balance='20000', emi='700')['loans'][0])
+        parsed = extraction()
+        parsed['loans'].append(extraction(loan_account_number='SYNTHETIC-OTHER')['loans'][0])
+        document = self.stage(parsed)
+        before = list(Loan.objects.values())
+        response = self.client.patch(f'/api/loans/import-uploads/{document.pk}/preview/', {
+            'revision': 0, 'edits': [{'index': 1, 'action': 'link', 'target_id': existing.pk}]}, content_type='application/json')
+        self.assertEqual(response.status_code, 200, response.content)
+        document.refresh_from_db()
+        self.assertEqual(self.confirm(document).status_code, 200)
+        self.assertEqual(list(Loan.objects.values()), before)
+        self.assertEqual(LoanDocumentEvidence.objects.get(loan=existing).source_values, {})
+
+    def test_corrected_identity_keeps_its_own_source_row_after_another_row_is_skipped(self):
+        from apps.loans.models import LoanDocumentEvidence
+        parsed = extraction()
+        parsed['loans'].insert(0, extraction(loan_account_number='SYNTHETIC-OTHER', principal='20000')['loans'][0])
+        document = self.stage(parsed)
+        response = self.client.patch(f'/api/loans/import-uploads/{document.pk}/preview/', {
+            'revision': 0, 'edits': [{'index': 0, 'action': 'skip'},
+                {'index': 1, 'loan_account_number': 'SYNTHETIC-OTHER'}]}, content_type='application/json')
+        self.assertEqual(response.status_code, 200, response.content)
+        document.refresh_from_db()
+        self.assertEqual(self.confirm(document).status_code, 200)
+        loan = Loan.objects.get()
+        self.assertEqual(loan.principal, Decimal('10000.02'))
+        self.assertEqual(LoanDocumentEvidence.objects.get(loan=loan).source_values['principal'], '10000.015')
+
     def test_saving_other_fields_preserves_estimates_until_explicit_field_review(self):
         document = self.stage()
         document.extracted_payload['import_review']['candidate'][0]['field_status']['principal'] = 'estimated'

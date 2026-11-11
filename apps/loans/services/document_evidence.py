@@ -15,25 +15,29 @@ FIELDS = ('principal', 'emi', 'remaining_balance')
 
 
 @transaction.atomic
-def capture_import(document, rows, *, extraction=None):
+def capture_import(document, rows, *, extraction=None, originals=None):
     """Keep the first unambiguous parser output; never infer legacy originals."""
     for row in rows:
         if row.user_id != document.user_id:
             raise ValueError('Loan evidence ownership mismatch.')
         values = {}
-        if extraction is not None:
+        candidates = []
+        if originals is not None:
+            original = originals.get(row.pk)
+            if isinstance(original, dict): candidates = [original]
+        elif extraction is not None:
             candidates = [item for item in extraction if isinstance(item, dict) and (
                 str(item.get('loan_account_number') or '').strip() == row.loan_account_number if row.loan_account_number else
                 not item.get('loan_account_number') and (item.get('lender') or '').strip() == row.lender
                 and (item.get('loan_type') or 'other') == row.loan_type)]
-            if len(candidates) == 1:
-                for field in FIELDS:
-                    value = candidates[0].get(field)
-                    if value is None or isinstance(value, (bool, list, dict)) or len(str(value)) > 80:
-                        continue
-                    try: loan_money(value)
-                    except ValueError: continue
-                    values[field] = str(value)
+        if len(candidates) == 1:
+            for field in FIELDS:
+                value = candidates[0].get(field)
+                if value is None or isinstance(value, (bool, list, dict)) or len(str(value)) > 80:
+                    continue
+                try: loan_money(value)
+                except ValueError: continue
+                values[field] = str(value)
         LoanDocumentEvidence.objects.get_or_create(document=document, original_loan_id=row.pk,
             defaults={'loan':row, 'source_values':values})
 

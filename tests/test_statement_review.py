@@ -1,4 +1,5 @@
 """Synthetic review-before-write, stale/replay and source preservation acceptance."""
+from copy import deepcopy
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -19,6 +20,39 @@ from tests.test_expense_money_identity import parsed_fixture
 
 
 class StatementReviewTests(TestCase):
+    def test_queueing_a_stale_instance_cannot_erase_a_newer_owner_edit(self):
+        from apps.expenses.services.statement_lifecycle import queue_statement_retry
+        from apps.expenses.services.statement_review import edit_statement_preview
+        upload = self.stage()
+        stale = StatementUpload.objects.get(pk=upload.pk)
+        edit_statement_preview(upload, revision=0, edits=[{'index': 0, 'amount': '12.34'}])
+        upload.refresh_from_db()
+        before = deepcopy(upload.extracted_payload)
+        with self.assertRaises(StatementReviewConflict):
+            queue_statement_retry(stale)
+        upload.refresh_from_db()
+        self.assertEqual(upload.extracted_payload, before)
+
+    def test_owner_edit_supersedes_queued_worker_and_does_not_starve_other_retries(self):
+        from apps.expenses.services.statement_lifecycle import queue_statement_retry
+        from apps.expenses.services.statement_review import edit_statement_preview
+        from apps.expenses.tasks import retry_statement_upload_task, retry_low_confidence_statement_uploads
+        upload = self.stage()
+        upload.parser_status = 'needs_review'; upload.save(update_fields=['parser_status'])
+        queue_statement_retry(upload)
+        edit_statement_preview(upload, revision=0, edits=[{'index': 0, 'amount': '12.34'}])
+        upload.refresh_from_db()
+        self.assertEqual(upload.extracted_payload['background_retry']['state'], 'superseded')
+        eligible = self.stage()
+        eligible.parser_status = 'needs_review'; eligible.save(update_fields=['parser_status'])
+        with patch('apps.expenses.services.statement_lifecycle.parse_bank_statement', return_value=parsed_fixture()) as parser:
+            self.assertEqual(retry_statement_upload_task.run(upload.pk)['status'], 'superseded')
+            self.assertEqual(retry_low_confidence_statement_uploads.run()['processed'], 1)
+        parser.assert_called_once()
+        upload.refresh_from_db()
+        self.assertEqual(statement_preview(upload)['rows'][0]['amount'], '12.34')
+        self.assertFalse(Expense.objects.exists())
+
     def test_missing_or_changed_retained_source_cannot_confirm(self):
         for action in ('replace', 'delete', 'unverified'):
             with self.subTest(action=action):
