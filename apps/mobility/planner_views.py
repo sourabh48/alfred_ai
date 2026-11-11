@@ -381,10 +381,10 @@ class TravelProviderUsage(APIView):
         from .services.travel.providers.places import OverpassPlaces
         from .services.travel.providers.accommodation import DuffelAccommodation
         from .services.travel.providers.transport import DuffelFlights, IndianRailProvider
-        from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations
+        from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations, WikivoyageStays
         providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),ValhallaRouting(),GoogleRoutes(),GooglePlaceSearch(),OverpassPlaces(),
                      DuffelAccommodation(),DuffelFlights(),IndianRailProvider(),BraveSearch(),
-                     SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations()]
+                     SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations(),WikivoyageStays()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 

@@ -28,7 +28,7 @@ from .providers.places import OverpassPlaces
 from .providers.permits import PermitProvider
 from .providers.accommodation import DuffelAccommodation
 from .providers.transport import DuffelFlights, IndianRailProvider
-from .providers.web import WikivoyageDestinations, WikivoyageSearch, BraveSearch, SearXNGSearch
+from .providers.web import WikivoyageDestinations, WikivoyageSearch, WikivoyageStays, BraveSearch, SearXNGSearch
 from .links import external_links
 from .presentation import age_saved_facts
 
@@ -221,6 +221,8 @@ def enrich_candidate(user, state, destination):
     people = value(state,"number_of_travelers",1)
     hotel = fetch(DuffelAccommodation(),{"latitude":d["lat"],"longitude":d["lon"],"check_in":start,"check_out":end,"adults":people,"rooms":ceil(people/2)}) if coords and start and end and start < end else ProviderResult("duffel","hotels",error="overnight_dates_and_destination_required")
     attach("hotels_result",hotel)
+    # Free guide listings: names, contact and contributor price text; never live rates or availability.
+    attach("stays_guide_result",fetch(WikivoyageStays(),{"destination":d["name"]}) if d.get("name") else ProviderResult("wikivoyage","stays_guide",error="destination_required"))
     flight = ProviderResult("duffel","flights",error="origin_and_destination_airport_codes_and_dates_required")
     if value(state,"origin_airport") and value(state,"destination_airport") and start:
         flight = fetch(DuffelFlights(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
@@ -257,8 +259,8 @@ def enrich_candidate(user, state, destination):
 
 
 def quality_contract(results):
-    return {"verified":[r.category for r in results if r.success and not r.stale and r.status == "ok" and r.category not in {"web","destinations","permits"}],
-            "research_leads":[r.category for r in results if r.success and r.category in {"web","destinations"}],
+    return {"verified":[r.category for r in results if r.success and not r.stale and r.status == "ok" and r.category not in {"web","destinations","permits","stays_guide"}],
+            "research_leads":[r.category for r in results if r.success and r.category in {"web","destinations","stays_guide"}],
             "estimated":["budget", "travel duration", "local travel allowance"],
             "unavailable":[{"category":r.category,"reason":r.error or "unverified"} for r in results if not r.success or r.error],
             "freshness":[{"category":r.category,"freshness":r.freshness,"retrieved_at":r.retrieved_at,"expires_at":r.expires_at} for r in results],

@@ -156,7 +156,8 @@ class TravelProviderTests(TestCase):
                 self.assertEqual(self.provider.fetch.call_count, call_count+1)
 
     def test_budget_windows_expire_and_ignore_other_requests(self):
-        now = timezone.now()
+        # Noon today: "two minutes ago" must not cross local midnight into yesterday.
+        now = timezone.localtime().replace(hour=12, minute=0, second=0, microsecond=0)
         self.provider.limits = {"minute": 1, "hour": 1, "day": 3, "month": 3}
         query(self.provider, {"latitude": 1})
         query(self.provider, {"latitude": 1})

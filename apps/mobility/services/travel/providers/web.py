@@ -222,3 +222,143 @@ class WikivoyageDestinations(WikivoyageSearch):
                 "caution":"Community destination reference; verify access and current conditions with the authority.",
                 "verification_state":"destination_reference", "popularity":"UNKNOWN"})
         return {"destinations":places, "coverage":"Geotagged English Wikivoyage travel guides; incomplete community coverage, not an official list."}
+
+
+SLEEP_SECTION = re.compile(r"^==\s*Sleep\s*==\s*$", re.M | re.I)
+NEXT_SECTION = re.compile(r"^==[^=].*==\s*$", re.M)
+SUBSECTION = re.compile(r"^===\s*([^=]+?)\s*===\s*$", re.M)
+
+
+def _templates(text):
+    """Top-level {{...}} bodies, tolerating nesting; unbalanced text is skipped."""
+    found, depth, start, index = [], 0, 0, 0
+    while index < len(text) - 1:
+        pair = text[index:index+2]
+        if pair == "{{":
+            if depth == 0:
+                start = index + 2
+            depth += 1; index += 2; continue
+        if pair == "}}" and depth:
+            depth -= 1; index += 2
+            if depth == 0:
+                found.append((start - 2, text[start:index-2]))
+            continue
+        index += 1
+    return found
+
+
+def _fields(body):
+    """Split template parameters on top-level pipes only."""
+    parts, depth, current = [], 0, ""
+    for index, char in enumerate(body):
+        pair = body[index:index+2]
+        if pair in ("{{", "[["):
+            depth += 1
+        elif pair in ("}}", "]]") and depth:
+            depth -= 1
+        if char == "|" and depth == 0:
+            parts.append(current); current = ""
+        else:
+            current += char
+    parts.append(current)
+    fields = {}
+    for part in parts[1:]:
+        key, sep, value = part.partition("=")
+        if sep:
+            fields[key.strip().lower()] = value.strip()
+    return parts[0].strip().lower(), fields
+
+
+def _plain(value, limit):
+    value = re.sub(r"<!--.*?-->", "", value or "", flags=re.S)
+    for _ in range(3):  # nested markup
+        value = re.sub(r"\{\{[^{}]*\}\}", "", value)
+    value = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", value)
+    value = re.sub(r"\[https?://\S+\s+([^\]]+)\]", r"\1", value)
+    value = re.sub(r"\[https?://\S+\]", "", value)
+    value = strip_tags(value).replace("'''", "").replace("''", "")
+    return re.sub(r"\s+", " ", value).strip()[:limit]
+
+
+def _insecure_host(url):
+    url = (url or "").strip()
+    if not url.lower().startswith("http://") or normalized_link("https://" + url[7:]) == "":
+        return ""
+    return urlsplit(normalized_link("https://" + url[7:])).hostname or ""
+
+
+def sleep_listings(wikitext, limit=30):
+    """Wikivoyage Sleep-section listings as unverified guide leads; free-text prices are never parsed as money."""
+    heading = SLEEP_SECTION.search(wikitext or "")
+    if not heading:
+        return []
+    following = NEXT_SECTION.search(wikitext, heading.end())
+    section = wikitext[heading.end():following.start() if following else len(wikitext)]
+    tiers = [(m.start(), _plain(m.group(1), 40)) for m in SUBSECTION.finditer(section)]
+    listings = []
+    for position, body in _templates(section):
+        name, fields = _fields(body)
+        if name not in ("sleep", "listing") or (name == "listing" and fields.get("type", "").lower() != "sleep"):
+            continue
+        title = _plain(fields.get("name"), 200)
+        if not title:
+            continue
+        try:
+            lat, lon = number(fields.get("lat"), low=-90, high=90), number(fields.get("long"), low=-180, high=180)
+        except (ProviderError, TypeError, ValueError):
+            lat = lon = None
+        phone = re.sub(r"[^0-9+() -]", "", fields.get("phone", ""))[:40].strip()
+        listings.append({"name": title, "category": "hotel",
+            "tier": next((tier for start, tier in reversed(tiers) if start < position), ""),
+            "price_text": _plain(fields.get("price"), 120), "website": normalized_link(fields.get("url", "")),
+            # http-only sites are shown as plain text, never as a link ALFRED vouches for.
+            "website_host": _insecure_host(fields.get("url", "")),
+            "phone": phone, "address": _plain(fields.get("address"), 200),
+            "check_in": _plain(fields.get("checkin"), 40), "check_out": _plain(fields.get("checkout"), 40),
+            "description": _plain(fields.get("content"), 400), "listing_updated": _plain(fields.get("lastedit"), 20),
+            "lat": lat, "lon": lon, "availability": "UNKNOWN"})
+        if len(listings) >= limit:
+            break
+    return listings
+
+
+class WikivoyageStays(WikivoyageSearch):
+    """Accommodation listings from the destination's Wikivoyage article, via the official MediaWiki API."""
+    category = "stays_guide"
+    ttl = timedelta(days=14)
+    allowed_parameters = {"destination"}
+
+    def parameters(self, parameters):
+        p = Provider.parameters(self, parameters)
+        title = re.sub(r"\s+", " ", str(p.get("destination") or "")).strip()[:120]
+        if not title or any(c in title for c in "[]{}|#<>"):
+            raise ProviderError("destination_required")
+        return {"destination": title}
+
+    def cache_ttl(self, p):
+        return self.ttl
+
+    def fetch(self, p):
+        # Only the public place name is sent; budgets, dates and history never leave.
+        return request_json("GET", "https://en.wikivoyage.org/w/api.php", params={"action":"query", "format":"json",
+            "formatversion":2, "prop":"revisions", "rvprop":"content|timestamp", "rvslots":"main",
+            "titles":p["destination"], "redirects":1, "maxlag":5})
+
+    def normalize(self, raw, p):
+        if raw.get("error"):
+            raise ProviderError("wiki_unavailable", retry_after=60)
+        pages = raw.get("query", {}).get("pages", [])
+        if not isinstance(pages, list):
+            raise ProviderError("malformed_response")
+        page = next((row for row in pages if not row.get("missing") and row.get("revisions")), None)
+        if not page:
+            return {"options": [], "coverage": "No Wikivoyage article matched this destination name."}
+        revision = page["revisions"][0]
+        text = revision.get("slots", {}).get("main", {}).get("content", "")
+        title = str(page.get("title", p["destination"]))[:160]
+        article = "https://en.wikivoyage.org/wiki/" + quote(title.replace(" ", "_"))
+        options = [{**item, "id": f"wikivoyage-stay:{int(page['pageid'])}:{index}", "provider": "Wikivoyage",
+                    "source_url": article + "#Sleep"} for index, item in enumerate(sleep_listings(text))]
+        return {"options": options, "article": title, "article_updated": str(revision.get("timestamp", ""))[:20],
+                "coverage": "Community travel-guide listings, CC BY-SA 4.0. Prices are as written by contributors, "
+                            "not current rates; availability, parking and condition are unverified."}

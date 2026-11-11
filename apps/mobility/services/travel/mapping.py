@@ -21,7 +21,7 @@ def map_features(destination):
     if destination.get("origin_location"):
         origin = destination["origin_location"]
         point(origin["name"],"origin",origin["lat"],origin["lon"],origin.get("freshness","STATIC_REFERENCE"))
-    for result_key in ("places_result", "hotels_result"):
+    for result_key in ("places_result", "hotels_result", "stays_guide_result"):
         result = destination.get(result_key, {})
         for item in result.get("payload", {}).get("places", result.get("payload", {}).get("options", [])):
             point(item.get("name", "Place"), item.get("category", "hotel"), item.get("lat"), item.get("lon"), result.get("freshness", "UNKNOWN"), source_url=item.get("source_url", ""),expires_at=result.get("expires_at"))
