@@ -1,5 +1,22 @@
 # ALFRED execution state
 
+## Career Ops application kit - 2026-11-12
+
+- Owner asked to complete the Career Ops port in this sprint. Pinned career-ops 775861b (MIT, Santiago Fernandez de
+  Valderrama); modes triage, text/ats, cover, email, offer-prep and patterns read, rewritten in
+  apps/career/services/application_kit.py with attribution. Corrections: follow-up reminders (M-C1) and resume
+  version comparison with stale-match flags (M-C2, CAREER2-001 slice) were already ported before this sprint.
+- New: triage on an owner brief (career-ops weights 35/25/25/15, unknown terms rescaled, red flags -0.5, hard
+  disqualifier cap 2.5, priority pass; pay only in the brief currency, Decimal, no FX), saved in the analysis JSON
+  with CAS (no migration); tailored ATS plain-text CV from verbatim CV lines plus a printable page for browser
+  Save as PDF (no new dependency); cover letter and six email drafts; offer clause walk with lawyer questions and
+  same-currency pay gaps (offer text not stored); patterns report (5-sent floor). Nothing is sent, submitted or
+  applied for. Career page: Application kit panel and Show application patterns.
+- Evidence: tests/test_career_application_kit.py 16 PASS; all 20 Career test modules 192 PASS with 3 Chrome tests
+  (kit with axe light/dark, Career history, dashboard follow-ups) = 195 PASS. CI not yet run on this work.
+- Not done: full oferta A-G evaluation, batch, LaTeX/HTML CV templates, bullet rewriting, calibrate/retro, and
+  CAREER2-002 attachment manifest and send confirmation. No requirement status or acceptance count changed.
+
 ## Career follow-ups on the dashboard and CI race fix - 2026-11-12
 
 - Pushed to master 0e1260c..3f505d5 (owner approved): 50ed9bb names the employer, not a careers/jobs subdomain,
