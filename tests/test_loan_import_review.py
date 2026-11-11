@@ -30,6 +30,25 @@ def extraction(**changes):
 
 
 class LoanImportReviewTests(TestCase):
+    def test_empty_extraction_supports_owner_entered_create_and_link_without_invented_originals(self):
+        from apps.loans.models import LoanDocumentEvidence
+        for action in ('create', 'link'):
+            with self.subTest(action=action):
+                document = self.stage({**extraction(), 'loans': []})
+                before = list(Loan.objects.values())
+                edit = {'index': 0, 'action': action}
+                if action == 'create': edit.update(extraction()['loans'][0])
+                else: edit['target_id'] = Loan.objects.get().pk
+                response = self.client.patch(f'/api/loans/import-uploads/{document.pk}/preview/',
+                    {'revision': 0, 'edits': [edit]}, content_type='application/json')
+                self.assertEqual(response.status_code, 200, response.content)
+                document.refresh_from_db()
+                response = self.confirm(document)
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual(Loan.objects.count(), 1)
+                if action == 'link': self.assertEqual(list(Loan.objects.values()), before)
+                self.assertEqual(LoanDocumentEvidence.objects.get(document=document).source_values, {})
+
     def test_two_review_rows_linked_to_one_loan_leave_original_values_ambiguous(self):
         from apps.loans.models import LoanDocumentEvidence
         existing = Loan.objects.create(user=self.owner, **extraction(principal='30000', remaining_balance='20000', emi='700')['loans'][0])

@@ -265,7 +265,7 @@ def confirm_investment_review(document, *, token):
             investment = serializer.save(user=document.user)
             linked.append(investment); created.append(investment)
         # Edited identities cannot identify the immutable source row; repeated links remain ambiguous.
-        originals[linked[-1].pk] = {} if linked[-1].pk in originals else review['original'][index]
+        originals[linked[-1].pk] = {} if linked[-1].pk in originals or index >= len(review['original']) else review['original'][index]
     document.linked_investments.add(*linked)
     capture_import(document, linked, originals=originals)
     receipt = dict(document_id=document.pk, created_count=len(created), linked_count=len(linked), replayed=False)

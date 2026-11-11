@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.core.handlers.base import BaseHandler
+from django.db import connection
 from django.test import override_settings
 
 from apps.expenses.models import Expense
@@ -34,9 +35,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         cls.By = By
         cls.active_requests = 0
         cls.request_lock = threading.Lock()
-        # The live server shares one in-memory SQLite connection between threads, unlike the real runtime.
-        # A page's burst of requests could empty another request's session read and sign the browser out.
-        cls.request_turn = threading.Lock()
+        # Only legacy direct test runs share one memory connection; file-backed browser runs must stay concurrent.
+        shared_memory = connection.vendor == 'sqlite' and connection.creation.is_in_memory_db(str(connection.settings_dict['NAME']))
+        cls.request_turn = threading.Lock() if shared_memory else nullcontext()
         original_get_response = BaseHandler.get_response
 
         def tracked_response(handler, request):

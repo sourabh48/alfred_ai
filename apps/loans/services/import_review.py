@@ -272,7 +272,7 @@ def confirm_loan_review(document, *, token):
             loan = serializer.save(user=document.user)
             linked.append(loan); created.append(loan)
         # Edited identities cannot identify the immutable source row; repeated links remain ambiguous.
-        originals[linked[-1].pk] = {} if linked[-1].pk in originals else review['original'][index]
+        originals[linked[-1].pk] = {} if linked[-1].pk in originals or index >= len(review['original']) else review['original'][index]
     document.linked_loans.add(*linked)
     capture_import(document, linked, originals=originals)
     receipt = dict(document_id=document.pk, created_count=len(created), linked_count=len(linked), replayed=False)

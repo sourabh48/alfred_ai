@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import nullcontext
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.db import connection
 from django.test import Client
 
 from apps.expenses.models import StatementUpload
@@ -31,8 +33,9 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         import threading
         from unittest.mock import patch
         from django.core.handlers.base import BaseHandler
-        # As in UserDataBrowserTests, the live server shares one in-memory SQLite connection.
-        request_turn = threading.Lock()
+        # Keep the shared-memory fallback without serializing real file-backed HTTP connections.
+        shared_memory = connection.vendor == 'sqlite' and connection.creation.is_in_memory_db(str(connection.settings_dict['NAME']))
+        request_turn = threading.Lock() if shared_memory else nullcontext()
         original_get_response = BaseHandler.get_response
 
         def serialized_response(handler, request):

@@ -29,6 +29,23 @@ def extraction(**changes):
 
 
 class InvestmentReviewTests(TestCase):
+    def test_empty_extraction_supports_owner_entered_create_and_link_without_invented_originals(self):
+        from apps.investments.models import InvestmentDocumentEvidence
+        for action in ('create', 'link'):
+            with self.subTest(action=action):
+                document = self.stage({**extraction(), 'investments': []})
+                before = list(Investment.objects.values())
+                edit = {'index': 0, 'action': action}
+                if action == 'create': edit.update(extraction()['investments'][0])
+                else: edit['target_id'] = Investment.objects.get().pk
+                edit_investment_review(document, revision=0, edits=[edit])
+                document.refresh_from_db()
+                response = self.confirm(document)
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual(Investment.objects.count(), 1)
+                if action == 'link': self.assertEqual(list(Investment.objects.values()), before)
+                self.assertEqual(InvestmentDocumentEvidence.objects.get(document=document).source_values, {})
+
     def test_two_review_rows_linked_to_one_holding_leave_original_values_ambiguous(self):
         from apps.investments.models import InvestmentDocumentEvidence
         existing = Investment.objects.create(user=self.owner, **extraction(invested_amount='30000', current_value='31000', monthly_sip='100')['investments'][0])

@@ -20,6 +20,31 @@ from tests.test_expense_money_identity import parsed_fixture
 
 
 class StatementReviewTests(TestCase):
+    def test_null_retry_metadata_does_not_block_owner_corrections(self):
+        from apps.expenses.services.statement_review import edit_statement_preview
+        upload = self.stage()
+        upload.extracted_payload['background_retry'] = None
+        upload.save(update_fields=['extracted_payload'])
+        edit_statement_preview(upload, revision=0, edits=[{'index': 0, 'amount': '12.34'}])
+        upload.refresh_from_db()
+        self.assertEqual(statement_preview(upload)['rows'][0]['amount'], '12.34')
+
+    def test_edit_during_running_worker_is_preserved_and_retry_is_superseded(self):
+        from apps.expenses.services.statement_review import edit_statement_preview
+        from apps.expenses.tasks import retry_statement_upload_task
+        upload = self.stage()
+        def parsed_after_owner_edit(*args, **kwargs):
+            current = StatementUpload.objects.get(pk=upload.pk)
+            self.assertEqual(current.extracted_payload['background_retry']['state'], 'running')
+            edit_statement_preview(current, revision=0, edits=[{'index': 0, 'amount': '12.34'}])
+            return parsed_fixture()
+        with patch('apps.expenses.services.statement_lifecycle.parse_bank_statement', side_effect=parsed_after_owner_edit):
+            self.assertEqual(retry_statement_upload_task.run(upload.pk)['status'], 'superseded')
+        upload.refresh_from_db()
+        self.assertEqual(upload.extracted_payload['background_retry']['state'], 'superseded')
+        self.assertEqual(statement_preview(upload)['rows'][0]['amount'], '12.34')
+        self.assertFalse(Expense.objects.exists())
+
     def test_queueing_a_stale_instance_cannot_erase_a_newer_owner_edit(self):
         from apps.expenses.services.statement_lifecycle import queue_statement_retry
         from apps.expenses.services.statement_review import edit_statement_preview
@@ -47,7 +72,11 @@ class StatementReviewTests(TestCase):
         eligible.parser_status = 'needs_review'; eligible.save(update_fields=['parser_status'])
         with patch('apps.expenses.services.statement_lifecycle.parse_bank_statement', return_value=parsed_fixture()) as parser:
             self.assertEqual(retry_statement_upload_task.run(upload.pk)['status'], 'superseded')
-            self.assertEqual(retry_low_confidence_statement_uploads.run()['processed'], 1)
+            batch = retry_low_confidence_statement_uploads.run()
+            self.assertEqual(batch['processed'], 1)
+            eligible.refresh_from_db()
+            self.assertEqual(batch['results'][0]['imported_count'], 0)
+            self.assertEqual(batch['results'][0]['parser_status'], eligible.parser_status)
         parser.assert_called_once()
         upload.refresh_from_db()
         self.assertEqual(statement_preview(upload)['rows'][0]['amount'], '12.34')
