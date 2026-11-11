@@ -94,6 +94,7 @@ jobs:
           name: native-windows-proof-${{ matrix.part }}
           path: |
             artifacts/ops/native_huey_extended_verification.json
+            artifacts/release-ci/*.log
             artifacts/native-tests/*/mobile-accessibility.json
             artifacts/native-tests/*/*.png
             artifacts/release-ci/release.json
