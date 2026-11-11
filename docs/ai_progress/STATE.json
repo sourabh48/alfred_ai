@@ -11,18 +11,11 @@
                                        ],
     "last_active_agent":  "Codex",
     "checkpoint_files_changed":  [
-                                     "docs/ALFRED_USABILITY_INTEGRATION.md",
-                                     "docs/CI_PIPELINE_STATE.md",
                                      "docs/EXECUTION_STATE.md",
-                                     "docs/LOCAL_ASSISTANT_GUIDE.md",
-                                     "docs/ai_progress/DECISIONS.md",
-                                     "docs/ai_progress/EXECUTION_BOARD.md",
-                                     "docs/ai_progress/FINAL_REVIEW_CHECKLIST.md",
+                                     "docs/CI_PIPELINE_STATE.md",
                                      "docs/ai_progress/HANDOFF.md",
-                                     "docs/ai_progress/KNOWN_ISSUES.md",
                                      "docs/ai_progress/STATE.json",
-                                     "docs/ai_progress/TEST_EVIDENCE.md",
-                                     "docs/images/usability/review-expiry.png"
+                                     "docs/ai_progress/TEST_EVIDENCE.md"
                                  ],
     "checkpoint_commit_resolution":  "git log -1 --format=%H -- docs/ai_progress/STATE.json",
     "last_completed_task_id":  "USE-02/expired-review-navigation",
