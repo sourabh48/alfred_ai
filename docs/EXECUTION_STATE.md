@@ -1,5 +1,21 @@
 # ALFRED execution state
 
+## Career follow-ups on the dashboard and CI race fix - 2026-11-12
+
+- Pushed to master 0e1260c..3f505d5 (owner approved): 50ed9bb names the employer, not a careers/jobs subdomain,
+  and adds tests/test_career_layout_pilot.py (three synthetic layouts; the current parser loses title, skills and
+  experience on the redesign, which is the baseline the Scrapling pilot must beat); c452bf2 shows due Career
+  follow-ups on the home dashboard (owner-only, escaped, hidden when none, axe light/dark clean; ALFRED sends
+  nothing); 3f505d5 fixes a diagnostics browser-test race.
+- CI: run 43107585759 at 0e1260c failed one test in selenium shard 2 (Chrome 156 "Node with given id does not
+  belong to the document": a form-submit navigation landed between find_element(body) and .text). Fixed by reading
+  document.body.innerText in one call. Other body-text waits follow browser.get, which returns after load.
+  Run 43111538950 at 3f505d5: PASS; Pages build: success. First runs on the Node 24 actions.
+- Follow-up reminders were already ported from Career Ops (apps/career/services/application_tracker.py); only
+  the dashboard surfacing is new. No requirement status changed.
+- Queue: still no eligible task. Next: Scrapling Career pilot not before 2026-11-18; owner checks per EXECUTION_QUEUE.
+  This checkpoint is local; pushing it publishes docs to Pages and needs owner approval.
+
 ## Codex handoff recovery and Travel stays - 2026-11-12
 
 - Recovered: PR #22 (head f8b11fd, including Codex's 20666ae and the browser-wait repair 0764f58/bc9c158) is merged
