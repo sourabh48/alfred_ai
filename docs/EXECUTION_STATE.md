@@ -1,5 +1,34 @@
 # ALFRED execution state
 
+## Closing master merge correction - 2026-11-11
+
+Codex single writer; MASTER_MERGE on work/master-review-fixes-20261111 in the
+isolated master-review-fixes-20261111 worktree. Code bf49dd4ae168e0d5cab104008c358570b26876ab,
+base e276370b724580d184044280e975452269df8bec. Root cache/notes are preserved.
+198 focused backend PASS85.731s and8 Chrome PASS93.549s, zero skips, on identical
+precommit code blobs. Empty-extraction create/link retains unknown originals;
+null retry metadata and owner edits during running workers are covered. Browser
+fixtures keep the memory-connection lock only for legacy in-memory test runs;
+file-backed requests run concurrently. No timeout/security/production change.
+
+Closing e276370 review completed and caught an introduced empty-original IndexError;
+that P2 is fixed and regression-tested in both domains. CI42991191022/a583407
+completed FAIL: all backend/native/Linux and two browser shards passed; the last
+browser shard timed out loading a source picker behind the obsolete fixture lock.
+Neither old checks nor review markers accept this newer source. Current checkpoint
+needs clean full-range preflight, Windows runtime check, final delta review and
+full exact-head CI. Source/receipt details and exact changed paths: STATE.json and
+TEST_EVIDENCE.md; local artifacts/master-merge-20261111/empty-review-final-backend.log
+and concurrent-browser-final/. All earlier failures/skips remain retained.
+
+MERGE_BLOCKED pending those gates and explicit final-scope Pages publication
+approval. Master/canonical development, owner runtime/data/keys/schema/models and
+installation remain unchanged. Baseline85/143 and extensions0/13 unchanged; full
+release/real-account/package/3.0 gates stay separate. Continue only this merge.
+Next: validate the clean checkpoint HEAD, re-review e276370..HEAD, push preparation
+source and dispatch exact-head CI; no PR reopen or master merge without every gate.
+
+
 ## Master merge repair checkpoint - 2026-11-11
 
 Codex single writer; active task MASTER_MERGE/usability-integration. Code source

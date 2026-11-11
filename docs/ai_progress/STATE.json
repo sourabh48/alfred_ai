@@ -39,9 +39,9 @@
     "uncommitted_fix_paths":  [
 
                               ],
-    "checkpoint_at":  "2026-11-11T14:48:50.6404742+05:30",
+    "checkpoint_at":  "2026-11-11T15:03:29.0269124+05:30",
     "release_preflight_status":  "PRIOR_SOURCE_PREFLIGHT_PASS; CURRENT_SOURCE_NOT_RUN",
-    "ci_status":  "PRIOR_SOURCE_CI_PENDING; NEW_CHECKPOINT_CI_NOT_REQUESTED",
+    "ci_status":  "PRIOR_a583407_CI_FAILED_ONE_BROWSER_TIMEOUT; CURRENT_CI_NOT_REQUESTED",
     "unattended_claude_write_handoff_verified":  false,
     "single_writer":  true,
     "branch":  "work/master-review-fixes-20261111",
@@ -57,51 +57,51 @@
                               "Application deployment/installation replacement and real-account release gates remain separate"
                           ],
     "files_changed":  [
-                          "apps/expenses/services/statement_lifecycle.py",
                           "apps/expenses/services/statement_review.py",
-                          "apps/expenses/tasks.py",
-                          "apps/investments/services/document_evidence.py",
                           "apps/investments/services/import_review.py",
-                          "apps/loans/services/document_evidence.py",
                           "apps/loans/services/import_review.py",
-                          "docs/ai_progress/KNOWN_ISSUES.md",
+                          "tests/test_document_review_browser.py",
                           "tests/test_investment_review.py",
                           "tests/test_loan_import_review.py",
-                          "tests/test_statement_review.py"
+                          "tests/test_statement_review.py",
+                          "tests/test_user_data_browser.py"
                       ],
     "active_task_id":  "MASTER_MERGE/usability-integration",
     "fix_commits":  [
                         "7e15c1434d153a154088ad3afcc28d9c96f2a6eb",
                         "7ade4a580e17169c4398ad15b73b671c6ae082ff",
                         "a5834070ce77c71ee0c4a040aba65f0bfd89d86e",
-                        "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37"
+                        "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37",
+                        "bf49dd4ae168e0d5cab104008c358570b26876ab"
                     ],
     "release_preflight_source_head":  "a5834070ce77c71ee0c4a040aba65f0bfd89d86e",
     "handoff_status":  "MERGE_PREPARATION",
     "fix_workspace":  "F:/ALFRED_DEV/master-review-fixes-20261111",
-    "implementation_source_head":  "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37",
+    "implementation_source_head":  "bf49dd4ae168e0d5cab104008c358570b26876ab",
     "completed_steps":  [
-                            "Reproduced and repaired stale queue lost edits, superseded workers and source-row provenance misattribution; repeated links remain ambiguous.",
-                            "186 backend PASS121.376s, no skips, on identical precommit blobs. Two Chrome journeys passed, investment timed out under concurrent work and passed unchanged alone24.821s.",
-                            "Actual independent a583407 static review completed; no code P1/P2, five P3; current fixes require follow-up."
+                            "Fixed and tested e276370 review P2: owner create/link after empty extraction keeps explicitly unknown originals, with atomic confirmation.",
+                            "Handled null retry metadata; running-worker edits supersede safely; batch status contract checked.",
+                            "File-backed browser fixtures run concurrent real HTTP; legacy in-memory lock retained. No security/timeouts/production change.",
+                            "198 focused backend PASS85.731s,8 Chrome PASS93.549s,zero skips, on identical precommit code blobs; all prior failures retained."
                         ],
     "identity_note":  "Codex single writer; actual read-only Claude CLI review completed at a583407, no Claude writer/development handoff launched.",
-    "recorded_at_head":  "cd2117e8c584a8ddff164fec4ee2eedae2cc1d37",
+    "recorded_at_head":  "bf49dd4ae168e0d5cab104008c358570b26876ab",
     "publication_consent":  "PENDING_FOR_FINAL_SCOPE",
     "claude_cli_available":  true,
     "claude_agent_launched":  false,
     "next_task_id":  null,
     "fix_branch":  "work/master-review-fixes-20261111",
     "active_agent":  "Codex",
-    "next_exact_instruction":  "Continue MASTER_MERGE only: validate final checkpoint source, re-review current delta, push preparation ref and dispatch exact-head CI; preserve root cache/notes and master until all gates and final Pages approval pass.",
+    "next_exact_instruction":  "Continue MASTER_MERGE only: validate clean checkpoint HEAD; review e276370..HEAD with full task/lifecycle context; push prep ref and dispatch full exact-head CI. Preserve root edits and master until all gates and final Pages consent pass.",
     "remaining_steps":  [
-                            "Clean full-range source/privacy/dependency/migration preflight and AST update at final checkpoint source.",
-                            "Independent review of current delta and exact-source full CI; preserve all failed/skipped evidence.",
-                            "Explicit Pages approval for final concrete cumulative diff; then recheck source/base/protection/reviews/rollback, integrate safely and verify post-merge CI."
+                            "Clean final checkpoint preflight, Windows runtime check and AST update.",
+                            "Final independent delta review and new exact-head full CI.",
+                            "Explicit final concrete Pages publication approval and all required premerge/postmerge gates; no app deployment."
                         ],
     "ci_run_ids":  [
                        42949697353,
                        42957164599,
                        42991191022
-                   ]
+                   ],
+    "review_status":  "E276370_REVIEW_P2_FIXED_TESTED; FINAL_DELTA_REVIEW_PENDING"
 }
