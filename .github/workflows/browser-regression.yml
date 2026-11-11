@@ -44,17 +44,17 @@ jobs:
       ALFRED_MEMORY_CLOUD_AUTHORIZED: "false"
       BASELINE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: |
             requirements.txt
             constraints/*.txt
-      - uses: browser-actions/setup-chrome@v1
+      - uses: browser-actions/setup-chrome@v2
       - name: Install dependencies
         run: |
           python -m pip install pip==26.2.2
@@ -89,7 +89,7 @@ jobs:
         run: python scripts/verify_native_runtime.py --browser --extended
       - name: Upload native proof (synthetic data only)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: native-windows-proof-${{ matrix.part }}
           path: |
@@ -109,11 +109,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: native-windows-proof-*
           path: artifacts/native-windows-parts
@@ -149,10 +149,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -161,7 +161,7 @@ jobs:
             constraints/*.txt
 
       - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@v2
 
       - name: Prepare browser artifact directory
         shell: bash
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload browser artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: browser-regression-artifacts-shard-${{ matrix.shard }}
           path: ${{ env.ALFRED_BROWSER_ARTIFACT_DIR }}
@@ -267,18 +267,18 @@ jobs:
     env:
       ALFRED_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: browser-regression-artifacts-shard-*
           path: artifacts/selenium-shards
       - name: Verify complete exact-source Windows browser coverage
         run: |
           python scripts/browser_test_plan.py --artifacts artifacts/selenium-shards --shards 3 --require-ci --job-result "${{ needs.selenium-shards.result }}" --checkout-sha "$GITHUB_SHA" --source-sha "$ALFRED_CI_SOURCE_SHA" --output artifacts/browser/selenium-aggregate.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: browser-regression-artifacts
@@ -289,15 +289,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: |
             requirements.txt
             constraints/*.txt
-      - uses: browser-actions/setup-chrome@v1
+      - uses: browser-actions/setup-chrome@v2
       - name: Install browser system dependencies
         run: |
           # No apt packages: portaudio19-dev only built PyAudio, removed from requirements in 5f6bb76; its apt fetch hung and failed this job.
@@ -324,7 +324,7 @@ jobs:
           --browser Chrome --require-browser --proof-label ci-linux-portable
       - name: Upload Linux portable browser proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: linux-portable-browser-artifacts
           path: artifacts/browser/
