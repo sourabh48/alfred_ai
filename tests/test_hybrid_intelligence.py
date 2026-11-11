@@ -61,7 +61,8 @@ class HybridIntelligenceTests(TestCase):
                 self.assertEqual(result['answer_style'], style)
                 self.assertEqual(result['local_output_token_limit'], limit)
                 self.assertEqual(self.local.reason.call_args.kwargs['max_output_tokens'], limit)
-                self.assertLessEqual(self.local.reason.call_args.kwargs['deadline']-time.monotonic(), 30)
+                # Compare the way the deadline is built: (t+30)-t can exceed 30 in floating point near 2**n seconds of uptime.
+                self.assertLessEqual(self.local.reason.call_args.kwargs['deadline'], time.monotonic()+30)
                 payload = self.local.reason.call_args.args[0]
                 self.assertEqual(payload['response_style'], style)
                 self.assertLessEqual(len(json.dumps(payload,ensure_ascii=False).encode()),4096)

@@ -27,7 +27,7 @@ class GeminiDevelopmentTests(SimpleTestCase):
         self.assertNotIn('key=', args[1])
         self.assertEqual(kwargs['json_body']['contents'], [{'role': 'user', 'parts': [{'text': PROMPT}]}])
         self.assertEqual(kwargs['max_bytes'], 16384)
-        self.assertLessEqual(kwargs['deadline']-time.monotonic(), 15)
+        self.assertLessEqual(kwargs['deadline'], time.monotonic()+15)  # (t+15)-t can exceed 15 in floating point
         self.assertEqual(kwargs['headers']['x-goog-api-key'], 'synthetic-test-key')
 
     def test_opt_in_debug_and_unpackaged_runtime_are_all_required(self):
