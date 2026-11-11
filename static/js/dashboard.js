@@ -10,7 +10,22 @@ document.addEventListener("DOMContentLoaded", () => {
     Alfred.enableLiveRefresh("dashboard-live", loadDashboard, { rootId: "dashboardRoot" });
 });
 
+// Career follow-ups load on their own: a Career failure never hides the finance dashboard.
+function loadCareerFollowUpReminder() {
+    const target = document.getElementById("dashboardCareerFollowUps");
+    return Alfred.fetchJSON("/api/career/follow-ups/").then(data => {
+        const due = data.due || [];
+        target.dataset.checkedOn = data.today || "";
+        target.hidden = !due.length;
+        if (!due.length) { target.replaceChildren(); return; }
+        const rows = due.slice(0, 5).map(item => `<li>${Alfred.escapeHtml(item.job_title || "Role")} · ${Alfred.escapeHtml(item.company || "Company not recorded")} · due ${Alfred.escapeHtml(item.due_on)}</li>`).join("");
+        Alfred.setHTML(target, `<strong>Career follow-ups due (${due.length})</strong><ul class="mb-1">${rows}</ul>
+            <a class="alert-link" href="/career/">Open Career</a> to mark one as sent after you send it yourself. ALFRED sends nothing.`);
+    }).catch(() => { target.hidden = true; });
+}
+
 function loadDashboard() {
+    loadCareerFollowUpReminder();
     Alfred.setPageBusy("dashboardRoot", true, { label: "Loading dashboard intelligence" });
     return Alfred.fetchJSON("/api/expenses/dashboard/")
         .then(renderDashboard)

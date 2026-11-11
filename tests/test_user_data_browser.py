@@ -5100,6 +5100,39 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
                 self.browser.save_screenshot(str(self.artifacts/f'career-recovery-{width}-{theme}.png'))
 
+    def test_home_dashboard_reminds_of_due_career_follow_ups_only(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.career.models import CareerJobAnalysis
+        from apps.career.services.application_tracker import apply_change
+        owner = self.scenario['user']; today = timezone.localdate()
+        applied = lambda days: {'application': apply_change({}, {'stage': 'applied', 'on': (today-timedelta(days=days)).isoformat()}, today=today)}
+        due = CareerJobAnalysis.objects.create(user=owner, job_title='Synthetic Due Role',
+            company='<img src=x onerror="window.dashboardFollowUpInjected=true">', extracted_payload=applied(10))
+        other = get_user_model().objects.create_user(username='synthetic-dashboard-followup-other')
+        CareerJobAnalysis.objects.create(user=other, job_title='OTHER-OWNER-SECRET', extracted_payload=applied(10))
+        self.login(); self.browser.get(self.live_server_url+'/')
+        self.wait.until(lambda _: 'Synthetic Due Role' in self.text('dashboardCareerFollowUps'))
+        notice = self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps')
+        self.assertEqual(notice.get_attribute('role'), 'status')
+        self.assertIn('Career follow-ups due (1)', notice.text)
+        self.assertIn('ALFRED sends nothing', notice.text)
+        self.assertNotIn('OTHER-OWNER', notice.text)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.dashboardFollowUpInjected)'))
+        self.assertEqual(notice.find_element(self.By.LINK_TEXT, 'Open Career').get_attribute('pathname'), '/career/')
+        self.wait.until(lambda _: self.text('dashboardSummaryCards'))
+        self.capture('dashboard-career-follow-up-due')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+            audit = self.browser.execute_async_script("const done=arguments[0];axe.run('#dashboardCareerFollowUps',{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done(r.violations));")
+            self.assertEqual(audit, [], theme)
+        due.extracted_payload = applied(1); due.save(update_fields=['extracted_payload'])
+        self.browser.refresh()
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').get_attribute('data-checked-on') == today.isoformat())
+        self.assertFalse(self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').is_displayed())
+
     def test_career_bad_history_does_not_hide_valid_followups_or_erase_records(self):
         from datetime import timedelta
         from django.utils import timezone
