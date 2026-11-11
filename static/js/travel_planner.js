@@ -5,6 +5,7 @@ window.TravelPlanner = (() => {
     const esc = value => Alfred.escapeHtml(String(value ?? ""));
     const money = value => Alfred.formatCurrency(value || 0);
     const state = {session: null, busy: false, timer: null, comparison: false, plans: []};
+    const dragAvailability = new WeakMap();
     let documentEpoch=0, documentActive=true, documentRefreshPending=false;
     let exportController=null;
     function clearDocuments() {
@@ -48,6 +49,10 @@ window.TravelPlanner = (() => {
     }
     const field = key => state.session?.state?.[key]?.value;
     function syncActionState() {
+        document.querySelectorAll('[data-editor-item][draggable], [data-editor-stop][draggable]').forEach(handle => {
+            if (!dragAvailability.has(handle)) dragAvailability.set(handle, handle.draggable);
+            handle.draggable = !state.busy && dragAvailability.get(handle);
+        });
         $('plannerExportPDF').disabled=state.busy || !state.session?.plan_id;
         $('plannerExportGPX').disabled=state.busy || !state.session?.plan_id;
         $('plannerPrepareICS').disabled=state.busy || !state.session?.plan_id;

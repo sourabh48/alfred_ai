@@ -6566,6 +6566,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for name in names:
             self.memory_click(f'#plannerStops [data-add-stop="{name}"]')
             self.wait.until(lambda _: name in ' '.join(e.text for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerStops ol li')))
+            self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'plannerSend').get_property('disabled'))
+            if name == names[0]:
+                self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li').get_property('draggable'))
         self.wait.until(lambda _: 'manually ordered stops' in self.text('plannerItinerary'))
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerItinerary [data-day]')), 4)
         self.assertIn('not optimized', self.text('plannerItinerary'))
@@ -6700,14 +6703,39 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         field.clear(); field.send_keys('Corrected synthetic museum')
         self.browser.find_element(self.By.CSS_SELECTOR,row+' button[type="submit"], '+row+' form button').send_keys(Keys.ENTER)
         self.wait.until(lambda _: 'Corrected synthetic museum' in self.browser.find_element(self.By.CSS_SELECTOR,row+' > strong').text)
+        self.wait.until(EC.element_to_be_clickable((self.By.CSS_SELECTOR,'[data-editor-reload]')))
+        self.browser.execute_script('''
+            const original=Alfred.fetchJSON, sessionId=arguments[0];
+            window.editorMoveResponseHeld=false;
+            Alfred.fetchJSON=async(...args)=>{
+                const result=await original(...args);
+                const payload=typeof args[1]?.body==='string'?JSON.parse(args[1].body):{};
+                if(String(args[0]).endsWith('/sessions/'+sessionId+'/') && payload.action==='itinerary_edit' && payload.operation==='move'){
+                    Alfred.fetchJSON=original;
+                    window.editorMoveResponseHeld=true;
+                    await new Promise(resolve=>{window.releaseEditorMoveResponse=resolve;});
+                }
+                return result;
+            };
+        ''',session.pk)
         source = self.browser.find_element(self.By.CSS_SELECTOR,row+' > strong')
         target = self.browser.find_element(self.By.CSS_SELECTOR,'[data-day="2"] [data-editor-item]:last-child > strong')
         self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'})",source)
-        ActionChains(self.browser).move_to_element(source).click_and_hold().pause(.3).move_to_element(target).pause(.3).release().perform()
         def moved():
             session.refresh_from_db()
             return any(i['id']==identity for i in session.itinerary['days'][1]['items'])
-        self.wait.until(lambda _: moved())
+        try:
+            ActionChains(self.browser).move_to_element(source).click_and_hold().pause(.3).move_to_element(target).pause(.3).release().perform()
+            self.wait.until(lambda _: moved())
+            self.wait.until(lambda _: self.browser.execute_script('return window.editorMoveResponseHeld'))
+            self.assertTrue(self.browser.find_element(self.By.ID,'plannerSave').get_property('disabled'))
+            self.assertTrue(all(not handle.get_property('draggable') for handle in
+                self.browser.find_elements(self.By.CSS_SELECTOR,'[data-editor-stop], [data-editor-item][draggable]')))
+        finally:
+            self.browser.execute_script('window.releaseEditorMoveResponse?.()')
+        self.wait.until(EC.element_to_be_clickable((self.By.CSS_SELECTOR,'[data-editor-reload]')))
+        self.assertTrue(all(handle.get_property('draggable') for handle in
+            self.browser.find_elements(self.By.CSS_SELECTOR,'[data-editor-stop]')))
         names = [s['name'] for s in value(session.state,'_itinerary_stops')]
         source = self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:first-child > strong')
         target = self.browser.find_element(self.By.CSS_SELECTOR,'#plannerStops ol li:last-child > strong')
