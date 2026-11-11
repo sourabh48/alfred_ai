@@ -360,7 +360,7 @@ function renderResumePanel(resume) {
     }
     const payload = resume.extracted_payload || {};
     const skillChips = (payload.skills || []).length
-        ? `<div class="d-flex flex-wrap gap-2 mt-2">${payload.skills.slice(0, 16).map(skill => `<span class="status-pill neutral">${Alfred.escapeHtml(skill)}</span>`).join("")}</div>`
+        ? `<div class="d-flex flex-wrap gap-2 mt-2">${payload.skills.map(skill => `<span class="status-pill neutral">${Alfred.escapeHtml(skill)}</span>`).join("")}</div>`
         : `<div class="muted small mt-2">No skill list extracted.</div>`;
     const linksBlock = (payload.links || []).length
         ? `<div class="mt-3">${payload.links.slice(0, 4).map(link => `<div><a href="${Alfred.safeHref(link)}" target="_blank" rel="noopener">${Alfred.escapeHtml(link)}</a></div>`).join("")}</div>`

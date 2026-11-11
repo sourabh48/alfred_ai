@@ -457,7 +457,7 @@ class CareerResumeUseDetailsView(APIView):
             resume.parser_status, resume.parse_confidence, "", payload, "", [], []))
         if not payload.get("profile_confirmed_at"):
             resume.extracted_payload = {**payload, "profile_confirmed_at": timezone.now().isoformat()}
-            resume.save(update_fields=["extracted_payload"])
+            resume.save(update_fields=["extracted_payload", "updated_at"])  # updated_at keys the dashboard cache
         return Response({"detail": "Your profile now uses these resume details.",
                          "resume": CareerResumeSerializer(resume, context={"request": request}).data,
                          "profile": CareerProfileSerializer(profile).data})

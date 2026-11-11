@@ -165,3 +165,16 @@ class CareerResumeUseDetailsTests(TestCase):
         self.assertEqual(self.client.post(f"/api/career/resumes/{self.resume(self.user, payload={}).pk}/use-details/").status_code, 400)
         self.client.logout()
         self.assertIn(self.client.post(f"/api/career/resumes/{foreign.pk}/use-details/").status_code, (401, 403))
+
+    def test_confirmation_keeps_every_owner_skill_and_refreshes_the_dashboard_key(self):
+        from apps.career.models import CareerProfile
+
+        owner_skills = [f"Skill{number}" for number in range(32)]
+        CareerProfile.objects.create(user=self.user, role="Owner Role", experience_years=2, skills=", ".join(owner_skills))
+        resume = self.resume(self.user)
+        before = resume.updated_at
+        self.assertEqual(self.client.post(f"/api/career/resumes/{resume.pk}/use-details/").status_code, 200)
+        saved = [item.strip() for item in CareerProfile.objects.get(user=self.user).skills.split(",")]
+        self.assertEqual(saved, owner_skills)  # nothing dropped; the list was already at the cap, so nothing new was added
+        resume.refresh_from_db()
+        self.assertGreater(resume.updated_at, before)

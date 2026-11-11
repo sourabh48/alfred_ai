@@ -486,13 +486,15 @@ class ResumeIntelligenceService:
     def _merge_skills(self, existing: str, skills: list[str]) -> str:
         merged = []
         seen = set()
-        for item in [*(segment.strip() for segment in (existing or "").split(",") if segment.strip()), *skills]:
+        owner = [segment.strip() for segment in (existing or "").split(",") if segment.strip()]
+        for index, item in enumerate([*owner, *skills]):
             key = item.lower()
-            if key in seen:
+            # Owner-saved skills are always kept; extracted ones are only added while the list is under 30.
+            if key in seen or (index >= len(owner) and len(merged) >= 30):
                 continue
             seen.add(key)
             merged.append(item)
-        return ", ".join(merged[:30])
+        return ", ".join(merged)
 
 
 resume_intelligence = ResumeIntelligenceService()
