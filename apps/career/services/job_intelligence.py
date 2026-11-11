@@ -209,6 +209,15 @@ def career_source_coverage_summary() -> dict:
     }
 
 
+# Hosting labels that name the job site, not the employer (careers.acme.com is Acme).
+GENERIC_HOST_LABELS = {"www", "careers", "career", "jobs", "job", "apply", "boards", "hiring", "work", "talent"}
+
+
+def _domain_company(domain: str) -> str:
+    labels = [label for label in domain.split(".")[:-1] if label not in GENERIC_HOST_LABELS] or domain.split(".")[:1]
+    return labels[0].replace("-", " ").title()
+
+
 @dataclass
 class JobPostingSnapshot:
     source_name: str
@@ -256,7 +265,7 @@ class JobIntelligenceService:
             source_name=raw.source_name,
             job_url=job_url,
             apply_url=raw.apply_url or job_url,
-            company=(raw.company or domain.split(".")[0].replace("-", " ").title())[:180],
+            company=(raw.company or _domain_company(domain))[:180],
             title=(raw.title or "")[:180],
             location=(raw.location or "")[:180],
             description=description,
@@ -1535,7 +1544,7 @@ class JobIntelligenceService:
         )
         description_node = soup.select_one('[data-automation-id="jobPostingDescription"]')
         apply_link = soup.find("a", href=True, string=re.compile(r"apply", re.IGNORECASE))
-        company = generic.company or domain.split(".")[0].replace("-", " ").title()
+        company = generic.company or _domain_company(domain)
         description_bits = []
         if description_node:
             description_bits.append(description_node.get_text(" ", strip=True))
@@ -1619,7 +1628,7 @@ class JobIntelligenceService:
         match = re.search(r"\bat\s+([A-Z][A-Za-z0-9&.,' -]{2,80})", f"{title} {description[:300]}")
         if match:
             return match.group(1).split(" - ", 1)[0].strip(" -")
-        return domain.split(".")[0].replace("-", " ").title()
+        return _domain_company(domain)
 
     def _extract_company_from_recruiter_text(self, text: str) -> str:
         for pattern in [r"(?i)\b(?:company|client|organization)\s*[:\-]\s*([A-Z][A-Za-z0-9&.,' -]{2,80})", r"(?i)\bat\s+([A-Z][A-Za-z0-9&.,' -]{2,80})"]:
