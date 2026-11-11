@@ -11,6 +11,7 @@
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "durations":  {
                       "tests.test_user_data_browser.UserDataBrowserTests.test_data_sources_expired_review_explains_recovery_and_cannot_confirm": 6.516,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_weak_resume_details_reach_the_profile_only_after_owner_confirms": 5.625,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_data_sources_explicit_knowledge_check_keyboard_reopen_and_key_recovery": 8.922,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_domain_stream_stop_buffered_figures_retry_citation_and_accessibility": 10.078,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_domain_stream_rejects_premature_preview_then_recovers_offline_cards": 6.735,

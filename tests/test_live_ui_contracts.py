@@ -398,7 +398,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         self.assertIn('scripts/browser_test_plan.py', aggregate)
         self.assertIn('--require-ci', aggregate)
         linux_job = workflow.split("\n  linux-secure-failure:\n", 1)[1]
-        self.assertIn("runs-on: ubuntu-latest", linux_job)
+        self.assertIn("runs-on: ubuntu-24.04", linux_job)
         self.assertIn("manage.py test tests.test_memory_platform", linux_job)
         self.assertIn("--require-browser --proof-label ci-linux-portable", linux_job)
         self.assertIn("Validate CI browser proof summary", workflow)
