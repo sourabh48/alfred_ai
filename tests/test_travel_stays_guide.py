@@ -65,3 +65,83 @@ class StaysGuideTests(SimpleTestCase):
         contract = quality_contract([ProviderResult("wikivoyage", "stays_guide", success=True, status="ok", freshness="LIVE", payload={})])
         self.assertNotIn("stays_guide", contract["verified"])
         self.assertIn("stays_guide", contract["research_leads"])
+
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from rest_framework.test import APIClient
+
+from apps.mobility.models import TravelPlanningSession, TravelProviderRequest
+from apps.mobility.services.travel.providers.web import HotelWebsite, lodging_details, robots_allows
+
+HOTEL_PAGE = """<html><head><script type="application/ld+json">{"@context":"https://schema.org","@graph":[
+ {"@type":"WebSite","name":"Not lodging"},
+ {"@type":["Hotel","LocalBusiness"],"name":"Synthetic <b>Lodge</b>","telephone":"+91 98 7654 3210<script>",
+  "address":{"@type":"PostalAddress","streetAddress":"1 Hill Road","addressLocality":"Manali","addressCountry":{"name":"IN"}},
+  "checkinTime":"14:00","checkoutTime":"11:00","priceRange":"₹₹","starRating":{"ratingValue":"3"},
+  "aggregateRating":{"ratingValue":"4.4","reviewCount":"120"},"petsAllowed":false,
+  "amenityFeature":[{"@type":"LocationFeatureSpecification","name":"Parking","value":true},
+                    {"@type":"LocationFeatureSpecification","name":"Pool","value":false},"Wifi"],
+  "geo":{"latitude":"32.2","longitude":"999"}}]}</script>
+<script type="application/ld+json">{ broken</script></head></html>"""
+
+
+class HotelWebsiteParserTests(SimpleTestCase):
+    def test_reads_only_lodging_schema_and_cleans_values(self):
+        details = lodging_details(HOTEL_PAGE)
+        self.assertEqual(details["name"], "Synthetic Lodge")
+        self.assertEqual(details["phone"], "+91 98 7654 3210")
+        self.assertEqual(details["address"], "1 Hill Road, Manali, IN")
+        self.assertEqual(details["amenities"], ["Parking", "Wifi"])
+        self.assertEqual((details["pets_allowed"], details["star_rating"], details["review_count"]), ("No", "3", "120"))
+        self.assertEqual(details["lat"], 32.2)
+        self.assertNotIn("lon", details)
+        self.assertEqual(lodging_details('<script type="application/ld+json">{"@type":"Restaurant","name":"x"}</script>'), {})
+        self.assertEqual(lodging_details('<meta name="description" content="Cosy <b>rooms</b>  by the river">'), {"page_summary": "Cosy rooms by the river"})
+
+    def test_robots_rules(self):
+        url = "https://stay.example.org/rooms"
+        self.assertFalse(robots_allows(url, lambda u: (200, "User-agent: *\nDisallow: /rooms")))
+        self.assertTrue(robots_allows(url, lambda u: (200, "User-agent: OtherBot\nDisallow: /")))
+        self.assertFalse(robots_allows(url, lambda u: (200, "User-agent: ALFRED-travel\nDisallow: /")))
+        self.assertTrue(robots_allows(url, lambda u: (404, "")))
+
+    def test_disallowed_site_is_never_opened(self):
+        provider = HotelWebsite("https://stay.example.org/")
+        robots = type("R", (), {"status": 200, "content": b"User-agent: *\nDisallow: /", "content_type": "text/plain"})
+        with patch.object(HotelWebsite, "_get", return_value=robots) as get:
+            with self.assertRaises(ProviderError) as raised:
+                provider.fetch({"url": "https://stay.example.org/"})
+        self.assertEqual(raised.exception.code, "robots_disallowed")
+        self.assertEqual([c.args[0] for c in get.call_args_list], ["https://stay.example.org/robots.txt"])
+
+    def test_only_its_own_url_is_accepted(self):
+        with self.assertRaises(ProviderError):
+            HotelWebsite("https://stay.example.org/").parameters({"url": "https://other.example.org/"})
+
+
+class StayDetailsEndpointTests(TestCase):
+    def setUp(self):
+        users = get_user_model().objects
+        self.owner = users.create_user("stayowner", password="synthetic-pass-1")
+        self.other = users.create_user("stayother", password="synthetic-pass-2")
+        option = {"name": "Synthetic Lodge", "website": "https://stay.example.org/"}
+        self.session = TravelPlanningSession.objects.create(user=self.owner, title="Synthetic trip",
+            candidates=[{"name": "Manali", "stays_guide_result": {"payload": {"options": [option]}}}])
+        self.client = APIClient()
+        self.url = f"/api/mobility/planner/sessions/{self.session.pk}/stay-details/"
+
+    def test_reads_a_listed_site_for_its_owner_only(self):
+        self.client.force_authenticate(self.owner)
+        self.assertEqual(self.client.post(self.url, {"url": "https://evil.example.org/"}, format="json").status_code, 400)
+        self.assertEqual(self.client.post(self.url, {"url": "http://stay.example.org/"}, format="json").status_code, 400)
+        with patch.object(HotelWebsite, "fetch", return_value=(HOTEL_PAGE, "hash")) as fetch:
+            response = self.client.post(self.url, {"url": "https://stay.example.org/"}, format="json")
+            again = self.client.post(self.url, {"url": "https://stay.example.org/"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["payload"]["details"]["name"], "Synthetic Lodge")
+        self.assertTrue(again.json()["cached"])
+        fetch.assert_called_once()
+        self.assertEqual(TravelProviderRequest.objects.filter(provider="hotel_website", network_call=True).count(), 1)
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.post(self.url, {"url": "https://stay.example.org/"}, format="json").status_code, 404)

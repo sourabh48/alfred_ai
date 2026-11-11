@@ -415,6 +415,28 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.assertIn("local budget left",self.text("plannerQuotaBody"))
         self.assertIn("per month",self.text("plannerQuotaBody"))
 
+    def test_guide_stay_reads_the_property_website_on_request(self):
+        from tests.test_travel_stays_guide import HOTEL_PAGE
+        article = "==Sleep==\n* {{sleep | name=Synthetic Lodge | url=https://stay.example.org/ | price=₹2000 }}\n==Connect==\n"
+        stays = patch("apps.mobility.services.travel.providers.web.WikivoyageStays.fetch", return_value=({"query":{"pages":[
+            {"pageid":7,"title":"Coorg","revisions":[{"timestamp":"2026-01-01T00:00:00Z","slots":{"main":{"content":article}}}]}]}},"stays-hash"))
+        site = patch("apps.mobility.services.travel.providers.web.HotelWebsite.fetch", return_value=(HOTEL_PAGE,"site-hash"))
+        stays.start(); self.addCleanup(stays.stop)
+        fetch = site.start(); self.addCleanup(site.stop)
+        self.browser.get(self.live_server_url+"/mobility/")
+        self.wait.until(lambda _: "destination is optional" in self.text("plannerMessages"))
+        self.send("Plan a 3-day bike trip from Bengaluru to Coorg. Budget 15000.")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,"[data-stay-details]"))
+        self.assertIn("Guide price: ₹2000", self.text("plannerEvidence"))
+        fetch.assert_not_called()  # Nothing is read from the property's site until the owner asks.
+        self.click("[data-stay-details]")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,"[data-stay-website-details]"))
+        details = self.browser.find_element(self.By.CSS_SELECTOR,"[data-stay-website-details]").text
+        self.assertIn("1 Hill Road, Manali, IN", details)
+        self.assertIn("Parking, Wifi", details)
+        self.assertNotIn("Pool", details)
+        fetch.assert_called_once()
+
     def test_date_change_keeps_edited_days_and_does_not_resurrect_old_forecast(self):
         self.browser.get(self.live_server_url + "/mobility/")
         self.wait.until(lambda _: "destination is optional" in self.text("plannerMessages"))

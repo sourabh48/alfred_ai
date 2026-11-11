@@ -21,7 +21,9 @@ from .services.travel.presentation import age_saved_facts
 from .services.travel.restrictions import KIND, record_restriction, restriction_context
 from .services.travel.links import booking_sites
 from .services.travel.mapping import map_configuration, map_features
-from .services.travel.cache import budget_status, usage_summary
+from .services.travel.cache import budget_status, query, usage_summary
+from .services.travel.providers.web import HotelWebsite
+from alfred_ai.services.public_http import normalized_link
 from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
 from .services.travel_itinerary import build_itinerary, build_multi_stop_itinerary, compare_stop_orders
@@ -371,6 +373,31 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
         return Response(session_payload(session))
 
 
+def _guide_websites(node):
+    if isinstance(node, dict):
+        for key, item in node.items():
+            if key == "stays_guide_result" and isinstance(item, dict):
+                for option in (item.get("payload") or {}).get("options") or []:
+                    if isinstance(option, dict) and option.get("website"):
+                        yield normalized_link(option["website"]).split("#", 1)[0]
+            else:
+                yield from _guide_websites(item)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _guide_websites(item)
+
+
+class TravelStayDetailsView(PrivateTravelSessionAPI):
+    """Reads one guide-listed property's own website on request; never an arbitrary URL."""
+
+    def post(self, request, pk):
+        session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
+        url = normalized_link(request.data.get("url")).split("#", 1)[0]
+        if not url or url not in set(_guide_websites(session.candidates)):
+            raise ValidationError("Choose a property website from this trip's guide listings.")
+        return Response(query(HotelWebsite(url), {"url": url}).as_dict())
+
+
 class TravelProviderUsage(APIView):
     permission_classes = [IsAdminUser]
 
@@ -381,10 +408,10 @@ class TravelProviderUsage(APIView):
         from .services.travel.providers.places import OverpassPlaces
         from .services.travel.providers.accommodation import DuffelAccommodation
         from .services.travel.providers.transport import DuffelFlights, IndianRailProvider
-        from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations, WikivoyageStays
+        from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations, WikivoyageStays, HotelWebsite
         providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),ValhallaRouting(),GoogleRoutes(),GooglePlaceSearch(),OverpassPlaces(),
                      DuffelAccommodation(),DuffelFlights(),IndianRailProvider(),BraveSearch(),
-                     SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations(),WikivoyageStays()]
+                     SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations(),WikivoyageStays(),HotelWebsite()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 

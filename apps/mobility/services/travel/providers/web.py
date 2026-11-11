@@ -362,3 +362,136 @@ class WikivoyageStays(WikivoyageSearch):
         return {"options": options, "article": title, "article_updated": str(revision.get("timestamp", ""))[:20],
                 "coverage": "Community travel-guide listings, CC BY-SA 4.0. Prices are as written by contributors, "
                             "not current rates; availability, parking and condition are unverified."}
+
+
+LODGING_TYPES = {"Hotel", "Motel", "Hostel", "Resort", "BedAndBreakfast", "LodgingBusiness", "Campground",
+                 "VacationRental", "SkiResort", "GuestHouse"}
+ROBOTS_AGENT = "ALFRED-travel"
+
+
+def _ld_items(node):
+    if isinstance(node, list):
+        for item in node:
+            yield from _ld_items(item)
+    elif isinstance(node, dict):
+        yield node
+        yield from _ld_items(node.get("@graph", []))
+
+
+def _text(value, limit=200):
+    if isinstance(value, dict):
+        value = value.get("name") or value.get("@value") or ""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return ""
+    return re.sub(r"\s+", " ", strip_tags(str(value))).strip()[:limit]
+
+
+def lodging_details(html):
+    """schema.org lodging facts the property publishes about itself; never prices or availability."""
+    from bs4 import BeautifulSoup
+    import json
+    soup = BeautifulSoup(html, "html.parser")
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"})[:20]:
+        try:
+            data = json.loads(script.string or script.get_text() or "")
+        except ValueError:
+            continue
+        for item in _ld_items(data):
+            kinds = item.get("@type")
+            if not LODGING_TYPES & set(kinds if isinstance(kinds, list) else [kinds]) - {None}:
+                continue
+            address = item.get("address")
+            if isinstance(address, dict):
+                address = ", ".join(filter(None, (_text(address.get(k), 120) for k in
+                    ("streetAddress", "addressLocality", "addressRegion", "postalCode", "addressCountry"))))
+            star = item.get("starRating")
+            rating = item.get("aggregateRating") if isinstance(item.get("aggregateRating"), dict) else {}
+            amenities = item.get("amenityFeature") or []
+            geo = item.get("geo") if isinstance(item.get("geo"), dict) else {}
+            def coordinate(key, bound):
+                try:
+                    return number(geo.get(key), low=-bound, high=bound)
+                except (ValueError, TypeError):
+                    return None
+            details = {
+                "name": _text(item.get("name"), 160), "description": _text(item.get("description"), 400),
+                "address": _text(address, 300), "phone": re.sub(r"[^0-9+() -]", "", _text(item.get("telephone"), 40)),
+                "check_in": _text(item.get("checkinTime"), 40), "check_out": _text(item.get("checkoutTime"), 40),
+                "price_range": _text(item.get("priceRange"), 80),
+                "star_rating": _text(star.get("ratingValue") if isinstance(star, dict) else star, 10),
+                "rating": _text(rating.get("ratingValue"), 10), "review_count": _text(rating.get("reviewCount") or rating.get("ratingCount"), 12),
+                "pets_allowed": _text(item.get("petsAllowed"), 60) if not isinstance(item.get("petsAllowed"), bool) else ("Yes" if item["petsAllowed"] else "No"),
+                "amenities": [name for name in (_text(a, 60) for a in (amenities if isinstance(amenities, list) else [amenities])[:40]
+                              if not (isinstance(a, dict) and a.get("value") is False)) if name][:20],
+                "lat": coordinate("latitude", 90), "lon": coordinate("longitude", 180),
+            }
+            return {key: value for key, value in details.items() if value not in ("", [], None)}
+    # No structured data: keep only the page's own one-line summary, clearly labelled as such.
+    meta = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
+    summary = _text(meta.get("content") if meta else "", 400)
+    return {"page_summary": summary} if summary else {}
+
+
+def robots_allows(url, fetch_text):
+    """RFC 9309: a missing robots.txt allows; anything unreadable is treated as a refusal."""
+    from urllib.robotparser import RobotFileParser
+    status, text = fetch_text(f"https://{urlsplit(url).hostname}/robots.txt")
+    if status in (404, 410):
+        return True
+    parser = RobotFileParser()
+    parser.parse(text.splitlines())
+    return parser.can_fetch(ROBOTS_AGENT, url)
+
+
+class HotelWebsite(Provider):
+    """One property's own public page, opened on the owner's request for a guide-listed website."""
+    name = "hotel_website"
+    category = "stay_website"
+    attribution = "Details published by the property on its own website; not verified by ALFRED"
+    ttl = timedelta(days=7)
+    limits = {"minute": 5, "hour": 30, "day": 100, "month": 1000}
+    min_interval = 2
+    allowed_parameters = {"url"}
+
+    def __init__(self, url=""):
+        self.source_url = normalized_link(url).split("#", 1)[0]
+
+    def unavailable_reason(self):
+        return "web_research_disabled" if os.getenv("TRAVEL_WEB_ENABLED", "true") != "true" else ""
+
+    def parameters(self, parameters):
+        url = normalized_link(Provider.parameters(self, parameters).get("url")).split("#", 1)[0]
+        if not url or url != self.source_url:
+            raise ProviderError("invalid_parameters")
+        return {"url": url}
+
+    @staticmethod
+    def _get(url, content_types, statuses=(200,)):
+        from alfred_ai.services.public_http import PublicHTTPError
+        from . import base  # The shared boundary that tests and other providers patch.
+        try:
+            response = base.request("GET", url, content_types=content_types, accepted_statuses=statuses, max_bytes=2_000_000)
+        except PublicHTTPError as exc:
+            raise ProviderError(exc.code, retry_after=exc.retry_after) from None
+        return response
+
+    def fetch(self, p):
+        def robots(url):
+            try:
+                response = self._get(url, ("text/plain", "text/html"), (200, 404, 410))
+            except ProviderError:
+                raise ProviderError("robots_unreadable", retry_after=3600) from None
+            # An HTML page in place of robots.txt has no rules, like a missing file.
+            return response.status, response.content.decode("utf-8", "replace") if response.content_type == "text/plain" else ""
+        if not robots_allows(p["url"], robots):
+            raise ProviderError("robots_disallowed", retry_after=86400)
+        response = self._get(p["url"], ("text/html", "application/xhtml+xml"))
+        return response.content.decode("utf-8", "replace"), response.response_hash
+
+    def normalize(self, raw, p):
+        details = lodging_details(raw)
+        return {"website": p["url"], "website_host": urlsplit(p["url"]).hostname, "details": details,
+                "coverage": ("Read from the property's own website (schema.org data). These are the property's own statements; "
+                             "prices and availability are not current rates." if set(details) - {"page_summary"} else
+                             "This website has no structured hotel details; shown is its own page summary. Open it to read more." if details else
+                             "This website does not publish machine-readable hotel details. Open it to read them yourself.")}

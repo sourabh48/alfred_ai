@@ -48,7 +48,23 @@ window.TravelResearchPanels = (() => {
         const r = d.stays_guide_result || {};
         const rows = (r.payload?.options || []).slice(0,12);
         if (!rows.length) return "";
-        return `<div data-stays-guide><h4 class="h6 mt-3">Guide listings · ${esc(r.payload?.article)}</h4>${provenance(r)}<p class="small">From the Wikivoyage travel guide. Prices are as written by contributors, not current rates. Availability, parking and condition are unverified: contact the property before you rely on a listing.</p><div class="travel-research-cards">${rows.map(o=>`<article><h5 class="h6">${esc(o.name)}</h5>${o.tier ? `<p class="small">${esc(o.tier)}</p>` : ""}${o.price_text ? `<p>Guide price: ${esc(o.price_text)}</p>` : ""}${o.description ? `<p class="small">${esc(o.description)}</p>` : ""}${o.address ? `<p class="small">${esc(o.address)}</p>` : ""}${o.check_in || o.check_out ? `<p class="small">Check-in ${esc(o.check_in || "unknown")} · check-out ${esc(o.check_out || "unknown")}</p>` : ""}${o.phone ? `<p class="small">Phone ${esc(o.phone)}</p>` : ""}${o.website ? `<p>${link(o.website,"Property website")}</p>` : o.website_host ? `<p class="small">Website (not a secure link): ${esc(o.website_host)}</p>` : ""}<p class="small">${link(o.source_url,"Guide entry")}${o.listing_updated ? ` · listing updated ${esc(o.listing_updated)}` : ""}</p></article>`).join("")}</div><p class="small">${esc(r.payload?.coverage)}</p></div>`;
+        return `<div data-stays-guide><h4 class="h6 mt-3">Guide listings · ${esc(r.payload?.article)}</h4>${provenance(r)}<p class="small">From the Wikivoyage travel guide. Prices are as written by contributors, not current rates. Availability, parking and condition are unverified: contact the property before you rely on a listing.</p><div class="travel-research-cards">${rows.map(o=>`<article><h5 class="h6">${esc(o.name)}</h5>${o.tier ? `<p class="small">${esc(o.tier)}</p>` : ""}${o.price_text ? `<p>Guide price: ${esc(o.price_text)}</p>` : ""}${o.description ? `<p class="small">${esc(o.description)}</p>` : ""}${o.address ? `<p class="small">${esc(o.address)}</p>` : ""}${o.check_in || o.check_out ? `<p class="small">Check-in ${esc(o.check_in || "unknown")} · check-out ${esc(o.check_out || "unknown")}</p>` : ""}${o.phone ? `<p class="small">Phone ${esc(o.phone)}</p>` : ""}${o.website ? `<p>${link(o.website,"Property website")}</p><div aria-live="polite">${stayDetailsHtml.get(o.website) || `<button class="btn btn-sm btn-outline-secondary" data-stay-details="${esc(o.website)}">Get details from this website</button>`}</div>` : o.website_host ? `<p class="small">Website (not a secure link): ${esc(o.website_host)}</p>` : ""}<p class="small">${link(o.source_url,"Guide entry")}${o.listing_updated ? ` · listing updated ${esc(o.listing_updated)}` : ""}</p></article>`).join("")}</div><p class="small">${esc(r.payload?.coverage)}</p></div>`;
+    }
+    const stayDetailsHtml = new Map();
+    const STAY_ERRORS = {robots_disallowed:"This website asks automated tools not to read it. Open it yourself.",
+        robots_unreadable:"ALFRED could not confirm that this website allows automated reading, so it did not read it.",
+        redirect_blocked:"This website sends visitors to another address. Open it yourself.",
+        authorization_failed:"This website refuses automated readers. Open it yourself.",
+        network_error:"The website did not respond.", timeout:"The website did not respond in time.",
+        response_too_large:"This page is too large to read safely. Open it yourself.",
+        api_error:"The website returned an error page.", unexpected_content_type:"This link is not a web page."};
+    function stayDetails(r) {
+        if (!r.success) return `<p class="small travel-unknown">${esc(STAY_ERRORS[r.error] || `Could not read this website: ${(r.error || "unavailable").replaceAll("_"," ")}.`)}</p>`;
+        const x = r.payload?.details || {};
+        const rows = [["Name",x.name],["Address",x.address],["Phone",x.phone],["Check-in",x.check_in],["Check-out",x.check_out],
+            ["Price range (property's own)",x.price_range],["Stars",x.star_rating],["Rating",x.rating && `${x.rating}${x.review_count ? ` from ${x.review_count} reviews` : ""}`],
+            ["Pets",x.pets_allowed],["Amenities",(x.amenities || []).join(", ")],["About",x.description],["Page summary",x.page_summary]].filter(([,v])=>v);
+        return `${rows.length ? `<dl class="small" data-stay-website-details>${rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}<p class="small">${esc(r.payload?.coverage)} ${r.cached ? "Saved copy" : "Checked"} ${esc(stamp(r.retrieved_at))}.</p>`;
     }
     function transport(d) {
         return `<h3 class="h5">Train, bus and flight research</h3>${["trains","buses","flights"].map(kind=>{
@@ -122,6 +138,17 @@ window.TravelResearchPanels = (() => {
         $("plannerEvidence")?.addEventListener("click",async e=>{
             const choice = e.target.closest("[data-research-destination]");
             if (choice) { selectedName=choice.dataset.researchDestination; render(session); }
+            const detailsButton = e.target.closest("[data-stay-details]");
+            if (detailsButton) {
+                const url = detailsButton.dataset.stayDetails;
+                detailsButton.disabled = true;
+                detailsButton.textContent = "Reading the property's website…";
+                try {
+                    stayDetailsHtml.set(url, stayDetails(await Alfred.fetchJSON(`/api/mobility/planner/sessions/${session.id}/stay-details/`,
+                        {method:"POST", body:JSON.stringify({url})})));
+                    render(session);
+                } catch (err) { detailsButton.disabled = false; detailsButton.textContent = `Try again · ${err.message}`; }
+            }
             if (e.target.id === "plannerLoadMap") { mapEnabled=true; renderMap(selected()); e.target.hidden=true; }
             if (e.target.id === "plannerLoadQuota") {
                 try {

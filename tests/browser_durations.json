@@ -55,6 +55,7 @@
                       "tests.test_document_review_browser.DocumentReviewBrowserTests.test_vehicle_invoice_overlay_candidate_buttons_fill_and_save_correction":  4.171,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_chat_to_saved_plan_desktop_and_mobile":  15.562,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_date_change_keeps_edited_days_and_does_not_resurrect_old_forecast":  8.594,
+                      "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_guide_stay_reads_the_property_website_on_request":  7.5,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_motorcycle_restriction_review_status_retry_conflict_withdrawal_and_expiry":  10.125,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_pending_action_disables_suggestions_until_response_finishes":  4.547,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_preferences_load_failure_does_not_enable_unknown_privacy_controls":  1.391,
