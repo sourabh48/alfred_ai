@@ -1,5 +1,23 @@
 # ALFRED execution state
 
+## Codex handoff recovery and Travel stays - 2026-11-12
+
+- Recovered: PR #22 (head f8b11fd, including Codex's 20666ae and the browser-wait repair 0764f58/bc9c158) is merged
+  and closed; no PR is open. origin/master is 0e18ec5. The uncommitted docs in F:/ALFRED/alfred_ai
+  (work/usability-integration) are Codex's pre-merge 20666ae checkpoint, superseded by master; left untouched,
+  as is the owner's materialized_cache.py edit.
+- Travel: guide stay listings from the Wikivoyage API (4584301) and, on the owner's click, schema.org details
+  read from a guide-listed hotel's own website (0e18ec5): robots.txt honoured, no redirects, cookies or evasion,
+  7-day cache and budgets; booking sites stay links only. Guide prices are labelled, never claimed current.
+- CI at 0e18ec5: run 43100756834 PASS, all 11 jobs. The first push run failed once in the Linux job's
+  test_currency_source_cards_and_exact_decimal_formatting on a slow runner (API calls 10-18 s), then ended
+  startup_failure on reruns during a GitHub Actions outage; classified environment/timeout, no code change.
+- RUNTIME-12: owner-approved ruleset 27070437 blocks master deletion and force push (2026-11-12). Workflow
+  actions moved to Node 24 releases in 7c4f7a2. Both are local on work/ci-node24, not pushed.
+- Queue: no eligible task; every row has a recorded owner, external or dependency blocker.
+- Next: owner checks / approvals listed in EXECUTION_QUEUE; Scrapling Career pilot not before 2026-11-18;
+  pushing these local commits publishes docs to Pages and needs owner approval.
+
 ## PR #22 master integration - 2026-11-11
 
 - Merged: PR #22 fast-forwarded master c730360 -> f8b11fd (exact PR head; PR run 43048075205 green on all 11 jobs).
