@@ -211,7 +211,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         amount = self.browser.find_element(self.By.ID, 'reviewAmount0')
         amount.clear(); amount.send_keys('120.25')
         self.memory_click('button[value="save"]')
-        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
+        # The save reloads the page; read the field in one page script so a node from the old page is never probed.
+        self.wait.until(lambda _: self.browser.execute_script("return document.querySelector('input[name=revision]')?.value === '1'"))
         self.assertEqual(Expense.objects.filter(user=owner).count(), before)
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
         findings = []
@@ -230,11 +231,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.save_screenshot(str(self.artifacts/f'statement-review-{width}-{theme}.png'))
         self.memory_click('input[name="reviewed"]')
         self.memory_click('button[value="confirm"]')
-        self.wait.until(lambda _: 'This preview was confirmed' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: self.browser.execute_script("return document.querySelector('main')?.innerText.includes('This preview was confirmed')"))
         self.assertEqual(Expense.objects.filter(user=owner).count(), before+1)
         self.assertEqual(Expense.objects.get(statement_upload=upload).amount, Decimal('120.25'))
         self.browser.refresh()
-        self.wait.until(lambda _: 'This preview was confirmed' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: self.browser.execute_script("return document.querySelector('main')?.innerText.includes('This preview was confirmed')"))
         self.assertEqual(Expense.objects.filter(user=owner).count(), before+1)
         self.assertTrue(Path(upload.original_file.path).is_file())
         self.browser.save_screenshot(str(self.artifacts/'statement-review-confirmed.png'))
@@ -264,7 +265,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         emi = self.browser.find_element(self.By.ID, 'loanReview0-emi')
         emi.clear(); emi.send_keys('450.25')
         self.memory_click('button[value="save"]')
-        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
+        self.wait.until(lambda _: self.browser.execute_script("return document.querySelector('input[name=revision]')?.value === '1'"))
         self.assertEqual(Loan.objects.filter(user=owner).count(), before)
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
         findings = []
@@ -350,7 +351,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for field in ('asset_type', 'invested_amount', 'annual_return_rate'):
             self.browser.find_element(self.By.CSS_SELECTOR, f'input[name="row-0-reviewed-{field}"]').send_keys(Keys.SPACE)
         self.memory_click('button[value="save"]')
-        self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
+        self.wait.until(lambda _: self.browser.execute_script("return document.querySelector('input[name=revision]')?.value === '1'"))
         self.assertEqual(Investment.objects.filter(user=owner).count(), before)
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
         findings = []
