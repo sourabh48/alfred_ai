@@ -19,6 +19,34 @@ from tests.test_expense_money_identity import parsed_fixture
 
 
 class StatementReviewTests(TestCase):
+    def test_missing_or_changed_retained_source_cannot_confirm(self):
+        for action in ('replace', 'delete', 'unverified'):
+            with self.subTest(action=action):
+                upload = self.stage()
+                token = statement_preview(upload)['token']
+                if action == 'replace': Path(upload.original_file.path).write_bytes(b'%PDF changed synthetic source')
+                elif action == 'delete': Path(upload.original_file.path).unlink()
+                else:
+                    upload.extracted_payload.pop('source_sha256')
+                    upload.save(update_fields=['extracted_payload'])
+                self.assertFalse(statement_preview(upload)['can_confirm'])
+                self.assertEqual(self.confirm(upload, token).status_code, 409)
+                self.assertFalse(Expense.objects.exists())
+
+    def test_document_center_retry_conflict_preserves_edited_statement(self):
+        from copy import deepcopy
+        from apps.expenses.services.statement_review import edit_statement_preview
+        upload = self.stage()
+        edit_statement_preview(upload, revision=0, edits=[{'index':0,'amount':'12.34'}])
+        upload.refresh_from_db()
+        before = deepcopy(upload.extracted_payload)
+        response = self.client.post('/api/documents/review-queue/retry/',
+            {'scope':'statement_document','id':upload.pk}, content_type='application/json')
+        self.assertEqual(response.status_code, 409)
+        upload.refresh_from_db()
+        self.assertEqual(upload.extracted_payload, before)
+        self.assertFalse(Expense.objects.exists())
+
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-statement-review-synthetic-')))
         self.enterContext(override_settings(MEDIA_ROOT=root/'media', ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits')))

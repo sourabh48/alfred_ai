@@ -174,6 +174,10 @@ def _post_reviewed_statement_upload(*, user, parsed: StatementParseResult, state
 
 def queue_statement_retry(upload: StatementUpload, *, reason: str = "") -> StatementUpload:
     payload = dict(upload.extracted_payload or {})
+    review = payload.get('import_review', {})
+    if review.get('state') == 'pending' and review.get('revision', 0):
+        from .statement_review import StatementReviewConflict
+        raise StatementReviewConflict('The edited preview is preserved. Finish reviewing it before retrying.')
     retry_state = dict(payload.get("background_retry") or {})
     ocr_progress = dict(payload.get("ocr_progress") or {})
     retry_state.update(

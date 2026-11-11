@@ -5575,6 +5575,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.click_upload_button("documentStatementForm")
             self.wait.until(lambda _: StatementUpload.objects.filter(file_name=statement.name).count() == attempt)
             self.wait.until(lambda _: "processed" in self.text("documentStatementFeedback").casefold())
+            upload = StatementUpload.objects.filter(user=self.scenario['user'], file_name=statement.name).latest('pk')
+            self.assertEqual(upload.extracted_payload['import_review']['state'], 'pending')
+            self.assertEqual(Expense.objects.filter(user=self.scenario['user'], source='bank_statement',
+                bank_account__account_number='999988887777').count(), 0 if attempt == 1 else len(expected_rows))
+            self.memory_click(f'a[href="/expenses/uploads/{upload.pk}/review/"]')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.NAME, 'reviewed'))
+            self.memory_click('input[name="reviewed"]')
+            self.memory_click('button[value="confirm"]')
+            self.wait.until(lambda _: 'This preview was confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
             rows = list(Expense.objects.filter(source="bank_statement", bank_account__account_number="999988887777").values_list("transaction_fingerprint", "external_reference", "amount"))
             balances = list(BankAccount.objects.filter(account_number="999988887777").values_list("current_balance", flat=True))
             if attempt == 1:
@@ -5583,6 +5592,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             else:
                 self.assertEqual(rows, expected_rows)
                 self.assertEqual(balances, expected_balances)
+            self.browser.get(self.live_server_url+'/documents/')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'documentStatementFile'))
         self.capture("upload-statement-deduplication")
 
     def test_family_invitation_limits_show_safe_feedback_then_allow_valid_acceptance(self):

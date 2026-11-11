@@ -404,7 +404,8 @@ def document_review_retry_api_view(request):
     except Exception as exc:
         from apps.loans.services.import_review import LoanReviewConflict
         from apps.investments.services.import_review import InvestmentReviewConflict
-        if isinstance(exc, (LoanReviewConflict, InvestmentReviewConflict)):
+        from apps.expenses.services.statement_review import StatementReviewConflict
+        if isinstance(exc, (LoanReviewConflict, InvestmentReviewConflict, StatementReviewConflict)):
             return JsonResponse({"error": "The review changed or contains saved corrections. Open the current review before retrying."}, status=409)
         if payload.get("scope") not in {"loan_document", "loan_closure_document", "investment_document"}:
             raise

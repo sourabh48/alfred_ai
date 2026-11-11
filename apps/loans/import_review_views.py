@@ -100,7 +100,8 @@ def loan_import_review_view(request, pk):
                 edit = {'index': row['index']}
                 for field in row['form_fields']:
                     value = request.POST.get(f"row-{row['index']}-{field['name']}", '')
-                    if request.POST.get('action') == 'save' or value != field['value']:
+                    if value != field['value'] or (field['status'] == 'estimated' and
+                            request.POST.get(f"row-{row['index']}-reviewed-{field['name']}") == 'yes'):
                         edit[field['name']] = value
                 action = request.POST.get(f"row-{row['index']}-action", '')
                 target = request.POST.get(f"row-{row['index']}-target_id", '')

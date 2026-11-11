@@ -29,6 +29,25 @@ def extraction(**changes):
 
 
 class InvestmentReviewTests(TestCase):
+    def test_saving_other_fields_preserves_estimates_until_explicit_field_review(self):
+        document = self.stage()
+        document.extracted_payload['import_review']['candidate'][0]['field_status']['invested_amount'] = 'estimated'
+        document.save(update_fields=['extracted_payload'])
+        url = f'/investments/import-uploads/{document.pk}/review/'
+        row = self.client.get(url).context['preview']['rows'][0]
+        data = {f"row-0-{field['name']}": field['value'] for field in row['form_fields']}
+        data.update(action='save', revision=0, page=1, **{'row-0-action':'create','row-0-currency':'USD'})
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['field_status']['invested_amount'], 'estimated')
+        self.assertFalse(investment_preview(document)['can_confirm'])
+        data.update(revision=1, **{'row-0-reviewed-invested_amount':'yes'})
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['field_status']['invested_amount'], 'owner_entered')
+        self.assertTrue(investment_preview(document)['can_confirm'])
+        self.assertFalse(Investment.objects.exists())
+
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-investment-review-')))
         self.enterContext(override_settings(MEDIA_ROOT=root/'media', ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits')))

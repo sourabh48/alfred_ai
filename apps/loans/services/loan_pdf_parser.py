@@ -221,7 +221,7 @@ class LoanPDFParser:
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return loan_money(match.group(1).replace(',', ''))
+                return self._source_amount(match.group(1).replace(',', ''))
 
         return None
 
@@ -250,7 +250,7 @@ class LoanPDFParser:
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return loan_money(match.group(1).replace(',', ''))
+                return self._source_amount(match.group(1).replace(',', ''))
 
         return None
 
@@ -283,9 +283,17 @@ class LoanPDFParser:
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return loan_money(match.group(1).replace(',', ''))
+                return self._source_amount(match.group(1).replace(',', ''))
 
         return None
+
+    @staticmethod
+    def _source_amount(value):
+        try:
+            loan_money(value)
+        except ValueError:
+            return None
+        return Decimal(value)
 
     def _extract_start_date(self, text: str) -> str | None:
         """Extract loan start date."""

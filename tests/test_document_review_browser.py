@@ -28,6 +28,20 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        import threading
+        from unittest.mock import patch
+        from django.core.handlers.base import BaseHandler
+        # As in UserDataBrowserTests, the live server shares one in-memory SQLite connection.
+        request_turn = threading.Lock()
+        original_get_response = BaseHandler.get_response
+
+        def serialized_response(handler, request):
+            with request_turn:
+                return original_get_response(handler, request)
+
+        tracker = patch.object(BaseHandler, 'get_response', serialized_response)
+        tracker.start()
+        cls.addClassCleanup(tracker.stop)
         try:
             from selenium import webdriver
             from selenium.common.exceptions import WebDriverException
@@ -431,15 +445,59 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         submit = form.find_element(self.By.CSS_SELECTOR, "button[type=submit]")
         self.selenium.execute_script("arguments[0].scrollIntoView({block:'center', behavior:'instant'});", submit)
         submit.click()
-        self.wait.until(lambda driver: type(record).objects.get(pk=record.pk).extracted_payload.get("review_queue_resolved"))
+        if scope in ('loan_document', 'investment_document'):
+            self.wait.until(lambda _: all(str(type(record).objects.get(pk=record.pk).extracted_payload
+                .get('accepted_corrections', {}).get(name)) == value for name, value in corrections.items()))
+        else:
+            self.wait.until(lambda driver: type(record).objects.get(pk=record.pk).extracted_payload.get("review_queue_resolved"))
         record.refresh_from_db()
         for name, value in corrections.items():
             self.assertEqual(str(record.extracted_payload["accepted_corrections"][name]), value)
+        if scope in ('loan_document', 'investment_document'):
+            self.assertEqual(record.extracted_payload['import_review']['state'], 'pending')
+            self.assertFalse(record.extracted_payload.get('review_queue_resolved'))
+            links = record.linked_loans if scope == 'loan_document' else record.linked_investments
+            self.assertFalse(links.exists())
+            self.selenium.refresh()
+            self.wait.until(self.EC.presence_of_element_located((self.By.ID, form_id)))
+            return
         self.selenium.refresh()
         self.wait.until(self.EC.presence_of_element_located((self.By.ID, "documentCenterRoot")))
         if scope != "loan_closure_document":
             self.wait.until(lambda driver: record.file_name in driver.find_element(self.By.ID, "documentCenterRoot").text)
         self.assertFalse(self.selenium.find_elements(self.By.ID, form_id))
+
+    def _confirm_first_investment_in_browser(self, document):
+        from apps.investments.models import Investment
+        before = list(Investment.objects.filter(user=self.user).values())
+        self.selenium.get(self.live_server_url + f'/investments/import-uploads/{document.pk}/review/')
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, 'investmentReview0-currency')))
+        self.Select(self.selenium.find_element(self.By.ID, 'investmentReview0-currency')).select_by_value('INR')
+        for name in ('monthly_sip', 'annual_return_rate'):
+            field = self.selenium.find_element(self.By.ID, f'investmentReview0-{name}')
+            field.clear()
+            field.send_keys('0')
+        for field in self.selenium.find_elements(self.By.CSS_SELECTOR, 'input[type="checkbox"][name^="row-0-reviewed-"]'):
+            self.selenium.execute_script("arguments[0].scrollIntoView({block:'center'})", field)
+            field.click()
+        for index, field in enumerate(self.selenium.find_elements(self.By.CSS_SELECTOR, 'select[name$="-action"]')):
+            self.Select(field).select_by_value('create' if index == 0 else 'skip')
+        save = self.selenium.find_element(self.By.CSS_SELECTOR, 'button[value="save"]')
+        self.selenium.execute_script("arguments[0].scrollIntoView({block:'center'})", save)
+        save.click()
+        self.wait.until(self.EC.staleness_of(save))
+        self.wait.until(self.EC.presence_of_element_located((self.By.ID, 'investmentReview0-currency')))
+        self.wait.until(lambda _: self.selenium.find_element(self.By.ID, 'investmentReview0-currency')
+                        .get_attribute('value') == 'INR' and
+                        self.selenium.find_element(self.By.CSS_SELECTOR, 'button[value="confirm"]').is_enabled())
+        self.assertEqual(list(Investment.objects.filter(user=self.user).values()), before)
+        checkbox = self.selenium.find_element(self.By.NAME, 'reviewed')
+        self.selenium.execute_script("arguments[0].scrollIntoView({block:'center'})", checkbox)
+        checkbox.click()
+        self.selenium.find_element(self.By.CSS_SELECTOR, 'button[value="confirm"]').click()
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.selenium.find_element(self.By.TAG_NAME, 'main').text)
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['state'], 'confirmed')
 
     def test_resume_review_form_preserves_and_saves_decimal_experience(self):
         resume = CareerResume.objects.create(user=self.user, file_name="checked-resume.txt",
@@ -499,11 +557,13 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         document = InvestmentImportDocument.objects.get(user=self.user, file_name=pdf.name)
         self.assertEqual(document.parser_status, 'needs_review')
         self.assertFalse(document.linked_investments.exists())
-        self.wait.until(lambda _: 'Uncertain table amounts' in self.selenium.find_element(self.By.ID, 'investmentImportList').text)
+        self.wait.until(lambda _: self.selenium.find_elements(self.By.CSS_SELECTOR,
+            f'a[href="/investments/import-uploads/{document.pk}/review/"]'))
         self._save_family_correction_in_browser('investment_document', document, {
             'asset_name': 'Synthetic Alpha Fund', 'asset_type': 'mutual_fund',
             'account_number': 'SYNTH-A', 'invested_amount': '100.25', 'current_value': '110.20',
         })
+        self._confirm_first_investment_in_browser(document)
         row = document.linked_investments.get()
         self.assertEqual(row.current_value, Decimal('110.20'))
         self.assertEqual(row.account_number, 'SYNTH-A')
@@ -513,14 +573,17 @@ class DocumentReviewBrowserTests(StaticLiveServerTestCase):
         self._capture_browser_artifacts()
 
     def test_investment_review_rounds_money_and_preserves_source_evidence(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
         document = InvestmentImportDocument.objects.create(
             user=self.user, file_name="checked-investment.pdf", parser_status="needs_review",
+            uploaded_file=SimpleUploadedFile('checked-investment.pdf', b'%PDF synthetic retained source'),
             parse_confidence=.2, extracted_payload={"raw_source_amount": "2.675"},
         )
         self._save_family_correction_in_browser("investment_document", document, {
             "asset_name": "Checked Cash", "asset_type": "cash",
             "invested_amount": "2.675", "current_value": "3.075",
         })
+        self._confirm_first_investment_in_browser(document)
         holding = document.linked_investments.get()
         self.assertEqual(holding.invested_amount, Decimal("2.68"))
         self.assertEqual(holding.current_value, Decimal("3.08"))

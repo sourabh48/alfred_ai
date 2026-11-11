@@ -30,6 +30,25 @@ def extraction(**changes):
 
 
 class LoanImportReviewTests(TestCase):
+    def test_saving_other_fields_preserves_estimates_until_explicit_field_review(self):
+        document = self.stage()
+        document.extracted_payload['import_review']['candidate'][0]['field_status']['principal'] = 'estimated'
+        document.save(update_fields=['extracted_payload'])
+        url = f'/loans/import-uploads/{document.pk}/review/'
+        row = self.client.get(url).context['preview']['rows'][0]
+        data = {f"row-0-{field['name']}": field['value'] for field in row['form_fields']}
+        data.update(action='save', revision=0, page=1, **{'row-0-action':'create','row-0-currency':'USD'})
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['field_status']['principal'], 'estimated')
+        self.assertFalse(loan_preview(document)['can_confirm'])
+        data.update(revision=1, **{'row-0-reviewed-principal':'yes'})
+        self.assertEqual(self.client.post(url, data).status_code, 302)
+        document.refresh_from_db()
+        self.assertEqual(document.extracted_payload['import_review']['candidate'][0]['field_status']['principal'], 'owner_entered')
+        self.assertTrue(loan_preview(document)['can_confirm'])
+        self.assertFalse(Loan.objects.exists())
+
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-loan-review-synthetic-')))
         self.enterContext(override_settings(MEDIA_ROOT=root/'media', ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits')))
@@ -187,16 +206,21 @@ class LoanImportReviewTests(TestCase):
             'ROI: 10.5%', 'Tenure: 24 Months', 'Start Date: 01/01/2025', 'Currency: INR')
         with patch('apps.loans.services.loan_pdf_parser.apply_parser_learning', side_effect=lambda **kwargs: (kwargs['confidence'], [])):
             parsed = loan_pdf_parser.parse_document(SimpleUploadedFile('synthetic-real.pdf', source))
-        self.assertEqual(parsed['loans'][0]['principal'], Decimal('10000.02'))
-        self.assertEqual(parsed['loans'][0]['remaining_balance'], Decimal('8000.01'))
+        self.assertEqual(parsed['loans'][0]['principal'], Decimal('10000.015'))
+        self.assertEqual(parsed['loans'][0]['remaining_balance'], Decimal('8000.005'))
+        self.assertEqual(parsed['loans'][0]['emi'], Decimal('500.005'))
         response = self.client.post('/api/loans/import-pdf/',
             {'file': SimpleUploadedFile('synthetic-real.pdf', source, content_type='application/pdf')})
         self.assertEqual(response.status_code, 201, response.content)
         self.assertFalse(Loan.objects.exists())
         document = LoanImportDocument.objects.get(pk=response.json()['upload']['id'])
+        self.assertEqual(document.extracted_payload['import_review']['original'][0]['principal'], '10000.015')
         self.assertTrue(loan_preview(document)['can_confirm'])
         self.assertEqual(self.confirm(document).status_code, 200)
         self.assertEqual(Loan.objects.get().principal, Decimal('10000.02'))
+        invalid = loan_pdf_parser._extract_loan_details('HDFC PERSONAL LOAN Principal Amount: 10000000000000000.123 EMI Amount: 10.005')
+        self.assertIsNone(invalid['principal'])
+        self.assertEqual(invalid['emi'], Decimal('10.005'))
         missing = loan_pdf_parser._extract_loan_details('HDFC PERSONAL LOAN Principal Amount: 10000')
         for field in ('remaining_balance', 'emi', 'interest_rate', 'tenure_months', 'start_date', 'currency'):
             self.assertIsNone(missing[field], field)

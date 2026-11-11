@@ -16,6 +16,7 @@
     <p>Parser confidence: {% widthratio preview.confidence 1 100 %}%. {{ preview.parser_notes }}</p>
     {% if preview.partial %}<p class="alert alert-warning">Partial extraction: only the extracted pages are shown. Retry the original for remaining pages; a retry requires a new review.</p>{% endif %}
     {% if preview.expired %}<p class="alert alert-warning">This extraction's confirmation has expired. {% if preview.revision %}Keep this edited preview, open the original source and upload it again to prepare a fresh preview.{% else %}Retry the original source to prepare a new preview.{% endif %}</p>{% endif %}
+    {% if not preview.source_ok %}<p class="alert alert-warning">The retained source is missing, changed or unverified. Keep this preview and re-upload the original before confirming.</p>{% endif %}
     <p>{{ preview.row_count }} extracted rows; {{ preview.duplicate_count }} duplicates to skip; {{ preview.new_count }} new rows. Duplicate checks use the existing account-scoped identity rules.</p>
     <p>Existing account balance: {% if preview.existing_account %}{{ preview.existing_account.current_balance|default_if_none:"Unknown" }} ({{ preview.existing_account.currency|default:"currency not recorded" }}){% else %}New account or unresolved account{% endif %}.
         Proposed recorded closing balance: {{ preview.proposed_closing_balance|default_if_none:"Not supplied" }}. Confirm the source date and denomination; no conversion or bank authentication is performed.</p>

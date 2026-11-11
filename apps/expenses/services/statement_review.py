@@ -16,6 +16,7 @@ from ..models import BankAccount, Expense, StatementUpload
 from ..money import expense_money, identity_amount
 from .statement_import import ParsedTransaction, StatementParseResult, clean_statement_text
 from .transaction_intelligence import _normalize_account_number, build_transaction_fingerprint, build_reference_signature
+from .statement_evidence import file_reference
 
 SALT = 'alfred.statement-review.v1'
 MAX_ROWS = 2000
@@ -78,6 +79,7 @@ def stage_statement(*, user, parsed, statement_kind, statement_file=None, existi
         payload['import_review_receipts'] = receipts
     payload['import_review'] = dict(id=uuid4().hex, revision=0, state='pending',
         expires_at=(timezone.now() + timedelta(days=1)).isoformat(), original=snapshot, candidate=snapshot)
+    payload['source_sha256'] = file_reference(upload.original_file)[1]
     upload.extracted_payload = payload
     upload.save(update_fields=['extracted_payload'])
     from apps.reports.services import operational_logging_service
@@ -134,20 +136,22 @@ def statement_preview(upload, *, page=1):
                             original=review['original']['transactions'][index]))
         preview[-1]['amount'] = str(expense_money(item.amount))
         preview[-1]['closing_balance'] = None if item.closing_balance is None else str(expense_money(item.closing_balance))
-    binding = dict(owner=upload.user_id, upload=upload.pk, review=review['id'], revision=review['revision'],
+    source_status, fingerprint, _ = file_reference(upload.original_file)
+    source_ok = source_status == 'available' and fingerprint == (upload.extracted_payload or {}).get('source_sha256')
+    binding = dict(owner=upload.user_id, upload=upload.pk, review=review['id'], revision=review['revision'], source=fingerprint,
                    candidate=_digest(snapshot), dependencies=dependency, metadata=_digest({field: getattr(upload, field)
                        for field in ('source', 'bank_name', 'account_holder', 'account_number', 'statement_start', 'statement_end')}))
     expired = timezone.now() >= timezone.datetime.fromisoformat(review['expires_at'])
     return dict(upload_id=upload.pk, state=review['state'], revision=review['revision'],
         token=signing.dumps(binding, salt=SALT) if review['state'] == 'pending' and not expired else None,
-        expired=expired, expires_at=review['expires_at'], token_max_age_seconds=1800,
+        expired=expired, expires_at=review['expires_at'], token_max_age_seconds=1800, source_ok=source_ok,
         confidence=snapshot['confidence'], parser_notes=snapshot['parser_notes'], partial=bool(snapshot['preview_only']),
         account_number=snapshot['account_number'], bank_name=snapshot['bank_name'],
         existing_account=account_data_public(account), proposed_closing_balance=preview[-1]['closing_balance'] if preview else None,
         rows=preview[(page-1)*PAGE_SIZE:page*PAGE_SIZE], page=page,
         pages=max(1, (len(preview)+PAGE_SIZE-1)//PAGE_SIZE), row_count=len(preview), duplicate_count=duplicates,
         new_count=len(preview)-duplicates, can_confirm=bool(preview) and bool(_normalize_account_number(snapshot['account_number']))
-            and not expired and review['state'] == 'pending')
+            and source_ok and not expired and review['state'] == 'pending')
 
 
 def account_data_public(account):

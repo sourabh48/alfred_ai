@@ -34,6 +34,7 @@
                 <option value="">Not recorded</option>{% for value, label in field.choices %}<option value="{{ value }}" {% if field.value == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>{% else %}<input class="form-control" id="loanReview{{ row.index }}-{{ field.name }}" name="row-{{ row.index }}-{{ field.name }}" type="{{ field.kind }}" value="{{ field.value }}" {% if field.kind == 'number' %}step="any"{% endif %} maxlength="120">{% endif %}
             <p class="small mt-1">{{ field.status }}. Original: {{ field.original|default_if_none:"Not extracted" }}</p>
+            {% if field.status == 'estimated' %}<label class="d-block small"><input type="checkbox" name="row-{{ row.index }}-reviewed-{{ field.name }}" value="yes"> I checked this estimated value against the source.</label>{% endif %}
         </div>{% endfor %}
         <div class="col-12 col-lg-6"><label for="loanReviewAction{{ row.index }}" class="form-label">Reviewed action</label>
             <select class="form-select" id="loanReviewAction{{ row.index }}" name="row-{{ row.index }}-action">
