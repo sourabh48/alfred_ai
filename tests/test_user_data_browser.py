@@ -346,6 +346,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         value.clear(); value.send_keys('120.25')
         Select(self.browser.find_element(self.By.ID, 'investmentReview0-currency')).select_by_value('INR')
         self.browser.find_element(self.By.ID, 'investmentReview0-monthly_sip').send_keys('0')
+        for field in ('asset_type', 'invested_amount', 'annual_return_rate'):
+            self.browser.find_element(self.By.CSS_SELECTOR, f'input[name="row-0-reviewed-{field}"]').send_keys(Keys.SPACE)
         self.memory_click('button[value="save"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="revision"]').get_attribute('value') == '1')
         self.assertEqual(Investment.objects.filter(user=owner).count(), before)
@@ -5363,8 +5365,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.wait.until(lambda _: 'Recorded values ready. Local AI is unavailable' in self.text('intelligenceFeedback'))
             self.assertIn('current value: 2,345.67 · Currency not recorded', self.text('intelligenceAnswers'))
             self.assertIn('No model explanation or new calculation', self.text('intelligenceAnswers'))
-            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'), '')
-            self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceRetry').get_property('hidden'))
+            self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'), 'Explain this record')
+            self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceRetry').get_property('hidden'))
             self.capture('canonical-offline-source-cards')
             if local.reason.call_count == 1:
                 self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))

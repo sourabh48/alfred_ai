@@ -724,8 +724,7 @@ document.addEventListener("DOMContentLoaded", () => {
             throw new Error('Connection ended before validation. Your draft is preserved; retry when ready.');
         } catch (error) {
             if (active && ticket === generation) {
-                if ([401,403,409].includes(error.status)) text.textContent = '';
-                if (!text.textContent.trim()) partial.remove();
+                if ([401,403,409].includes(error.status) || (!text.textContent.trim() && !payload.conversation_id)) partial.remove();
                 else {
                     partial.dataset.status = 'partial'; label.textContent = payload.conversation_id
                         ? 'Partial, unverified preview. A completed turn may already be saved; reopen history or retry safely.'
