@@ -12,6 +12,26 @@ from apps.loans.models import Loan, LoanImportDocument
 from apps.mobility.models import BikeProfile, TravelPlan, TravelPreferenceProfile
 
 
+# Every place ALFRED reads a web page rather than a free API or official download. Owner rule (2026-11-12):
+# read a site's pages only where its data is not available free. tests/test_data_sources.py fails when code
+# starts accepting HTML responses in a file that is not listed here.
+PUBLIC_PAGE_READS = (
+    dict(module='Career', file='apps/career/services/job_intelligence.py',
+         what='A job page whose link you paste, when the job site has no free job API. Greenhouse, Lever and Ashby '
+              'jobs come from their free public APIs instead.',
+         sent='The link you pasted', safeguard="Only on your request, and only if the site's robots.txt allows it."),
+    dict(module='Travel', file='apps/mobility/services/travel/providers/web.py',
+         what="A guide-listed hotel's own website, for the details it publishes about itself.",
+         sent="The hotel's website address", safeguard="Only when you ask for that hotel; robots.txt is checked first."),
+    dict(module='Tax', file='apps/integrations/services/verified_intelligence.py',
+         what='The official Union Budget website (indiabudget.gov.in), to notice a new Budget year.',
+         sent='Nothing about you', safeguard='It has no API. Used as a notice only; tax rules are not changed from it.'),
+    dict(module='Investments', file='apps/investments/services/portfolio_intelligence.py',
+         what="AMFI's official NAV history download (portal.amfiindia.com).",
+         sent='The date range', safeguard='A free official text download that the server may label as a web page.'),
+)
+
+
 def knowledge_sources_snapshot(user):
     """Explicit owner check: metadata only, using existing retention/source validation."""
     from datetime import datetime
@@ -131,4 +151,5 @@ def data_sources_snapshot(user):
     next_setup = next((s for s in sources if s['state'] in ('Unavailable', 'Import needs attention', 'Review needed')), None)
     if next_setup is None:
         next_setup = next((s for s in sources if not s['has_data']), None)
-    return dict(sources=sources, populated=sum(item['has_data'] for item in sources), total=len(sources), next_setup=next_setup)
+    return dict(sources=sources, populated=sum(item['has_data'] for item in sources), total=len(sources), next_setup=next_setup,
+                page_reads=PUBLIC_PAGE_READS)

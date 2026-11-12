@@ -1,5 +1,18 @@
 # ALFRED execution state
 
+## Websites read directly, listed and guarded - 2026-11-12
+
+- `next`: the queue still has no eligible task; continued the owner's free-sources-first Web Intelligence
+  direction. 66cd3ed and c4878b7 pushed to master (owner approved); Pages build success; Browser Regression
+  on c4878b7 was still running at this checkpoint.
+- Data Sources now has "Websites ALFRED reads directly" (alfred_ai/services/data_sources.py PUBLIC_PAGE_READS):
+  Career job pages without a free job API, a guide-listed hotel's own website, the official Union Budget site, and
+  AMFI's NAV history download, each with what is sent and the safeguard. tests/test_data_sources.py fails when a
+  non-test file under apps/ or alfred_ai/ starts accepting HTML responses without an entry, so a new page reader
+  needs a free-source review first.
+- Evidence: tests.test_data_sources 19 PASS; Data Sources browser tests 4 PASS with axe clean (the table's
+  scroll region is keyboard-focusable). Not checked: phone-width screenshot of the new table.
+
 ## Free job-board APIs before page reading - 2026-11-12
 
 - Owner directive with the ALFRED 2.0 master prompt: do not crawl sites whose data is free; read a page only where

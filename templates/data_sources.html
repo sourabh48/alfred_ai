@@ -58,6 +58,17 @@
     </article></div>
 {% endfor %}
 </section>
+<section class="surface-card mb-4" aria-labelledby="pageReadsTitle">
+    <h2 class="h4" id="pageReadsTitle">Websites ALFRED reads directly</h2>
+    <p>Public data comes from free APIs and official downloads where they exist. ALFRED reads a website's own page only in the cases below, where no free source has the data. Your private records are never sent to these sites.</p>
+    <div class="table-responsive" tabindex="0" role="region" aria-labelledby="pageReadsTitle">
+    <table class="table table-sm align-middle" id="pageReadsTable">
+        <caption class="visually-hidden">Websites ALFRED reads directly, what is sent and the safeguards</caption>
+        <thead><tr><th scope="col">Module</th><th scope="col">What is read</th><th scope="col">What is sent</th><th scope="col">Safeguard</th></tr></thead>
+        <tbody>{% for item in page_reads %}<tr><th scope="row">{{ item.module }}</th><td>{{ item.what }}</td><td>{{ item.sent }}</td><td>{{ item.safeguard }}</td></tr>{% endfor %}</tbody>
+    </table>
+    </div>
+</section>
 <section class="surface-card" aria-labelledby="knowledgeSourcesTitle">
     <h2 class="h4" id="knowledgeSourcesTitle">Personal knowledge and permissions</h2>
     <p>Check counts and retention in your existing encrypted local vault. No document text, filenames or memory facts are displayed here. Document copies remain unverified evidence; conversation statements become permanent facts only after your explicit review.</p>

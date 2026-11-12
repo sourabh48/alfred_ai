@@ -281,3 +281,27 @@ class KnowledgeReadinessTests(TestCase):
                          {'action':['check_knowledge','check_knowledge']}):
                 self.assertEqual(self.client.post('/data-sources/', data).status_code, 400)
         self.assertFalse(self.directory.exists())
+
+
+class PublicPageReadPolicyTests(TestCase):
+    """Owner rule: read a website's pages only where its data is not available free."""
+
+    def test_every_html_reader_is_listed_and_every_listing_is_real(self):
+        from pathlib import Path
+        from django.conf import settings
+        from alfred_ai.services.data_sources import PUBLIC_PAGE_READS
+        root = Path(settings.BASE_DIR)
+        readers = {path.relative_to(root).as_posix()
+                   for folder in ('apps', 'alfred_ai') for path in (root / folder).rglob('*.py')
+                   if 'tests' not in path.parts and 'migrations' not in path.parts
+                   and any(token in path.read_text(encoding='utf-8') for token in ('"text/html"', "'text/html'", 'xhtml'))}
+        listed = {item['file'] for item in PUBLIC_PAGE_READS}
+        self.assertEqual(readers, listed, 'A new web-page reader needs a free-source review and a PUBLIC_PAGE_READS entry.')
+
+    def test_data_sources_page_lists_the_page_reads(self):
+        from alfred_ai.services.data_sources import PUBLIC_PAGE_READS
+        self.client.force_login(get_user_model().objects.create_user(username='page_reads_owner', password='Orbit-X8!Lantern'))
+        response = self.client.get('/data-sources/')
+        self.assertContains(response, 'Websites ALFRED reads directly')
+        for item in PUBLIC_PAGE_READS:
+            self.assertContains(response, item['what'].replace("'", '&#x27;'))
