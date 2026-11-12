@@ -6,7 +6,7 @@ from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -15,7 +15,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 
 from apps.investments.models import FundPortfolioSnapshot, Investment, InvestmentImportDocument
-from apps.investments.services.fund_look_through import LookThroughError, parse_portfolio
+from apps.investments.services.fund_look_through import LookThroughChoice, LookThroughError, parse_portfolio
 
 TODAY = date(2026, 11, 12)
 MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -23,7 +23,11 @@ RELS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 def xlsx(rows, shared=("Synthetic Alpha Flexi Cap Fund",), doctype=False):
-    """A minimal workbook: text cells inline (or shared when listed in `shared`), numbers as values."""
+    return workbook({"Portfolio": rows}, shared, doctype)
+
+
+def workbook(sheets, shared=("Synthetic Alpha Flexi Cap Fund",), doctype=False):
+    """A minimal workbook, one sheet per name: text cells inline (or shared when listed in `shared`), numbers as values."""
     strings = list(shared)
     def cell(ref, value):
         if isinstance(value, (int, float, Decimal)):
@@ -31,16 +35,18 @@ def xlsx(rows, shared=("Synthetic Alpha Flexi Cap Fund",), doctype=False):
         if value in strings:
             return f'<c r="{ref}" t="s"><v>{strings.index(value)}</v></c>'
         return f'<c r="{ref}" t="inlineStr"><is><t>{escape(value)}</t></is></c>'
-    body = "".join(f'<row r="{r}">' + "".join(cell(f"{chr(65 + c)}{r}", v) for c, v in enumerate(row) if v is not None) + "</row>"
-                   for r, row in enumerate(rows, 1))
+    body = lambda rows: "".join(f'<row r="{r}">' + "".join(cell(f"{chr(65 + c)}{r}", v) for c, v in enumerate(row) if v is not None) + "</row>"
+                                for r, row in enumerate(rows, 1))
     head = '<?xml version="1.0"?>' + ('<!DOCTYPE x [<!ENTITY a "a">]>' if doctype else "")
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("xl/workbook.xml", f'<workbook xmlns="{MAIN}" xmlns:r="{RELS}"><sheets><sheet name="Portfolio" sheetId="1" r:id="rId1"/></sheets></workbook>')
-        archive.writestr("xl/_rels/workbook.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                         '<Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')
+        archive.writestr("xl/workbook.xml", f'<workbook xmlns="{MAIN}" xmlns:r="{RELS}"><sheets>' + "".join(
+            f'<sheet name={quoteattr(name)} sheetId="{n}" r:id="rId{n}"/>' for n, name in enumerate(sheets, 1)) + "</sheets></workbook>")
+        archive.writestr("xl/_rels/workbook.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + "".join(
+            f'<Relationship Id="rId{n}" Target="worksheets/sheet{n}.xml"/>' for n in range(1, len(sheets) + 1)) + "</Relationships>")
+        for n, rows in enumerate(sheets.values(), 1):
+            archive.writestr(f"xl/worksheets/sheet{n}.xml", f'{head}<worksheet xmlns="{MAIN}"><sheetData>{body(rows)}</sheetData></worksheet>')
         archive.writestr("xl/sharedStrings.xml", f'<sst xmlns="{MAIN}">' + "".join(f"<si><t>{escape(s)}</t></si>" for s in strings) + "</sst>")
-        archive.writestr("xl/worksheets/sheet1.xml", f'{head}<worksheet xmlns="{MAIN}"><sheetData>{body}</sheetData></worksheet>')
     return buffer.getvalue()
 
 
@@ -58,6 +64,23 @@ ALPHA = [
     ["Net Receivables / (Payables)", None, None, None, -20.0, -0.02],
     ["Grand Total", None, None, None, 1272.6, 1.0],
 ]
+BETA_ROWS = [
+    ["Synthetic Beta Large Cap Fund"],
+    ["Monthly portfolio as on 31-Aug-2026"],
+    [],
+    ["Company", "ISIN", "Sector", "% to NAV"],
+    ["Synthetic Bank Ltd", "INE000A01011", "Banks", 25],
+    ["Synthetic Power Ltd", "INE000C01013", "Power", 50],
+    ["Cash & equivalents", None, None, 25],
+]
+INDEX_ROWS = [["Synthetic Fund House: list of schemes"], ["Alpha"], ["Beta"]]
+
+
+def book():
+    """One fund house workbook: an index sheet without a portfolio table, then one sheet per fund."""
+    return workbook({"Index": INDEX_ROWS, "Alpha": ALPHA, "Beta": BETA_ROWS})
+
+
 BETA_CSV = (
     "Synthetic Beta Large Cap Fund\nMonthly portfolio as on August 31, 2026\n"
     "Company,ISIN,Sector,% to NAV\n"
@@ -87,6 +110,19 @@ class FundPortfolioParserTests(TestCase):
         self.assertEqual([item["reason"] for item in parsed["opaque"]],
                          ["Another fund's units; its holdings are not in this file", "No security ISIN"])
         self.assertEqual(parsed["total_pct"], Decimal("98.00"))
+
+    def test_a_workbook_with_several_funds_needs_the_owners_choice_of_sheet(self):
+        with self.assertRaises(LookThroughChoice) as raised:
+            parse_portfolio(book(), "house.xlsx")
+        self.assertEqual(raised.exception.funds, [{"sheet": "Alpha", "scheme": "Synthetic Alpha Flexi Cap Fund"},
+                                                  {"sheet": "Beta", "scheme": "Synthetic Beta Large Cap Fund"}])
+        beta = parse_portfolio(book(), "house.xlsx", "Beta")
+        self.assertEqual((beta["scheme"], beta["as_of"], len(beta["securities"])), ("Synthetic Beta Large Cap Fund", date(2026, 8, 31), 2))
+        with self.assertRaises(LookThroughChoice):  # a sheet that is not one of the funds is never replaced by a guess
+            parse_portfolio(book(), "house.xlsx", "Index")
+        # Sheets without a portfolio table do not count: one fund needs no choice.
+        only = parse_portfolio(workbook({"Index": INDEX_ROWS, "Alpha": ALPHA}), "house.xlsx")
+        self.assertEqual(only["scheme"], "Synthetic Alpha Flexi Cap Fund")
 
     def test_unsupported_malformed_and_unsafe_files_are_refused(self):
         with self.assertRaises(LookThroughError):
@@ -161,6 +197,27 @@ class FundLookThroughApiTests(TestCase):
                 self.assertNotIn("Theirs", response.content.decode())
         mismatched = self.client.post("/api/investments/look-through/analyze/", {"file": [SimpleUploadedFile("a.csv", BETA_CSV)], "investment": []})
         self.assertEqual(mismatched.status_code, 400)
+
+    def test_one_workbook_serves_two_holdings_once_the_owner_picks_each_fund(self):
+        def post(sheets=None, save=False):
+            data = {"file": [SimpleUploadedFile("house.xlsx", book()), SimpleUploadedFile("house.xlsx", book())],
+                    "investment": [str(self.alpha.pk), str(self.beta.pk)]}
+            return self.client.post("/api/investments/look-through/analyze/",
+                                    {**data, **({"sheet": sheets} if sheets is not None else {}), **({"save": "1"} if save else {})})
+        asked = post(save=True)
+        self.assertEqual(asked.status_code, 200, asked.content)
+        self.assertEqual(asked.json()["choose"], {"file_index": 0, "funds": [
+            {"sheet": "Alpha", "scheme": "Synthetic Alpha Flexi Cap Fund"}, {"sheet": "Beta", "scheme": "Synthetic Beta Large Cap Fund"}]})
+        self.assertNotIn("funds", asked.json())
+        self.assertFalse(FundPortfolioSnapshot.objects.exists())  # nothing is saved until every fund is chosen
+        self.assertEqual(post(["Alpha", ""]).json()["choose"]["file_index"], 1)
+        data = post(["Alpha", "Beta"], save=True).json()
+        self.assertEqual([fund["scheme_in_file"] for fund in data["funds"]], ["Synthetic Alpha Flexi Cap Fund", "Synthetic Beta Large Cap Fund"])
+        self.assertEqual(data["overlaps"], [{"funds": [self.alpha.pk, self.beta.pk], "common_securities": 1, "overlap_pct": "25.00"}])
+        self.assertEqual(sorted(FundPortfolioSnapshot.objects.values_list("scheme", flat=True)),
+                         ["Synthetic Alpha Flexi Cap Fund", "Synthetic Beta Large Cap Fund"])
+        self.assertEqual(post(["Alpha"]).status_code, 400)
+        self.assertEqual(post(["Alpha", "B" * 101]).status_code, 400)
 
     def test_sign_in_and_csrf_are_required(self):
         anonymous = Client()

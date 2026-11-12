@@ -846,13 +846,36 @@ function addLookThroughRow() {
                 <input class="form-control form-control-sm" id="lookThroughFile${n}" name="file" type="file" accept=".xlsx,.csv" required></div>
         </div>`;
     rows.append(row);
+    // A different file may hold different funds, so an earlier "which fund" choice no longer applies.
+    row.querySelector("input[type=file]").addEventListener("change", () => row.querySelector("[data-sheet-choice]")?.remove());
     fillLookThroughHoldings(lookThroughHoldings);
     document.getElementById("lookThroughAdd").disabled = rows.children.length >= 5;
 }
 
+function askWhichFund(row, funds, status) {
+    row.querySelector("[data-sheet-choice]")?.remove();
+    const id = `${row.querySelector("input[type=file]").id}Sheet`;
+    const box = document.createElement("div");
+    box.className = "col-12";
+    box.dataset.sheetChoice = "";
+    const label = document.createElement("label");
+    label.className = "form-label small";
+    label.htmlFor = id;
+    label.textContent = "This file has several funds. Which one is this holding?";
+    const select = document.createElement("select");
+    select.className = "form-select form-select-sm";
+    select.id = id;
+    select.name = "sheet";
+    select.append(new Option("Choose a fund", ""), ...funds.map(fund => new Option(fund.scheme === fund.sheet ? fund.sheet : `${fund.sheet}: ${fund.scheme}`, fund.sheet)));
+    box.append(label, select);
+    row.querySelector(".row").append(box);
+    status.textContent = "This file has several funds. Choose which one belongs to the holding, then show again.";
+    select.focus();
+}
+
 function fillLookThroughHoldings(items) {
     lookThroughHoldings = items;
-    document.querySelectorAll("#lookThroughRows select").forEach(select => {
+    document.querySelectorAll("#lookThroughRows select[name=investment]").forEach(select => {
         const chosen = select.value;
         select.replaceChildren(new Option("Choose a holding", ""), ...items.map(item => new Option(item.asset_name, String(item.id))));
         select.value = items.some(item => String(item.id) === chosen) ? chosen : "";
@@ -863,9 +886,9 @@ async function submitLookThrough(event) {
     event.preventDefault();
     const status = document.getElementById("lookThroughStatus"), result = document.getElementById("lookThroughResult");
     const button = document.getElementById("lookThroughSubmit");
-    const payload = new FormData();
+    const payload = new FormData(), used = [];
     for (const row of document.querySelectorAll("#lookThroughRows fieldset")) {
-        const select = row.querySelector("select"), file = row.querySelector("input[type=file]").files[0];
+        const select = row.querySelector("select[name=investment]"), file = row.querySelector("input[type=file]").files[0];
         if (!select.value && !file) continue;
         if (!select.value || !file) {
             status.textContent = "Choose both a holding and its file for each fund, or leave the row empty.";
@@ -874,6 +897,8 @@ async function submitLookThrough(event) {
         }
         payload.append("investment", select.value);
         payload.append("file", file);
+        payload.append("sheet", row.querySelector("select[name=sheet]")?.value || "");
+        used.push(row);
     }
     if (!payload.has("file")) { status.textContent = "Add at least one fund's portfolio file."; return; }
     const save = document.getElementById("lookThroughSave").checked;
@@ -882,6 +907,7 @@ async function submitLookThrough(event) {
     status.textContent = "Reading the files…";
     try {
         const data = await Alfred.fetchJSON("/api/investments/look-through/analyze/", { method: "POST", body: payload });
+        if (data.choose) { result.replaceChildren(); askWhichFund(used[data.choose.file_index], data.choose.funds, status); return; }
         renderLookThrough(data);
         const kept = data.funds.filter(fund => fund.saved_snapshot).length;
         status.textContent = save ? `Read ${data.funds.length} file(s). Saved ${kept} portfolio(s).` : `Read ${data.funds.length} file(s). Nothing was saved.`;

@@ -29,6 +29,7 @@ from ..money import investment_money
 MAX_FILES = 5
 MAX_ROWS = 5000
 STALE_DAYS = 45
+MAX_SHEETS = 200
 KEEP_PER_HOLDING = 3
 PARSER_VERSION = 1
 ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
@@ -44,6 +45,14 @@ DATE_PATTERNS = (
 
 class LookThroughError(ValueError):
     pass
+
+
+class LookThroughChoice(LookThroughError):
+    """The workbook holds several funds; the owner must say which sheet belongs to the holding."""
+
+    def __init__(self, funds):
+        super().__init__("This file has several funds. Choose which one belongs to the holding.")
+        self.funds, self.index = funds, None
 
 
 def _local(tag):
@@ -165,8 +174,18 @@ def _header(rows):
     return None
 
 
-def parse_portfolio(raw: bytes, filename: str) -> dict:
-    """One scheme's dated weights from its monthly portfolio file (.xlsx or .csv)."""
+def _title(rows, start, sheet_name):
+    """Scheme name and portfolio date from the rows above the table, each joined: a CSV splits "August 31, 2026" at its comma."""
+    above = [text for row in rows[:start] if (text := _text(" ".join(_text(cell) for cell in row)))]
+    scheme = next((text for text in above if re.search(r"\b(fund|scheme|etf|plan)\b", text, re.I)), sheet_name or None)
+    return scheme, next((found_date for text in above if (found_date := _date(text))), None)
+
+
+def parse_portfolio(raw: bytes, filename: str, sheet: str | None = None) -> dict:
+    """One scheme's dated weights from its monthly portfolio file (.xlsx or .csv).
+
+    A workbook with a portfolio table on several sheets needs `sheet` (the sheet's name); it is never guessed.
+    """
     extension = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     if extension not in {"xlsx", "csv"}:
         raise LookThroughError("Upload the fund's monthly portfolio as .xlsx or .csv (save an .xls file as .xlsx first).")
@@ -175,18 +194,18 @@ def parse_portfolio(raw: bytes, filename: str) -> dict:
         sheets = _xlsx_sheets(raw) if extension == "xlsx" else [("", _csv_rows(raw))]
     except (zipfile.BadZipFile, ElementTree.ParseError, KeyError):
         raise UploadFormatError() from None
-    # shortcut: the first sheet with a portfolio table is read; workbooks listing many schemes need one upload per sheet later.
-    for sheet_name, rows in sheets:
-        found = _header(rows)
-        if found:
-            break
-    else:
+    tables = [(sheet_name, rows, found) for sheet_name, rows in sheets if (found := _header(rows))]
+    if not tables:
         raise LookThroughError("No portfolio table was found. The file needs ISIN and % to net assets columns.")
+    if len(tables) > 1:
+        chosen = [table for table in tables if table[0] == sheet]
+        if sheet is None or not chosen:
+            raise LookThroughChoice([{"sheet": name[:100], "scheme": (_title(rows, found[0], name)[0] or name)[:160]}
+                                     for name, rows, found in tables[:MAX_SHEETS]])
+        tables = chosen
+    sheet_name, rows, found = tables[0]
     start, name_col, isin_col, sector_col, weight_col = found
-    # Rows above the table, each joined: a CSV splits "August 31, 2026" at its comma.
-    above = [text for row in rows[:start] if (text := _text(" ".join(_text(cell) for cell in row)))]
-    scheme = next((text for text in above if re.search(r"\b(fund|scheme|etf|plan)\b", text, re.I)), sheet_name or None)
-    as_of = next((found_date for text in above if (found_date := _date(text))), None)
+    scheme, as_of = _title(rows, start, sheet_name)
     cell = lambda row, index: row[index] if index is not None and index < len(row) else None
     securities, opaque = defaultdict(lambda: {"weight_pct": Decimal(0)}), []
     for row in rows[start + 1:]:
@@ -228,12 +247,22 @@ def _holdings(user, ids):
     return holdings
 
 
-def look_through(user, uploads: list[tuple[int, bytes, str]], *, today: date, save: bool = False) -> dict:
-    """uploads: (investment id, file bytes, file name). Owner's chosen holdings only; parsed rows are kept only if save."""
+def look_through(user, uploads: list[tuple[int, bytes, str]], *, today: date, save: bool = False,
+                 sheets: list[str | None] | None = None) -> dict:
+    """uploads: (investment id, file bytes, file name). Owner's chosen holdings only; parsed rows are kept only if save.
+
+    sheets, aligned with uploads, names the fund's sheet for a workbook that holds several funds.
+    """
     if not 1 <= len(uploads) <= MAX_FILES:
         raise LookThroughError(f"Upload between one and {MAX_FILES} fund portfolio files.")
     holdings = _holdings(user, [identity for identity, _, _ in uploads])
-    parsed = [(identity, parse_portfolio(raw, filename), None) for identity, raw, filename in uploads]
+    parsed = []
+    for index, (identity, raw, filename) in enumerate(uploads):
+        try:
+            parsed.append((identity, parse_portfolio(raw, filename, sheets[index] if sheets else None), None))
+        except LookThroughChoice as choice:
+            choice.index = index
+            raise
     result = _combine(holdings, parsed, today)
     if save:
         with transaction.atomic():

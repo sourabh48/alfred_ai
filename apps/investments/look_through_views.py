@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from alfred_ai.services.upload_limits import UploadFormatError, UploadLimitExceeded, read_upload_bytes
 from .models import FundPortfolioSnapshot
-from .services.fund_look_through import MAX_FILES, LookThroughError, look_through, look_through_saved
+from .services.fund_look_through import MAX_FILES, LookThroughChoice, LookThroughError, look_through, look_through_saved
 
 
 def _private(data, status=200):
@@ -28,9 +28,16 @@ class FundLookThroughView(APIView):
         if not all(str(value).isdigit() for value in ids):
             return Response({"detail": "Choose one of your own holdings for each file."}, status=400)
         save = request.data.get("save") in ("1", "true")
+        sheets = request.data.getlist("sheet")  # optional, one per file: the fund's sheet in a multi-fund workbook
+        if sheets and (len(sheets) != len(files) or any(len(value) > 100 for value in sheets)):
+            return Response({"detail": "Choose which fund in each file belongs to the holding."}, status=400)
         try:
             uploads = [(int(identity), read_upload_bytes(upload), upload.name) for identity, upload in zip(ids, files)]
-            result = look_through(request.user, uploads, today=timezone.localdate(), save=save)
+            result = look_through(request.user, uploads, today=timezone.localdate(), save=save,
+                                  sheets=[value or None for value in sheets] or None)
+        except LookThroughChoice as choice:
+            # Not an error: the page asks the owner which fund in the file to use, then posts again.
+            return _private({"choose": {"file_index": choice.index, "funds": choice.funds}, "detail": str(choice)})
         except LookThroughError as error:
             return Response({"detail": str(error)}, status=400)
         except (UploadFormatError, UploadLimitExceeded) as error:
