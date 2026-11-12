@@ -129,6 +129,21 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 raise StaleElementReferenceException(str(error)) from error
             raise
 
+    def gone(self, element):
+        """Wait condition: the element was replaced. ChromeDriver may say so without a stale-element error."""
+        from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
+        def replaced(_):
+            try:
+                element.is_enabled()
+                return False
+            except StaleElementReferenceException:
+                return True
+            except WebDriverException as error:
+                if "does not belong to the document" in str(error):
+                    return True
+                raise
+        return replaced
+
     def memory_post(self,path,payload,csrf=True):
         return self.browser.execute_async_script('''
             const [path,payload,csrf,done]=arguments;
@@ -6299,7 +6314,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             field.click()
         save = self.browser.find_element(self.By.CSS_SELECTOR, 'button[value="save"]')
         self.memory_click('button[value="save"]')
-        self.wait.until(EC.staleness_of(save))
+        self.wait.until(self.gone(save))
         self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, 'button[value="confirm"]').is_enabled())
         self.assertEqual(list(Investment.objects.filter(user=owner).values()), before)
         self.memory_click('input[name="reviewed"]')
@@ -7245,7 +7260,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.user.monthly_income='3100';self.user.save(update_fields=['monthly_income'])
         previous=self.browser.find_element(self.By.ID,'plannerAffordabilityForm')
         self.memory_click('#plannerAffordabilityReload')
-        self.wait.until(EC.staleness_of(previous))
+        self.wait.until(self.gone(previous))
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'future_monthly_income').get_attribute('value')=='3100.00')
         self.memory_click('#plannerAffordabilityForm [name="projection"]')
         for name,value in (('departure',departure.isoformat()),('income_from',today.isoformat()),
