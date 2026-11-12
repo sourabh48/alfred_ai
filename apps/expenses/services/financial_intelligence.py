@@ -41,6 +41,8 @@ MONEY_QUANT = Decimal("0.01")
 PERCENT_QUANT = Decimal("0.01")
 # Credit cards are debt and investment-type accounts are holdings; neither is spendable cash.
 NON_CASH_ACCOUNT_TYPES = {"credit", "investment"}
+SCHEDULE_ESTIMATE_LABEL = "Estimated from schedule (assumes on-time EMIs)"
+CLOSED_LOAN_STATUSES = {"foreclosed", "closed", "prepaid"}
 
 BASELINE_FORMULAS = {
     "monthly_income": "Normalized reliable monthly income from salary credits, reported income, career salary, or observed credit inflow fallback.",
@@ -1183,6 +1185,8 @@ def _serialize_loans(loans: list[Loan], today: date) -> list[dict]:
                 "home_upfront_cash_invested": home_upfront_cash_invested,
                 "home_property_acquisition_cost": home_property_acquisition_cost,
                 "estimated_balance": round(estimated_balance, 2),
+                "balance_basis": _loan_balance_basis(loan),
+                "balance_label": SCHEDULE_ESTIMATE_LABEL if _loan_balance_basis(loan) == "estimated_from_schedule" else None,
                 "status": loan.status,
                 "verification_status": loan.verification_status,
                 "verification_label": loan.get_verification_status_display(),
@@ -1257,12 +1261,15 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     liability_loans = []
     pending_foreclosure_balance = 0.0
     open_loan_liability = 0.0
+    estimated_loan_liability = Decimal("0")
     today = timezone.localdate()
     for loan in loans:
         balance = _loan_reporting_balance(loan, today=today)
         if not _loan_counts_toward_liabilities(loan, balance):
             continue
         liability_loans.append((loan, balance))
+        if _loan_balance_basis(loan) == "estimated_from_schedule":
+            estimated_loan_liability += _decimal_amount(balance)
         if loan.status == "foreclosure_pending":
             pending_foreclosure_balance += balance
         else:
@@ -1287,8 +1294,12 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         assets.append({"label": "Vehicles (estimated current market value)", "amount": vehicle_assets})
 
     liabilities = []
+    estimated_loan_liability_float = _money_float(estimated_loan_liability)
     if open_loan_liability:
-        liabilities.append({"label": "Open loan liabilities", "amount": open_loan_liability})
+        row = {"label": "Open loan liabilities", "amount": open_loan_liability}
+        if estimated_loan_liability:
+            row["note"] = f"INR {estimated_loan_liability_float:,.2f} of loan balances is {SCHEDULE_ESTIMATE_LABEL[0].lower()}{SCHEDULE_ESTIMATE_LABEL[1:]}"
+        liabilities.append(row)
     if pending_foreclosure_balance:
         liabilities.append({"label": "Pending foreclosure liabilities", "amount": pending_foreclosure_balance})
     if credit_liability:
@@ -1334,6 +1345,9 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         "pending_foreclosure_excluded_balance": pending_foreclosure_balance,
         "home_loan_asset_proxy_total": home_loan_asset_proxy_total,
         "home_loan_upfront_cash_total": home_loan_upfront_cash_total,
+        # Observed and schedule-estimated loan balances are kept apart; they add up to loan liabilities.
+        "loan_liability_recorded": _money_float(_decimal_amount(loan_liability) - estimated_loan_liability),
+        "loan_liability_estimated": estimated_loan_liability_float,
         "assets": assets,
         "liabilities": liabilities,
         "home_ownership_positions": home_ownership_positions,
@@ -1345,8 +1359,15 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     }
 
 
+def _loan_balance_basis(loan: Loan) -> str:
+    """Where a loan's reported balance comes from; only "recorded" is an observed amount."""
+    if loan.status in CLOSED_LOAN_STATUSES:
+        return "closed"
+    return "recorded" if loan.remaining_balance is not None else "estimated_from_schedule"
+
+
 def _loan_reporting_balance(loan: Loan, *, today: date, months_elapsed: int | None = None) -> float:
-    if loan.status in {"foreclosed", "closed", "prepaid"}:
+    if loan.status in CLOSED_LOAN_STATUSES:
         return 0.0
     if loan.remaining_balance is not None:
         return round(max(float(loan.remaining_balance or 0), 0), 2)

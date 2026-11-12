@@ -493,7 +493,7 @@ function renderBalanceSheet(balanceSheet) {
         {
             key: "liabilities",
             label: "Liabilities",
-            value: liabilities.map(item => `${Alfred.escapeHtml(item.label)} ${formatCurrency(item.amount)}`).join(" | ") || "No liabilities tracked",
+            value: liabilities.map(item => `${Alfred.escapeHtml(item.label)} ${formatCurrency(item.amount)}${item.note ? ` (${Alfred.escapeHtml(item.note)})` : ""}`).join(" | ") || "No liabilities tracked",
         },
         {
             key: "home-ownership",

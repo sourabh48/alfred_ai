@@ -232,7 +232,7 @@ function renderLoanTable(loans) {
                     ${consolidationCopy}
                 </td>
                 <td class="text-end">${money(item.emi)}</td>
-                <td class="text-end">${money(item.estimated_balance)}</td>
+                <td class="text-end">${money(item.estimated_balance)}${item.balance_label ? `<div class="muted small" data-balance-basis="estimated">${Alfred.escapeHtml(item.balance_label)}</div>` : ""}</td>
                 <td class="text-end">${item.months_remaining}</td>
                 <td class="small">
                     ${confirmed ? `<div>${money(item.recommended_prepayment)}</div>
@@ -521,7 +521,7 @@ function prepareForeclosure(id) {
     document.getElementById("foreclosureAmount").value = loan.estimated_balance || loan.remaining_balance || "";
     Alfred.setHTML(document.getElementById("foreclosureLoanMeta"), `
         <strong>${Alfred.escapeHtml(loan.lender || loan.loan_type_label)}</strong>
-        <div class="muted small mt-1">Loan #${loan.id} | Estimated balance ${Alfred.formatCurrency(loan.estimated_balance || 0)}</div>
+        <div class="muted small mt-1">Loan #${loan.id} | ${loan.balance_label ? `Balance ${Alfred.formatCurrency(loan.estimated_balance || 0)} (${Alfred.escapeHtml(loan.balance_label)})` : `Recorded balance ${Alfred.formatCurrency(loan.estimated_balance || 0)}`}</div>
     `);
     window.scrollTo({ top: document.getElementById("loanForeclosureForm").getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" });
 }

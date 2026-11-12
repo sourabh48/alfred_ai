@@ -136,6 +136,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_field_confirmation_revocation_correction_and_stale_mobile_source":  8.031,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_grounded_answer_opens_owner_confirmed_field_citation":  7.75,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_payment_reference_opens_bank_review_and_tracks_revocation":  11.109,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_loan_balance_from_schedule_is_labelled_as_estimate":  6.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_loan_refresh_response_does_not_replace_rows_during_table_interaction":  5.813,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_login_limit_shows_feedback_then_recovers_after_window":  6.672,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_manual_recruiter_resume_list_unavailable_preserves_inputs_and_recovers":  7.329,

@@ -1683,6 +1683,29 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_async_script("Alfred.checkLiveVersion().then(arguments[0])")
         self.wait.until(lambda _: '80,000' in self.text('dashboardSummaryCards'))
 
+    def test_loan_balance_from_schedule_is_labelled_as_estimate(self):
+        from datetime import date
+        from apps.loans.models import Loan
+        owner = self.scenario['user']
+        Loan.objects.filter(user=owner).delete()
+        terms = dict(user=owner, loan_type='personal', principal=100000, emi=5000, interest_rate=10, tenure_months=24,
+                     start_date=date(2026, 1, 1), verification_status='confirmed')
+        recorded = Loan.objects.create(lender='Synthetic Recorded Lender', remaining_balance=40000, **terms)
+        estimated = Loan.objects.create(lender='Synthetic Schedule Lender', **terms)
+        cache.clear()
+        self.login(); self.browser.get(self.live_server_url + '/loans/')
+        self.wait.until(lambda _: 'Synthetic Schedule Lender' in self.text('loanTableBody'))
+        labels = self.browser.find_elements(self.By.CSS_SELECTOR, '#loanTableBody [data-balance-basis="estimated"]')
+        self.assertEqual([label.text for label in labels], ['Estimated from schedule (assumes on-time EMIs)'])
+        row_of = lambda pk: self.browser.find_element(self.By.CSS_SELECTOR, f'button[onclick="editLoan({pk})"]').find_element(self.By.XPATH, './ancestor::tr')
+        self.assertIn('assumes on-time EMIs', row_of(estimated.pk).text)
+        self.assertNotIn('assumes on-time EMIs', row_of(recorded.pk).text)
+        self.browser.get(self.live_server_url + '/expenses/')
+        liabilities = '#balanceSheetPanel [data-balance-sheet-row="liabilities"]'
+        self.wait.until(lambda _: 'Open loan liabilities' in self.browser.find_element(self.By.CSS_SELECTOR, liabilities).text)
+        self.assertIn('estimated from schedule (assumes on-time EMIs)',
+                      self.browser.find_element(self.By.CSS_SELECTOR, liabilities).text)
+
     def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
         self.login()
         self.browser.get(self.live_server_url + '/loans/')
