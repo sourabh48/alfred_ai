@@ -543,6 +543,15 @@ ALFRED_MEMORY_REASONING_DAILY_MICROUSD = env.int('ALFRED_MEMORY_REASONING_DAILY_
 ALFRED_MEMORY_OPENAI_AUTHORIZED = env.bool('ALFRED_MEMORY_OPENAI_AUTHORIZED', default=False)
 ALFRED_MEMORY_OPENAI_PRICING_DATE = env('ALFRED_MEMORY_OPENAI_PRICING_DATE', default='')
 ALFRED_MEMORY_OLLAMA_MODEL = env('ALFRED_MEMORY_OLLAMA_MODEL', default='qwen3.5:4b')
+# Owner's own mailbox for Career emails the owner approves one at a time (CAREER2-002). Empty means sending is off.
+# Keep the password (an app password, not the account password) only in the untracked config/local.env.
+ALFRED_SMTP_HOST = env('ALFRED_SMTP_HOST', default='')
+ALFRED_SMTP_PORT = env.int('ALFRED_SMTP_PORT', default=587)
+ALFRED_SMTP_SSL = env.bool('ALFRED_SMTP_SSL', default=False)
+ALFRED_SMTP_USER = env('ALFRED_SMTP_USER', default='')
+ALFRED_SMTP_PASSWORD = env('ALFRED_SMTP_PASSWORD', default='')
+ALFRED_SMTP_FROM = env('ALFRED_SMTP_FROM', default='')
+ALFRED_SMTP_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
 ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)
 # Current-profile recovery/retention approval is separate from an owner's opt-in.

@@ -1,6 +1,6 @@
 from django.urls import path
 from .history_review_api import CareerHistoryReviewAPI
-from .views import CareerApplicationKitView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
+from .views import CareerApplicationKitView, CareerBatchTriageView, CareerBulletRewriteView, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
 
 urlpatterns = [
     path('job-analyses/<int:pk>/history-review/', CareerHistoryReviewAPI.as_view()),
@@ -20,7 +20,10 @@ urlpatterns = [
     path("job-analyses/", CareerOpportunityListView.as_view(), name="career_opportunities"),
     path("job-analyses/<int:pk>/triage/", CareerTriageView.as_view(), name="career_job_triage"),
     path("job-analyses/<int:pk>/kit/", CareerApplicationKitView.as_view(), name="career_job_kit"),
+    path("job-analyses/<int:pk>/rewrite-bullets/", CareerBulletRewriteView.as_view(), name="career_job_rewrite_bullets"),
+    path("job-analyses/<int:pk>/email/<str:action>/", CareerSendEmailView.as_view(), name="career_job_email"),
     path("job-analyses/<int:pk>/offer-prep/", CareerOfferPrepView.as_view(), name="career_job_offer_prep"),
+    path("triage/batch/", CareerBatchTriageView.as_view(), name="career_batch_triage"),
     path("triage-brief/", career_triage_brief, name="career_triage_brief"),
     path("patterns/", career_patterns, name="career_patterns"),
 ]

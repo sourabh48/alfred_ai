@@ -111,7 +111,7 @@ class DraftTests(SimpleTestCase):
             with self.subTest(kind=kind):
                 draft = kit.email_draft(analysis(), self.resume, None, kind=kind, triage_score=3.6)
                 self.assertTrue(draft["subject"])
-                self.assertTrue(any("sends nothing" in note for note in draft["notes"]))
+                self.assertTrue(any("only if you review it and press Send" in note for note in draft["notes"]))
         self.assertTrue(any("below 4.0" in note for note in kit.email_draft(analysis(), self.resume, None, kind="hr_application", triage_score=3.6)["notes"]))
         with self.assertRaisesMessage(ValueError, "supported email"):
             kit.email_draft(analysis(), self.resume, None, kind="send_now")

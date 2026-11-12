@@ -27,7 +27,7 @@ from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
 from .services.job_intelligence import ROBOTS_REFUSED_MESSAGE
-from .services import application_kit, application_tracker
+from .services import application_kit, application_tracker, evaluation
 from .services.resume_intelligence import ParsedResume
 
 
@@ -986,6 +986,32 @@ class CareerTriageView(APIView):
         return Response({"opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data})
 
 
+class CareerBatchTriageView(APIView):
+    """Career Ops batch: triage every saved opportunity on one brief, best first. Saves only each triage result."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        try:
+            brief = application_kit.clean_brief(request.data.get("brief") if isinstance(request.data, dict) else None)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        profile = CareerProfile.objects.filter(user=request.user).first()
+        today, results, skipped = timezone.localdate(), [], 0
+        for analysis in CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]:
+            if not isinstance(analysis.extracted_payload, dict) or not analysis.extracted_payload:
+                skipped += 1
+                continue
+            result = application_kit.triage(analysis, brief, profile_role=getattr(profile, "role", ""), today=today)
+            saved = CareerJobAnalysis.objects.filter(pk=analysis.pk, user=request.user, updated_at=analysis.updated_at).update(
+                extracted_payload={**analysis.extracted_payload, "triage": result}, updated_at=timezone.now())
+            results.append({"id": analysis.pk, "title": analysis.job_title, "company": analysis.company, "score": result["score"],
+                            "verdict": result["verdict"], "reason": result["reason"], "saved": bool(saved)})
+        results.sort(key=lambda row: (row["score"] is None, -(row["score"] or 0)))
+        return Response({"results": results, "skipped": skipped,
+                         "basis": "Same triage formula as a single opportunity. A filter for your time, not a hiring prediction."})
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def career_triage_brief(request):
@@ -1009,6 +1035,8 @@ class CareerApplicationKitView(APIView):
         kind = request.query_params.get("type", "")
         if kind == "cv":
             return Response(application_kit.tailored_cv(analysis, resume, profile))
+        if kind == "evaluation":
+            return Response(evaluation.evaluation_report(analysis, resume, profile, today=timezone.localdate()))
         if kind == "cover":
             return Response(application_kit.cover_letter(analysis, resume, profile, today=timezone.localdate()))
         if kind == "email":
@@ -1018,7 +1046,59 @@ class CareerApplicationKitView(APIView):
                                                             triage_score=(triage or {}).get("score")))
             except ValueError as exc:
                 return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({"detail": "Choose cv, cover or email."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Choose cv, cover, email or evaluation."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CareerBulletRewriteView(APIView):
+    """Suggest clearer wording for the CV bullets that fit this job, through local Ollama only. Nothing is stored."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from .services import bullet_rewrite
+        analysis = _owned_analysis(request, pk)
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        resume, _ = _draft_sources(request.user)
+        if resume is None or not (resume.extracted_text or "").strip():
+            return Response({"detail": "Upload your CV first; bullets are taken from it."}, status=status.HTTP_400_BAD_REQUEST)
+        facts = application_kit._facts(analysis, resume.extracted_payload if isinstance(resume.extracted_payload, dict) else {})
+        bullets = application_kit.ranked_achievements(resume.extracted_text, facts["terms"], 5)
+        if not bullets:
+            return Response({"detail": "No achievement bullets were found in your CV."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            results = bullet_rewrite.rewrite_bullets(bullets, facts["terms"])
+        except EmbeddingUnavailable:
+            return Response({"detail": "Local AI is not available. Start Ollama on this computer and try again."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"results": results, "basis": "Suggested by your local model. ALFRED rejects any suggestion that adds or drops a "
+                         "number, name, tool, job keyword or bigger scope. Nothing was saved; copy what you want."})
+
+
+class CareerSendEmailView(APIView):
+    """CAREER2-002: review an email (attachment manifest and checklist), then send exactly that after the owner confirms."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk, action):
+        from .services import application_send
+        analysis = _owned_analysis(request, pk) if action in ("review", "send") else None
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        data = request.data if isinstance(request.data, dict) else {}
+        resume, _ = _draft_sources(request.user)
+        fields = {"to": data.get("to"), "subject": data.get("subject"), "body": data.get("body"), "attach_cv": data.get("attach_cv") is True}
+        try:
+            if action == "review":
+                return Response(application_send.review(request.user, analysis, resume, **fields))
+            if data.get("confirm") is not True:
+                return Response({"detail": "Confirm that you want to send this email."}, status=status.HTTP_400_BAD_REQUEST)
+            record, created = application_send.send(request.user, analysis, resume, confirmation=data.get("confirmation"), **fields)
+        except application_send.SendRefused as exc:
+            return Response({"detail": str(exc)}, status=exc.status)
+        return Response({"sent": record, "already_sent": not created}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 class CareerOfferPrepView(APIView):
@@ -1056,4 +1136,13 @@ def career_tailored_cv_print(request, pk):
     if analysis is None:
         raise Http404
     resume, profile = _draft_sources(request.user)
-    return render(request, "career/tailored_cv_print.html", {"cv": application_kit.tailored_cv(analysis, resume, profile), "analysis": analysis})
+    cv = application_kit.tailored_cv(analysis, resume, profile)
+    if request.GET.get("format") == "tex" and cv.get("available"):
+        from django.http import HttpResponse
+        response = HttpResponse(application_kit.cv_latex(cv["text"]), content_type="application/x-tex; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="tailored-cv-{analysis.pk}.tex"'
+        response["Cache-Control"] = "no-store"
+        return response
+    styled = request.GET.get("style") == "styled"
+    return render(request, "career/tailored_cv_print.html", {"cv": cv, "analysis": analysis, "styled": styled,
+                                                             "blocks": application_kit.cv_blocks(cv.get("text", "")) if styled else []})

@@ -3,7 +3,8 @@
 Adapted from career-ops (https://github.com/career-ops-hq/career-ops, commit 775861b, MIT License,
 Copyright (c) 2026 Santiago Fernandez de Valderrama): modes triage, text/ats, cover, email, offer-prep
 and patterns. No upstream code is copied. Everything here is deterministic and read-only apart from the
-saved triage result: no model, no network, and nothing is ever sent, submitted or applied for.
+saved triage result: no model, no network, and nothing is sent, submitted or applied for here
+(sending after the owner's review of each email lives in application_send.py).
 Every CV, letter and email line comes from the owner's own CV and the saved job match; gaps stay placeholders.
 """
 import re
@@ -300,6 +301,51 @@ def tailored_cv(analysis, resume, profile) -> dict:
             "basis": "Plain single-column text with standard headings, so applicant tracking systems can read it."}
 
 
+CV_HEADINGS = {"PROFESSIONAL SUMMARY", "SKILLS", "SELECTED ACHIEVEMENTS", "PROFESSIONAL EXPERIENCE", "PROJECTS", "EDUCATION", "CERTIFICATIONS"}
+LATEX_ESCAPES = {"\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_",
+                 "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}"}
+
+
+def cv_blocks(text: str) -> list[dict]:
+    """Split the tailored CV text into a name block and headed sections for the styled and LaTeX layouts."""
+    blocks = [{"heading": "", "lines": [], "bullets": []}]
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line in CV_HEADINGS:
+            blocks.append({"heading": line.title(), "lines": [], "bullets": []})
+        elif line.startswith("- "):
+            blocks[-1]["bullets"].append(line[2:])
+        else:
+            blocks[-1]["lines"].append(line)
+    return [block for block in blocks if block["heading"] or block["lines"]]
+
+
+def _tex(value: str) -> str:
+    return "".join(LATEX_ESCAPES.get(char, char) for char in value)
+
+
+def cv_latex(text: str) -> str:
+    """A plain article-class .tex file using only the standard geometry package, so any LaTeX install compiles it."""
+    blocks = cv_blocks(text)
+    head = blocks[0] if blocks and not blocks[0]["heading"] else {"lines": []}
+    out = [r"\documentclass[11pt]{article}", r"\usepackage[margin=18mm]{geometry}", r"\pagestyle{empty}",
+           r"\setlength{\parindent}{0pt}", r"\begin{document}"]
+    if head["lines"]:
+        out.append(r"{\Large\bfseries " + _tex(head["lines"][0]) + r"}\\")
+        out += [_tex(line) + r"\\" for line in head["lines"][1:]]
+    for block in blocks:
+        if not block["heading"]:
+            continue
+        out += ["", r"\section*{" + _tex(block["heading"]) + "}"]
+        out += [_tex(line) + r"\\" for line in block["lines"]]
+        if block["bullets"]:
+            out += [r"\begin{itemize}"] + [r"  \item " + _tex(item) for item in block["bullets"]] + [r"\end{itemize}"]
+    out.append(r"\end{document}")
+    return "\n".join(out) + "\n"
+
+
 def cover_letter(analysis, resume, profile, *, today: date) -> dict:
     payload, text, source = _evidence(resume, profile)
     if payload is None:
@@ -322,7 +368,7 @@ def cover_letter(analysis, resume, profile, *, today: date) -> dict:
         "use what you know from their site or people there.]", "",
         "I would welcome a conversation about the role.", "", "[Your name]",
     ]
-    notes = ["Read every sentence and replace each bracketed part. You send it yourself; ALFRED sends nothing."]
+    notes = ["Read every sentence and replace each bracketed part. ALFRED never sends it on its own."]
     if facts["missing"]:
         notes.append(f"Not on your CV: {', '.join(facts['missing'][:6])}. Mention them only if true.")
     return {"available": True, "text": ats_text("\n".join(body)), "notes": notes, "source": source}
@@ -375,7 +421,7 @@ def email_draft(analysis, resume, profile, *, kind: str, triage_score=None) -> d
              "Could we find another time? I am free [two or three options].", "", "Regards,", "[Your name]"]),
     }
     subject, body = drafts[kind]
-    notes = ["A draft only. Check it, fill the brackets and send it yourself; ALFRED sends nothing."]
+    notes = ["A draft only. Fill the brackets; ALFRED sends it only if you review it and press Send."]
     if kind in ("hr_application", "referral_request", "cold_application") and triage_score is not None and triage_score < 4.0:
         notes.append(f"Triage score {triage_score}/5 is below 4.0, where Career Ops advises against applying; keep the email restrained.")
     return {"available": True, "kind": kind, "label": EMAIL_KINDS[kind], "subject": ats_text(subject),

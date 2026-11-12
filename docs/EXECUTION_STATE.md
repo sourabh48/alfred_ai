@@ -1,5 +1,31 @@
 # ALFRED execution state
 
+## Career Ops evaluation, batch triage, bullets, CV layouts and reviewed sending - 2026-11-12
+
+- Owner asked to complete the partly covered Career Ops parts, then approved sending applications and recruiter
+  emails on one condition: ALFRED sends only after the owner reviews that exact email and presses Send
+  (no automatic sending). Job-board forms were also requested; Greenhouse, Lever and Ashby application endpoints
+  need the employer's own API key and their web forms use CAPTCHA, so ALFRED does not submit them.
+- apps/career/services/evaluation.py: the career-ops (775861b, MIT) A-G job evaluation, deterministic. Importance
+  comes from the posting alone (stated / structural / inferred tiers; a guess is never critical or high), then
+  the CV match; 12-row budget that keeps every critical and high row; gaps with risk and mitigation; level, pay
+  (posted pay only, market pay not researched), CV changes, interview prompts and posting legitimacy (money
+  requests, text aimed at automated tools). GET kit/?type=evaluation, also as Markdown. Nothing stored.
+- POST /api/career/triage/batch/: triage every saved opportunity on one brief, best first; saves each triage only.
+- apps/career/services/bullet_rewrite.py: CV bullets reworded by the local Ollama model only; code rejects any
+  suggestion that adds or drops a number or adds a name, tool, job keyword or bigger scope. Nothing stored.
+  Live check with local qwen3.5:4b on synthetic bullets: accepted rewording, caught a dropped number.
+- Tailored CV print page: styled layout (?style=styled) and a LaTeX download (?format=tex), escaped.
+- CAREER2-002 slice (apps/career/services/application_send.py): review returns the attachment manifest (name,
+  size, SHA-256), blockers (recipient, placeholders, missing CV file, mailbox not set) and warnings; send needs
+  confirm=true and a signed review of exactly that content from the last 15 minutes. A changed email or CV file is
+  refused as stale, a retry of a sent email is not resent, a mail-server failure is recorded and can be retried.
+  Mailbox comes from ALFRED_SMTP_* in the untracked config/local.env (off while empty); the sent log keeps
+  recipient, subject, attachment name and status, not the body. No migration, no new dependency.
+- Evidence: all Career test modules 231 PASS; env/readiness/data-sources/hardening/public-HTTP 79 PASS; Career and
+  dashboard browser tests 11 PASS with axe clean in light and dark and no horizontal scroll at 390 px. CAREER2-002
+  stays UNACCEPTED (one slice, no owner acceptance). Not pushed; CI not run on this work.
+
 ## Websites read directly, listed and guarded - 2026-11-12
 
 - `next`: the queue still has no eligible task; continued the owner's free-sources-first Web Intelligence

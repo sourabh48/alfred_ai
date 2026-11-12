@@ -677,7 +677,7 @@ function renderCareerInterviewPrep(item) {
         </details>`;
 }
 
-// Career Ops workflows (career-ops 775861b, MIT): triage, CV-grounded drafts and offer reading. ALFRED sends nothing.
+// Career Ops workflows (career-ops 775861b, MIT): triage, evaluation, CV-grounded drafts and offer reading. Email goes only after the owner reviews it and presses Send.
 let careerTriageBrief;
 const careerList = value => (value || []).join(", ");
 const careerSplit = value => value.split(",").map(part => part.trim()).filter(Boolean);
@@ -691,7 +691,7 @@ function renderCareerApplicationKit(item) {
     target.innerHTML = `
         <details class="surface-card p-3 mb-3" id="careerKit">
             <summary class="fw-semibold">Application kit</summary>
-            <p class="small muted mt-2">Built only from your CV and this saved job match. Drafts are for you to check and send yourself; ALFRED sends, submits and applies for nothing.</p>
+            <p class="small muted mt-2">Built only from your CV and this saved job match. ALFRED sends an email only after you review that exact email and press Send; it never submits job-board forms.</p>
             <h4 class="h6">Triage</h4>
             <div id="careerTriageResult" role="status">${triage ? `<p class="small mb-1"><strong>${triage.score === null ? "Not scored" : `${triage.score}/5`} · ${Alfred.escapeHtml(triage.verdict)}</strong> on ${Alfred.escapeHtml(triage.scored_on)}. ${Alfred.escapeHtml(triage.reason || "")}</p><ul class="small">${dims}</ul><p class="small muted">${Alfred.escapeHtml(triage.basis)}</p>` : `<p class="small muted">Not triaged yet.</p>`}</div>
             <form id="careerTriageForm" class="row g-2 mb-3">
@@ -703,11 +703,15 @@ function renderCareerApplicationKit(item) {
                 ${field("careerTriageFlags", "Red flags", "Phrases that lower the score by 0.5 each.")}
                 ${field("careerTriagePriority", "Priority companies", "Always pass, comma separated.")}
                 <div class="col-md-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="careerTriageRemote"><label class="form-check-label small" for="careerTriageRemote">Remote roles are fine for me</label></div></div>
-                <div class="col-12"><button class="btn btn-outline-primary btn-sm" type="submit" id="careerTriageScore">Score this opportunity</button></div>
+                <div class="col-12 d-flex flex-wrap gap-2"><button class="btn btn-outline-primary btn-sm" type="submit" id="careerTriageScore">Score this opportunity</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="careerTriageBatch">Score all saved opportunities</button></div>
             </form>
+            <div id="careerBatchResult" aria-live="polite"></div>
             <h4 class="h6">Drafts</h4>
             <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitEvaluation">Full evaluation (A-G)</button>
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitCv">Tailored CV</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitBullets">Improve CV bullets (local AI)</button>
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitCover">Cover letter</button>
                 <div><label class="form-label small mb-0" for="careerKitEmailKind">Email type</label>
                     <select class="form-select form-select-sm" id="careerKitEmailKind">
@@ -742,15 +746,25 @@ function renderCareerApplicationKit(item) {
     else if (careerTriageBrief !== undefined) setBrief(careerTriageBrief);
     else Alfred.fetchJSON("/api/career/triage-brief/").then(data => { careerTriageBrief = data.brief; if (document.getElementById("careerTriageForm")) setBrief(data.brief); }).catch(() => {});
     const fail = error => showCareerFeedback("careerKitFeedback", error.message, "danger");
-    document.getElementById("careerTriageForm").addEventListener("submit", event => {
-        event.preventDefault();
+    const brief = () => {
         const value = id => document.getElementById(id).value;
-        const brief = {target_roles: careerSplit(value("careerTriageRoles")), locations: careerSplit(value("careerTriageLocations")),
+        return {target_roles: careerSplit(value("careerTriageRoles")), locations: careerSplit(value("careerTriageLocations")),
             hard_dq: careerSplit(value("careerTriageDq")), red_flags: careerSplit(value("careerTriageFlags")),
             priority_companies: careerSplit(value("careerTriagePriority")), pay_floor: value("careerTriageFloor").trim(),
             pay_currency: value("careerTriageCurrency").trim(), remote_ok: document.getElementById("careerTriageRemote").checked};
-        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/triage/`, {method: "POST", body: JSON.stringify({brief})}).then(data => {
-            careerTriageBrief = brief;
+    };
+    document.getElementById("careerTriageBatch").addEventListener("click", () => {
+        Alfred.fetchJSON("/api/career/triage/batch/", {method: "POST", body: JSON.stringify({brief: brief()})}).then(data => {
+            careerTriageBrief = brief();
+            const rows = data.results.map(row => `<li>${Alfred.escapeHtml(row.title || "Untitled")}${row.company ? ` at ${Alfred.escapeHtml(row.company)}` : ""}: <strong>${row.score === null ? "not scored" : `${row.score}/5`} · ${Alfred.escapeHtml(row.verdict)}</strong>${row.saved ? "" : " (changed meanwhile; not saved)"}</li>`).join("");
+            document.getElementById("careerBatchResult").innerHTML = `<div id="careerBatchList" class="small mb-3"><p class="mb-1">${data.results.length} scored, best first${data.skipped ? `; ${data.skipped} without a job match skipped` : ""}.</p><ol>${rows}</ol><p class="muted mb-0">${Alfred.escapeHtml(data.basis)}</p></div>`;
+        }).catch(fail);
+    });
+    document.getElementById("careerTriageForm").addEventListener("submit", event => {
+        event.preventDefault();
+        const current = brief();
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/triage/`, {method: "POST", body: JSON.stringify({brief: current})}).then(data => {
+            careerTriageBrief = current;
             const index = careerOpportunities.findIndex(row => row.id === item.id);
             if (index >= 0) careerOpportunities[index] = data.opportunity;
             renderCareerOutcomeForm(data.opportunity);
@@ -766,10 +780,30 @@ function renderCareerApplicationKit(item) {
             <ul class="small mt-2 mb-1">${data.notes.map(note => `<li>${Alfred.escapeHtml(note)}</li>`).join("")}</ul>${extra}`;
         document.getElementById("careerKitText").value = data.text;
     };
-    const draft = (query, extra) => Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/kit/?${query}`).then(data => showDraft(data, extra)).catch(fail);
-    document.getElementById("careerKitCv").addEventListener("click", () => draft("type=cv", `<a class="small" id="careerKitPrint" href="/career/job-analyses/${item.id}/tailored-cv/" target="_blank" rel="noopener">Open printable CV (save as PDF)</a>`));
+    const draft = (query, extra, then) => Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/kit/?${query}`).then(data => { showDraft(data, extra); if (then && data.available) then(data); }).catch(fail);
+    const cvLinks = `<p class="small mb-0">Printable CV: <a id="careerKitPrint" href="/career/job-analyses/${item.id}/tailored-cv/" target="_blank" rel="noopener">plain</a> ·
+        <a id="careerKitPrintStyled" href="/career/job-analyses/${item.id}/tailored-cv/?style=styled" target="_blank" rel="noopener">styled</a> ·
+        <a id="careerKitTex" href="/career/job-analyses/${item.id}/tailored-cv/?format=tex">LaTeX (.tex)</a></p>`;
+    document.getElementById("careerKitCv").addEventListener("click", () => draft("type=cv", cvLinks));
     document.getElementById("careerKitCover").addEventListener("click", () => draft("type=cover"));
-    document.getElementById("careerKitEmail").addEventListener("click", () => draft(`type=email&kind=${encodeURIComponent(document.getElementById("careerKitEmailKind").value)}`));
+    document.getElementById("careerKitEmail").addEventListener("click", () => {
+        const kind = document.getElementById("careerKitEmailKind").value;
+        draft(`type=email&kind=${encodeURIComponent(kind)}`, `<div id="careerSendPanel"></div>`, data => renderCareerSendPanel(item, data, kind));
+    });
+    document.getElementById("careerKitEvaluation").addEventListener("click", () => {
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/kit/?type=evaluation`).then(renderCareerEvaluation).catch(fail);
+    });
+    document.getElementById("careerKitBullets").addEventListener("click", event => {
+        const button = event.currentTarget, host = document.getElementById("careerKitDraft");
+        button.disabled = true;
+        host.innerHTML = '<p class="small" role="status">Asking your local model. This can take a minute.</p>';
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/rewrite-bullets/`, {method: "POST", body: "{}"}).then(data => {
+            host.innerHTML = `<div id="careerBullets"><p class="small muted">${Alfred.escapeHtml(data.basis)}</p><ol class="small">${data.results.map(row => `<li class="mb-2">
+                <div><span class="muted">Your bullet:</span> ${Alfred.escapeHtml(row.original)}</div>
+                ${row.accepted ? `<div><strong>Suggestion:</strong> ${Alfred.escapeHtml(row.suggestion)}</div>`
+                    : `<div><strong>Kept your bullet.</strong> ${Alfred.escapeHtml(row.issues.join(" "))}</div>`}</li>`).join("")}</ol></div>`;
+        }).catch(error => { host.replaceChildren(); fail(error); }).finally(() => { button.disabled = false; });
+    });
     document.getElementById("careerOfferForm").addEventListener("submit", event => {
         event.preventDefault();
         const amount = document.getElementById("careerOfferAmount").value.trim();
@@ -786,6 +820,89 @@ function renderCareerApplicationKit(item) {
                 <h5 class="h6">Questions for your lawyer</h5>${list(data.lawyer_questions, text => `<li>${Alfred.escapeHtml(text)}</li>`)}
                 <h5 class="h6">Items to raise with the employer</h5>${list(data.raise_with_employer, text => `<li>${Alfred.escapeHtml(text)}</li>`)}</div>`;
         }).catch(fail);
+    });
+}
+
+const CAREER_MATCH_LABEL = {strong: "Strong", partial: "Partial", missing: "Missing"};
+
+function renderCareerEvaluation(report) {
+    const host = document.getElementById("careerKitDraft");
+    if (!report.available) { host.innerHTML = `<p class="small" role="status">${Alfred.escapeHtml(report.reason)}</p>`; return; }
+    const e = Alfred.escapeHtml, list = items => items.length ? `<ul class="small">${items.map(text => `<li>${e(text)}</li>`).join("")}</ul>` : "";
+    const verdict = report.verdict;
+    host.innerHTML = `<article id="careerEvaluation" class="small" aria-label="Evaluation report">
+        <p class="muted">${e(report.basis)}</p>
+        <p><strong>Triage:</strong> ${e(verdict.verdict)}${verdict.score === null ? "" : ` (${verdict.score}/5)`}. ${e(verdict.reason || "")}</p>
+        <h5 class="h6">A) ${e(report.A.title)}</h5>
+        <dl class="row mb-2">${Object.entries(report.A.rows).map(([key, value]) => `<dt class="col-5 col-md-3">${e(key)}</dt><dd class="col-7 col-md-9 mb-1">${e(String(value))}</dd>`).join("")}</dl>
+        <h5 class="h6">B) ${e(report.B.title)}</h5>
+        <ol id="careerEvaluationRows">${report.B.rows.map(row => `<li class="mb-2"><strong>${e(row.requirement)}</strong> · ${e(row.band)} (${e(row.tier)}) · ${CAREER_MATCH_LABEL[row.match]}
+            <div class="muted">Posting: ${e(row.jd_signal)}</div><div>${e(row.evidence)}</div></li>`).join("")}</ol>
+        ${report.B.dropped ? `<p>+${report.B.dropped} lower-importance requirements not listed.</p>` : ""}
+        ${report.B.gaps.length ? `<h6>Gaps to prepare</h6><ul>${report.B.gaps.map(gap => `<li><strong>${e(gap.requirement)}</strong>${gap.blocker ? " (blocker)" : ""}: ${e(gap.risk)} ${e(gap.mitigation)}</li>`).join("")}</ul>` : ""}
+        <h5 class="h6">C) ${e(report.C.title)}</h5><p>${e(report.C.assessment)}</p>${list(report.C.plan)}
+        <h5 class="h6">D) ${e(report.D.title)}</h5>${list(report.D.lines)}
+        <h5 class="h6">E) ${e(report.E.title)}</h5>${list(report.E.steps)}
+        ${report.E.lead_with.length ? `<p>Lead with: ${e(report.E.lead_with.join(", "))}</p>` : ""}${list(report.E.achievements.map(line => `Put first: ${line}`))}
+        ${report.E.add_only_if_true.length ? `<p>Asked for but not on your CV (add only if true): ${e(report.E.add_only_if_true.join(", "))}</p>` : ""}
+        <h5 class="h6">F) ${e(report.F.title)}</h5>${report.F.stories.length ? list(report.F.stories.map(story => `${story.prompt} Start from: ${story.seed}`)) : "<p>No critical or high requirement to prepare for.</p>"}
+        <h5 class="h6">G) ${e(report.G.title)}</h5><p>Assessment: ${e(report.G.assessment)}.</p>${list([...report.G.signals, ...report.G.concerns.map(line => `Concern: ${line}`)])}
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="careerEvaluationDownload">Download report (.md)</button>
+    </article>`;
+    document.getElementById("careerEvaluationDownload").addEventListener("click", () => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([report.markdown], {type: "text/markdown"}));
+        link.download = "job-evaluation.md";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    });
+}
+
+function renderCareerSendPanel(item, data, kind) {
+    const host = document.getElementById("careerSendPanel");
+    const attachDefault = ["hr_application", "cold_application", "process_stuck"].includes(kind);
+    host.innerHTML = `<form id="careerSendForm" class="border-top pt-2 mt-2">
+        <h5 class="h6">Send this email</h5>
+        <p class="small muted">Edit it here, review it, then press Send. Nothing goes until you do; any change needs a new review.</p>
+        <div class="row g-2">
+            <div class="col-md-6"><label class="form-label small" for="careerSendTo">To</label><input class="form-control form-control-sm" id="careerSendTo" type="email" autocomplete="off"></div>
+            <div class="col-md-6"><label class="form-label small" for="careerSendSubject">Subject</label><input class="form-control form-control-sm" id="careerSendSubject"></div>
+            <div class="col-12"><label class="form-label small" for="careerSendBody">Email</label><textarea class="form-control form-control-sm" id="careerSendBody" rows="10"></textarea></div>
+            <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" id="careerSendAttach" ${attachDefault ? "checked" : ""}><label class="form-check-label small" for="careerSendAttach">Attach my uploaded CV</label></div></div>
+            <div class="col-12"><button class="btn btn-outline-primary btn-sm" type="submit" id="careerSendReview">Review before sending</button></div>
+        </div>
+        <div id="careerSendReviewResult" class="mt-2" aria-live="polite"></div>
+    </form>`;
+    document.getElementById("careerSendSubject").value = data.subject || "";
+    document.getElementById("careerSendBody").value = data.text || "";
+    const fields = () => ({to: document.getElementById("careerSendTo").value, subject: document.getElementById("careerSendSubject").value,
+        body: document.getElementById("careerSendBody").value, attach_cv: document.getElementById("careerSendAttach").checked});
+    const result = document.getElementById("careerSendReviewResult");
+    const form = document.getElementById("careerSendForm");
+    form.addEventListener("input", () => result.replaceChildren());
+    form.addEventListener("change", () => result.replaceChildren());
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        const reviewed = fields();
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/email/review/`, {method: "POST", body: JSON.stringify(reviewed)}).then(review => {
+            const e = Alfred.escapeHtml;
+            const files = review.attachments.length ? review.attachments.map(file => `${e(file.name)} (${Math.ceil(file.bytes / 1024)} KB)`).join(", ") : "none";
+            result.innerHTML = `<div id="careerSendManifest" class="small surface-card p-2">
+                <p class="mb-1"><strong>From:</strong> ${e(review.from || "not set")} · <strong>To:</strong> ${e(review.to || "not set")}</p>
+                <p class="mb-1"><strong>Subject:</strong> ${e(review.subject)}</p><p class="mb-1"><strong>Attachments:</strong> ${files}</p>
+                ${review.blockers.length ? `<p class="mb-1 text-danger"><strong>Fix before sending:</strong></p><ul>${review.blockers.map(text => `<li>${e(text)}</li>`).join("")}</ul>` : ""}
+                ${review.warnings.length ? `<p class="mb-1"><strong>Check:</strong></p><ul>${review.warnings.map(text => `<li>${e(text)}</li>`).join("")}</ul>` : ""}
+                ${review.ready ? `<button class="btn btn-primary btn-sm" type="button" id="careerSendNow">Send to ${e(review.to)}</button>` : ""}
+                <p class="muted mb-0 mt-1">${e(review.note)}</p></div>`;
+            if (!review.ready) return;
+            document.getElementById("careerSendNow").addEventListener("click", event => {
+                event.currentTarget.disabled = true;
+                Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/email/send/`, {method: "POST",
+                    body: JSON.stringify({...reviewed, confirmation: review.confirmation, confirm: true})}).then(sent => {
+                    result.innerHTML = `<p class="small alert alert-success mb-0" id="careerSendDone" role="status">${sent.already_sent ? "Already sent earlier; not sent again." : "Sent"} to ${e(sent.sent.to)}.</p>`;
+                }).catch(error => { result.innerHTML = `<p class="small alert alert-danger mb-0" role="alert">${e(error.message)}</p>`; });
+            });
+        }).catch(error => { result.innerHTML = `<p class="small alert alert-danger mb-0" role="alert">${Alfred.escapeHtml(error.message)}</p>`; });
     });
 }
 

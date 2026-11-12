@@ -5123,7 +5123,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         notice = self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps')
         self.assertEqual(notice.get_attribute('role'), 'status')
         self.assertIn('Career follow-ups due (1)', notice.text)
-        self.assertIn('ALFRED sends nothing', notice.text)
+        self.assertIn('ALFRED never sends on its own', notice.text)
         self.assertNotIn('OTHER-OWNER', notice.text)
         self.assertFalse(self.browser.execute_script('return Boolean(window.dashboardFollowUpInjected)'))
         self.assertEqual(notice.find_element(self.By.LINK_TEXT, 'Open Career').get_attribute('pathname'), '/career/')
@@ -5190,6 +5190,71 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url + f'/career/job-analyses/{item.pk}/tailored-cv/')
         self.assertIn('Save as PDF', self.browser.execute_script('return document.body.innerText'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
+
+    def test_career_evaluation_batch_triage_and_reviewed_send(self):
+        from django.core import mail
+        from django.test import override_settings
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from tests.test_career_application_kit import CV
+        from tests.test_career_evaluation import JD, job
+        from tests.test_career_matching_acceptance import offline_career
+        from tests.test_career_send import MAILBOX
+        offline_career(self)
+        owner = self.scenario['user']
+        CareerResume.objects.create(user=owner, uploaded_file=SimpleUploadedFile('eval-cv.pdf', b'%PDF-synthetic'), file_name='eval-cv.pdf',
+            parser_status='parsed', extracted_text=CV.replace('Mentored three junior engineers', 'Mentored <img src=x onerror="window.kitInjected=true"> Django engineers'),
+            extracted_payload={'role': 'Backend Engineer', 'experience_years': 5, 'skills': ['Python', 'Django', 'SQL']})
+        item = CareerJobAnalysis.objects.create(user=owner, job_url='https://jobs.example.test/eval', job_title='Senior Backend Engineer',
+            company='Synthetic Eval Corp', location='Pune', extracted_text=JD, extracted_payload=job().extracted_payload)
+        with override_settings(**MAILBOX):
+            self.login(); self.browser.get(self.live_server_url + '/career/')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#careerOutcomeAnalysis option[value="{item.pk}"]'))
+            Select(self.browser.find_element(self.By.ID, 'careerOutcomeAnalysis')).select_by_value(str(item.pk))
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerKit'))
+            self.browser.execute_script("document.getElementById('careerKit').open = true")
+            for field, value in (('careerTriageRoles', 'Backend Engineer'), ('careerTriageLocations', 'Pune')):
+                box = self.browser.find_element(self.By.ID, field); box.clear(); box.send_keys(value)
+            self.memory_click('#careerTriageBatch')
+            self.wait.until(lambda _: 'best first' in self.text('careerBatchResult'))
+            self.assertIn('Synthetic Eval Corp', self.text('careerBatchList'))
+            self.memory_click('#careerKitEvaluation')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerEvaluation'))
+            report = self.text('careerEvaluation')
+            self.assertIn('Kafka', report); self.assertIn('Gaps to prepare', report); self.assertIn('Concern:', report)
+            self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
+            for theme in ('light', 'dark'):
+                self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+                self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+                audit = self.browser.execute_async_script("const done=arguments[0];axe.run('#careerKit',{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done(r.violations));")
+                self.assertEqual(audit, [], theme)
+            Select(self.browser.find_element(self.By.ID, 'careerKitEmailKind')).select_by_value('hr_application')
+            self.memory_click('#careerKitEmail')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerSendForm'))
+            self.browser.find_element(self.By.ID, 'careerSendTo').send_keys('hr@synthetic.example.test')
+            self.memory_click('#careerSendReview')
+            self.wait.until(lambda _: 'Fix before sending' in self.text('careerSendReviewResult'))
+            self.assertFalse(self.browser.find_elements(self.By.ID, 'careerSendNow'))
+            body = self.browser.find_element(self.By.ID, 'careerSendBody')
+            body.clear(); body.send_keys('Hello,\nI would like to apply for the Senior Backend Engineer role.\nRegards,\nAsha')
+            self.assertEqual(self.text('careerSendReviewResult'), '')
+            self.memory_click('#careerSendReview')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerSendNow'))
+            self.assertIn('eval-cv.pdf', self.text('careerSendManifest'))
+            self.assertEqual(len(mail.outbox), 0)
+            self.browser.execute_script("document.getElementById('careerSendForm').scrollIntoView({block:'start'})")
+            self.capture('career-send-review')
+            audit = self.browser.execute_async_script("const done=arguments[0];axe.run('#careerKit',{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done(r.violations));")
+            self.assertEqual(audit, [])
+            self.memory_click('#careerSendNow')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerSendDone'))
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(mail.outbox[0].attachments[0][0], 'eval-cv.pdf')
+            self.browser.set_window_size(390, 900)
+            self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),
+                                 self.browser.execute_script('return document.documentElement.clientWidth'))
+            self.browser.set_window_size(1440, 1200)
 
     def test_career_bad_history_does_not_hide_valid_followups_or_erase_records(self):
         from datetime import timedelta

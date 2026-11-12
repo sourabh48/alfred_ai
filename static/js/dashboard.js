@@ -20,7 +20,7 @@ function loadCareerFollowUpReminder() {
         if (!due.length) { target.replaceChildren(); return; }
         const rows = due.slice(0, 5).map(item => `<li>${Alfred.escapeHtml(item.job_title || "Role")} · ${Alfred.escapeHtml(item.company || "Company not recorded")} · due ${Alfred.escapeHtml(item.due_on)}</li>`).join("");
         Alfred.setHTML(target, `<strong>Career follow-ups due (${due.length})</strong><ul class="mb-1">${rows}</ul>
-            <a class="alert-link" href="/career/">Open Career</a> to mark one as sent after you send it yourself. ALFRED sends nothing.`);
+            <a class="alert-link" href="/career/">Open Career</a> to mark one as sent after you send it. ALFRED never sends on its own.`);
     }).catch(() => { target.hidden = true; });
 }
 
