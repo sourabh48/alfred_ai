@@ -8,8 +8,8 @@ html[data-theme="dark"] .travel-candidate .travel-fit { color:var(--alfred-muted
 [data-editor-item][draggable="true"], [data-editor-stop][draggable="true"] > strong { cursor:grab; }
 [data-itinerary-editor] form { display:grid; gap:.5rem; margin:.6rem 0; }
 html:not([data-theme="dark"]) [data-itinerary-editor] .btn-outline-secondary { --bs-btn-color:#495057; --bs-btn-border-color:#495057; }
-html[data-theme="dark"] [data-itinerary-editor] .travel-day { background:var(--alfred-surface); color:var(--alfred-ink); border-color:var(--alfred-stroke); }
-html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority) { color:var(--alfred-muted); }
+html[data-theme="dark"] .travel-day { background:var(--alfred-surface); color:var(--alfred-ink); border-color:var(--alfred-stroke); }
+html[data-theme="dark"] .travel-day :is(.travel-fit,.travel-priority) { color:var(--alfred-muted); }
 #plannerDocuments { overflow-wrap:anywhere; }
 .travel-packing-list { padding:0; list-style:none; }
 .travel-packing-list > li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:.75rem 0; border-bottom:1px solid var(--alfred-stroke); overflow-wrap:anywhere; }
@@ -27,3 +27,27 @@ html[data-theme="dark"] [data-itinerary-editor] :is(.travel-fit,.travel-priority
 :is(#travelPlanner,#plannerItinerary,#plannerPacking,#plannerReminders,#plannerCalendar,#plannerAffordability) :is(.form-control,.form-select) { border-color:var(--alfred-muted); }
 :is(#travelPlanner,#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders,#plannerExport,#plannerCalendar,#plannerAffordability) :focus-visible { outline:3px solid #1858d6; outline-offset:3px; }
 html[data-theme="dark"] :is(#travelPlanner,#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders,#plannerExport,#plannerCalendar,#plannerAffordability) :focus-visible { outline-color:#a8caff; }
+/* Plan board: one card per trip with a cover, status badge and totals. */
+.trip-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); gap:1rem; }
+.trip-card { display:flex; flex-direction:column; border:1px solid var(--alfred-stroke); border-radius:18px; overflow:hidden; background:var(--alfred-surface-strong); color:var(--alfred-ink); box-shadow:var(--alfred-shadow-soft); transition:transform .2s, box-shadow .2s; }
+.trip-card:hover { transform:translateY(-2px); box-shadow:var(--alfred-shadow); }
+.trip-card-cover { position:relative; aspect-ratio:16/9; background:linear-gradient(135deg,#1f6f78,#3e9e88 55%,#f2c36b); }
+.trip-card-cover img { width:100%; height:100%; object-fit:cover; display:block; }
+.trip-status { position:absolute; top:.75rem; left:.75rem; padding:.25rem .65rem; border-radius:999px; font-size:.75rem; font-weight:600; background:#fff; color:#203e38; }
+.trip-status-confirmed, .trip-status-booked { background:#d5f0e3; color:#0d5b3f; }
+.trip-status-on_trip { background:#1858d6; color:#fff; }
+.trip-status-completed { background:#e7e3f6; color:#40307a; }
+.trip-status-cancelled { background:#f7dcd8; color:#86271c; }
+.trip-card-body { display:grid; gap:.35rem; padding:1rem 1.1rem 1.1rem; flex:1; align-content:start; }
+.trip-when { margin:0; font-size:.75rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#1d6b5f; }
+.trip-card-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:.25rem; list-style:none; margin:.5rem 0; padding:.6rem 0; border-block:1px solid var(--alfred-stroke); text-align:center; font-size:.75rem; color:var(--alfred-muted); }
+.trip-card-stats strong { display:block; font-size:1.05rem; color:var(--alfred-ink); }
+html[data-theme="dark"] .trip-card { background:var(--alfred-surface); }
+html[data-theme="dark"] .trip-when { color:#8fd3c4; }
+@media (prefers-reduced-motion:reduce) { .trip-card, .trip-card:hover { transition:none; transform:none; } }
+/* Itinerary days read as a timeline: a line down the day with a dot per activity. */
+.travel-day > ul { position:relative; margin-left:.4rem; padding-left:1.25rem; border-left:2px solid #b7d3ca; }
+.travel-day > ul > li { position:relative; }
+.travel-day > ul > li::before { content:""; position:absolute; left:calc(-1.25rem - 6px); top:.35rem; width:10px; height:10px; border-radius:50%; background:#248b81; box-shadow:0 0 0 3px var(--alfred-surface-strong); }
+html[data-theme="dark"] .travel-day > ul { border-left-color:#3d5d70; }
+html[data-theme="dark"] .travel-day > ul > li::before { background:#8fd3c4; box-shadow:0 0 0 3px var(--alfred-surface); }

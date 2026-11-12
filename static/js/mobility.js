@@ -109,6 +109,24 @@ function renderTravelAdvice(data) {
     `);
 }
 
+function tripTiming(item) {
+    if (!item.start_date) return "Dates not set";
+    const day = value => { const [y, m, d] = value.split("-").map(Number); return new Date(y, m - 1, d); };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const start = day(item.start_date), end = item.end_date ? day(item.end_date) : start;
+    const days = Math.round((start - today) / 86400000);
+    if (days > 1) return `Starts in ${days} days`;
+    if (days === 1) return "Starts tomorrow";
+    if (today <= end) return "Happening now";
+    return `Ended ${Alfred.formatDate(item.end_date || item.start_date)}`;
+}
+
+function tripCover(planId) {
+    // shortcut: the dashboard sends only the latest 12 photos, so older trips fall back to the gradient cover.
+    const photos = mobilityState.photos.filter(photo => photo.travel_plan === planId && photo.photo_url);
+    return (photos.find(photo => photo.is_favorite) || photos[0])?.photo_url || "";
+}
+
 function renderTravelPlans(items) {
     const target = document.getElementById("travelPlanList");
     Alfred.setHTMLIfChanged(target, items.length ? items.map(item => {
@@ -117,23 +135,36 @@ function renderTravelPlans(items) {
         const planCurrency = item.budget_currency || "INR";
         const spend = planLogs.filter(log => (log.currency || "INR") === planCurrency).reduce((sum, log) => sum + Number(log.spend_amount || 0), 0);
         const distance = planLogs.reduce((sum, log) => sum + Number(log.distance_km || 0), 0);
+        const cover = tripCover(item.id);
         return `
-            <div class="mini-card">
-                <div class="d-flex justify-content-between align-items-start gap-3">
-                    <div>
-                        <div class="fw-semibold">${Alfred.escapeHtml(item.title)} <span class="muted small">${Alfred.escapeHtml(item.status_label)}</span></div>
-                        <div class="muted small">${Alfred.escapeHtml(item.destination)} | ${Alfred.formatDate(item.start_date)} to ${Alfred.formatDate(item.end_date)} | ${Alfred.escapeHtml(item.transport_mode_label)}</div>
-                        ${item.vehicle_profile_name ? `<div class="muted small">Vehicle: ${Alfred.escapeHtml(item.vehicle_profile_name)}</div>` : ""}
-                        <div class="muted small">${Alfred.formatNumber(item.duration_days, 0)} days | ${Alfred.formatNumber(item.log_count || 0, 0)} logs | ${Alfred.formatNumber(item.photo_count || 0, 0)} photos</div>
-                        <div class="muted small">Logged spend ${Alfred.formatCurrency(spend, planCurrency)} | distance ${Alfred.formatNumber(distance, 1)} km</div>
-                    </div>
-                    <div class="text-end">
-                        <strong>${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")}</strong>
-                        ${item.approximate && item.budget ? `<div class="muted small" title="${Alfred.escapeHtml(Alfred.approximateNote(mobilityState.display))}">${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "budget"))} approx.</div>` : ""}
-                        <div class="mt-2"><button class="btn btn-sm btn-outline-primary" type="button" onclick="TravelPlanner.openPlan(${item.id})">Open plan</button> <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})">Delete</button></div>
+            <article class="trip-card">
+                <div class="trip-card-cover">
+                    ${cover ? `<img src="${Alfred.escapeHtml(cover)}" alt="" loading="lazy">` : ""}
+                    <span class="trip-status trip-status-${Alfred.escapeHtml(item.status)}">${Alfred.escapeHtml(item.status_label)}</span>
+                </div>
+                <div class="trip-card-body">
+                    <p class="trip-when">${Alfred.escapeHtml(tripTiming(item))}</p>
+                    <h3 class="h5 mb-1">${Alfred.escapeHtml(item.title)}</h3>
+                    <div class="muted small">${Alfred.escapeHtml(item.destination || "Destination not set")} · ${Alfred.escapeHtml(item.transport_mode_label)}</div>
+                    ${item.start_date ? `<div class="muted small">${Alfred.formatDate(item.start_date)} to ${Alfred.formatDate(item.end_date || item.start_date)}</div>` : ""}
+                    ${item.vehicle_profile_name ? `<div class="muted small">Vehicle: ${Alfred.escapeHtml(item.vehicle_profile_name)}</div>` : ""}
+                    <ul class="trip-card-stats" aria-label="Trip totals">
+                        <li><strong>${Alfred.formatNumber(item.duration_days, 0)}</strong> days</li>
+                        <li><strong>${Alfred.formatNumber(item.log_count || 0, 0)}</strong> logs</li>
+                        <li><strong>${Alfred.formatNumber(item.photo_count || 0, 0)}</strong> photos</li>
+                        <li><strong>${Alfred.formatNumber(distance, 1)}</strong> km</li>
+                    </ul>
+                    <div class="d-flex justify-content-between align-items-end gap-2 flex-wrap">
+                        <div>
+                            <div class="muted small">Budget</div>
+                            <strong>${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")}</strong>
+                            ${item.approximate && item.budget ? `<div class="muted small" title="${Alfred.escapeHtml(Alfred.approximateNote(mobilityState.display))}">${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "budget"))} approx.</div>` : ""}
+                            <div class="muted small">Logged spend ${Alfred.formatCurrency(spend, planCurrency)}</div>
+                        </div>
+                        <div><button class="btn btn-sm btn-outline-primary" type="button" onclick="TravelPlanner.openPlan(${item.id})">Open plan</button> <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.title)}">Delete</button></div>
                     </div>
                 </div>
-            </div>
+            </article>
         `;
     }).join("") : `<div class="empty-state">No travel plans saved yet.</div>`);
 }
