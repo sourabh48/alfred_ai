@@ -48,7 +48,8 @@
   holding name. Investments page: "Your views by stock" panel. Tests: API (versions, overdue, identity, owner
   isolation, zero holding/decision writes, sign-in required) and browser (save second view, reload, history, axe
   light/dark). Limits: owned-or-watching matches the holding name only, not a symbol or ISIN. Implemented, not
-  accepted. Not pushed.
+  accepted. Pushed as bc23c9e (CI: 2 browser shards failed on a Chrome 156 replaced-node error in loan/statement
+  import waits, fixed in 462ea52, pushed; CI_PENDING on 462ea52). 8d84fa7 CI: 17/17 PASS.
   Limiter fix: every `/research/` request counted as "expensive" (30/hour per account), so ordinary Investments
   page loads could lock the owner out of uploads, job matching and packets for the rest of the hour. Only
   `research/packet` (and its challenge) now count; regression test in tests/test_global_abuse_limits.py fails
