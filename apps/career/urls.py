@@ -1,6 +1,6 @@
 from django.urls import path
 from .history_review_api import CareerHistoryReviewAPI
-from .views import CareerApplicationKitView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
+from .views import CareerApplicationKitView, CareerPlanCheckView, CareerPracticeFeedbackView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
 
 urlpatterns = [
     path('job-analyses/<int:pk>/history-review/', CareerHistoryReviewAPI.as_view()),
@@ -26,6 +26,8 @@ urlpatterns = [
     path("triage/batch/", CareerBatchTriageView.as_view(), name="career_batch_triage"),
     path("triage-brief/", career_triage_brief, name="career_triage_brief"),
     path("patterns/", career_patterns, name="career_patterns"),
+    path("plan-check/<str:kind>/", CareerPlanCheckView.as_view(), name="career_plan_check"),
+    path("job-analyses/<int:pk>/practice-feedback/", CareerPracticeFeedbackView.as_view(), name="career_practice_feedback"),
     path("job-analyses/<int:pk>/interview-notes/", CareerInterviewNotesView.as_view(), name="career_job_interview_notes"),
     path("stories/", career_story_bank, name="career_story_bank"),
 ]

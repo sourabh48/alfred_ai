@@ -5219,11 +5219,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Not in your CV: 1, 77' in self.text('careerSessionList'))
         self.assertIn('Practice', self.text('careerSessionList'))
         self.assertNotIn('Not answered', self.text('careerSessionList'))
+        self.browser.execute_script(open_notes)
+        self.memory_click('#careerPracticeStart')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-practice-feedback="0"]'))  # local-AI comments: API-tested
         # Transcript import from a real round, with a marked signal
         self.browser.execute_script(open_notes)
         self.browser.find_element(self.By.ID, 'careerTranscriptText').send_keys(
             '---\nround: behavioral\ndate: 2026-01-05\nsource: manual\n---\n'
-            '**Interviewer:** Tell me about <img src=x onerror="window.kitInjected=true"> a conflict.\n**Candidate:** I listened first.')
+            '**Interviewer:** Tell me about <img src=x onerror="window.kitInjected=true"> a conflict.\n**Candidate:** I listened first.\n'
+            '**Interviewer:** Are you married? Do you have kids?\n**Candidate:** I would rather talk about the role.')
         self.memory_click('#careerTranscriptSignal-scope_ambiguity')
         self.memory_click('#careerTranscriptForm button[type="submit"]')
         self.wait.until(lambda _: 'Real interview' in self.text('careerSessionList'))
@@ -5231,6 +5235,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Synthetic Kit Corp' in self.text('careerRedFlags'))
         self.assertIn('Scope ambiguity 2/2, pattern', self.text('careerRedFlags'))
         self.assertIn('Triage at least 5', self.text('careerSkillGaps'))
+        self.assertIn('India', self.text('careerRedFlags'))
+        Select(self.browser.find_element(self.By.ID, 'careerJurisdiction')).select_by_value('CA-ON')
+        self.wait.until(lambda _: 'touches marital status' in self.text('careerRedFlags'))
+        self.assertIn('Protected-ground questions 1/2', self.text('careerRedFlags'))
+        self.assertNotIn('illegal', self.text('careerRedFlags').casefold())
+        # Course and project checks against saved postings
+        for field, value in (('careerPlanName', 'Kafka <img src=x onerror="window.kitInjected=true"> course'), ('careerPlanSkills', 'Kafka')):
+            self.browser.find_element(self.By.ID, field).send_keys(value)
+        self.memory_click('#careerPlanForm button[type="submit"]')
+        self.wait.until(lambda _: 'North Star alignment' in self.text('careerPlanResult'))
+        Select(self.browser.find_element(self.By.ID, 'careerPlanKind')).select_by_value('project')
+        self.assertTrue(self.browser.find_element(self.By.ID, 'careerPlanTraining').get_property('hidden'))
+        self.memory_click('#careerPlanForm button[type="submit"]')
+        self.wait.until(lambda _: 'Uniqueness (20%)' in self.text('careerPlanResult'))
         self.memory_click('#careerStoriesLoad')
         self.wait.until(lambda _: 'Synthetic Kit Corp - Senior Backend Engineer' in self.text('careerStoriesPanel'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))

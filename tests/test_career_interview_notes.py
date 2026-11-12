@@ -1,13 +1,16 @@
 """Career Ops ports at 775861b (MIT): calibrate, story bank, debrief, deep research, red flags, sessions, practice,
-upskill and titles."""
+upskill, titles, training, project, protected-grounds and scope/pay checks, and local practice feedback."""
+import json
 from datetime import date
 from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
 
 from apps.career.models import CareerJobAnalysis, CareerResume
-from apps.career.services import application_kit, interview_notes
+from apps.career.services import application_kit, bullet_rewrite, interview_notes
+from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 
 TODAY = date(2026, 11, 12)
 
@@ -135,13 +138,13 @@ Then I learned to stage it.
 """
 
 
-def job_row(company, title, *, notes=None, score=None, missing=(), matched=(), stage=None):
+def job_row(company, title, *, notes=None, score=None, missing=(), matched=(), stage=None, text=""):
     payload = {"interview_notes": notes or {}, "fit": {"missing_skills": list(missing), "matched_skills": list(matched)}}
     if score is not None:
         payload["triage"] = {"score": score}
     if stage:
         payload["application"] = {"stage": stage, "history": []}
-    return SimpleNamespace(pk=1, company=company, job_title=title, extracted_payload=payload)
+    return SimpleNamespace(pk=1, company=company, job_title=title, extracted_payload=payload, extracted_text=text)
 
 
 class SessionsResearchAndRedFlagTests(SimpleTestCase):
@@ -251,3 +254,122 @@ class UpskillAndTitlesTests(SimpleTestCase):
         self.assertEqual([row["title"] for row in result["suggestions"]], ["Solutions Architect", "Data Engineer"])
         self.assertEqual(result["suggestions"][1]["evidence"], ["Built Python services for billing", "Led SQL reporting"])
         self.assertTrue(result["suggestions"][0]["reached_interview"])
+
+
+def real_round(*questions, source="manual"):
+    return {"source": source, "on": "2026-11-05", "round_type": "screen", "turns": [{"question": q} for q in questions]}
+
+
+class QuestionChecksTests(SimpleTestCase):
+    def test_protected_grounds_need_a_verified_row_and_two_counted_questions(self):
+        notes = {"sessions": [real_round("Do you have kids?", "Are you married?", "How old are you?"),
+                              real_round("Do you have kids?", "Are you married?", source="practice")]}
+        jobs = [job_row("Synthetic Corp", "Analyst", notes=notes)]
+        unchecked = interview_notes.red_flags(jobs)
+        self.assertEqual((unchecked["companies"][0]["observations"], unchecked["jurisdiction"]), ([], ""))
+        self.assertIn("India", unchecked["protected_basis"])
+        report = interview_notes.red_flags(jobs, "CA-ON")
+        company = report["companies"][0]
+        self.assertEqual(company["rounds"], 1)  # practice is left out
+        self.assertEqual([(item["topic"], item["counted"]) for item in company["observations"]],
+                         [("family status", True), ("marital status", True), ("age", False)])
+        self.assertTrue(company["observations"][0]["statement"].startswith("This question touches family status, a ground protected"))
+        self.assertIn("statutory minimum working age", company["observations"][2]["contexts"][0])
+        self.assertEqual([(row["key"], row["rounds"]) for row in company["signals"]], [("protected_grounds", 1)])
+        self.assertEqual(company["score"], 1)
+        words = json.dumps(report).casefold()
+        self.assertNotIn("illegal", words)
+        self.assertNotIn("unlawful", words)
+        self.assertIn("Not legal advice", report["protected_basis"])
+        single = interview_notes.red_flags([job_row("One Corp", "A", notes={"sessions": [real_round("Are you married?")]})], "CA-ON")
+        self.assertEqual((len(single["companies"][0]["observations"]), single["companies"][0]["score"]), (1, 0))
+        found, present = interview_notes.protected_observations(["尊敬する人物は誰ですか？"], "JP")
+        self.assertEqual((found[0]["topic"].split(" ")[0], present), ("尊敬する人物", False))
+        self.assertEqual(interview_notes.protected_observations(["How do you manage transactions?"], "DE"), ([], False))
+
+    def test_scope_pay_needs_entry_label_pay_figure_and_an_unposted_skill(self):
+        posting = "Junior Data Analyst. Salary: Rs 4,00,000 per annum. You will use SQL and Excel."
+        notes = {"debriefs": [{"on": "2026-11-04", "round_type": "technical", "questions": "- Design our Kubernetes cluster\n- Write a SQL join"}]}
+        report = interview_notes.red_flags([job_row("Pay Corp", "Junior Data Analyst", notes=notes, text=posting)])
+        mismatch = report["companies"][0]["scope_pay"]
+        self.assertEqual([(item["label"], item["off_posting"]) for item in mismatch],
+                         [("Junior", [{"topic": "Kubernetes", "quote": "Design our Kubernetes cluster"}])])
+        self.assertEqual(report["companies"][0]["score"], 0)  # reported separately, not scored
+        self.assertIn("4,00,000", mismatch[0]["pay"])
+        for text in ("Data Analyst. Salary: Rs 4,00,000 per annum. SQL.", "Junior Data Analyst. Competitive pay. SQL."):
+            job = job_row("Pay Corp", "Data Analyst", notes=notes, text=text)
+            self.assertEqual(interview_notes.red_flags([job])["companies"][0]["scope_pay"], [])
+
+
+def gap_jobs():
+    return [job_row(name, "Data Engineer", score=3.0, missing=["Kafka"], text="We need Kafka and Python.") for name in "ABCDE"]
+
+
+class PlanCheckTests(SimpleTestCase):
+    def test_course_verdicts_and_plan(self):
+        data = {"name": "Kafka course", "skills": "Kafka", "weeks": 6, "hours_per_week": 5, "deliverable": True}
+        result = application_kit.plan_check("training", data, gap_jobs(), "Python")
+        self.assertEqual(([d["score"] for d in result["dimensions"]], result["verdict"], len(result["plan"])), ([5, 5, 5, 5, 5, 5], "DO", 6))
+        self.assertIn("only once completed", result["plan"][-1]["deliverable"])
+        skip = application_kit.plan_check("training", {**data, "skills": "Excel"}, gap_jobs(), "Python")
+        self.assertEqual((skip["verdict"], skip["instead"]["skill"], skip["plan"]), ("DON'T DO", "Kafka", []))
+        self.assertEqual(skip["instead"]["courses"][0], {"site": "Coursera", "url": "https://www.coursera.org/search?query=Kafka"})
+        capped = application_kit.plan_check("training", {**data, "weeks": 20, "risks": ["outdated"]}, gap_jobs(), "Python")
+        self.assertEqual((capped["verdict"], len(capped["plan"])), ("DO WITH TIMEBOX", 6))
+        for bad in ({**data, "risks": ["cheap"]}, {**data, "hours_per_week": 0}, {**data, "skills": ""}, {**data, "weeks": True}):
+            with self.assertRaises(ValueError):
+                application_kit.plan_check("training", bad, gap_jobs(), "")
+
+    def test_project_weighted_score_and_verdicts(self):
+        data = {"name": "Stream monitor", "skills": ["Kafka"], "weeks": 2, "uniqueness": 4, "demo": 4, "metrics": 4, "story": 4}
+        built = application_kit.plan_check("project", data, gap_jobs(), "")
+        self.assertEqual((built["total"], built["verdict"], len(built["pack"])), (4.25, "BUILD", 3))
+        self.assertEqual([d["weight"] for d in built["dimensions"]], [25, 20, 20, 15, 10, 10])
+        low = {**data, "skills": "Excel", "weeks": 20, "uniqueness": 1, "demo": 1, "metrics": 1, "story": 1}
+        skipped = application_kit.plan_check("project", low, gap_jobs(), "")
+        self.assertEqual((skipped["total"], skipped["verdict"], skipped["change"]), (1.0, "SKIP", "Spend the time on Kafka instead."))
+        pivot = application_kit.plan_check("project", {**low, "uniqueness": 4, "demo": 4, "metrics": 4, "story": 4}, gap_jobs(), "")
+        self.assertEqual((pivot["verdict"], pivot["change"]), ("PIVOT", "Build it around Kafka, a gap your postings ask for."))
+        with self.assertRaisesMessage(ValueError, "Demo ability must be"):
+            application_kit.plan_check("project", {**data, "demo": 6}, gap_jobs(), "")
+        self.assertEqual(application_kit.course_links("Power BI")[1]["url"], "https://www.edx.org/search?q=Power+BI")
+
+
+class FakeCoach:
+    def __init__(self, reply):
+        self.reply = reply
+
+    def feedback(self, question, answer, round_type, *, deadline):
+        return self.reply
+
+
+class PracticeFeedbackTests(TestCase):
+    def test_feedback_with_invented_figures_is_withheld(self):
+        ok = bullet_rewrite.practice_feedback("Why us?", "I cut costs 10%.", "screen", "", coach=FakeCoach({"works": "Clear.", "improve": "Say the 10% first."}))
+        self.assertEqual((ok["available"], ok["improve"]), (True, "Say the 10% first."))
+        bad = bullet_rewrite.practice_feedback("Why us?", "I cut costs.", "screen", "", coach=FakeCoach({"works": "Clear.", "improve": "Say you saved 40%."}))
+        self.assertEqual(bad["available"], False)
+        self.assertIn("40", bad["issues"][0])
+        with self.assertRaisesMessage(ValueError, "Write an answer"):
+            bullet_rewrite.practice_feedback("Why us?", " ", "screen", "", coach=FakeCoach({}))
+
+    def test_owner_scoped_api_and_local_ai_down(self):
+        users = get_user_model()
+        owner, other = users.objects.create_user("fb-owner"), users.objects.create_user("fb-other")
+        job = CareerJobAnalysis.objects.create(user=owner, job_url="https://jobs.example.test/fb", job_title="Analyst")
+        url = f"/api/career/job-analyses/{job.pk}/practice-feedback/"
+        body = {"question": "Why us?", "answer": "I like the product.", "round_type": "screen"}
+        self.client.force_login(other)
+        self.assertEqual(self.client.post(url, body, content_type="application/json").status_code, 404)
+        self.client.force_login(owner)
+        with mock.patch.object(bullet_rewrite.AnswerCoach, "__init__", return_value=None), \
+                mock.patch.object(bullet_rewrite.AnswerCoach, "feedback", return_value={"works": "Direct.", "improve": "Add why."}):
+            response = self.client.post(url, body, content_type="application/json")
+        self.assertEqual((response.status_code, response.json()["works"], response["Cache-Control"]), (200, "Direct.", "no-store, private"))
+        with mock.patch.object(bullet_rewrite.AnswerCoach, "__init__", side_effect=EmbeddingUnavailable("down")):
+            self.assertEqual(self.client.post(url, body, content_type="application/json").status_code, 503)
+        self.assertEqual(self.client.post(url, {**body, "answer": ""}, content_type="application/json").status_code, 400)
+        plan = self.client.post("/api/career/plan-check/project/", {"name": "x", "skills": "Kafka", "weeks": 2,
+                                "uniqueness": 3, "demo": 3, "metrics": 3, "story": 3}, content_type="application/json")
+        self.assertEqual((plan.status_code, plan.json()["verdict"]), (200, "PIVOT"))
+        self.assertEqual(self.client.post("/api/career/plan-check/other/", {}, content_type="application/json").status_code, 400)

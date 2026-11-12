@@ -1077,6 +1077,34 @@ class CareerBulletRewriteView(APIView):
                          "number, name, tool, job keyword or bigger scope. Nothing was saved; copy what you want."})
 
 
+class CareerPracticeFeedbackView(APIView):
+    """Comments on one typed practice answer from the local model only. Nothing is stored or sent elsewhere."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from .services import bullet_rewrite, interview_notes
+        analysis = _owned_analysis(request, pk)
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        data = request.data if isinstance(request.data, dict) else {}
+        round_type = data.get("round_type") if data.get("round_type") in interview_notes.ROUND_TYPES else "other"
+        resume, _ = _draft_sources(request.user)
+        try:
+            turn = interview_notes._turn({"question": data.get("question"), "answer": data.get("answer")})
+            result = bullet_rewrite.practice_feedback(turn["question"], turn["answer"], round_type, resume.extracted_text if resume else "")
+        except EmbeddingUnavailable:
+            return Response({"detail": "Local AI is not available. Start Ollama on this computer and try again."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response({**result, "basis": "From your local model, which may be wrong. Comments that bring in figures not in "
+                             "your answer or CV are withheld. Nothing was saved."})
+        response["Cache-Control"] = "no-store, private"
+        return response
+
+
 class CareerSendEmailView(APIView):
     """CAREER2-002: review an email (attachment manifest and checklist), then send exactly that after the owner confirms."""
     permission_classes = [IsAuthenticated]
@@ -1193,9 +1221,27 @@ def career_patterns(request):
     response = Response({**application_kit.patterns(analyses), "calibration": application_kit.calibration(analyses),
                          "skill_gaps": application_kit.skill_gaps(analyses, cv_text),
                          "titles": application_kit.title_suggestions(analyses, targets, cv_text),
-                         "red_flags": interview_notes.red_flags(analyses)})
+                         "red_flags": interview_notes.red_flags(analyses, request.query_params.get("jurisdiction", ""))})
     response["Cache-Control"] = "no-store, private"
     return response
+
+
+class CareerPlanCheckView(APIView):
+    """Score a course (training.md) or portfolio project (project.md) against your saved jobs and gaps. Nothing is stored."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, kind):
+        analyses = list(CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300])
+        resume, _ = _draft_sources(request.user)
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            result = application_kit.plan_check(kind, data, analyses, resume.extracted_text if resume else "")
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response(result)
+        response["Cache-Control"] = "no-store, private"
+        return response
 
 
 def career_tailored_cv_print(request, pk):

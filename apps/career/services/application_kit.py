@@ -11,6 +11,7 @@ import re
 from collections import Counter
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from urllib.parse import quote_plus
 
 SALARY_ANNUAL_MULTIPLIERS = {"year": 1, "month": 12, "week": 52, "day": 260, "hour": 2080}
 
@@ -632,7 +633,8 @@ def skill_gaps(analyses, cv_text: str, *, min_scored=UPSKILL_MIN_SCORED) -> dict
     scored = [row for row in rows if row[0] is not None]
     basis = (f"From the missing skills in your saved job matches. Each job counts a skill once and weighs 5 minus its triage "
              f"score (1 if unscored), so a poor fit says more about a gap. Tiers use the share of low-fit jobs (triage under "
-             f"{LOW_FIT_SCORE}) that name the skill. No courses are suggested: ALFRED does not search the web for them.")
+             f"{LOW_FIT_SCORE}) that name the skill. Course links open each site's own search for the skill name; ALFRED "
+             f"does not fetch or rank them.")
     if len(scored) < min_scored:
         return {"available": False, "basis": basis, "scored": len(scored), "minimum": min_scored,
                 "reason": f"Triage at least {min_scored} job matches that list missing skills first ({len(scored)} so far)."}
@@ -652,6 +654,7 @@ def skill_gaps(analyses, cv_text: str, *, min_scored=UPSKILL_MIN_SCORED) -> dict
         entry["tier"] = ("Critical" if share >= 0.5 and entry["low_fit_jobs"] >= 3 else "High" if share >= 0.3 and entry["low_fit_jobs"] >= 2
                          else "Medium" if entry["low_fit_jobs"] >= 2 else "Low")
         entry["weight"] = round(entry["weight"], 2)
+        entry["courses"] = course_links(entry["skill"])
     ordered = sorted(gaps.values(), key=lambda entry: (-entry["weight"], -entry["jobs"], entry["skill"].casefold()))
     return {"available": True, "basis": basis, "scored": len(scored), "low_fit": low_fit, "gaps": ordered[:15],
             "already_on_cv": sorted(known, key=str.casefold)}
@@ -684,3 +687,119 @@ def title_suggestions(analyses, targets: list[str], cv_text: str) -> dict:
             "basis": "Titles as posted in jobs you saved that none of your target roles match, with lines quoted from your CV "
                      "that show the matched skills. Nothing is added for you: put a title in Target roles in your triage "
                      "brief if you want it."}
+
+
+# Free-to-browse catalogues whose search pages answered on 2026-11-12. Only the public skill name goes in the link.
+COURSE_SEARCH = (("Coursera", "https://www.coursera.org/search?query={}"), ("edX", "https://www.edx.org/search?q={}"),
+                 ("Microsoft Learn", "https://learn.microsoft.com/en-us/training/browse/?terms={}"))
+TRAINING_RISKS = {"outdated": "Content may be out of date", "unknown_provider": "Provider is little known",
+                  "too_basic": "Too basic for you"}
+PROJECT_WEIGHTS = {"signal": 0.25, "uniqueness": 0.20, "demo": 0.20, "metrics": 0.15, "time": 0.10, "story": 0.10}
+PROJECT_LABELS = {"signal": "Signal for target roles", "uniqueness": "Uniqueness", "demo": "Demo ability",
+                  "metrics": "Metrics potential", "time": "Time to MVP", "story": "STAR story potential"}
+
+
+def course_links(skill: str) -> list[dict]:
+    return [{"site": site, "url": url.format(quote_plus(skill))} for site, url in COURSE_SEARCH]
+
+
+def _whole_number(value, low, high, label):
+    if isinstance(value, bool) or not isinstance(value, (int, str)) or not str(value).strip().isdigit() or not low <= int(value) <= high:
+        raise ValueError(f"{label} must be a whole number from {low} to {high}.")
+    return int(value)
+
+
+def _score_within(value, limits):
+    """5 for the first limit the value is within, down to 1 past the last."""
+    return next((5 - index for index, limit in enumerate(limits) if value <= limit), 1)
+
+
+def plan_check(kind: str, data: dict, analyses, cv_text: str) -> dict:
+    """modes/training.md and modes/project.md: score a course or portfolio project against your saved jobs and skill gaps."""
+    if kind not in ("training", "project"):
+        raise ValueError("Choose training or project.")
+    name = " ".join(str(data.get("name") or "").split())[:120]
+    raw = data.get("skills") or ""
+    items = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
+    skills = list(dict.fromkeys(item.strip()[:60] for item in items if isinstance(item, str) and item.strip()))
+    if not name or not 1 <= len(skills) <= 10:
+        raise ValueError("Give a name and 1 to 10 skills, separated by commas.")
+    weeks = _whole_number(data.get("weeks"), 1, 52, "Weeks")
+    gaps_report = skill_gaps(analyses, cv_text)
+    gaps = gaps_report["gaps"] if gaps_report["available"] else []
+
+    def covers(gap):
+        return any(_on_cv(gap["skill"], skill.casefold()) or _on_cv(skill, gap["skill"].casefold()) for skill in skills)
+
+    covered = [gap for gap in gaps if covers(gap)]
+    uncovered_top = [gap for gap in gaps if gap["tier"] in ("Critical", "High") and not covers(gap)]
+    postings = [(analysis.extracted_text or "").casefold() for analysis in analyses if (analysis.extracted_text or "").strip()]
+    hits = sum(any(_on_cv(skill, text) for skill in skills) for text in postings)
+    share = hits / len(postings) if postings else None
+    signal = 3 if share is None else 5 if share >= 0.5 else 4 if share >= 0.3 else 3 if share >= 0.15 else 2 if hits else 1
+    signal_note = ("No saved postings to compare, so this is neutral." if share is None
+                   else f"{hits} of {len(postings)} saved postings name at least one of these skills.")
+    gap_score = max(({"Critical": 5, "High": 5, "Medium": 4, "Low": 3}[gap["tier"]] for gap in covered), default=0)
+    alternative = uncovered_top[0] if uncovered_top else next((gap for gap in gaps if not covers(gap)), None)
+    instead = {"skill": alternative["skill"], "tier": alternative["tier"], "courses": alternative["courses"]} if alternative else None
+    result = {"kind": kind, "name": name, "skills": skills, "weeks": weeks, "covered_gaps": [gap["skill"] for gap in covered],
+              "instead": instead, "gaps_note": gaps_report["basis"] if gaps_report["available"] else gaps_report["reason"]}
+    if kind == "training":
+        return {**result, **_training(data, skills, weeks, cv_text, gaps, covered, uncovered_top, covers, signal, signal_note, gap_score)}
+    ratings = {key: _whole_number(data.get(key), 1, 5, PROJECT_LABELS[key]) for key in ("uniqueness", "demo", "metrics", "story")}
+    scores = {"signal": max(signal, gap_score), "time": _score_within(weeks, (1, 2, 4, 11)), **ratings}
+    total = round(sum(PROJECT_WEIGHTS[key] * scores[key] for key in PROJECT_WEIGHTS), 2)
+    weakest = min(ratings, key=ratings.get)
+    if total >= 3.5:
+        verdict, change = "BUILD", ""
+    elif total >= 2.5:
+        verdict = "PIVOT"
+        change = (f"Build it around {instead['skill']}, a gap your postings ask for." if instead and scores["signal"] <= 3
+                  else f"Raise {PROJECT_LABELS[weakest].lower()}, its weakest part.")
+    else:
+        verdict = "SKIP"
+        change = f"Spend the time on {instead['skill']} instead." if instead else "Pick a project that uses skills your postings ask for."
+    why = {"signal": signal_note, "time": f"{weeks} weeks to a first version."}
+    build = verdict == "BUILD"
+    return {**result, "total": total, "verdict": verdict, "change": change,
+            "dimensions": [{"name": PROJECT_LABELS[key], "score": scores[key], "weight": round(PROJECT_WEIGHTS[key] * 100),
+                            "why": why.get(key, "Your rating.")} for key in PROJECT_WEIGHTS],
+            "plan": ["Week 1: a first version with one core metric.", "Week 2: polish it and make the interview pack."] if build else [],
+            "pack": ["One page: the problem, how it works, the metric and how you checked it.",
+                     "A live link or a two-minute recorded walkthrough.",
+                     "What worked, what did not, and what you would change."] if build else [],
+            "basis": "project.md's weighted score: signal 25%, uniqueness 20%, demo 20%, metrics 15%, time to MVP 10%, story 10%. "
+                     "Signal and time come from your postings, gaps and weeks; the rest are your ratings. 3.5 or more builds, "
+                     "2.5 or more pivots, lower skips."}
+
+
+def _training(data, skills, weeks, cv_text, gaps, covered, uncovered_top, covers, signal, signal_note, gap_score) -> dict:
+    hours = _whole_number(data.get("hours_per_week"), 1, 60, "Hours per week")
+    risks = data.get("risks") if isinstance(data.get("risks"), list) else []
+    if any(risk not in TRAINING_RISKS for risk in risks):
+        raise ValueError("Choose listed risks.")
+    on_cv = all(_on_cv(skill, (cv_text or "").casefold()) for skill in skills)
+    north = gap_score or (2 if on_cv else min(signal, 3))
+    opportunity = 5 if not uncovered_top or covers(gaps[0]) else 3 if covered else 2
+    deliverable = data.get("deliverable") is True
+    dims = [("North Star alignment", north, f"Covers your gaps: {', '.join(gap['skill'] for gap in covered)}." if covered
+             else "Already on your CV." if on_cv else "Covers none of your listed gaps."),
+            ("Recruiter signal", signal, signal_note),
+            ("Time and effort", _score_within(weeks * hours, (40, 80, 160, 300)), f"{weeks} weeks x {hours} hours = {weeks * hours} hours."),
+            ("Opportunity cost", opportunity, "Nothing more pressing is left uncovered." if opportunity == 5 else
+             f"Higher-tier gaps it leaves: {', '.join(gap['skill'] for gap in uncovered_top[:3])}."),
+            ("Risks", max(1, 5 - 2 * len(risks)), "; ".join(TRAINING_RISKS[risk] for risk in risks) or "None you ticked."),
+            ("Portfolio deliverable", 5 if deliverable else 2, "Produces something you can show." if deliverable else "Nothing to show at the end.")]
+    if north <= 2 or signal == 1:
+        verdict, length = "DON'T DO", 0
+    elif dims[2][1] <= 2 or weeks > 12 or risks:
+        verdict, length = "DO WITH TIMEBOX", min(weeks, 6)
+    else:
+        verdict, length = "DO", min(max(weeks, 4), 12)
+    plan = [{"week": week, "focus": skills[(week - 1) % len(skills)],
+             "deliverable": "Finish; add it to your CV only once completed." if week == length
+             else f"One note, exercise or small demo using {skills[(week - 1) % len(skills)]}."} for week in range(1, length + 1)]
+    return {"hours_per_week": hours, "verdict": verdict, "plan": plan,
+            "dimensions": [{"name": name, "score": score, "why": why} for name, score, why in dims],
+            "basis": "training.md's six dimensions, scored 1-5 from your saved postings, your skill gaps and what you entered. "
+                     "DO keeps a 4-12 week plan, a timebox caps it at 6 weeks, and DON'T DO points at a gap that matters more."}

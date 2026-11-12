@@ -923,8 +923,10 @@ function renderCareerSendPanel(item, data, kind) {
 
 function loadCareerPatterns() {
     const target = document.getElementById("careerPatternsPanel");
-    return Alfred.fetchJSON("/api/career/patterns/").then(data => {
-        const calibration = careerCalibrationHtml(data.calibration) + careerGapsHtml(data.skill_gaps) + careerTitlesHtml(data.titles) + careerRedFlagsHtml(data.red_flags);
+    let place = "";
+    try { place = localStorage.getItem("careerJurisdiction") || ""; } catch (_) { /* storage blocked: no place chosen */ }
+    return Alfred.fetchJSON(`/api/career/patterns/?jurisdiction=${encodeURIComponent(place)}`).then(data => {
+        const calibration = careerCalibrationHtml(data.calibration) + careerGapsHtml(data.skill_gaps) + careerPlanCheckHtml() + careerTitlesHtml(data.titles) + careerRedFlagsHtml(data.red_flags);
         if (!data.available) { target.innerHTML = `<p class="small" id="careerPatternsUnavailable" role="status">${Alfred.escapeHtml(data.reason)}</p>${calibration}`; return; }
         const rows = (items, render) => items.map(render).join("");
         target.innerHTML = `<div class="surface-card p-3" id="careerPatterns">
@@ -936,6 +938,12 @@ function loadCareerPatterns() {
             <tbody>${rows(data.score_vs_outcome, row => `<tr><td>${Alfred.escapeHtml(row.group)}</td><td>${row.average}/5</td><td>${row.min}-${row.max}</td><td>${row.count}</td></tr>`)}</tbody></table>` : ""}
             ${data.top_gaps.length ? `<p class="small mb-0">Skills most often missing where you were rejected or withdrew: ${Alfred.escapeHtml(data.top_gaps.map(gap => `${gap.skill} (${gap.count})`).join(", "))}.</p>` : ""}
         </div>${calibration}`;
+    }).then(() => {
+        bindCareerPlanCheck();
+        document.getElementById("careerJurisdiction")?.addEventListener("change", event => {
+            try { localStorage.setItem("careerJurisdiction", event.target.value); } catch (_) { /* not remembered */ }
+            loadCareerPatterns();
+        });
     }).catch(() => { target.innerHTML = '<p class="small" role="status">Patterns could not load. Try again.</p>'; });
 }
 
@@ -957,10 +965,67 @@ function careerGapsHtml(gaps) {
     if (!gaps) return "";
     const body = !gaps.available ? `<p class="small mb-0" role="status">${Alfred.escapeHtml(gaps.reason)}</p>` : `
         <div class="table-responsive" role="region" tabindex="0" aria-label="Skills to learn"><table class="table table-sm small"><caption>Skills to learn, most pressing first (${gaps.low_fit} of ${gaps.scored} scored jobs were a low fit)</caption>
-        <thead><tr><th scope="col">Tier</th><th scope="col">Skill</th><th scope="col">Missing in jobs</th><th scope="col">Of low-fit jobs</th><th scope="col">Weight</th></tr></thead>
-        <tbody>${gaps.gaps.map(gap => `<tr><td>${gap.tier}</td><td>${Alfred.escapeHtml(gap.skill)}</td><td>${gap.jobs}</td><td>${gap.low_fit_jobs}/${gaps.low_fit}</td><td>${gap.weight}</td></tr>`).join("")}</tbody></table></div>
+        <thead><tr><th scope="col">Tier</th><th scope="col">Skill</th><th scope="col">Missing in jobs</th><th scope="col">Of low-fit jobs</th><th scope="col">Weight</th><th scope="col">Find courses</th></tr></thead>
+        <tbody>${gaps.gaps.map(gap => `<tr><td>${gap.tier}</td><td>${Alfred.escapeHtml(gap.skill)}</td><td>${gap.jobs}</td><td>${gap.low_fit_jobs}/${gaps.low_fit}</td><td>${gap.weight}</td><td>${careerCourseLinks(gap)}</td></tr>`).join("")}</tbody></table></div>
         ${gaps.already_on_cv.length ? `<p class="small">Already on your CV, so not counted: ${Alfred.escapeHtml(gaps.already_on_cv.join(", "))}.</p>` : ""}`;
     return `<div class="surface-card p-3 mt-2" id="careerSkillGaps"><h4 class="h6">What to learn next</h4>${body}<p class="small muted mb-0">${Alfred.escapeHtml(gaps.basis)}</p></div>`;
+}
+
+function careerCourseLinks(gap) {
+    return gap.courses.map(link => `<a href="${Alfred.escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">${Alfred.escapeHtml(link.site)}<span class="visually-hidden"> courses for ${Alfred.escapeHtml(gap.skill)} (opens in a new tab)</span></a>`).join(" · ");
+}
+
+function careerPlanCheckHtml() {
+    const rating = (id, label) => `<div class="col-6 col-md-3"><label class="form-label small" for="${id}">${label} (1-5)</label>
+        <select class="form-select form-select-sm" id="${id}">${[1, 2, 3, 4, 5].map(n => `<option${n === 3 ? " selected" : ""}>${n}</option>`).join("")}</select></div>`;
+    return `<div class="surface-card p-3 mt-2" id="careerPlanCheck"><h4 class="h6">Is a course or project worth your time?</h4>
+        <form id="careerPlanForm" class="small"><div class="row g-2">
+            <div class="col-md-3"><label class="form-label small" for="careerPlanKind">Check</label>
+                <select class="form-select form-select-sm" id="careerPlanKind"><option value="training">A course or certification</option><option value="project">A portfolio project</option></select></div>
+            <div class="col-md-5"><label class="form-label small" for="careerPlanName">Name</label><input class="form-control form-control-sm" id="careerPlanName" maxlength="120" required></div>
+            <div class="col-md-4"><label class="form-label small" for="careerPlanWeeks">Weeks (to a first version for a project)</label><input class="form-control form-control-sm" id="careerPlanWeeks" type="number" min="1" max="52" value="4" required></div>
+            <div class="col-12"><label class="form-label small" for="careerPlanSkills">Skills it covers, separated by commas</label><input class="form-control form-control-sm" id="careerPlanSkills" required></div>
+        </div>
+        <fieldset class="row g-2 mt-1" id="careerPlanTraining"><legend class="visually-hidden">Course details</legend>
+            <div class="col-md-3"><label class="form-label small" for="careerPlanHours">Hours per week</label><input class="form-control form-control-sm" id="careerPlanHours" type="number" min="1" max="60" value="5"></div>
+            <div class="col-md-9">${[["outdated", "Content may be out of date"], ["unknown_provider", "Provider is little known"], ["too_basic", "Too basic for me"]].map(([key, label]) =>
+                `<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="careerPlanRisk-${key}" value="${key}" data-plan-risk><label class="form-check-label" for="careerPlanRisk-${key}">${label}</label></div>`).join("")}
+                <div class="form-check"><input class="form-check-input" type="checkbox" id="careerPlanDeliverable"><label class="form-check-label" for="careerPlanDeliverable">It ends with something I can show</label></div></div>
+        </fieldset>
+        <fieldset class="row g-2 mt-1" id="careerPlanProject" hidden><legend class="visually-hidden">Your project ratings</legend>
+            ${rating("careerPlanUniqueness", "Uniqueness")}${rating("careerPlanDemo", "Demo ability")}${rating("careerPlanMetrics", "Metrics potential")}${rating("careerPlanStory", "Story potential")}
+        </fieldset>
+        <button class="btn btn-outline-secondary btn-sm mt-2" type="submit">Check</button></form>
+        <div id="careerPlanResult" class="mt-2" aria-live="polite"></div></div>`;
+}
+
+function bindCareerPlanCheck() {
+    const form = document.getElementById("careerPlanForm");
+    if (!form) return;
+    const value = id => document.getElementById(id).value;
+    const kind = document.getElementById("careerPlanKind");
+    kind.addEventListener("change", () => {
+        document.getElementById("careerPlanTraining").hidden = kind.value !== "training";
+        document.getElementById("careerPlanProject").hidden = kind.value !== "project";
+    });
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        const result = document.getElementById("careerPlanResult"), e = Alfred.escapeHtml;
+        const body = {name: value("careerPlanName"), skills: value("careerPlanSkills"), weeks: value("careerPlanWeeks"),
+            ...(kind.value === "training" ? {hours_per_week: value("careerPlanHours"), deliverable: document.getElementById("careerPlanDeliverable").checked,
+                risks: [...form.querySelectorAll("[data-plan-risk]:checked")].map(box => box.value)}
+                : {uniqueness: value("careerPlanUniqueness"), demo: value("careerPlanDemo"), metrics: value("careerPlanMetrics"), story: value("careerPlanStory")})};
+        Alfred.fetchJSON(`/api/career/plan-check/${kind.value}/`, {method: "POST", body: JSON.stringify(body)}).then(data => {
+            result.innerHTML = `<p class="mb-1" id="careerPlanVerdict"><strong>${e(data.verdict)}</strong>${data.total !== undefined ? ` (${data.total}/5)` : ""}${data.change ? `: ${e(data.change)}` : ""}</p>
+                <div class="table-responsive" role="region" tabindex="0" aria-label="Check details"><table class="table table-sm small"><caption>${e(data.name)}</caption>
+                <thead><tr><th scope="col">Part</th><th scope="col">Score</th><th scope="col">Why</th></tr></thead>
+                <tbody>${data.dimensions.map(d => `<tr><td>${e(d.name)}${d.weight ? ` (${d.weight}%)` : ""}</td><td>${d.score}/5</td><td>${e(d.why)}</td></tr>`).join("")}</tbody></table></div>
+                ${data.plan.length ? `<ol class="small ps-3 mb-1">${data.plan.map(step => `<li>${typeof step === "string" ? e(step) : `${e(step.focus)}: ${e(step.deliverable)}`}</li>`).join("")}</ol>` : ""}
+                ${data.pack?.length ? `<p class="small mb-1"><strong>Interview pack:</strong> ${e(data.pack.join(" "))}</p>` : ""}
+                ${data.instead && !["DO", "BUILD"].includes(data.verdict) ? `<p class="small mb-1">Instead: ${e(data.instead.skill)} (${e(data.instead.tier)}), ${careerCourseLinks(data.instead)}</p>` : ""}
+                <p class="small muted mb-0">${e(data.basis)} ${e(data.gaps_note)}</p>`;
+        }).catch(error => { result.innerHTML = `<p class="small alert alert-danger mb-0" role="alert">${e(error.message)}</p>`; });
+    });
 }
 
 function careerTitlesHtml(titles) {
@@ -980,7 +1045,24 @@ function careerRedFlagsHtml(flags) {
     return `<div class="surface-card p-3 mt-2" id="careerRedFlags"><h4 class="h6">How companies interviewed you</h4>
         ${rows ? `<div class="table-responsive" role="region" tabindex="0" aria-label="Signals you marked"><table class="table table-sm small"><caption>Signals you marked in real rounds</caption><thead><tr><th scope="col">Company</th><th scope="col">Real rounds</th><th scope="col">Level</th><th scope="col">Signals</th></tr></thead><tbody>${rows}</tbody></table></div>`
             : '<p class="small" role="status">No real-interview debriefs or transcripts yet. Practice rounds are not counted.</p>'}
-        <p class="small muted mb-0">${Alfred.escapeHtml(flags.basis)}</p></div>`;
+        <p class="small muted">${Alfred.escapeHtml(flags.basis)}</p>
+        <label class="form-label small" for="careerJurisdiction">Check interviewer questions against the protected topics for</label>
+        <select class="form-select form-select-sm mb-2" id="careerJurisdiction"><option value="">Not chosen</option>${Object.entries(flags.jurisdictions).map(([code, name]) => `<option value="${Alfred.escapeHtml(code)}"${code === flags.jurisdiction ? " selected" : ""}>${Alfred.escapeHtml(name)}</option>`).join("")}</select>
+        ${careerQuestionFindingsHtml(flags.companies)}
+        <p class="small muted">${Alfred.escapeHtml(flags.protected_basis)}</p>
+        <p class="small muted mb-0">${Alfred.escapeHtml(flags.scope_pay_basis)}</p></div>`;
+}
+
+function careerQuestionFindingsHtml(companies) {
+    const e = Alfred.escapeHtml;
+    const when = item => `${e(item.on)}, ${e(item.round_type)}${item.role ? `, ${e(item.role)}` : ""}`;
+    return companies.filter(row => row.observations.length || row.scope_pay.length).map(row => `<section class="small mb-2" id="careerQuestionFindings-${e(row.company.replace(/[^A-Za-z0-9]/g, ""))}">
+        <h5 class="h6">${e(row.company)}</h5>
+        ${row.observations.length ? `<ul class="ps-3 mb-1">${row.observations.map(item => `<li>${e(item.statement)} "${e(item.quote)}" (${when(item)})
+            ${item.contexts.length ? `<br><span class="muted">Not counted, as it can be permissible: ${e(item.contexts.join(" "))}</span>` : ""}
+            ${item.notes.length ? `<br><span class="muted">${e(item.notes.join(" "))}</span>` : ""}</li>`).join("")}</ul>` : ""}
+        ${row.scope_pay.map(item => `<p class="mb-1">Posting labelled "${e(item.label)}" with pay "${e(item.pay)}"; asked about skills it never names (${when(item)}): ${item.off_posting.map(off => `${e(off.topic)} in "${e(off.quote)}"`).join("; ")}.</p>`).join("")}
+    </section>`).join("");
 }
 
 function loadCareerStoryBank() {
@@ -1147,8 +1229,21 @@ function renderCareerInterviewNotes(item, host) {
                 ${practice.questions.map((row, index) => `<div class="mb-2" data-practice-turn="${index}"><label class="form-label small" for="careerPracticeAnswer${index}"><strong>${index + 1}. ${Alfred.escapeHtml(row.question)}</strong> <span class="muted">(${Alfred.escapeHtml(row.origin)})</span></label>
                     <textarea class="form-control form-control-sm" rows="3" id="careerPracticeAnswer${index}"></textarea>
                     <label class="form-label small mt-1" for="careerPracticeRating${index}">How did it feel?</label>
-                    <select class="form-select form-select-sm w-auto" id="careerPracticeRating${index}"><option value="">Not rated</option><option value="strong">Strong</option><option value="solid">Solid</option><option value="gap">Gap</option></select></div>`).join("")}
+                    <select class="form-select form-select-sm w-auto" id="careerPracticeRating${index}"><option value="">Not rated</option><option value="strong">Strong</option><option value="solid">Solid</option><option value="gap">Gap</option></select>
+                    <button class="btn btn-link btn-sm p-0 ms-2" type="button" data-practice-feedback="${index}">Comments from local AI</button>
+                    <div class="small" id="careerPracticeFeedback${index}" aria-live="polite"></div></div>`).join("")}
                 <button class="btn btn-outline-secondary btn-sm" type="submit">Save practice round and check answers</button>`;
+            form.querySelectorAll("[data-practice-feedback]").forEach(button => button.addEventListener("click", () => {
+                const index = Number(button.dataset.practiceFeedback), out = document.getElementById(`careerPracticeFeedback${index}`), e = Alfred.escapeHtml;
+                button.disabled = true;
+                out.textContent = "Asking your local model...";
+                Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/practice-feedback/`, {method: "POST", body: JSON.stringify({
+                    question: practice.questions[index].question, answer: value(`careerPracticeAnswer${index}`).trim(), round_type: practice.round_type})}).then(data => {
+                    out.innerHTML = data.available ? `<p class="mb-1"><strong>Works:</strong> ${e(data.works)}</p><p class="mb-1"><strong>Improve:</strong> ${e(data.improve)}</p><p class="muted mb-0">${e(data.basis)}</p>`
+                        : `<p class="mb-0">${e(data.issues.join(" "))}</p>`;
+                }).catch(error => { out.innerHTML = `<p class="alert alert-danger mb-0" role="alert">${e(error.message)}</p>`; })
+                    .finally(() => { button.disabled = false; });
+            }));
             form.onsubmit = event => {
                 event.preventDefault();
                 const turns = practice.questions.map((row, index) => ({question: row.question, answer: value(`careerPracticeAnswer${index}`).trim(),
