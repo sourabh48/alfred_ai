@@ -172,6 +172,23 @@ class StatementReviewTests(TestCase):
             expired_token = statement_preview(upload)['token']
         self.assertEqual(self.confirm(upload, expired_token).status_code, 409)
 
+    def test_overlapping_statement_confirmed_after_review_makes_the_other_preview_stale(self):
+        # WEALTH2-002: a preview depends on the account's existing rows; another source posting them invalidates it.
+        BankAccount.objects.create(user=self.owner, account_number=parsed_fixture().account_number, current_balance='0.00')
+        first, second = self.stage(), self.stage()
+        stale = statement_preview(second)
+        self.assertEqual(stale['duplicate_count'], 0)
+        self.assertEqual(self.confirm(first).status_code, 200)
+        posted = Expense.objects.count()
+        self.assertEqual(self.confirm(second, stale['token']).status_code, 409)
+        self.assertEqual(Expense.objects.count(), posted)
+        second.refresh_from_db()
+        fresh = statement_preview(second)
+        self.assertEqual((fresh['duplicate_count'], fresh['new_count']), (posted, 0))
+        response = self.confirm(second, fresh['token'])
+        self.assertEqual((response.status_code, response.json()['imported_count']), (200, 0))
+        self.assertEqual(Expense.objects.count(), posted)
+
     def test_provenance_failure_rolls_back_account_rows_and_confirmation_claim(self):
         upload = self.stage()
         token = statement_preview(upload)['token']

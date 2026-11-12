@@ -54,7 +54,10 @@
   "Checked again when you confirm"); confirm refuses a create card when a same-name goal (any case/spacing) was
   added after review (409, nothing saved), and propose refuses a duplicate name. Update cards keep the full-goal
   fingerprint. Tests: stale create card (fails on the old code), other owner's goal is no dependency, refusal,
-  update depends_on; browser card assertion. Assistant/history-review/hybrid suites PASS. Cross-module cards pending.
+  update depends_on; browser card assertion. Assistant/history-review/hybrid suites PASS. Slice 2: a test that an
+  overlapping statement confirmed after review makes another statement's preview stale (409, nothing posted, fresh
+  preview imports 0). The other proposal flows already had stale-dependency tests; no shared helper built.
+  WEALTH2-002 implemented, not accepted.
 - `next` (after INVEST2-002 checkpoint, CI_PENDING on 462ea52): queue had no eligible task; owner chose CAREER2-002.
   The reviewed send already existed (manifest, signed review, stale/retry/interrupted). Added: "Reply to a recruiter's
   message" draft. It quotes the sentence behind each ask in the saved recruiter message (pay, notice period, location,
