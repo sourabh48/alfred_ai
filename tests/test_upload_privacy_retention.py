@@ -11,7 +11,6 @@ from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extracti
 from apps.career.models import CareerResume
 from apps.expenses.models import StatementUpload
 from apps.expenses.services.statement_import import StatementParseResult
-from apps.integrations.models import CreditReportUpload
 from apps.investments.models import InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanImportDocument
 from apps.mobility.models import BikeDocument
@@ -122,15 +121,6 @@ class UploadPrivacyRetentionTests(TestCase):
                     extracted_payload={"parser_notes": "ok"},
                 ),
                 "original_file",
-            ),
-            (
-                CreditReportUpload.objects.create(
-                    user=self.user,
-                    uploaded_file=SimpleUploadedFile("credit.pdf", b"credit", content_type="application/pdf"),
-                    file_name="credit.pdf",
-                    extracted_payload={"score": 780},
-                ),
-                "uploaded_file",
             ),
             (
                 InvestmentImportDocument.objects.create(

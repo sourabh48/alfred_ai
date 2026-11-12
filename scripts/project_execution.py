@@ -7,9 +7,10 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+# OWNER_DESCOPED: the owner removed the capability; it keeps its ID in the 143 and is never queued or verified.
 STATES = ('IMPLEMENTED_NOT_ACCEPTED', 'PARTIALLY_IMPLEMENTED', 'BLOCKED_APPROVAL',
-          'BLOCKED_EXTERNAL', 'NOT_IMPLEMENTED', 'COMPLETE_VERIFIED')
-PHASE = {STATES[0]: 'A', STATES[1]: 'B', STATES[2]: 'C', STATES[3]: 'C', STATES[4]: 'D', STATES[5]: 'DONE'}
+          'BLOCKED_EXTERNAL', 'NOT_IMPLEMENTED', 'COMPLETE_VERIFIED', 'OWNER_DESCOPED')
+PHASE = {STATES[0]: 'A', STATES[1]: 'B', STATES[2]: 'C', STATES[3]: 'C', STATES[4]: 'D', STATES[5]: 'DONE', STATES[6]: 'DONE'}
 # Owner decision 2026-11-05: AI Council work goes after every other module, whatever its phase.
 OWNER_DEFERRED_MODULES = ('COUNCIL',)
 MODULE_ORDER = ('FIN', 'LOAN', 'INV', 'DOC', 'AI', 'CAREER', 'TRAVEL', 'FAMILY', 'BIKE', 'COUNCIL', 'OPENAI', 'SYNC', 'RUNTIME')
@@ -51,7 +52,7 @@ GATES = {
     'SYNC-11': 'BLOCKED_EXTERNAL: encrypted backup copies to R2 built 2026-11-06 (scripts/cloud_backup.py), tested against a synthetic signed server only; needs the owner R2 bucket, a portable backup key with a copy kept off this PC, then a live upload, read-back and restore check',
     'TRAVEL-14': 'BLOCKED_APPROVAL: owner left the choice to Claude 2026-11-06; kept deferred because no free official bus inventory source exists and live booking stays off; links to verified bus websites remain',
     'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
-    'FIN-17': 'BLOCKED_APPROVAL: owner dropped credit bureau access and all credit report features 2026-11-06; stored reports and scores are kept, not shown; reopening needs a new owner decision',
+    'FIN-17': 'OWNER_DESCOPED (2026-11-12): credit score, credit reports and their tables removed; drop migration integrations 0007 waits for the owner backup; reopening needs a new owner decision',
     'FIN-16': 'BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; CI PASS at e8ef8f4; reviewed actual tax cases (income unverified) remain',
     'TRAVEL-18': 'BLOCKED_APPROVAL: Google configuration/credentials and offline map scope',
 }
@@ -194,7 +195,7 @@ def synchronize(root=ROOT, *, write=False, audit=None):
     next_task = None
     index = 0
     for row in ordered(rows):
-        if row['status'] == STATES[5]:
+        if row['status'] in (STATES[5], STATES[6]):
             continue
         index += 1
         ready = readiness(row, statuses, prerequisites)
@@ -207,6 +208,8 @@ def synchronize(root=ROOT, *, write=False, audit=None):
     queue += ['', '**Next eligible for `next` or active `sprint`: ' + str(next_task) + '.**', '',
               '## Accepted baseline — excluded from execution', '', '| ID | Capability | Status |', '| --- | --- | --- |']
     queue += ['| ' + r['id'] + ' | ' + r['title'] + ' | ' + r['status'] + ' |' for r in ordered(rows) if r['status'] == STATES[5]]
+    queue += ['', '## Owner-descoped — excluded from execution', '', '| ID | Capability | Status |', '| --- | --- | --- |']
+    queue += ['| ' + r['id'] + ' | ' + r['title'] + ' | ' + r['status'] + ' |' for r in ordered(rows) if r['status'] == STATES[6]]
     queue += ['', '## Separate 2.0 extensions — after authorized baseline closure', '',
               'Inspect existing reuse/gaps before implementing each of the ' + str(len(extensions)) + ' defined stories.',
               'Dependencies refer to original IDs; shared look-through is counted once, not per consumer.', '',

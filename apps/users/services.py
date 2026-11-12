@@ -14,7 +14,7 @@ from apps.budgets.models import Budget, BudgetMoneySnapshot, SavingsGoal
 from apps.career.models import CareerJobAnalysis, CareerProfile, CareerProfileMoneySnapshot, CareerResume, CareerResumeLearningMemory
 from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
-from apps.integrations.models import CreditReportUpload, CreditScore, EmailConnection, VerifiedExternalInsight
+from apps.integrations.models import EmailConnection, VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument, InvestmentMoneySnapshot, ResearchDecision
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanMoneySnapshot, LoanPaymentHistory, LoanRelatedMoneySnapshot
 from apps.ml_engine.models.parser_memory import DocumentParserLearningMemory
@@ -80,7 +80,6 @@ def clear_user_fed_data(user) -> dict:
         memory_count = MemoryStore(settings.ALFRED_MEMORY_DIR).reset_owner(user)
     career_resume_qs = CareerResume.objects.filter(user=user)
     statement_upload_qs = StatementUpload.objects.filter(user=user)
-    credit_report_qs = CreditReportUpload.objects.filter(user=user)
     investment_doc_qs = InvestmentImportDocument.objects.filter(user=user)
     loan_import_qs = LoanImportDocument.objects.filter(user=user)
     loan_closure_qs = LoanClosureDocument.objects.filter(loan__user=user)
@@ -99,7 +98,6 @@ def clear_user_fed_data(user) -> dict:
     file_names = []
     file_names.extend(_collect_file_names(career_resume_qs, "uploaded_file"))
     file_names.extend(_collect_file_names(statement_upload_qs, "original_file"))
-    file_names.extend(_collect_file_names(credit_report_qs, "uploaded_file"))
     file_names.extend(_collect_file_names(investment_doc_qs, "uploaded_file"))
     file_names.extend(_collect_file_names(loan_import_qs, "uploaded_file"))
     file_names.extend(_collect_file_names(loan_closure_qs, "uploaded_file"))
@@ -133,8 +131,6 @@ def clear_user_fed_data(user) -> dict:
         "travel_plans": TravelPlan.objects.filter(user=user).count(),
         "trip_photos": trip_photo_qs.count(),
         "trip_videos": trip_video_qs.count(),
-        "credit_reports": credit_report_qs.count(),
-        "credit_scores": CreditScore.objects.filter(user=user).count(),
         "system_tickets": SystemTicket.objects.filter(user=user).count(),
         "operational_logs": OperationalLog.objects.filter(user=user).count(),
         "chatgpt_imports": ChatGPTImport.objects.filter(user=user).count(),
@@ -182,8 +178,6 @@ def clear_user_fed_data(user) -> dict:
         TravelPlan.objects.filter(user=user).delete()
         BikeProfile.objects.filter(user=user).delete()
 
-        CreditReportUpload.objects.filter(user=user).delete()
-        CreditScore.objects.filter(user=user).delete()
         EmailConnection.objects.filter(user=user).delete()
         VerifiedExternalInsight.objects.filter(user=user).delete()
 

@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 6 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 3 | COMPLETE_VERIFIED: 85
+IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 3 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
 
 PR/CI: master `99b8e8f` CI_PASSED (run 42194736278: Linux, four Windows backend shards, native, three Selenium shards); `84b61ac` and `0ef41f8` CI_PENDING. PR #16/#18/#19 closed by the owner 2026-10-27; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). No Pages or deployment change.
 
@@ -814,7 +814,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 1 | 0 |
+| FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
@@ -1825,7 +1825,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-17 — Credit bureau reports and official score access
 
-**BLOCKED_APPROVAL** · Personal finance · P2.
+**OWNER_DESCOPED** · Personal finance · P2.
 
 - Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py), [apps/integrations/models.py](../apps/integrations/models.py) (kept tables only).
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
@@ -1835,7 +1835,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - SCOPED_INSPECTION 2026-11-06: the credit page showed the internal estimate as "Current Bureau Score" and "<rating> on CIBIL", and fell back to "CIBIL" when no bureau was known, so an estimate could pass for an official score. Fixed: estimates now read "Estimated credit health" and "<rating> on CIBIL scale (ALFRED estimate, not an official score)"; official uploaded snapshots keep "Current bureau score". New Chrome test plus 19 credit/smoke backend tests PASS. Parsed tradeline amounts reach loans only through the existing Decimal `loan_money` boundary (unchanged). Live pulls stay unimplemented: configured credentials return an explicit not-implemented status.
 - OWNER_DECISION 2026-11-06: "drop cibil score page... no need". The `/credit-score/` page, its sidebar link, template and script are removed (the route now returns 404). Kept: credit report uploads and parsing in Documents, bureau tradeline-to-loan sync, the stored scores and the `/api/integrations/credit-score/...` endpoints, so no data is lost. Smoke, credit upload, packaging and the all-pages Chrome CSP tests PASS.
 - OWNER_DECISION 2026-11-06 (second): "Official credit bureau access drop it completely" and "Remove credit reports too". Removed: the credit report upload form and list in Documents, the report parser, bureau tradeline-to-loan sync, the credit score tracker and every `/api/integrations/credit-score/...` endpoint (now 404), credit reports in the review queue, risk queues, project details and financial relationships. Kept, with no migration: the `CreditScore`, `CreditScoreFactor` and `CreditReportUpload` tables and their rows, upload file privacy, user data export/reset/deletion of them, and loans whose verification source is "bureau". Tests: the credit upload and bureau sync modules were removed; affected suites were updated and pass (see EXECUTION_STATE).
-- Next: none. Dropped by the owner; reopening needs a new owner decision.
+- OWNER_DECISION 2026-11-12: credit score is removed entirely (OWNER_DESCOPED; the 143 count stays 143). The `CreditScore`, `CreditScoreFactor` and `CreditReportUpload` models, admin, export/reset handling, upload privacy entry, tests and fixtures are removed. Drop migration `integrations/0007_drop_credit_score` is written but NOT applied to the owner runtime: the owner takes a backup first. It refuses to run if any score row holds a non-zero `total_credit_limit` (the owner asked to keep card limits; that column exists only on `CreditScore`). Uploaded report files under `media/credit_reports/` stay on disk.
+- Next: none. Descoped by the owner; reopening needs a new owner decision.
 
 ### LOAN-01 — EMI, schedules, outstanding and repayment metrics
 

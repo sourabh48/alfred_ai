@@ -54,7 +54,7 @@ class AuditProjectTests(unittest.TestCase):
         self.assertEqual(len(rows), 143)
         self.assertCountEqual([feature for feature, _ in sections], [row["id"] for row in rows])
         for feature, section in sections:
-            self.assertRegex(section, r"\*\*(?:COMPLETE_VERIFIED|IMPLEMENTED_NOT_ACCEPTED|PARTIALLY_IMPLEMENTED|NOT_IMPLEMENTED|BLOCKED_EXTERNAL|BLOCKED_APPROVAL|REQUIRES_RESEARCH|UNKNOWN)\*\*", feature)
+            self.assertRegex(section, r"\*\*(?:COMPLETE_VERIFIED|IMPLEMENTED_NOT_ACCEPTED|PARTIALLY_IMPLEMENTED|NOT_IMPLEMENTED|BLOCKED_EXTERNAL|BLOCKED_APPROVAL|REQUIRES_RESEARCH|UNKNOWN|OWNER_DESCOPED)\*\*", feature)
         for match in audit.LINK.finditer(tracker):
             target = audit.link_target(root, tracker_path, match[1].strip("<>"))
             if target is not None:

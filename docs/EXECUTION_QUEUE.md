@@ -64,22 +64,21 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | 40 | B | SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn) | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: Cloudflare R2 encrypted adapter built 2026-11-06, tested against a synthetic signed server only; owner creates a free R2 bucket and bucket-scoped token in the data folder config/local.env, then a live sync check |
 | 41 | B | SYNC-11 — Full application/cloud backup | PARTIALLY_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: encrypted backup copies to R2 built 2026-11-06 (scripts/cloud_backup.py), tested against a synthetic signed server only; needs the owner R2 bucket, a portable backup key with a copy kept off this PC, then a live upload, read-back and restore check |
 | 42 | B | RUNTIME-12 — GitHub CI and branch/source protection | PARTIALLY_IMPLEMENTED | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: CI runs on each master push; owner-approved ruleset 27070437 (2026-11-12) blocks master deletion and force push; required status checks are unset because finished work is pushed straight to master and need an owner decision |
-| 43 | C | FIN-17 — Credit bureau reports and official score access | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 44 | C | TRAVEL-11 — Hotel live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
-| 45 | C | TRAVEL-12 — Flight live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
-| 46 | C | TRAVEL-13 — Train live seat/fare/waitlist inventory | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
-| 47 | C | OPENAI-07 — Real paid-provider acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 48 | C | SYNC-09 — Portable keys and independent multi-device/device-loss recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 49 | C | SYNC-10 — Real provider activation, costs and IAM acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 50 | C | RUNTIME-08 — Off-device/device-loss disaster recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 51 | C | RUNTIME-16 — Real-account and manual accessibility acceptance | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
-| 52 | D | TRAVEL-14 — Bus live inventory | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: owner left the choice to Claude 2026-11-06; kept deferred because no free official bus inventory source exists and live booking stays off; links to verified bus websites remain |
-| 53 | D | TRAVEL-18 — Google Maps API integration and offline map packages | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: Google configuration/credentials and offline map scope |
-| 54 | A | COUNCIL-01 — Multiple ML inference roles and registry routing | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: owner agreed to local auto-training 2026-11-06; it takes effect when the owner presses Approve Auto-Training in their app, then held-out outcomes follow |
-| 55 | B | COUNCIL-02 — Planning/coding/review/security multi-agent application | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-01 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-01 |
-| 56 | B | COUNCIL-04 — Persistent tasks, conflicts and usage-limit recovery | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-02 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-02 |
-| 57 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
-| 58 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
+| 43 | C | TRAVEL-11 — Hotel live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
+| 44 | C | TRAVEL-12 — Flight live availability | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
+| 45 | C | TRAVEL-13 — Train live seat/fare/waitlist inventory | BLOCKED_EXTERNAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_EXTERNAL: see canonical decision |
+| 46 | C | OPENAI-07 — Real paid-provider acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 47 | C | SYNC-09 — Portable keys and independent multi-device/device-loss recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 48 | C | SYNC-10 — Real provider activation, costs and IAM acceptance | BLOCKED_APPROVAL | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 49 | C | RUNTIME-08 — Off-device/device-loss disaster recovery | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 50 | C | RUNTIME-16 — Real-account and manual accessibility acceptance | BLOCKED_APPROVAL | P1 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: see canonical decision |
+| 51 | D | TRAVEL-14 — Bus live inventory | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: owner left the choice to Claude 2026-11-06; kept deferred because no free official bus inventory source exists and live booking stays off; links to verified bus websites remain |
+| 52 | D | TRAVEL-18 — Google Maps API integration and offline map packages | NOT_IMPLEMENTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: Google configuration/credentials and offline map scope |
+| 53 | A | COUNCIL-01 — Multiple ML inference roles and registry routing | IMPLEMENTED_NOT_ACCEPTED | P2 / L | Scoped source/evidence inspection | B/P; U if affected; MONEY if changed | BLOCKED_APPROVAL: owner agreed to local auto-training 2026-11-06; it takes effect when the owner presses Approve Auto-Training in their app, then held-out outcomes follow |
+| 54 | B | COUNCIL-02 — Planning/coding/review/security multi-agent application | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-01 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-01 |
+| 55 | B | COUNCIL-04 — Persistent tasks, conflicts and usage-limit recovery | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-02 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-02 |
+| 56 | B | COUNCIL-05 — AI development budget and human Git approval | PARTIALLY_IMPLEMENTED | P2 / L | COUNCIL-04 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-04 |
+| 57 | D | COUNCIL-03 — Experimental self-improvement engine | NOT_IMPLEMENTED | P1 / L | COUNCIL-05 | B/P; U if affected; MONEY if changed | BLOCKED_DEPENDENCY: COUNCIL-05 |
 
 **Next eligible for `next` or active `sprint`: None.**
 
@@ -172,6 +171,12 @@ in [PROJECT_STATUS](PROJECT_STATUS.md); product intent is in [requirements](ALFR
 | RUNTIME-04 | Portable package and static assets | COMPLETE_VERIFIED |
 | RUNTIME-07 | Local backup, encrypted restore and rollback | COMPLETE_VERIFIED |
 | RUNTIME-10 | Session/CSRF/auth/upload/HTTP/diagnostic safeguards | COMPLETE_VERIFIED |
+
+## Owner-descoped — excluded from execution
+
+| ID | Capability | Status |
+| --- | --- | --- |
+| FIN-17 | Credit bureau reports and official score access | OWNER_DESCOPED |
 
 ## Separate 2.0 extensions — after authorized baseline closure
 

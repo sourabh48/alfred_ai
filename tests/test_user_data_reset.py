@@ -15,7 +15,7 @@ from apps.career.models import CareerJobAnalysis, CareerProfile, CareerResume, C
 from apps.expenses.models import BankAccount, Expense, StatementUpload
 from apps.expenses.services.financial_intelligence import build_financial_intelligence
 from apps.family.models import Dependent
-from apps.integrations.models import CreditReportUpload, CreditScore, VerifiedExternalInsight
+from apps.integrations.models import VerifiedExternalInsight
 from apps.investments.models import Investment, InvestmentImportDocument
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument
 from apps.ml_engine.models.parser_memory import DocumentParserLearningMemory
@@ -84,8 +84,6 @@ class UserDataResetApiTests(TestCase):
         self.assertEqual(BikeServiceRecord.objects.filter(user=self.user).count(), 0)
         self.assertEqual(TravelPlan.objects.filter(user=self.user).count(), 0)
         self.assertEqual(TripPhoto.objects.filter(user=self.user).count(), 0)
-        self.assertEqual(CreditScore.objects.filter(user=self.user).count(), 0)
-        self.assertEqual(CreditReportUpload.objects.filter(user=self.user).count(), 0)
         self.assertEqual(BehavioralSignal.objects.filter(user=self.user).count(), 0)
         self.assertEqual(Budget.objects.filter(user=self.user).count(), 0)
         self.assertEqual(Dependent.objects.filter(user=self.user).count(), 0)
@@ -260,23 +258,6 @@ class UserDataResetApiTests(TestCase):
             image=SimpleUploadedFile("trip.jpg", b"trip-photo", content_type="image/jpeg"),
         )
 
-        credit_score = CreditScore.objects.create(
-            user=self.user,
-            bureau="CIBIL",
-            score_kind="official",
-            score=782,
-            rating="Good",
-            valid_until=timezone.now() + timedelta(days=30),
-        )
-        CreditReportUpload.objects.create(
-            user=self.user,
-            uploaded_file=SimpleUploadedFile("cibil.pdf", b"credit-data", content_type="application/pdf"),
-            file_name="cibil.pdf",
-            bureau="CIBIL",
-            parser_status="parsed",
-            parse_confidence=0.96,
-            parsed_credit_score=credit_score,
-        )
         VerifiedExternalInsight.objects.create(
             user=self.user,
             scope="career",
@@ -309,7 +290,6 @@ class UserDataResetApiTests(TestCase):
             Path(InvestmentImportDocument.objects.filter(user=self.user).first().uploaded_file.path),
             Path(BikeDocument.objects.filter(user=self.user).first().document_file.path),
             Path(TripPhoto.objects.filter(user=self.user).first().image.path),
-            Path(CreditReportUpload.objects.filter(user=self.user).first().uploaded_file.path),
         ]
 
     def _seed_other_user_data(self):

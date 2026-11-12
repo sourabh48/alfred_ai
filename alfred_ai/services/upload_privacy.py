@@ -15,7 +15,6 @@ RAW_FILE_RETENTION_KEY = "raw_file_retention"
 PRIVATE_FILE_FIELDS = (
     ("expenses.StatementUpload", "original_file", "user_id"),
     ("investments.InvestmentImportDocument", "uploaded_file", "user_id"),
-    ("integrations.CreditReportUpload", "uploaded_file", "user_id"),
     ("career.CareerResume", "uploaded_file", "user_id"),
     ("mobility.TripPhoto", "image", "user_id"),
     ("mobility.TripVideo", "video", "user_id"),

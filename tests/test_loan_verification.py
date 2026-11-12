@@ -224,7 +224,9 @@ class LoanVerificationMigrationTests(TransactionTestCase):
         leaves = executor.loader.graph.leaf_nodes()
         self.addCleanup(lambda: MigrationExecutor(connection).migrate(leaves))
         executor.migrate([self.migrate_from])
-        previous_leaves = [self.migrate_from if node[0] == "loans" else node for node in leaves]
+        # integrations 0007 drops CreditReportUpload after loans 0013; read the state from before both.
+        older = {"loans": self.migrate_from, "integrations": ("integrations", "0006_verifiedexternalinsight_refresh_observability")}
+        previous_leaves = [older.get(node[0], node) for node in leaves]
         old_apps = executor.loader.project_state(previous_leaves).apps
         User = old_apps.get_model("users", "User")
         OldLoan = old_apps.get_model("loans", "Loan")
@@ -285,7 +287,7 @@ class LoanVerificationMigrationTests(TransactionTestCase):
         before = list(OldLoan.objects.order_by("pk").values_list(*retained_fields))
         executor = MigrationExecutor(connection)
         executor.migrate([self.migrate_to])
-        new_leaves = [self.migrate_to if node[0] == "loans" else node for node in leaves]
+        new_leaves = [{**older, "loans": self.migrate_to}.get(node[0], node) for node in leaves]
         new_apps = executor.loader.project_state(new_leaves).apps
         NewLoan = new_apps.get_model("loans", "Loan")
         self.assertEqual(NewLoan.objects.get(pk=manual.pk).verification_status, "confirmed")

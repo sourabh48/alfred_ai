@@ -114,7 +114,7 @@ def source_inventory(repo, paths):
 def validate_matrix(repo, path):
     rows = json.loads(path.read_text(encoding="utf-8"))
     statuses = {"COMPLETE_VERIFIED", "IMPLEMENTED_NOT_ACCEPTED", "PARTIALLY_IMPLEMENTED", "NOT_IMPLEMENTED",
-                "BLOCKED_EXTERNAL", "BLOCKED_APPROVAL", "REQUIRES_RESEARCH", "UNKNOWN"}
+                "BLOCKED_EXTERNAL", "BLOCKED_APPROVAL", "REQUIRES_RESEARCH", "UNKNOWN", "OWNER_DESCOPED"}
     required = {"id", "module", "requirement", "status", "sources", "endpoints", "models", "tests", "test_result",
                 "real_account_acceptance", "real_provider_acceptance", "production_status", "limitations", "dependencies", "priority", "next_action"}
     issues, seen = [], set()
