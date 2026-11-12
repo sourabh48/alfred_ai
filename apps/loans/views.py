@@ -620,6 +620,7 @@ def _build_networth_payload(user) -> dict:
         ),
         "pending_foreclosure_excluded_balance": round(balance_sheet.get("pending_foreclosure_excluded_balance", 0.0), 2),
         "credit_card_liability": liability_lookup.get("Credit card liability", 0.0),
+        "overdrawn_accounts": liability_lookup.get("Overdrawn accounts", 0.0),
         "lifestyle_vehicle_burden": 0.0,
         "total": total_debt,
     }

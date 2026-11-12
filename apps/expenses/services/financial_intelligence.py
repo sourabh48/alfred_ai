@@ -1224,7 +1224,10 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if loans and not payment_rows:
         payment_rows = fetch_payment_history_rows(user=user)
 
-    liquid_cash = _money_float(sum(max(account.current_balance or 0, 0) for account in accounts if account.account_type != "credit"))
+    cash_balances = [_decimal_amount(account.current_balance or 0) for account in accounts if account.account_type != "credit"]
+    liquid_cash = _money_float(sum((max(value, Decimal("0")) for value in cash_balances), Decimal("0")))
+    # An overdraft is money owed, not zero cash.
+    overdrawn_liability = _money_float(sum((-value for value in cash_balances if value < 0), Decimal("0")))
     credit_liability = _money_float(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"))
     investment_assets = investment_total_float(sum(item.current_value or 0 for item in investments))
     home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
@@ -1267,6 +1270,8 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
         liabilities.append({"label": "Pending foreclosure liabilities", "amount": pending_foreclosure_balance})
     if credit_liability:
         liabilities.append({"label": "Credit card liability", "amount": credit_liability})
+    if overdrawn_liability:
+        liabilities.append({"label": "Overdrawn accounts", "amount": overdrawn_liability})
 
     total_assets = _money_float(sum(_decimal_amount(item["amount"]) for item in assets))
     total_liabilities = _money_float(sum(_decimal_amount(item["amount"]) for item in liabilities))
