@@ -2840,13 +2840,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **PARTIALLY_IMPLEMENTED** · Career · P2.
 
-- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js), [apps/integrations/services/email_integration.py](../apps/integrations/services/email_integration.py).
+- Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
 - APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
 - Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py), [tests/test_career_matching_acceptance.py](../tests/test_career_matching_acceptance.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py). Fresh scoped evidence: 81 backend and 5 integrated actual Chrome PASS, zero skips; see manual recruiter checkpoint above.
 - Acceptance: PASS for synthetic manual-equivalent JD/attachment intake, explicit owned resume selection, source references, abstention, error/retry, correction/reopen and ownership/CSRF. Desktop/390px captures inspected. This is not live-mail, real-account, predictive-quality or packaged acceptance.
 - Limitations/dependencies: Automatic mail access is not an accepted integrated workflow and remains off. Career Ops repository identity is unverified; repository-dependent conversion is deferred independently. The retired OAuth prototypes must not be revived.
 - Next: Preserve accepted manual source/correction/retry contracts. Automatic mailbox processing requires separately approved provider access, a reviewed integration and live acceptance; continue independent DOC/AI work meanwhile.
 - SCOPED_INSPECTION 2026-11-06: career backend tests re-run PASS (73, including the recruiter/evidence and matching suites). Manual intake stays the accepted path; no mailbox access was added.
+- 2026-11-12: the unreachable IMAP scanner (`email_integration.py`) and the investment email scraper were deleted; nothing in the app called them. EmailConnection rows are unchanged.
 
 ### CAREER-05 — Application and opportunity outcome tracking
 
