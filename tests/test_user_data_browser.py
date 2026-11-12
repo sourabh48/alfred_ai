@@ -119,10 +119,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         Session.objects.filter(session_key=cookie['value']).delete()
         self.browser.delete_cookie(settings.SESSION_COOKIE_NAME)
 
-    def text(self, element_id):
+    def text(self, element_id, by=None):
         from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
         try:
-            return self.browser.find_element(self.By.ID, element_id).text
+            return self.browser.find_element(by or self.By.ID, element_id).text
         except WebDriverException as error:
             # ChromeDriver can report a just-replaced element this way instead of as stale.
             if "does not belong to the document" in str(error):
@@ -284,11 +284,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.save_screenshot(str(self.artifacts/f'loan-review-{width}-{theme}.png'))
         self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="reviewed"]').send_keys(Keys.SPACE)
         self.memory_click('button[value="confirm"]')
-        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.text('main', self.By.TAG_NAME))
         loan = Loan.objects.get(user=owner, loan_account_number='SYNTHETICREVIEW42')
         self.assertEqual((loan.principal, loan.emi, loan.remaining_balance), (Decimal('10000.02'), Decimal('450.25'), Decimal('8000.01')))
         self.browser.refresh()
-        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.text('main', self.By.TAG_NAME))
         self.assertEqual(Loan.objects.filter(user=owner).count(), before+1)
         self.browser.save_screenshot(str(self.artifacts/'loan-review-confirmed.png'))
         self.memory_click('main a[href="/loans/"]')
@@ -296,7 +296,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url+'/documents/')
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
         self.memory_click(link)
-        self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Loan review confirmed.' in self.text('main', self.By.TAG_NAME))
         self.assertTrue(Path(document.uploaded_file.path).is_file())
 
     def test_legacy_loan_source_removal_preserves_the_canonical_record(self):
@@ -370,25 +370,25 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 self.browser.save_screenshot(str(self.artifacts/f'investment-review-{width}-{theme}.png'))
         self.browser.find_element(self.By.CSS_SELECTOR, 'input[name="reviewed"]').send_keys(Keys.SPACE)
         self.memory_click('button[value="confirm"]')
-        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.text('main', self.By.TAG_NAME))
         investment = Investment.objects.get(user=owner, account_number='SYNTHETICREVIEW42')
         self.assertEqual((investment.invested_amount, investment.current_value, investment.monthly_sip),
             (Decimal('10000.02'), Decimal('120.25'), Decimal('0.00')))
         self.browser.refresh()
-        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.text('main', self.By.TAG_NAME))
         self.assertEqual(Investment.objects.filter(user=owner).count(), before+1)
         self.browser.save_screenshot(str(self.artifacts/'investment-review-confirmed.png'))
         self.memory_click('main a[href="/investments/"]')
         self.wait.until(lambda _: '120.25' in self.text('investmentPositionsBody'))
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
         self.memory_click(link)
-        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.text('main', self.By.TAG_NAME))
         self.assertTrue(Path(document.uploaded_file.path).is_file())
 
     def test_data_sources_owned_counts_and_navigation(self):
         self.login()
         self.browser.get(self.live_server_url + '/data-sources/')
-        self.wait.until(lambda _: 'module groups contain saved data' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'module groups contain saved data' in self.text('main', self.By.TAG_NAME))
         self.assertIn('not a verification score', self.browser.find_element(self.By.TAG_NAME, 'main').text)
         links = self.browser.find_elements(self.By.CSS_SELECTOR, 'main a')
         for path in ('/expenses/', '/loans/', '/budgets/', '/investments/', '/career/', '/mobility/', '/documents/', '/settings/diagnostics/'):
@@ -529,7 +529,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             upload_file=SimpleUploadedFile('synthetic-onboarding.pdf', b'%PDF synthetic onboarding source'))
         before = Loan.objects.filter(user=owner).count()
         self.browser.get(self.live_server_url+'/data-sources/')
-        self.wait.until(lambda _: 'Your next setup step' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Your next setup step' in self.text('main', self.By.TAG_NAME))
         link = f'main a[href="/loans/import-uploads/{document.pk}/review/"]'
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, link))
         self.assertNotIn('synthetic-onboarding.pdf', self.browser.page_source)
@@ -5850,7 +5850,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.browser.get(self.live_server_url+f'/loans/import-uploads/{upload.pk}/review/')
             self.memory_click('input[name="reviewed"]')
             self.memory_click('button[value="confirm"]')
-            self.wait.until(lambda _: 'Loan review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+            self.wait.until(lambda _: 'Loan review confirmed.' in self.text('main', self.By.TAG_NAME))
             self.assertEqual(LoanImportDocument.objects.filter(file_name=file.name, parser_status="parsed").count(), attempt)
             rows = list(Loan.objects.filter(user=owner, loan_account_number="TESTM14F42").values_list("pk", "principal", "remaining_balance", "emi"))
             self.assertEqual(len(rows), 1)
@@ -5898,7 +5898,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.wait.until(lambda _: self.browser.find_elements(self.By.NAME, 'reviewed'))
             self.memory_click('input[name="reviewed"]')
             self.memory_click('button[value="confirm"]')
-            self.wait.until(lambda _: 'This preview was confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+            self.wait.until(lambda _: 'This preview was confirmed.' in self.text('main', self.By.TAG_NAME))
             rows = list(Expense.objects.filter(source="bank_statement", bank_account__account_number="999988887777").values_list("transaction_fingerprint", "external_reference", "amount"))
             balances = list(BankAccount.objects.filter(account_number="999988887777").values_list("current_balance", flat=True))
             if attempt == 1:
@@ -6245,7 +6245,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(list(Investment.objects.filter(user=owner).values()), before)
         self.memory_click('input[name="reviewed"]')
         self.memory_click('button[value="confirm"]')
-        self.wait.until(lambda _: 'Investment review confirmed.' in self.browser.find_element(self.By.TAG_NAME, 'main').text)
+        self.wait.until(lambda _: 'Investment review confirmed.' in self.text('main', self.By.TAG_NAME))
         self.browser.get(self.live_server_url+'/investments/')
         self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'investmentPdfFiles'))
 
