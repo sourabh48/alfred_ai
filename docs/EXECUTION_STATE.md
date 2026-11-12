@@ -36,7 +36,10 @@
   posting-less matches. Career page: re-check button and a "Compare two of your CVs" table on the existing compare
   API. Tests: API (citation, archive, 404, 409, refusals) and browser (compare, re-check, axe light/dark).
   Limits: the job-match result card is not refreshed until reload; a match saved before labels existed cites the file
-  name only. Implemented, not accepted: owner acceptance pending. Not pushed.
+  name only. Implemented, not accepted: owner acceptance pending. Pushed as f89c8df (owner approved).
+- CI at f89c8df (run 43222348115): all three Selenium shards refused to start because the new browser test had no
+  entry in tests/browser_durations.json (shard planning fails closed). Added its local time (11.72 s); local
+  collect-only shard planning passes (211 tests). No test or timeout was changed.
 - Baseline 85/143, extensions 0/13 unchanged.
 
 ## Career Ops training, project, question checks, practice comments and course links - 2026-11-12

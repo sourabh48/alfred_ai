@@ -24,6 +24,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_history_status_retry_does_not_clear_a_saved_conversation_conflict": 13.063,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_history_recovery_review_cancel_lost_ack_retry_and_retention": 18.812,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_bad_history_does_not_hide_valid_followups_or_erase_records": 15.797,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_career_cv_versions_compare_and_stale_match_recheck": 11.72,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_home_dashboard_reminds_of_due_career_follow_ups_only": 8.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_application_kit_triage_drafts_and_offer_reading": 28.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_evaluation_batch_triage_and_reviewed_send": 14.5,
