@@ -196,8 +196,8 @@ def _build_recommendation_overview_payload(request) -> dict:
         evidence=[market.evidence, inflation.evidence],
         required_sources=["Yahoo Finance", "World Bank"],
         notes=[
-            "Investment matching is grounded in your savings capacity, persona, and risk appetite, then contextualized with verified market and inflation evidence.",
-            "External evidence shapes market posture and real-return context, not a guarantee that any product will outperform.",
+            "Investment matching uses only your own savings capacity, holdings and risk appetite; verified market and inflation evidence is attached with its date.",
+            "Expected returns are not available: no verified, dated return source is attached, so none is shown.",
         ],
     )
     insurance_grounding = _grounding_payload(
@@ -206,13 +206,13 @@ def _build_recommendation_overview_payload(request) -> dict:
             "dependents": int(profile.get("dependents", 0) or 0),
             "age": int(profile.get("age", 0) or 0),
             "essential_recommendations": sum(1 for item in insurance.get("recommendations", []) if item.get("is_essential")),
-            "total_annual_premium": round(insurance.get("total_annual_premium", 0), 2),
+            "total_annual_premium": None,
         },
         evidence=[inflation.evidence],
         required_sources=["World Bank"],
         notes=[
             "Insurance matching is grounded in household dependence, age, and affordability. Verified inflation evidence is attached only as protection-cost context.",
-            "Coverage suggestions remain planning guidance, not insurer underwriting approval or premium quotes.",
+            "Premiums and cover amounts are not available: no insurer quote is attached, and none is estimated.",
         ],
     )
     credit_cards_grounding = _grounding_payload(

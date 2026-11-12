@@ -328,6 +328,23 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
         self.assertEqual(len(payload["disabled_modules"]), 2)
         self.assertEqual(payload["credit_cards"]["grounding"]["history"]["policy_state"], "disabled")
         self.assertEqual(payload["loans"]["grounding"]["history"]["policy_state"], "disabled")
+
+        # Nothing in the payload is invented: no catalog products, returns, premiums, cover or credit score.
+        text = response.content.decode()
+        for invented in ("HDFC", "ICICI", "SBI", "Axis", "Bajaj", "credit_score", "expected_value_1y", "benefits"):
+            self.assertNotIn(invented, text)
+        investments, insurance = payload["investments"], payload["insurance"]
+        self.assertTrue(investments["recommendations"])
+        for item in investments["recommendations"]:
+            self.assertIsNone(item["expected_return"])
+            self.assertIn("Not available", item["expected_return_status"])
+            self.assertNotIn("expected_return", item["investment"])
+        self.assertIsNone(investments["suggested_portfolio"]["expected_return"])
+        self.assertIsNone(insurance["total_annual_premium"])
+        for item in insurance["recommendations"]:
+            self.assertEqual((item["insurance"]["premium_estimate"], item["insurance"]["coverage"]), (None, None))
+        self.assertIsNone(payload["profile"]["age"])
+        self.assertEqual(payload["profile"]["city"], self.user.city)
         self.assertGreaterEqual(payload["credit_cards"]["grounding"]["freshness"]["tracked_records"], 1)
         self.assertGreaterEqual(payload["loans"]["grounding"]["freshness"]["tracked_records"], 1)
         self.assertEqual(payload["investments"]["grounding"]["freshness"]["tracked_records"], 2)

@@ -763,6 +763,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertFalse(self.browser.execute_script("return Boolean(window.Chart && Chart.getChart('taxComparisonChart'))"))
         self.browser.get(self.live_server_url + '/recommendations/')
         self.wait.until(lambda _: 'savings rate unavailable' in self.text('recommendationHeroCopy'))
+        # No invented return, premium or cover figure reaches the page.
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#recommendationInvestmentsList [data-expected-return]'))
+        returns = {e.text for e in self.browser.find_elements(self.By.CSS_SELECTOR, '#recommendationInvestmentsList [data-expected-return]')}
+        self.assertTrue(returns)
+        self.assertTrue(all(text.startswith('Not available') for text in returns), returns)
+        premiums = [e.text for e in self.browser.find_elements(self.By.CSS_SELECTOR, '#recommendationInsuranceList [data-premium-status]')]
+        self.assertEqual(len(premiums), 3)
+        self.assertTrue(all('Not available' in text for text in premiums))
 
         from apps.career.models import CareerProfile
         CareerProfile.objects.create(user=type(owner).objects.get(username='no_income_tax_viewer'), role='Analyst', experience_years=1, skills='', last_salary=0)

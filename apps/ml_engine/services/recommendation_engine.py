@@ -1,165 +1,44 @@
 """
-Financial Product Recommendation Engine
-Personalized suggestions for credit cards, loans, investments, and insurance
+Financial recommendation engine.
+
+Suggestions are built only from the owner's own records. No product catalog, expected return,
+premium, cover amount or credit score is assumed: where a figure would need an outside source,
+the payload says "Not available".
 """
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict, List, Optional
 from django.db.models import Sum
 from django.utils import timezone
 
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 
+NOT_AVAILABLE = "Not available"
+NO_RETURN_SOURCE = "Not available: no verified, dated source for expected returns is attached."
+NO_PREMIUM_SOURCE = "Not available: get quotes from insurers; ALFRED does not estimate premiums or cover."
+
 
 class FinancialRecommendationEngine:
-    """
-    AI-powered recommendation engine for financial products.
-    Uses collaborative filtering, content-based filtering, and rule-based logic.
-    """
+    """Rule-based suitability guidance from the owner's own baseline, holdings and household."""
 
-    # Credit Card Recommendations
-    CREDIT_CARDS = {
-        'HDFC_REGALIA': {
-            'name': 'HDFC Bank Regalia Credit Card',
-            'type': 'Premium Rewards',
-            'annual_fee': 2500,
-            'benefits': ['4 reward points per ₹150', 'Lounge access', 'Fuel surcharge waiver'],
-            'income_required': 100000,
-            'recommended_for': ['high_spender', 'frequent_traveler'],
-            'category_bonuses': {'travel': 5, 'dining': 3, 'shopping': 2}
-        },
-        'ICICI_AMAZON': {
-            'name': 'Amazon Pay ICICI Credit Card',
-            'type': 'Cashback',
-            'annual_fee': 0,
-            'benefits': ['5% cashback on Amazon', '2% on bill payments', 'No annual fee'],
-            'income_required': 30000,
-            'recommended_for': ['online_shopper', 'budget_conscious'],
-            'category_bonuses': {'shopping': 5, 'utilities': 2}
-        },
-        'SBI_ELITE': {
-            'name': 'SBI Elite Credit Card',
-            'type': 'Travel',
-            'annual_fee': 4999,
-            'benefits': ['10 reward points per ₹100', 'Complimentary lounge', 'Golf access'],
-            'income_required': 150000,
-            'recommended_for': ['luxury_traveler', 'high_income'],
-            'category_bonuses': {'travel': 10, 'dining': 5, 'shopping': 3}
-        },
-        'AXIS_ACE': {
-            'name': 'Axis Bank Ace Credit Card',
-            'type': 'Cashback',
-            'annual_fee': 0,
-            'benefits': ['5% cashback on bill payments', '4% on Swiggy/Zomato', '2% on others'],
-            'income_required': 25000,
-            'recommended_for': ['foodie', 'bill_payer'],
-            'category_bonuses': {'food': 4, 'utilities': 5, 'other': 2}
-        }
+    # Asset classes only; no product names, returns or minimums are claimed.
+    ASSET_CLASSES = {
+        'EQUITY_LARGE': {'name': 'Large-cap equity', 'type': 'Equity', 'risk': 'Moderate',
+                         'recommended_for': ['stable_income', 'long_term'], 'liquidity': 'High'},
+        'EQUITY_MID': {'name': 'Mid-cap equity', 'type': 'Equity', 'risk': 'High',
+                       'recommended_for': ['high_risk_appetite', 'long_term'], 'liquidity': 'High'},
+        'DEBT': {'name': 'Debt funds or deposits', 'type': 'Debt', 'risk': 'Low',
+                 'recommended_for': ['conservative', 'short_term'], 'liquidity': 'High'},
+        'GOLD': {'name': 'Gold', 'type': 'Gold', 'risk': 'Moderate',
+                 'recommended_for': ['diversification', 'inflation_hedge'], 'liquidity': 'High'},
+        'PENSION': {'name': 'Retirement / pension account', 'type': 'Pension', 'risk': 'Low',
+                    'recommended_for': ['retirement_planning', 'long_term'], 'liquidity': 'Low'},
     }
 
-    # Personal Loan Products
-    PERSONAL_LOANS = {
-        'HDFC_PERSONAL': {
-            'name': 'HDFC Personal Loan',
-            'interest_rate': 10.5,
-            'max_amount': 4000000,
-            'tenure_months': 60,
-            'processing_fee': 2.0,
-            'eligibility': {'min_income': 25000, 'min_credit_score': 700}
-        },
-        'BAJAJ_INSTA': {
-            'name': 'Bajaj Finserv Insta Personal Loan',
-            'interest_rate': 11.0,
-            'max_amount': 2500000,
-            'tenure_months': 60,
-            'processing_fee': 1.5,
-            'eligibility': {'min_income': 20000, 'min_credit_score': 680}
-        },
-        'ICICI_INSTANT': {
-            'name': 'ICICI Instant Personal Loan',
-            'interest_rate': 10.75,
-            'max_amount': 3500000,
-            'tenure_months': 72,
-            'processing_fee': 2.5,
-            'eligibility': {'min_income': 30000, 'min_credit_score': 720}
-        }
-    }
-
-    # Investment Products
-    INVESTMENTS = {
-        'EQUITY_MF_LARGE': {
-            'name': 'Large Cap Equity Mutual Fund',
-            'type': 'Equity MF',
-            'risk': 'Moderate',
-            'expected_return': 12,
-            'min_investment': 500,
-            'recommended_for': ['stable_income', 'long_term'],
-            'liquidity': 'High'
-        },
-        'EQUITY_MF_MID': {
-            'name': 'Mid Cap Equity Mutual Fund',
-            'type': 'Equity MF',
-            'risk': 'High',
-            'expected_return': 15,
-            'min_investment': 1000,
-            'recommended_for': ['high_risk_appetite', 'long_term'],
-            'liquidity': 'High'
-        },
-        'DEBT_FUND': {
-            'name': 'Debt Mutual Fund',
-            'type': 'Debt Fund',
-            'risk': 'Low',
-            'expected_return': 7,
-            'min_investment': 500,
-            'recommended_for': ['conservative', 'short_term'],
-            'liquidity': 'High'
-        },
-        'GOLD_ETF': {
-            'name': 'Gold ETF',
-            'type': 'Gold',
-            'risk': 'Moderate',
-            'expected_return': 8,
-            'min_investment': 1000,
-            'recommended_for': ['diversification', 'inflation_hedge'],
-            'liquidity': 'High'
-        },
-        'NPS': {
-            'name': 'National Pension System',
-            'type': 'Pension',
-            'risk': 'Low-Moderate',
-            'expected_return': 10,
-            'min_investment': 500,
-            'recommended_for': ['retirement_planning', 'tax_saving'],
-            'liquidity': 'Low'
-        }
-    }
-
-    # Insurance Products
-    INSURANCE = {
-        'TERM_LIFE': {
-            'name': 'Term Life Insurance',
-            'type': 'Life Insurance',
-            'coverage': 10000000,
-            'premium_estimate': 15000,
-            'recommended_for': ['has_dependents', 'primary_earner'],
-            'benefits': ['Pure protection', 'Tax benefits', 'High coverage']
-        },
-        'HEALTH_FAMILY': {
-            'name': 'Family Health Insurance',
-            'type': 'Health Insurance',
-            'coverage': 500000,
-            'premium_estimate': 20000,
-            'recommended_for': ['has_family', 'preventive_care'],
-            'benefits': ['Cashless treatment', 'No claim bonus', 'Pre-post hospitalization']
-        },
-        'HEALTH_CRITICAL': {
-            'name': 'Critical Illness Cover',
-            'type': 'Health Insurance',
-            'coverage': 2000000,
-            'premium_estimate': 8000,
-            'recommended_for': ['family_history', 'comprehensive_protection'],
-            'benefits': ['Lump sum payout', 'Covers 30+ illnesses', 'Income replacement']
-        }
+    # Protection types only; cover and premium need an insurer quote.
+    PROTECTION_TYPES = {
+        'TERM_LIFE': {'name': 'Term life insurance', 'type': 'Life Insurance', 'recommended_for': ['has_dependents']},
+        'HEALTH_FAMILY': {'name': 'Health insurance', 'type': 'Health Insurance', 'recommended_for': ['has_family']},
+        'HEALTH_CRITICAL': {'name': 'Critical illness cover', 'type': 'Health Insurance', 'recommended_for': ['has_dependents']},
     }
 
     def __init__(self):
@@ -182,8 +61,9 @@ class FinancialRecommendationEngine:
 
         profile = {
             'user_id': user.id,
-            'age': getattr(user, 'age', 30),
-            'city': getattr(user, 'city', 'Mumbai'),
+            # Unknown age stays unknown; it is never defaulted.
+            'age': getattr(user, 'age', None),
+            'city': getattr(user, 'city', '') or '',
             'dependents': Dependent.objects.filter(user=user).count(),
         }
         baseline = resolve_canonical_financial_baseline(user)
@@ -239,10 +119,13 @@ class FinancialRecommendationEngine:
         """Assess user's risk appetite based on profile."""
         score = 0
 
-        # Age factor
-        if profile['age'] < 30:
+        # Age factor, only when the owner's age is recorded
+        age = profile.get('age')
+        if age is None:
+            pass
+        elif age < 30:
             score += 3
-        elif profile['age'] < 40:
+        elif age < 40:
             score += 2
         else:
             score += 1
@@ -302,7 +185,7 @@ class FinancialRecommendationEngine:
             personas.append('has_dependents')
             personas.append('has_family')
 
-        if profile['age'] > 45:
+        if (profile.get('age') or 0) > 45:
             personas.append('retirement_planning')
 
         # Financial behavior
@@ -313,138 +196,6 @@ class FinancialRecommendationEngine:
             personas.append('investment_beginner')
 
         return personas
-
-    def recommend_credit_cards(self, user, top_n: int = 3) -> Dict:
-        """
-        Recommend credit cards based on user profile.
-
-        Args:
-            user: Django user object
-            top_n: Number of recommendations
-
-        Returns:
-            Dict with recommended cards
-        """
-        profile = self.build_user_profile(user)
-
-        recommendations = []
-
-        for card_id, card in self.CREDIT_CARDS.items():
-            score = 0
-
-            # Income eligibility
-            if profile['income'] >= card['income_required']:
-                score += 30
-            else:
-                continue  # Skip if not eligible
-
-            # Persona match
-            matching_personas = set(profile['persona']) & set(card['recommended_for'])
-            score += len(matching_personas) * 15
-
-            # Category alignment
-            top_category = profile['top_category']
-            if top_category in card['category_bonuses']:
-                score += card['category_bonuses'][top_category] * 5
-
-            # Fee affordability
-            if card['annual_fee'] == 0:
-                score += 10
-            elif card['annual_fee'] < profile['income'] * 0.05:
-                score += 5
-
-            recommendations.append({
-                'card': card,
-                'score': score,
-                'card_id': card_id,
-                'match_reason': self._explain_card_match(card, profile, matching_personas)
-            })
-
-        # Sort by score and return top N
-        recommendations.sort(key=lambda x: x['score'], reverse=True)
-
-        return {
-            'recommendations': recommendations[:top_n],
-            'user_profile': {
-                'income': profile['income'],
-                'top_spending_category': profile['top_category'],
-                'personas': profile['persona']
-            }
-        }
-
-    def recommend_loans(self, user, loan_amount: Optional[float] = None) -> Dict:
-        """
-        Recommend personal loan products.
-
-        Args:
-            user: Django user object
-            loan_amount: Desired loan amount (optional)
-
-        Returns:
-            Dict with loan recommendations
-        """
-        profile = self.build_user_profile(user)
-
-        recommendations = []
-
-        # Estimate credit score (simplified)
-        estimated_credit_score = 720
-        if profile['dti_ratio'] < 25:
-            estimated_credit_score += 30
-        elif profile['dti_ratio'] > 40:
-            estimated_credit_score -= 50
-
-        for loan_id, loan in self.PERSONAL_LOANS.items():
-            # Check eligibility
-            if profile['income'] < loan['eligibility']['min_income']:
-                continue
-
-            if estimated_credit_score < loan['eligibility']['min_credit_score']:
-                continue
-
-            # Calculate max eligible amount
-            max_eligible = min(
-                loan['max_amount'],
-                profile['income'] * 30  # 30x monthly income
-            )
-
-            # Calculate EMI for requested amount
-            if loan_amount and loan_amount <= max_eligible:
-                amount = loan_amount
-            else:
-                amount = max_eligible * 0.5  # Suggest 50% of max
-
-            monthly_rate = loan['interest_rate'] / 12 / 100
-            tenure = loan['tenure_months']
-            emi = amount * monthly_rate * (1 + monthly_rate)**tenure / ((1 + monthly_rate)**tenure - 1)
-
-            # Check if EMI is affordable
-            affordable_emi = profile['monthly_savings'] * 0.6  # Max 60% of savings
-            is_affordable = emi <= affordable_emi
-
-            recommendations.append({
-                'loan': loan,
-                'loan_id': loan_id,
-                'max_eligible': max_eligible,
-                'suggested_amount': amount,
-                'emi': round(emi, 2),
-                'total_payable': round(emi * tenure, 2),
-                'is_affordable': is_affordable,
-                'affordability_score': min(100, (affordable_emi / emi * 100)) if emi > 0 else 0
-            })
-
-        # Sort by interest rate (lower is better)
-        recommendations.sort(key=lambda x: x['loan']['interest_rate'])
-
-        return {
-            'recommendations': recommendations,
-            'your_profile': {
-                'estimated_credit_score': estimated_credit_score,
-                'monthly_income': profile['income'],
-                'affordable_emi': profile['monthly_savings'] * 0.6,
-                'dti_ratio': profile['dti_ratio']
-            }
-        }
 
     def recommend_investments(self, user, investment_amount: Optional[float] = None,
                             time_horizon: str = 'long_term') -> Dict:
@@ -462,12 +213,15 @@ class FinancialRecommendationEngine:
         profile = self.build_user_profile(user)
         risk_appetite = profile['risk_appetite']
 
+        amount_source = 'entered'
         if not investment_amount:
+            # Half of the owner's own monthly savings capacity; never a guessed amount.
             investment_amount = max(profile['monthly_savings'] * 0.5, 0)
+            amount_source = 'half_of_monthly_savings_capacity'
 
         recommendations = []
 
-        for inv_id, inv in self.INVESTMENTS.items():
+        for inv_id, inv in self.ASSET_CLASSES.items():
             score = 0
 
             # Risk alignment
@@ -490,10 +244,6 @@ class FinancialRecommendationEngine:
             matching_personas = set(profile['persona']) & set(inv['recommended_for'])
             score += len(matching_personas) * 10
 
-            # Affordability
-            if investment_amount >= inv['min_investment']:
-                score += 20
-
             # Suggested allocation
             suggested_allocation = self._calculate_allocation(inv, risk_appetite, investment_amount)
 
@@ -503,12 +253,9 @@ class FinancialRecommendationEngine:
                 'score': score,
                 'suggested_allocation': suggested_allocation,
                 'suggested_amount': round(investment_amount * suggested_allocation / 100, 2),
-                'monthly_sip': round(investment_amount * suggested_allocation / 100 / 12, 2),
-                'expected_value_1y': round(
-                    investment_amount * suggested_allocation / 100 * (1 + inv['expected_return'] / 100),
-                    2
-                ),
-                'match_reason': f"Matches your {risk_appetite} risk profile"
+                'expected_return': None,
+                'expected_return_status': NO_RETURN_SOURCE,
+                'match_reason': f"Matches your {risk_appetite} risk profile, worked out from your own records"
             })
 
         # Sort by score
@@ -523,57 +270,32 @@ class FinancialRecommendationEngine:
             'your_profile': {
                 'risk_appetite': risk_appetite,
                 'available_amount': investment_amount,
+                'amount_source': amount_source,
                 'time_horizon': time_horizon
             }
         }
 
     def recommend_insurance(self, user) -> Dict:
-        """
-        Recommend insurance products based on life stage and needs.
-
-        Args:
-            user: Django user object
-
-        Returns:
-            Dict with insurance recommendations
-        """
+        """Protection needs from the owner's household records; no premium or cover is estimated."""
         profile = self.build_user_profile(user)
-
         recommendations = []
-
-        for ins_id, ins in self.INSURANCE.items():
-            score = 0
-
-            # Persona match
+        for ins_id, ins in self.PROTECTION_TYPES.items():
             matching_personas = set(profile['persona']) & set(ins['recommended_for'])
-            score += len(matching_personas) * 30
-
-            # Affordability
-            if ins['premium_estimate'] < profile['income'] * 0.1:
-                score += 20
-
-            # Life stage
-            if 'Life Insurance' in ins['type']:
-                if profile['age'] < 45 and profile['dependents'] > 0:
-                    score += 30
-
-            if 'Health Insurance' in ins['type']:
-                score += 20  # Always recommended
-
+            # Health cover applies to every household; life cover is essential once dependents are recorded.
+            essential = ins_id == 'HEALTH_FAMILY' or (ins_id == 'TERM_LIFE' and profile['dependents'] > 0)
+            score = 50 if essential else 30 * len(matching_personas)
             recommendations.append({
-                'insurance': ins,
+                'insurance': {**ins, 'premium_estimate': None, 'coverage': None, 'quote_status': NO_PREMIUM_SOURCE},
                 'insurance_id': ins_id,
                 'score': score,
                 'is_essential': score >= 50,
-                'match_reason': self._explain_insurance_match(ins, profile, matching_personas)
+                'match_reason': self._explain_insurance_match(ins, profile, matching_personas),
             })
-
-        # Sort by score
         recommendations.sort(key=lambda x: x['score'], reverse=True)
-
         return {
             'recommendations': recommendations,
-            'total_annual_premium': sum(r['insurance']['premium_estimate'] for r in recommendations if r['is_essential']),
+            'total_annual_premium': None,
+            'premium_status': NO_PREMIUM_SOURCE,
             'your_profile': {
                 'age': profile['age'],
                 'dependents': profile['dependents'],
@@ -609,7 +331,8 @@ class FinancialRecommendationEngine:
         portfolio = {
             'total_amount': amount,
             'allocations': [],
-            'expected_return': 0,
+            'expected_return': None,
+            'expected_return_status': NO_RETURN_SOURCE,
             'risk_level': risk
         }
 
@@ -622,49 +345,22 @@ class FinancialRecommendationEngine:
                     'product': rec['investment']['name'],
                     'amount': rec['suggested_amount'],
                     'percentage': alloc,
-                    'expected_return': rec['investment']['expected_return']
                 })
                 allocated += alloc
 
-        # Calculate weighted average return
-        portfolio['expected_return'] = sum(
-            a['expected_return'] * a['percentage'] / 100
-            for a in portfolio['allocations']
-        )
-
         return portfolio
 
-    def _explain_card_match(self, card: Dict, profile: Dict, matching_personas: set) -> str:
-        """Generate explanation for card recommendation."""
-        reasons = []
-
-        if matching_personas:
-            reasons.append(f"Perfect for {', '.join(matching_personas)}")
-
-        top_cat = profile['top_category']
-        if top_cat in card['category_bonuses']:
-            bonus = card['category_bonuses'][top_cat]
-            reasons.append(f"{bonus}x rewards on {top_cat}")
-
-        if card['annual_fee'] == 0:
-            reasons.append("No annual fee")
-
-        return "; ".join(reasons) if reasons else "Good general-purpose card"
-
     def _explain_insurance_match(self, insurance: Dict, profile: Dict, matching_personas: set) -> str:
-        """Generate explanation for insurance recommendation."""
+        """Reasons drawn only from the owner's household and income records."""
         reasons = []
-
-        if 'has_dependents' in profile['persona'] and 'Life Insurance' in insurance['type']:
-            reasons.append("Essential protection for your family")
-
-        if insurance['premium_estimate'] < profile['income'] * 0.05:
-            reasons.append("Highly affordable")
-
-        if matching_personas:
-            reasons.append(f"Recommended for {', '.join(matching_personas)}")
-
-        return "; ".join(reasons) if reasons else "Good coverage option"
+        dependents = profile.get('dependents') or 0
+        if dependents and 'has_dependents' in insurance['recommended_for']:
+            reasons.append(f"You have {dependents} dependent(s) recorded")
+        if insurance['name'] == 'Health insurance':
+            reasons.append("Medical costs can hit any household; no health cover is recorded in ALFRED")
+        if not profile.get('income'):
+            reasons.append("Confirm your income to judge affordability")
+        return "; ".join(reasons) if reasons else "Optional; nothing in your records makes this essential"
 
 
 # Singleton instance

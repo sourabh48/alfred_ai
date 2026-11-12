@@ -43,7 +43,7 @@ function renderRecommendationSummary(data) {
         { title: "Income", value: incomeKnown ? Alfred.formatCurrency(profile.income) : "Unavailable", copy: incomeKnown ? "Monthly income used for suitability" : "Confirm your income in Settings" },
         { title: "Monthly Spend", value: Alfred.formatCurrency(profile.monthly_expenses || 0), copy: "Derived from recent history" },
         { title: "Savings Rate", value: incomeKnown ? `${Alfred.formatNumber(profile.savings_rate || 0)}%` : "Unavailable", copy: incomeKnown ? `${Alfred.formatCurrency(profile.monthly_savings || 0)} monthly savings` : "Needs a confirmed income" },
-        { title: "Debt Load", value: incomeKnown ? `${Alfred.formatNumber(profile.dti_ratio || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(data.insurance?.total_annual_premium || 0)} annual essential premium` },
+        { title: "Debt Load", value: incomeKnown ? `${Alfred.formatNumber(profile.dti_ratio || 0)}%` : "Unavailable", copy: `${Alfred.formatCurrency(profile.total_emi || 0)} monthly EMIs from your loans` },
     ];
 
     Alfred.setHTML(document.getElementById("recommendationSummaryCards"), cards.map(card => `
@@ -87,8 +87,8 @@ function renderInvestmentRecommendations(data) {
             <div class="data-value">${Alfred.formatCurrency(item.suggested_amount)}</div>
         </div>
         <div class="data-row">
-            <div class="data-label">Expected 1Y value</div>
-            <div class="data-value">${Alfred.formatCurrency(item.expected_value_1y)}</div>
+            <div class="data-label">Expected return</div>
+            <div class="data-value" data-expected-return>${Alfred.escapeHtml(item.expected_return_status || "Not available")}</div>
         </div>
         <div class="muted small mt-2">${Alfred.escapeHtml(item.match_reason)}</div>
     `, "No investment recommendations available."));
@@ -119,8 +119,8 @@ function renderInsuranceRecommendations(data) {
     const target = document.getElementById("recommendationInsuranceList");
     Alfred.setHTML(target, renderRecommendationStack(items, item => `
         <div class="fw-semibold">${Alfred.escapeHtml(item.insurance.name)}</div>
-        <div class="muted small">${Alfred.escapeHtml(item.insurance.type)} | premium ${Alfred.formatCurrency(item.insurance.premium_estimate)}</div>
-        <div class="chip-row mt-2">${item.insurance.benefits.map(benefit => `<span class="chip-neutral">${Alfred.escapeHtml(benefit)}</span>`).join("")}</div>
+        <div class="muted small">${Alfred.escapeHtml(item.insurance.type)}</div>
+        <div class="muted small" data-premium-status>Premium and cover: ${Alfred.escapeHtml(item.insurance.quote_status || "Not available")}</div>
         <div class="muted small mt-2">${item.is_essential ? "Marked essential." : "Optional coverage."} ${Alfred.escapeHtml(item.match_reason)}</div>
     `, "No insurance recommendations available."));
 }
