@@ -1,4 +1,3 @@
-from collections import defaultdict
 from decimal import Decimal
 
 from django.db.models import Count, Max, Sum
@@ -11,11 +10,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from alfred_ai.services.currency import counts_in_rupees, currency_fingerprint
+from alfred_ai.services.currency import currency_fingerprint
 from alfred_ai.services.materialized_cache import materialize_payload
 from apps.expenses.models import Expense
 from apps.expenses.money import money_float
-from apps.expenses.services.cashflow_treatment import variable_spend_rows
 
 from .models import Budget, SavingsGoal
 from .money import allocate_budget, budget_money, goal_progress, required_annual_return
@@ -107,7 +105,6 @@ def _budget_dashboard_revision(user) -> str:
         count=Count("id"),
         max_id=Max("id"),
         total_budget=Sum("inflation_adjusted"),
-        total_spent=Sum("spent"),
     )
     expense_meta = Expense.objects.filter(user=user).aggregate(
         count=Count("id"),
@@ -129,12 +126,11 @@ def _budget_dashboard_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in (
-            "budget-dashboard-v5",
+            "budget-dashboard-v6",
             today.strftime("%Y-%m-%d"),
             budget_meta["count"],
             budget_meta["max_id"],
             budget_meta["total_budget"],
-            budget_meta["total_spent"],
             currency_fingerprint(Budget.objects.filter(user=user), Expense.objects.filter(user=user)),
             expense_meta["count"],
             expense_meta["max_id"],
@@ -145,9 +141,13 @@ def _budget_dashboard_revision(user) -> str:
     )
 
 
+def _spent_float(value):
+    return money_float(value) if value is not None else None
+
+
 def _build_budget_dashboard_payload(request) -> dict:
     """Build the active monthly budget plan plus AI-backed spending guidance."""
-    from .services.budget_intelligence import budget_intelligence_service, current_budget_plan
+    from .services.budget_intelligence import budget_intelligence_service, budget_spent, current_budget_plan, plan_spend_by_category
 
     today = timezone.localdate()
     start_of_month = today.replace(day=1)
@@ -155,20 +155,7 @@ def _build_budget_dashboard_payload(request) -> dict:
     active_plan = current_budget_plan(request.user, today=today, budgets=budgets)
     # FIN-15: a plan compares only spend in its own currency; nothing is converted.
     plan_currency = getattr(active_plan, "currency", None)
-    if counts_in_rupees(plan_currency):
-        compatible, housing = Expense.objects.in_rupee_totals(), request.user.rupee_rent_or_emi
-    else:
-        compatible = Expense.objects.filter(currency=plan_currency)
-        housing = request.user.rent_or_emi if request.user.rent_currency == plan_currency else Decimal("0")
-    monthly_expenses = compatible.filter(
-        user=request.user,
-        transaction_date__gte=start_of_month,
-        transaction_date__lte=today,
-        direction="debit",
-    )
-    spent_by_category = defaultdict(Decimal)
-    for expense, amount in variable_spend_rows(monthly_expenses, monthly_housing=housing):
-        spent_by_category[expense.category] += amount
+    spent_by_category = plan_spend_by_category(request.user, plan_currency, start_of_month, today)
 
     unavailable_sections = []
     def guidance(name, method, **kwargs):
@@ -225,7 +212,7 @@ def _build_budget_dashboard_payload(request) -> dict:
             "month": budget.month,
             "base_budget": money_float(budget.base_budget),
             "inflation_adjusted": money_float(budget.inflation_adjusted),
-            "spent": money_float(budget.spent),
+            "spent": _spent_float(budget_spent(budget, today=today)),
             "currency": budget.currency,
         }
         for budget in budgets[:6]
@@ -248,7 +235,7 @@ def _build_budget_dashboard_payload(request) -> dict:
             "month": active_plan.month,
             "base_budget": money_float(active_plan.base_budget),
             "inflation_adjusted": money_float(active_plan.inflation_adjusted),
-            "spent": money_float(active_plan.spent),
+            "spent": money_float(total_spent),
             "currency": active_plan.currency,
         } if active_plan else None,
         "budget_history": budget_history,

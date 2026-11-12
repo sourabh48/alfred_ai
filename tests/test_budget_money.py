@@ -53,15 +53,17 @@ class BudgetMoneyRuntimeTests(TestCase):
                          (Decimal('2.68'), Decimal('100000000000.01'), Decimal('0.00')))
         self.assertIsInstance(response.json()['base_budget'], float)
         self.assertEqual(set(response.json()), {'id', 'user', 'month', 'currency', *FIELDS})
+        # Spent is read-only now: it comes from transactions and the stored column is never written.
         result = self.client.patch(f'/api/budgets/{row.pk}/', json.dumps({'spent': '0.005'}), content_type='application/json')
         self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json()['spent'], 0.0)
         row.refresh_from_db()
-        self.assertEqual((row.base_budget, row.spent), (Decimal('2.68'), Decimal('0.01')))
+        self.assertEqual((row.base_budget, row.spent), (Decimal('2.68'), Decimal('0.00')))
         self.assertFalse(BudgetMoneySnapshot.objects.exists())
 
     def test_invalid_api_amounts_reject_the_whole_update(self):
         row = Budget.objects.create(user=self.owner, month='Oct 2026', base_budget=10, inflation_adjusted=10)
-        for field in FIELDS:
+        for field in ('base_budget', 'inflation_adjusted'):  # spent is read-only and ignored on input
             for value in ('NaN', 'Infinity', '-Infinity', None, True, '-0.001', '1e9999', 'bad', '999999999999.995'):
                 with self.subTest(field=field, value=value):
                     result = self.client.patch(f'/api/budgets/{row.pk}/', json.dumps({

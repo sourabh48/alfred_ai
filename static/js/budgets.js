@@ -199,7 +199,6 @@ function hydrateBudgetForm(plan, month) {
     form.month.value = plan.month;
     form.base_budget.value = plan.base_budget;
     form.inflation_adjusted.value = plan.inflation_adjusted;
-    form.spent.value = plan.spent;
     form.currency.value = plan.currency || "";
 }
 
@@ -209,7 +208,6 @@ function submitBudgetPlan(event) {
     const payload = Object.fromEntries(new FormData(form).entries());
     const button = form.querySelector('button[type="submit"]');
     if (button.disabled) return;
-    payload.spent = payload.spent || "0";
     button.disabled = true;
 
     Alfred.fetchJSON("/api/budgets/", {

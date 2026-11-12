@@ -11,6 +11,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List
 from django.utils import timezone
 
+from alfred_ai.services.currency import counts_in_rupees
+
 from apps.budgets.models import Budget
 from apps.budgets.money import allocate_budget
 from apps.expenses.money import money_float
@@ -19,18 +21,48 @@ from apps.expenses.services.financial_intelligence import resolve_canonical_fina
 from apps.expenses.services.cashflow_treatment import variable_spend_rows
 
 
+def plan_month(plan):
+    """First day of the plan's month, or None when the stored month cannot be read."""
+    for pattern in ("%b %Y", "%B %Y", "%Y-%m"):
+        try:
+            return datetime.strptime(plan.month.strip(), pattern).date()
+        except ValueError:
+            continue
+    return None
+
+
 def current_budget_plan(user, *, today=None, budgets=None):
     today = today or timezone.localdate()
     plans = budgets if budgets is not None else Budget.objects.filter(user=user).order_by("-id")
     for plan in plans:
-        for pattern in ("%b %Y", "%B %Y", "%Y-%m"):
-            try:
-                month = datetime.strptime(plan.month.strip(), pattern)
-            except ValueError:
-                continue
-            if (month.year, month.month) == (today.year, today.month):
-                return plan
+        month = plan_month(plan)
+        if month and (month.year, month.month) == (today.year, today.month):
+            return plan
     return None
+
+
+def plan_spend_by_category(user, currency, start, end):
+    """Living spend per category from the owner's transactions in one currency (FIN-15: nothing is converted)."""
+    if counts_in_rupees(currency):
+        compatible, housing = Expense.objects.in_rupee_totals(), user.rupee_rent_or_emi
+    else:
+        compatible = Expense.objects.filter(currency=currency)
+        housing = user.rent_or_emi if user.rent_currency == currency else Decimal("0")
+    rows = compatible.filter(user=user, transaction_date__gte=start, transaction_date__lte=end, direction="debit")
+    spent = defaultdict(Decimal)
+    for expense, amount in variable_spend_rows(rows, monthly_housing=housing):
+        spent[expense.category] += amount
+    return spent
+
+
+def budget_spent(plan, *, today=None):
+    """What was spent in the plan's month, worked out from transactions each time it is read; None if the month is unreadable."""
+    start = plan_month(plan)
+    if start is None:
+        return None
+    today = today or timezone.localdate()
+    end = min(start.replace(day=calendar.monthrange(start.year, start.month)[1]), today)
+    return sum(plan_spend_by_category(plan.user, plan.currency, start, end).values(), Decimal("0"))
 
 
 class BudgetIntelligenceService:

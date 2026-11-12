@@ -117,7 +117,7 @@ class CanonicalGroundingTests(TestCase):
             self.assertEqual(self.answer(kind)['sources'][0]['data']['amounts'][field]['amount'],new)
 
     def test_each_record_change_delete_and_owner_reassignment_rejects_in_flight_answer(self):
-        fields={'expense':'amount','budget':'spent','loan':'emi','investment':'current_value','baseline':'monthly_income'}
+        fields={'expense':'amount','budget':'inflation_adjusted','loan':'emi','investment':'current_value','baseline':'monthly_income'}
         for kind,row in self.rows.items():
             for action in ('edit','delete','owner'):
                 if kind=='baseline' and action=='owner': continue

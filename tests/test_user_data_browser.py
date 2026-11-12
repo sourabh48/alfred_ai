@@ -8618,17 +8618,19 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_async_script("loadBudgetDashboard({live:true}).then(arguments[0]);")
         self.assertEqual(field.get_attribute("value"), "7.77")
         count = Budget.objects.filter(user=owner).count()
-        for name, value in (("budgetBase","100000.01"),("budgetInflation","100000.01"),("budgetSpent","999.99")):
+        # Spent is not an input any more; it is worked out from transactions.
+        self.assertFalse(self.browser.find_elements(self.By.ID,"budgetSpent"))
+        for name, value in (("budgetBase","100000.01"),("budgetInflation","100000.01")):
             field=self.browser.find_element(self.By.ID,name); field.clear(); field.send_keys(value)
         self.memory_click('#budgetPlanForm button[type="submit"]')
         self.wait.until(lambda _: Budget.objects.filter(user=owner).count()==count+1)
         self.wait.until(lambda _: "exceeds recorded disposable" in self.text("budgetDailyStatus"))
         row=Budget.objects.filter(user=owner).latest("id")
-        self.assertEqual((row.inflation_adjusted,row.spent),(Decimal("100000.01"),Decimal("999.99")))
+        self.assertEqual((row.inflation_adjusted,row.spent),(Decimal("100000.01"),Decimal("0.00")))
         self.client.force_login(owner)
         data=self.client.get("/api/budgets/dashboard/").json()
         self.assertEqual(sum(Decimal(str(r["limit"])) for r in data["budgets"]),Decimal("100000.01"))
-        self.assertNotEqual(data["summary"]["total_spent"],999.99)
+        self.assertEqual(data["plan"]["spent"],data["summary"]["total_spent"])
         contrast = """const e=document.querySelector('#budgetSuggestionList li'),s=getComputedStyle(e);
             function light(c){const v=c.match(/[\\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]}
             const a=light(s.color),b=light(s.backgroundColor);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);"""
@@ -8637,7 +8639,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture("budget-plan-affordability-desktop")
         self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,"budgetInflation").get_attribute("value")=="100000.01")
-        for name in ("budgetBase","budgetInflation","budgetSpent"):
+        for name in ("budgetBase","budgetInflation"):
             field=self.browser.find_element(self.By.ID,name); field.clear(); field.send_keys("0")
         self.memory_click('#budgetPlanForm button[type="submit"]')
         self.wait.until(lambda _: "No positive budget for utilization" in self.text("budgetSummaryCards"))

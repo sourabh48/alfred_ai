@@ -43,7 +43,8 @@ class SavingsGoalSerializer(serializers.ModelSerializer):
 class BudgetSerializer(serializers.ModelSerializer):
     base_budget = BudgetMoneySerializerField()
     inflation_adjusted = BudgetMoneySerializerField()
-    spent = BudgetMoneySerializerField(required=False)
+    # Bug 6: spent comes from transactions when read; the stored column is legacy and no longer written.
+    spent = serializers.SerializerMethodField()
     currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
 
     class Meta:
@@ -53,6 +54,11 @@ class BudgetSerializer(serializers.ModelSerializer):
 
     def validate_currency(self, value):
         return value or None  # FIN-15: blank means not recorded, never a guessed INR
+
+    def get_spent(self, budget):
+        from .services.budget_intelligence import budget_spent
+        value = budget_spent(budget)
+        return money_float(value) if value is not None else None
 
     def validate_month(self, value):
         for pattern in ("%b %Y", "%B %Y", "%Y-%m"):

@@ -426,11 +426,11 @@ def record_source(user, kind, identity, *, selected_documents=None, source_catal
             direction=row.direction,category=row.category,classification=row.classification)
         if row.source!='manual': data['verification']='imported_not_verified'
     elif kind=='budget':
-        fields=('base_budget','inflation_adjusted','spent'); helper=budget_money
+        fields=('base_budget','inflation_adjusted'); helper=budget_money
         period=_month(row.month); available=period is not None
         data.update(applicable_date=period,month=period,verification='owner_saved_approval_not_recorded')
-        data['limitations'].append('Budget has no approval/verification field; saved does not mean independently approved. Spent is the stored field, not a new transaction total.')
-        peers=list(Budget.objects.filter(user=user).order_by('pk').values('id','month','base_budget','inflation_adjusted','spent'))
+        data['limitations'].append('Budget has no approval/verification field; saved does not mean independently approved. Spending is worked out from transactions, not stored on the budget.')
+        peers=list(Budget.objects.filter(user=user).order_by('pk').values('id','month','base_budget','inflation_adjusted'))
         related=[peer for peer in peers if _month(peer['month'])==period]
         if any(any(peer[field]!=getattr(row,field) for field in fields) for peer in related):
             available=False; data['verification']='conflicting_budget_records'

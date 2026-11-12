@@ -105,6 +105,28 @@ class BudgetAcceptanceTests(TestCase):
         self.assertEqual(self.dashboard()["summary"]["total_remaining"], 17)
         plan.refresh_from_db(); self.assertEqual(plan.spent, Decimal("999.99"))
 
+    def test_spent_follows_transactions_and_is_never_stored(self):
+        march = self.plan("500", month="Mar 2026")
+        april = self.plan("500")
+        march_food = Expense.objects.create(user=self.owner, amount="40.10", category="food", transaction_date=date(2026, 3, 5))
+        Expense.objects.create(user=self.owner, amount="9.90", category="shopping", transaction_date=date(2026, 3, 31))
+        Expense.objects.create(user=self.owner, amount="12.00", category="food", transaction_date=self.today)
+        Expense.objects.create(user=self.owner, amount="88.00", category="food", transaction_date=self.today + timedelta(days=1))
+        Expense.objects.create(user=self.other, amount="777.00", category="food", transaction_date=date(2026, 3, 6))
+        Expense.objects.create(user=self.owner, amount="5.00", category="food", currency="USD", transaction_date=date(2026, 3, 7))
+        spent = {row["id"]: row["spent"] for row in self.client.get("/api/budgets/").json()}
+        self.assertEqual(spent, {march.pk: 50.0, april.pk: 12.0})
+        history = {row["id"]: row["spent"] for row in self.dashboard()["budget_history"]}
+        self.assertEqual(history, {march.pk: 50.0, april.pk: 12.0})
+        self.assertEqual(self.dashboard()["plan"]["spent"], 12.0)
+        # Editing a transaction moves spent with no budget write; posted spent is ignored.
+        self.assertEqual(self.client.patch(f"/api/expenses/{march_food.pk}/", {"amount": "60.10"}, content_type="application/json").status_code, 200)
+        self.assertEqual(self.client.get(f"/api/budgets/{march.pk}/").json()["spent"], 70.0)
+        created = self.client.post("/api/budgets/", {"month": "2026-02", "base_budget": "1", "inflation_adjusted": "1", "spent": "999"}, content_type="application/json")
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["spent"], 0.0)
+        self.assertEqual(set(Budget.objects.values_list("spent", flat=True)), {Decimal("0.00")})
+
     def test_owner_crud_and_csrf_preserve_foreign_plans(self):
         foreign = self.plan("77", user=self.other)
         csrf = Client(enforce_csrf_checks=True); csrf.force_login(self.owner)
