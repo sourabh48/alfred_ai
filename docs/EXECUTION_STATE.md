@@ -9,6 +9,9 @@
 - Evidence: tests.test_career_send 10 PASS (new: interrupted send simulated with a BaseException); all Career test
   modules 233 PASS; Career kit and reviewed-send browser tests 2 PASS. 2e1ce9a pushed to master (owner approved);
   this fix is not pushed.
+- Real send check (owner-requested, 2026-11-12): on a throwaway database with a synthetic user and synthetic CV,
+  the reviewed send went through the owner's Gmail SMTP to the owner's own Outlook address; a second send was
+  refused as already sent. The owner confirmed receipt. CAREER2-002 acceptance still rests with the owner.
 
 ## Career Ops calibrate, interview stories and debriefs - 2026-11-12
 
