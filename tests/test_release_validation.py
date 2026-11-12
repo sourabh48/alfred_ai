@@ -328,6 +328,15 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertTrue(all(shards))
         self.assertEqual(sorted(sum(shards, [])), sorted(validation.BACKEND))
 
+    def test_every_backend_test_file_is_in_ci_or_listed_with_its_reason(self):
+        tests = Path(validation.__file__).resolve().parents[1] / "tests"
+        browser = lambda path: "browser" in path.stem or "RUN_BROWSER_TESTS" in path.read_text(encoding="utf-8")
+        files = {"tests." + path.stem for path in tests.glob("test_*.py") if not browser(path)}
+        listed = {".".join(label.split(".")[:2]) for label in validation.BACKEND}
+        self.assertEqual(files - listed - set(validation.BACKEND_NOT_IN_CI), set(), "add the new test file to BACKEND with a measured duration")
+        self.assertEqual(set(validation.BACKEND_NOT_IN_CI) & listed, set())
+        self.assertEqual(set(validation.BACKEND_NOT_IN_CI) - files, set())
+
     def test_backend_shard_runs_and_records_only_its_labels(self):
         result = {"status": "PASS", "code": "suite_exit", "tests": 3, "skips": 0,
                   "log": "synthetic.log", "log_sha256": "a" * 64}

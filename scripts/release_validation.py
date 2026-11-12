@@ -34,14 +34,41 @@ BACKEND = tuple("tests." + name for name in (
     "test_mobility_money", "test_native_observation", "test_native_runtime", "test_native_probe_runner", "test_native_tray", "test_operational_hardening",
     "test_password_security", "test_persistent_memory", "test_profile_money_boundary",
     "test_private_storage", "test_source_storage", "test_private_media_profiles", "test_local_config", "test_time_zone_boundaries",
-    "test_platform_hardening.EmailConnectionTokenSecurityTests", "test_remaining_public_http",
+    "test_remaining_public_http",
     "test_retention_release_boundary", "test_statement_columns", "test_statement_evidence", "test_statement_review", "test_statement_metadata_security", "test_statement_evidence_migration", "test_token_rotation",
     "test_travel_http", "test_travel_retention", "test_travel_refresh", "test_travel_candidate_pool", "test_travel_multistop", "test_travel_itinerary_editor", "test_travel_documents", "test_travel_packing", "test_travel_reminders", "test_travel_pdf_export", "test_travel_gpx_export", "test_travel_ics_export", "test_travel_export_integration", "test_travel_affordability", "test_travel_affordability_ui", "test_travel_savings", "test_travel_financial_reconciliation", "test_travel_end_to_end", "test_travel_security", "test_travel_restrictions", "test_travel_route_choices", "test_upload_limits", "test_upload_privacy_retention", "test_user_data_reset", "test_user_money",
     "test_local_stack_ops", "test_production_readiness_contracts",
     "test_release_gate", "test_release_validation", "test_release_recovery", "test_private_recovery_verifier",
-    "test_release_promotion", "test_release_acceptance", "test_browser_regression_runner", "test_browser_test_runner", "test_browser_test_plan", "test_live_ui_contracts", "test_windows_build_provenance"))
+    "test_release_promotion", "test_release_acceptance", "test_browser_regression_runner", "test_browser_test_runner", "test_browser_test_plan", "test_live_ui_contracts", "test_windows_build_provenance",
+    # Added 2026-11-13: these files existed but were never in CI. Files that need a live Ollama,
+    # a signing tool or a browser stay outside this list (see BACKEND_NOT_IN_CI).
+    "test_advisory_evidence_freshness", "test_ai_emotion_api", "test_application_smoke", "test_audit_project", "test_behavioral_linkage", "test_bike_profile_and_invoice_review",
+    "test_budget_acceptance", "test_calculation_risk_snapshot", "test_career_adaptive_intelligence", "test_career_application_kit", "test_career_bullet_rewrite", "test_career_evaluation",
+    "test_career_interview_notes", "test_career_layout_pilot", "test_career_outcome_workflow", "test_career_projection_confidence", "test_career_projection_simulation", "test_career_salary_evidence",
+    "test_career_send", "test_cashflow_forecast_acceptance", "test_celery_startup", "test_chatgpt_imports", "test_credit_score_drop_migration", "test_development_council",
+    "test_document_layouts", "test_durable_queue", "test_expense_chart_granularity", "test_expense_money_migration", "test_expense_money_rehearsal", "test_expense_timeline_window",
+    "test_financial_health_acceptance", "test_financial_relationships", "test_financial_scenario_reconciliation", "test_fund_look_through", "test_investment_projection", "test_large_data_materialization",
+    "test_live_data_version", "test_loan_balance_basis", "test_loan_money_migration", "test_loan_money_retention", "test_local_ai_limits", "test_ml_readiness",
+    "test_ml_role_routing", "test_ml_training_orchestrator", "test_mobility_endpoint_contracts", "test_mobility_record_acceptance", "test_mobility_vehicle_dashboard", "test_model_registry_recovery",
+    "test_net_worth_overdraft", "test_observation_supervisor", "test_parser_adaptive_learning", "test_pdf_recovery", "test_platform_hardening", "test_project_details_career_outcomes",
+    "test_project_details_live", "test_related_loan_money_migration", "test_relationship_alignment_coverage", "test_remaining_task_closures", "test_risk_evidence_coverage", "test_service_import_receipts",
+    "test_statement_layouts", "test_statement_upload_cleanup", "test_tax_policy", "test_travel_continuation", "test_travel_discovery_acceptance", "test_travel_media_acceptance",
+    "test_travel_places_acceptance", "test_travel_planner", "test_travel_providers", "test_travel_stays_guide", "test_travel_web", "test_untrusted_link_rendering",
+    "test_user_data_acceptance", "test_user_profile_api", "test_vehicle_accounting", "test_windows_setup"))
 
 BACKEND_DURATIONS = Path(__file__).resolve().parents[1] / "tests" / "backend_durations.json"
+# Backend-style test files this job cannot run without skips, and why. Every other tests/test_*.py file that is
+# not browser-gated must be in BACKEND (tests/test_release_validation.py checks this).
+BACKEND_NOT_IN_CI = {
+    "tests.test_canonical_ollama": "needs a real local Ollama model (ALFRED_RUN_OLLAMA_GROUNDING=true)",
+    "tests.test_document_questions_ollama": "needs a real local Ollama model (ALFRED_RUN_DOCUMENT_QUESTIONS=true)",
+    "tests.test_local_conversation_acceptance": "needs a real local Ollama model (ALFRED_RUN_LOCAL_AI_ACCEPTANCE=true)",
+    "tests.test_local_stream_acceptance": "needs a real local Ollama model (ALFRED_RUN_LOCAL_AI_ACCEPTANCE=true)",
+    "tests.test_memory_evaluation_ollama": "needs a real local Ollama model (ALFRED_RUN_OLLAMA_GROUNDING=true)",
+    "tests.test_ml_artifact_trust": "one test skips when the Windows account may not create file symlinks",
+    "tests.test_retrieval_quality_ollama": "needs a real local Ollama model (ALFRED_RUN_OLLAMA_GROUNDING=true)",
+    "tests.test_windows_signing": "three tests need signtool, Inno Setup or ALFRED_SIGNING_E2E and skip without them",
+}
 
 
 def backend_shard(index, count):
