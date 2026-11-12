@@ -29,6 +29,14 @@
   on owner checks, approvals, external hosts or dependencies, and the 13 extensions wait for baseline closure. Fixed the
   audit's remaining PLAUSIBLE gap instead: the superuser career-outcome form saved a stale payload copy and could drop
   an email send record; it now merges into the latest payload against `updated_at` (regression test). Not pushed.
+- CAREER2-001 (owner: "Yes, CAREER2-001"), no migration: a stale match now names the CV it used and the current one
+  (file name and upload date) and lists saved decisions built on it (triage score). POST
+  `job-analyses/<pk>/recheck-match/` (owner-scoped, revision-checked, CAS write) redoes the fit from the saved posting
+  with the current CV, archives the old fit and triage in `superseded_matches` (last 5) and refuses current or
+  posting-less matches. Career page: re-check button and a "Compare two of your CVs" table on the existing compare
+  API. Tests: API (citation, archive, 404, 409, refusals) and browser (compare, re-check, axe light/dark).
+  Limits: the job-match result card is not refreshed until reload; a match saved before labels existed cites the file
+  name only. Implemented, not accepted: owner acceptance pending. Not pushed.
 - Baseline 85/143, extensions 0/13 unchanged.
 
 ## Career Ops training, project, question checks, practice comments and course links - 2026-11-12

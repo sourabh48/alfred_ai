@@ -26,7 +26,7 @@ from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
-from .services.job_intelligence import ROBOTS_REFUSED_MESSAGE, ROBOTS_UNREADABLE_MESSAGE
+from .services.job_intelligence import ROBOTS_REFUSED_MESSAGE, ROBOTS_UNREADABLE_MESSAGE, JobPostingSnapshot
 from .services import application_kit, application_tracker, evaluation
 from .services.resume_intelligence import ParsedResume
 
@@ -787,6 +787,58 @@ class CareerApplicationView(APIView):
         return Response({"opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data})
 
     patch = post
+
+
+class CareerMatchRecheckView(APIView):
+    """Redo a stale job match from the saved posting with the owner's current resume; the old result is archived."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        analysis = CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        payload = analysis.extracted_payload if isinstance(analysis.extracted_payload, dict) else {}
+        conflict = {"detail": "This opportunity changed. Reload it before editing again."}
+        revision = request.data.get("revision") if isinstance(request.data, dict) else None
+        if revision != CareerJobAnalysisSerializer(analysis).data["updated_at"]:
+            return Response(conflict, status=status.HTTP_409_CONFLICT)
+        current = application_tracker.current_resume_evidence(request.user)
+        freshness = application_tracker.match_freshness(payload, current)
+        if freshness["status"] != "stale" or not freshness["can_recheck"]:
+            detail = ("This match already uses your current resume." if freshness["status"] == "current"
+                      else "This match cannot be re-checked: its posting or resume evidence was not saved. Run a new job match.")
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        latest = CareerResume.objects.filter(user=request.user).order_by("-created_at", "-id").first()
+        profile = CareerProfile.objects.filter(user=request.user).first()
+        resume_payload = latest.extracted_payload if latest else _resume_payload_from_profile(profile)
+        saved = payload["job_snapshot"]
+        try:
+            job = JobPostingSnapshot(
+                source_name=analysis.source_name, job_url=analysis.job_url, apply_url=analysis.apply_url,
+                company=analysis.company, title=analysis.job_title, location=analysis.location,
+                description=analysis.extracted_text or "",
+                required_skills=[item for item in saved.get("required_skills") or [] if isinstance(item, str)],
+                experience_years=float(saved.get("experience_years") or 0),
+                employment_type=str(saved.get("employment_type") or ""), source_kind=str(saved.get("source_kind") or "job_page"))
+        except (TypeError, ValueError):
+            return Response({"detail": "The saved posting is unreadable. Run a new job match."}, status=status.HTTP_400_BAD_REQUEST)
+        fit = job_intelligence.compare_resume_to_job(resume_payload, job, resume_source={
+            "kind": current["kind"], "record_id": current["record_id"], "label": current["label"],
+            "parser_status": latest.parser_status if latest else "user_declared",
+        })
+        updated = CareerJobAnalysis.objects.filter(pk=analysis.pk, user=request.user, updated_at=analysis.updated_at,
+                                                   extracted_payload=analysis.extracted_payload).update(
+            extracted_payload=application_tracker.rechecked_payload(payload, fit, resume_payload, today=timezone.localdate()),
+            fit_score=fit["fit_score"] if fit["fit_score"] is not None else 0,
+            strengths="\n".join(fit["strengths"]), gaps="\n".join(fit["gaps"]),
+            summary=(f"Rule-based fit score {fit['fit_score']}/100; not a hiring probability." if fit["fit_score"] is not None
+                     else "Fit unavailable: review incomplete or ambiguous resume/JD evidence."),
+            updated_at=timezone.now())
+        if not updated:
+            return Response(conflict, status=status.HTTP_409_CONFLICT)
+        analysis.refresh_from_db()
+        return Response({"opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data})
 
 
 @api_view(["GET"])

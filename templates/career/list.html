@@ -115,6 +115,17 @@
                 <div id="careerResumeFeedback" class="d-none alert mb-0"></div>
             </form>
             <div class="mt-4" id="careerResumePanel"></div>
+            <section class="mt-4" id="careerResumeCompare" aria-labelledby="careerResumeCompareTitle">
+                <h3 class="h6" id="careerResumeCompareTitle">Compare two of your CVs</h3>
+                <form id="careerResumeCompareForm" class="row g-2 align-items-end">
+                    <div class="col-md-5"><label class="form-label small" for="careerResumeCompareFrom">Older CV</label>
+                        <select class="form-select form-select-sm" id="careerResumeCompareFrom" name="from" required disabled></select></div>
+                    <div class="col-md-5"><label class="form-label small" for="careerResumeCompareTo">Newer CV</label>
+                        <select class="form-select form-select-sm" id="careerResumeCompareTo" name="to" required disabled></select></div>
+                    <div class="col-md-2"><button class="btn btn-outline-primary btn-sm w-100" type="submit" disabled>Compare</button></div>
+                </form>
+                <div id="careerResumeCompareResult" class="small mt-2" role="status" aria-live="polite">Loading your saved CVs…</div>
+            </section>
         </div>
     </div>
 </section>
@@ -309,5 +320,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/career.js?v=3.18.0"></script>
+<script src="/static/js/career.js?v=3.19.0"></script>
 {% endblock %}

@@ -5040,6 +5040,57 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(local.reason.call_count,calls)
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Keep this blocked draft')
 
+    def test_career_cv_versions_compare_and_stale_match_recheck(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        owner = self.scenario['user']
+        first = CareerResume.objects.create(user=owner, file_name='synthetic-v1.pdf', parser_status='parsed',
+            extracted_payload={'skills': ['Python', 'SQL'], 'role': 'Backend Engineer', 'experience_years': 4})
+        analysis = CareerJobAnalysis.objects.create(user=owner, job_title='Synthetic Stream Engineer', company='Synthetic Co',
+            extracted_text='Build Python and Kafka services.',
+            extracted_payload={'fit': {'sources': [{'kind': 'resume_upload', 'record_id': first.pk, 'label': 'synthetic-v1.pdf',
+                                                    'skills': ['Python', 'Sql'], 'role': 'backend engineer', 'experience_years': 4.0}]},
+                               'triage': {'score': 3.5, 'verdict': 'MAYBE'},
+                               'job_snapshot': {'title': 'Synthetic Stream Engineer', 'required_skills': ['Python', 'Kafka'], 'experience_years': 5}})
+        CareerResume.objects.create(user=owner, file_name='synthetic-v2.pdf', parser_status='parsed',
+            extracted_payload={'skills': ['Python', 'Kafka'], 'role': 'Backend Engineer', 'experience_years': 5})
+        CareerResume.objects.create(user=get_user_model().objects.create_user(username='synthetic-cv-other'),
+                                    file_name='OTHER-OWNER-CV.pdf', parser_status='parsed', extracted_payload={})
+        self.login(); self.browser.get(self.live_server_url+'/career/')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'careerResumeCompareTo').is_enabled())
+        self.assertNotIn('OTHER-OWNER', self.text('careerResumeCompare'))
+        self.memory_click('#careerResumeCompareForm button[type="submit"]')
+        self.wait.until(lambda _: 'Skills added' in self.text('careerResumeCompareResult'))
+        result = self.text('careerResumeCompareResult')
+        self.assertIn('synthetic-v1.pdf compared with synthetic-v2.pdf', result)
+        self.assertIn('Kafka', result); self.assertIn('Years of experience 4 → 5', result)
+        Select(self.browser.find_element(self.By.ID,'careerOutcomeAnalysis')).select_by_value(str(analysis.pk))
+        self.wait.until(lambda _: 'older resume' in self.text('careerMatchStale'))
+        stale = self.text('careerMatchStale')
+        self.assertIn('synthetic-v1.pdf (used by this match) with synthetic-v2.pdf (uploaded', stale)
+        self.assertIn('Triage score 3.5/5', stale)
+        self.capture('career-stale-match-recheck')
+        self.run_axe_light_dark('career-cv-versions')
+        self.memory_click('#careerMatchRecheck')
+        self.wait.until(lambda _: 'earlier result is archived' in self.text('careerApplicationFeedback'))
+        self.assertIn('uses your current resume', self.text('careerMatchCurrent'))
+        analysis.refresh_from_db()
+        self.assertEqual(analysis.extracted_payload['superseded_matches'][0]['triage'], {'score': 3.5, 'verdict': 'MAYBE'})
+        self.assertNotIn('triage', analysis.extracted_payload)
+        self.run_axe_light_dark('career-cv-versions-rechecked')
+
+    def run_axe_light_dark(self, name):
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+            self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+            audit = self.browser.execute_async_script("const done=arguments[0];axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done(r.violations));")
+            (self.artifacts/f'{name}-{theme}-accessibility.json').write_text(json.dumps(audit, indent=2), encoding='utf-8')
+            self.assertEqual([item['id'] for item in audit], [], theme)
+
     def test_career_history_recovery_review_cancel_lost_ack_retry_and_retention(self):
         from datetime import timedelta
         from django.utils import timezone

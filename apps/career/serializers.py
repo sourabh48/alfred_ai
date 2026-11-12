@@ -16,7 +16,7 @@ class CareerOpportunitySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CareerJobAnalysis
-        fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence','interview_prep',
+        fields = ('id','company','job_title','location','job_url','updated_at','summary','outcome','salary_evidence','interview_prep',
                   'application','match_freshness','triage','interview_notes')
 
     def get_interview_notes(self, obj):

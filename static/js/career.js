@@ -532,7 +532,10 @@ function renderCareerApplication(item) {
     const skills = (label, list) => list?.length ? `<div>${label}: ${Alfred.escapeHtml(list.join(", "))}</div>` : "";
     const freshness = fresh.status === "stale"
         ? `<div class="alert alert-warning small" id="careerMatchStale"><strong>This match used an older resume.</strong> ${Alfred.escapeHtml((fresh.reasons || []).join(" "))}
-             ${skills("Skills added since", fresh.added_skills)}${skills("Skills removed since", fresh.removed_skills)}Run the job match again before relying on its fit.</div>`
+             <div>Compared: ${Alfred.escapeHtml(fresh.used_label || "the resume saved with this match")} (used by this match) with ${Alfred.escapeHtml(fresh.current_label || "your current resume")} (current).</div>
+             ${skills("Skills added since", fresh.added_skills)}${skills("Skills removed since", fresh.removed_skills)}
+             ${fresh.affected?.length ? `<div>Saved decisions based on the old match: ${Alfred.escapeHtml(fresh.affected.join(", "))}. A re-check archives them; run triage again afterwards.</div>` : ""}
+             ${fresh.can_recheck ? `<button class="btn btn-outline-dark btn-sm mt-2" type="button" id="careerMatchRecheck">Re-check with my current resume</button>` : "Run the job match again before relying on its fit."}</div>`
         : (fresh.status === "current" ? `<p class="small muted" id="careerMatchCurrent">This match uses your current resume.</p>` : "");
     target.innerHTML = `
         <div class="surface-card p-3 mb-3" id="careerApplication">
@@ -567,6 +570,21 @@ function renderCareerApplication(item) {
         send({stage: document.getElementById("careerApplicationStage").value, ...(on ? {on} : {})});
     });
     document.getElementById("careerFollowUpSent")?.addEventListener("click", () => send({follow_up_sent: true}));
+    document.getElementById("careerMatchRecheck")?.addEventListener("click", event => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/recheck-match/`, {method: "POST", body: JSON.stringify({revision: item.updated_at})})
+            .then(data => {
+                const index = careerOpportunities.findIndex(row => row.id === item.id);
+                if (index >= 0) careerOpportunities[index] = data.opportunity;
+                renderCareerOutcomeForm(data.opportunity);
+                showCareerFeedback("careerApplicationFeedback", `Re-checked with your current resume. ${data.opportunity.summary} The earlier result is archived.`, "success");
+            })
+            .catch(error => {
+                button.disabled = false;
+                showCareerFeedback("careerApplicationFeedback", error.message, "danger");
+            });
+    });
     document.getElementById('careerHistoryReviewOpen').addEventListener('click', () => {
         const host = document.getElementById('careerHistoryReviewHost');
         if (host.childElementCount) { host.hidden = !host.hidden; return; }
@@ -1560,10 +1578,12 @@ function loadCareerResumeChoices() {
         }
         select.value = previous;
         select.disabled = false;
+        renderCareerResumeCompareChoices(resumes);
         status.textContent = "Used for recruiter and job-link matching. Only your saved resumes are listed. Matching captures these fields; later edits do not rewrite earlier analyses.";
     }).catch(() => {
         select.replaceChildren(new Option("Resume list unavailable", previous));
         status.textContent = "Resume list unavailable. Reload to retry; your recruiter text and attachment are preserved.";
+        document.getElementById("careerResumeCompareResult").textContent = "Your CV list could not load, so versions cannot be compared. Reload to retry.";
     }).finally(() => {
         reload.disabled = false;
         form.querySelector("button[type='submit']").disabled = select.disabled || form.dataset.submitting === "true";
@@ -1723,6 +1743,40 @@ function renderSimulationPanel(simulation) {
             </div>
         ` : ""}
     `);
+}
+
+function renderCareerResumeCompareChoices(resumes) {
+    const form = document.getElementById("careerResumeCompareForm");
+    const result = document.getElementById("careerResumeCompareResult");
+    const ordered = [...resumes].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id);
+    const ready = ordered.length >= 2;
+    [form.elements.from, form.elements.to].forEach(select => {
+        select.replaceChildren(...ordered.map(resume => new Option(`${resume.file_name} (uploaded ${String(resume.created_at).slice(0, 10)})`, resume.id)));
+        select.disabled = !ready;
+    });
+    form.querySelector("button[type='submit']").disabled = !ready;
+    if (ready) {
+        form.elements.from.value = ordered[ordered.length - 2].id;
+        form.elements.to.value = ordered[ordered.length - 1].id;
+    }
+    result.textContent = ready ? "" : "Upload a second CV to compare versions.";
+    if (form.dataset.bound) return;
+    form.dataset.bound = "true";
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        const query = new URLSearchParams({from: form.elements.from.value, to: form.elements.to.value});
+        result.textContent = "Comparing…";
+        Alfred.fetchJSON(`/api/career/resumes/compare/?${query}`).then(data => {
+            const list = items => Alfred.escapeHtml(items.length ? items.join(", ") : "None");
+            const change = item => item.changed ? `${Alfred.escapeHtml(String(item.from ?? "Not stated"))} → ${Alfred.escapeHtml(String(item.to ?? "Not stated"))}` : `Unchanged (${Alfred.escapeHtml(String(item.to ?? "Not stated"))})`;
+            result.innerHTML = `<table class="table table-sm mb-0"><caption>${Alfred.escapeHtml(data.from.file_name)} compared with ${Alfred.escapeHtml(data.to.file_name)}</caption>
+                <tbody><tr><th scope="row">Skills added</th><td>${list(data.added_skills)}</td></tr>
+                <tr><th scope="row">Skills removed</th><td>${list(data.removed_skills)}</td></tr>
+                <tr><th scope="row">Skills in both</th><td>${list(data.kept_skills)}</td></tr>
+                <tr><th scope="row">Role</th><td>${change(data.role)}</td></tr>
+                <tr><th scope="row">Years of experience</th><td>${change(data.experience_years)}</td></tr></tbody></table>`;
+        }).catch(error => { result.textContent = error.message; });
+    });
 }
 
 function showCareerFeedback(elementId, message, tone) {

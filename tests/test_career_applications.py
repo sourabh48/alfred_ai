@@ -197,3 +197,54 @@ class CareerApplicationApiTests(TestCase):
         foreign = CareerResume.objects.create(user=self.other, file_name="x.pdf")
         self.assertEqual(self.client.get(f"/api/career/resumes/compare/?from={first.pk}&to={foreign.pk}").status_code, 404)
         self.assertEqual(self.client.get("/api/career/resumes/compare/?from=x&to=1").status_code, 400)
+
+    def test_stale_match_cites_versions_and_recheck_archives_the_old_fit_and_triage(self):
+        first = CareerResume.objects.create(user=self.owner, file_name="v1.pdf", parser_status="parsed",
+                                            extracted_payload={"skills": ["Python", "SQL"], "role": "Backend Engineer", "experience_years": 4})
+        fit = _fit(["Python", "Sql"], record_id=first.pk)["fit"]
+        fit["sources"][0]["label"] = "v1.pdf"
+        self.analysis.extracted_text = "Build Python and Kafka services."
+        self.analysis.extracted_payload = {"fit": fit, "triage": {"score": 3.5, "verdict": "MAYBE"},
+                                           "job_snapshot": {"title": "Backend Engineer", "required_skills": ["Python", "Kafka"], "experience_years": 5}}
+        self.analysis.save()
+        recheck = lambda revision: self.client.post(f"/api/career/job-analyses/{self.analysis.pk}/recheck-match/",
+                                                    {"revision": revision}, content_type="application/json")
+        revision = lambda: self.client.get("/api/career/job-analyses/").json()["results"][0]["updated_at"]
+        self.assertEqual(recheck(revision()).json()["detail"], "This match already uses your current resume.")
+        second = CareerResume.objects.create(user=self.owner, file_name="v2.pdf", parser_status="parsed",
+                                             extracted_payload={"skills": ["Python", "Kafka"], "role": "Backend Engineer", "experience_years": 5})
+        fresh = self.client.get("/api/career/job-analyses/").json()["results"][0]["match_freshness"]
+        self.assertEqual(fresh["used_label"], "v1.pdf")
+        self.assertTrue(fresh["current_label"].startswith("v2.pdf (uploaded "))
+        self.assertEqual((fresh["affected"], fresh["can_recheck"]), (["Triage score 3.5/5"], True))
+        foreign = CareerJobAnalysis.objects.create(user=self.other, job_url="https://jobs.example.test/3", extracted_payload=self.analysis.extracted_payload)
+        self.assertEqual(self.client.post(f"/api/career/job-analyses/{foreign.pk}/recheck-match/", {}, content_type="application/json").status_code, 404)
+        self.assertEqual(recheck("2000-01-01T00:00:00Z").status_code, 409)
+        self.assertEqual(self.client.post(f"/api/career/job-analyses/{self.analysis.pk}/recheck-match/", {}, content_type="application/json").status_code, 409)
+
+        saved = recheck(revision())
+        self.assertEqual(saved.status_code, 200, saved.content)
+        opportunity = saved.json()["opportunity"]
+        self.assertEqual((opportunity["match_freshness"]["status"], opportunity["triage"]), ("current", None))
+        self.analysis.refresh_from_db()
+        payload = self.analysis.extracted_payload
+        self.assertEqual(payload["fit"]["sources"][0]["record_id"], second.pk)
+        self.assertEqual(payload["fit"]["missing_skills"], [])
+        self.assertEqual(payload["superseded_matches"][0]["fit"], fit)
+        self.assertEqual(payload["superseded_matches"][0]["triage"], {"score": 3.5, "verdict": "MAYBE"})
+        self.assertEqual(payload["job_snapshot"]["required_skills"], ["Python", "Kafka"])
+        self.assertIn("Rule-based fit score", self.analysis.summary)
+        self.assertEqual(recheck(revision()).status_code, 400)  # now current: nothing to redo
+
+    def test_recheck_refuses_a_match_without_a_saved_posting(self):
+        resume = CareerResume.objects.create(user=self.owner, file_name="v1.pdf", parser_status="parsed",
+                                             extracted_payload={"skills": ["Go"], "role": "Backend Engineer", "experience_years": 4})
+        self.analysis.extracted_payload = _fit(["Python"], record_id=resume.pk)
+        self.analysis.save()
+        revision = self.client.get("/api/career/job-analyses/").json()["results"][0]["updated_at"]
+        refused = self.client.post(f"/api/career/job-analyses/{self.analysis.pk}/recheck-match/", {"revision": revision},
+                                   content_type="application/json")
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn("Run a new job match", refused.json()["detail"])
+        self.analysis.refresh_from_db()
+        self.assertNotIn("superseded_matches", self.analysis.extracted_payload)

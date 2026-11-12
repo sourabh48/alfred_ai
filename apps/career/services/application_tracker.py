@@ -8,11 +8,14 @@ from __future__ import annotations
 import math
 from datetime import date, timedelta
 
+from django.utils import timezone
+
 STAGES = ("evaluated", "applied", "responded", "assessment", "interview", "offer", "rejected", "discarded", "hired")
 CLOSED_STAGES = {"offer", "rejected", "discarded", "hired"}
 # stage: (days after entering the stage, days between follow-ups, most follow-ups before the lead goes cold)
 FOLLOW_UP_CADENCE = {"applied": (7, 7, 2), "responded": (1, 3, None), "assessment": (1, 3, None), "interview": (1, 3, None)}
 MAX_HISTORY = 60
+MAX_SUPERSEDED = 5
 HISTORY_REVIEW = 'Unavailable: review missing, malformed or conflicting application history. Saved records have not been changed.'
 
 
@@ -151,8 +154,17 @@ def match_freshness(analysis_payload, current: dict | None) -> dict:
     fit = (analysis_payload or {}).get("fit") if isinstance(analysis_payload, dict) else None
     sources = fit.get("sources") if isinstance(fit, dict) else None
     used = sources[0] if isinstance(sources, list) and sources and isinstance(sources[0], dict) else None
+    snapshot = analysis_payload.get("job_snapshot") if isinstance(analysis_payload, dict) else None
+    triage = analysis_payload.get("triage") if isinstance(analysis_payload, dict) else None
+    citation = {"used_label": str(used.get("label") or "Unnamed resume") if used else "",
+                "current_label": (current or {}).get("label", ""),
+                # Saved decisions computed from this match's fit; a re-check drops them so they are not reused silently.
+                "affected": ([f"Triage score {triage['score']:g}/5" if isinstance(triage.get("score"), (int, float)) else "Triage result"]
+                             if isinstance(triage, dict) else []),
+                "can_recheck": isinstance(snapshot, dict)}
     if used is None or current is None:
-        return {"status": "unknown", "reasons": ["The resume evidence behind this match was not saved."], "added_skills": [], "removed_skills": []}
+        return {"status": "unknown", "reasons": ["The resume evidence behind this match was not saved."],
+                "added_skills": [], "removed_skills": [], **citation, "can_recheck": False}
     used = resume_evidence(used, kind=used.get("kind"), record_id=used.get("record_id"))
     reasons = []
     if (used["kind"], used["record_id"]) != (current["kind"], current["record_id"]):
@@ -166,7 +178,17 @@ def match_freshness(analysis_payload, current: dict | None) -> dict:
     if used["experience_years"] != current["experience_years"]:
         reasons.append("Your years of experience changed.")
     return {"status": "stale" if reasons else "current", "reasons": reasons,
-            "added_skills": [item.title() for item in added], "removed_skills": [item.title() for item in removed]}
+            "added_skills": [item.title() for item in added], "removed_skills": [item.title() for item in removed], **citation}
+
+
+def rechecked_payload(payload: dict, fit: dict, resume_payload: dict, *, today: date) -> dict:
+    """The analysis payload after a re-check: the new fit, with the old fit and any triage built on it archived."""
+    archived = {"fit": payload.get("fit"), "replaced_on": today.isoformat()}
+    if "triage" in payload:
+        archived["triage"] = payload["triage"]
+    history = payload.get("superseded_matches") if isinstance(payload.get("superseded_matches"), list) else []
+    rest = {key: value for key, value in payload.items() if key != "triage"}
+    return {**rest, "resume_payload": resume_payload, "fit": fit, "superseded_matches": (history + [archived])[-MAX_SUPERSEDED:]}
 
 
 def compare_resumes(older: dict, newer: dict) -> dict:
@@ -185,10 +207,11 @@ def current_resume_evidence(user) -> dict | None:
 
     latest = CareerResume.objects.filter(user=user).order_by("-created_at", "-id").first()
     if latest is not None:
-        return resume_evidence(latest.extracted_payload or {}, kind="resume_upload", record_id=latest.pk)
+        return {**resume_evidence(latest.extracted_payload or {}, kind="resume_upload", record_id=latest.pk),
+                "label": f"{latest.file_name} (uploaded {timezone.localtime(latest.created_at).date().isoformat()})"}
     profile = CareerProfile.objects.filter(user=user).first()
     if profile is None:
         return None
     payload = {"role": profile.role, "experience_years": profile.experience_years,
                "skills": [item.strip() for item in (profile.skills or "").split(",") if item.strip()]}
-    return resume_evidence(payload, kind="manual_profile", record_id=profile.pk)
+    return {**resume_evidence(payload, kind="manual_profile", record_id=profile.pk), "label": "Manual career profile"}

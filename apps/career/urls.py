@@ -1,6 +1,6 @@
 from django.urls import path
 from .history_review_api import CareerHistoryReviewAPI
-from .views import CareerApplicationKitView, CareerPlanCheckView, CareerPracticeFeedbackView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
+from .views import CareerApplicationKitView, CareerPlanCheckView, CareerPracticeFeedbackView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerMatchRecheckView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
 
 urlpatterns = [
     path('job-analyses/<int:pk>/history-review/', CareerHistoryReviewAPI.as_view()),
@@ -15,6 +15,7 @@ urlpatterns = [
     path("job-match/", CareerJobMatchView.as_view(), name="career_job_match"),
     path("job-analyses/<int:pk>/outcome/", CareerJobOutcomeView.as_view(), name="career_job_outcome"),
     path("job-analyses/<int:pk>/application/", CareerApplicationView.as_view(), name="career_job_application"),
+    path("job-analyses/<int:pk>/recheck-match/", CareerMatchRecheckView.as_view(), name="career_match_recheck"),
     path("follow-ups/", career_follow_ups, name="career_follow_ups"),
     path("resumes/compare/", CareerResumeCompareView.as_view(), name="career_resume_compare"),
     path("job-analyses/", CareerOpportunityListView.as_view(), name="career_opportunities"),
