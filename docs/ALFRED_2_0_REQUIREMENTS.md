@@ -40,7 +40,7 @@ queue preferences, while security and approval gates remain mandatory.
 - **Evidence/AI:** citations identify selected owned sources and source revisions.
   Distinguish observed evidence, derived calculations, estimates, assumptions and
   uncertainty. Missing/conflicting/expired evidence requires abstention or explicit
-  unavailable status. Ollama stays default; the 30-second AI deadline is unchanged.
+  unavailable status. Ollama stays default; its deadline and other local AI limits are owner settings (2026-11-12), not a fixed 30 seconds.
   Registry readiness requires real held-out outcomes; drift/calibration claims need
   sustained independent evidence. A scenario is not income, a fact or a guarantee.
 - **Learning:** encrypted owner-isolated candidates remain unverified until review.

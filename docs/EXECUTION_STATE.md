@@ -1,5 +1,40 @@
 # ALFRED execution state
 
+## Final-development audit and "fix all" follow-ups - 2026-11-13
+
+- Source: origin/master 3dc51ff (CI run 43307042381 PASS on that exact commit), branch work/fix-all-2026-11-13 in
+  the owner-decisions-1112 worktree. Committed locally; push needs the owner's OK.
+- Owner runtime: integrations 0007 and investments 0008 are both applied (108 migrations, none pending). 0008 was
+  applied on the owner's "fix all" after a copy to F:/ALFRED/runtime-backups/pre-0008-20261113; one new empty table,
+  no other table changed. The app checkout runs master 3dc51ff.
+- Closure matrix for the 58 open baseline IDs and 13 extensions: artifacts/alfred2-closure-20261113/ in the app
+  checkout (not published). First gap type: 21 await owner/real-data acceptance, 15 an owner decision, 11 an
+  external source, 7 code, 2 another requirement, 2 descoped/retired.
+- c4d6648 development council accepts work/* branches (was pinned to the retired development/alfred-integrated).
+- c347ec5 + 96d56d0 Travel plan board cards and itinerary timeline (restyle fe4303c reviewed), with a Chrome test.
+- b4e8b24 WEALTH2-001 slice 3: multi-fund workbooks by owner choice of sheet, never guessed.
+- ddf87ef link-safety check corrected (it had failed on master unseen by CI).
+- 7a7b3ca CONFIRMED_DEFECT fixed: public_http.request() resolved DNS outside its 20 s limit when the caller gave no
+  deadline; reproduced with a blocking resolver, now always bounded.
+- db5a0bb whole-owner financial scenario with hand-worked expectations across eight views; recommendation profile's
+  unused total_invested (it held current value) renamed.
+- 28f188f AI-12 slice: cash and EMI given to the local assistant only when every active record states INR.
+- Active-guidance drift corrected: FIN-15 and INV-02 next steps, FIN-17 and provider register now say 0007 is
+  applied, the fixed 30-second AI deadline wording, the PR #16 flow in the architecture note, the PR/CI line.
+- Evidence: Travel/mobility/investments/link suites 586 PASS (14 skipped); AI evidence suites 81 PASS; public HTTP
+  93 PASS; council 43 PASS; look-through 17 PASS and 3 Chrome PASS; trip cards Chrome PASS; tracker check clean.
+- Local limit: tests.test_travel_planner_browser is flaky on this PC (2 to 6 of 10 time out behind a SQLite
+  "API misuse" from the live test server's shared connection), identically on clean master 3dc51ff where CI passes.
+- CI coverage gap (RUNTIME-12): the backend shards run the 179 modules in scripts/release_validation.BACKEND; 83
+  test files were outside it (84 with the new scenario test). 76 are now listed with measured durations; eight stay
+  out with a reason in BACKEND_NOT_IN_CI (six need a real Ollama model, signing tools, one symlink-privilege skip);
+  tests/test_release_validation.py fails when a new backend test file is in neither list. Four shards kept.
+- Four-shard local run as CI splits it: 2,988 tests, no failures, 14 skips, all from the calendar test parser
+  missing on this PC in three files CI already ran. Hosted CI has not run on this change: CI_PENDING until pushed.
+- Not built: WEALTH2-001 use in other Investment views (touches INV-04 risk evidence, an owner decision), Wikidata
+  as a second destination source (new provider, owner approval), Scrapling pilot (not before 2026-11-18).
+- Next: owner OK to push work/fix-all-2026-11-13 to master; then read the exact-HEAD CI run.
+
 ## WEALTH2-001 slice 2: saved fund portfolios - 2026-11-13
 
 - Owner approved the plan 2026-11-13. Source: origin/master 3395bbc, branch work/wealth2-001-snapshots in the

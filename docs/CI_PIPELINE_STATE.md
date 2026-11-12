@@ -1,5 +1,14 @@
 # Development CI and integration pipeline
 
+## Final-development audit and CI coverage - 2026-11-13
+
+LOCAL_ACCEPTED, not pushed. Branch work/fix-all-2026-11-13 in the owner-decisions-1112 worktree, base origin/master
+3dc51ff (run 43307042381 PASS on that commit only). The backend job now lists 254 labels (was 179); eight files stay
+out with reasons in BACKEND_NOT_IN_CI. Local: four backend shards 2,988 tests, no failures (14 skips from the calendar
+test parser missing on this PC, in files CI already ran); release validation 78 PASS; tracker check clean. No new
+docs file, no migration, no dependency, no workflow change. Blocker: the owner's OK for the push. After the push:
+read the exact-HEAD run; a skip or failure in a newly listed file on the hosted runner is the known risk.
+
 ## Closing master merge correction - 2026-11-11
 
 Codex single writer; MASTER_MERGE on work/master-review-fixes-20261111 in the
@@ -749,6 +758,9 @@ requirements own intent, the queue selects features, and EXECUTION_STATE owns co
 13 extensions remain separate. Full capability acceptance is never inferred from a slice.
 
 ## Permanent simplified workflow
+
+Superseded 2026-11-12: AGENTS.md now owns the flow (a work/* branch in a worktree from master, local commits,
+push to master only after a whole phase or a CI fix with the owner's OK). The text below is kept as history.
 
 - **development/alfred-integrated** is the only canonical development branch.
 - Keep **PR #16: development/alfred-integrated -> master**. Do not automatically

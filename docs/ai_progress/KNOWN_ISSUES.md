@@ -1,5 +1,22 @@
 # Known issues and gates
 
+## Final-development audit limits - 2026-11-13
+
+- `tests.test_travel_planner_browser` is flaky on the development PC: 2 to 6 of its 10 tests time out behind a
+  SQLite "bad parameter or other API misuse" error from the live test server's shared connection. It fails the same
+  way on clean master 3dc51ff, where hosted CI passes. Not fixed; a local pass of this file is not evidence.
+- The local assistant's finance tool gives monthly income, and gives cash and EMI only when every active account
+  and loan records INR. Net worth, total assets, total liabilities and the other derived totals are still withheld
+  (AI-12 stays PARTIALLY_IMPLEMENTED).
+- Eight backend test files stay outside CI because the backend job fails on any skipped test: six need a real local
+  Ollama model, `test_windows_signing` needs signing tools, and `test_ml_artifact_trust` has one test that skips
+  when the account may not create file symlinks. `scripts/release_validation.BACKEND_NOT_IN_CI` lists each with its
+  reason; run them by hand before a release.
+- Saved fund portfolio snapshots (WEALTH2-001) sit in the same access-controlled SQLite file as other investment
+  records. They are not separately encrypted.
+- Wikidata as a second free destination source was only evaluated (CC0, no key stated, rate limited). It is not
+  wired in; adding a provider needs the owner's approval.
+
 ## Master merge review limits - 2026-11-11
 
 Pending statement reviews created before source fingerprint binding in 7e15c14

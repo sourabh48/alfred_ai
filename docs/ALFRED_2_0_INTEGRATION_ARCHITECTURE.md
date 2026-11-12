@@ -85,7 +85,8 @@ never inferred. Approved map fallback and financial affordability stay shared.
 
 ## Models, confirmation, failures and recovery
 
-Ollama/local routing remains default with the existing 30-second AI deadline.
+Ollama/local routing remains default. Its host, deadline, context and output limits are owner settings in
+`config/local.env` (owner decision 2026-11-12; `apps/ml_engine/services/local_ai_limits.py`), not a fixed 30 seconds.
 Cloud routes need explicit consent/cost/disclosure controls; no automatic fallback,
 new credentials or assumed ChatGPT-plan API billing. Source material/model outputs
 are untrusted; citations, structured validation and deterministic financial tools
@@ -99,11 +100,12 @@ proposals. Existing migration/backup/rollback safeguards are reused, not replace
 
 ## Delivery and conditional integration
 
-See [pipeline state](CI_PIPELINE_STATE.md) and AGENTS for sprint/section states.
-One active coding scope, at most three outstanding candidates; isolated PR refs
-protect concurrent CI from cancellation. Explicit stacks pin dependencies and must
-be retargeted/revalidated against master before merge. Cumulative PR #16 needs its
-full diff reviewed. Do not repeatedly push unrelated sections into it.
+AGENTS.md owns the current flow (owner decision 2026-11-12): one work/* branch in a
+worktree from master per scope, local commits, and a push to master only after a
+whole phase or a CI fix, with the owner's OK. PR #16/#18/#19 are closed; the earlier
+single-development-branch flow in [pipeline state](CI_PIPELINE_STATE.md) is history.
+One active coding scope per worktree. Explicit stacks pin dependencies and must
+be retargeted/revalidated against master before merge.
 
 Owner now conditionally authorizes automatic section merges. Exact-head checks,
 independent/project reviews, protections/rulesets, source/privacy/rollback and

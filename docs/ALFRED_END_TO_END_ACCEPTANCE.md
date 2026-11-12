@@ -2,7 +2,9 @@
 
 Baseline: 3932f391aa4eed7b3200ad3b034f7991435e01e4, audited 2026-10-15. Current normal-account acceptance is PENDING.
 
-Status note 2026-11-12: master is now e548d42; the checklist below was not re-run against it. Normal-account, clean second PC, real provider and disaster recovery lines stay PENDING. The only new real-world receipt is the owner's reviewed-send check (2026-11-12, synthetic data); see the provider register. This plan does not authorize production actions, password changes, provider calls, data corrections or deployment.
+Status note 2026-11-13: master is now 3dc51ff (CI run 43307042381 PASS on that commit); the checklist below was still not re-run. Automated CI covers the 179 backend modules listed in scripts/release_validation.py plus the browser shards; it is not product acceptance.
+
+Status note 2026-11-12: master was e548d42; the checklist below was not re-run against it. Normal-account, clean second PC, real provider and disaster recovery lines stay PENDING. The only new real-world receipt is the owner's reviewed-send check (2026-11-12, synthetic data); see the provider register. This plan does not authorize production actions, password changes, provider calls, data corrections or deployment.
 
 Use the [feature matrix](PROJECT_STATUS.md), [provider register](ALFRED_EXTERNAL_INTEGRATIONS.md) and [roadmap](PROJECT_STATUS.md). Record PASS/FAIL/PENDING/NOT_RUN with date, exact source/package SHA, environment and observed evidence for each line. Synthetic and real results remain separate.
 
