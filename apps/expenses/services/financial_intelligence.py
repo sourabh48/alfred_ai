@@ -25,6 +25,7 @@ from apps.ml_engine.behavior.insight_generator import insight_generator
 from apps.ml_engine.behavior.personalizer import personalizer
 from apps.mobility.models import BikeProfile, BikeServiceRecord, TripLog
 from .financial_relationships import build_financial_relationships
+from .transaction_intelligence import _normalize_account_number
 
 
 DISCRETIONARY_CATEGORIES = {
@@ -38,6 +39,8 @@ DISCRETIONARY_CATEGORIES = {
 RECURRING_CATEGORIES = {"loan", "utilities", "subscription", "rent", "bills", "credit_card"}
 MONEY_QUANT = Decimal("0.01")
 PERCENT_QUANT = Decimal("0.01")
+# Credit cards are debt and investment-type accounts are holdings; neither is spendable cash.
+NON_CASH_ACCOUNT_TYPES = {"credit", "investment"}
 
 BASELINE_FORMULAS = {
     "monthly_income": "Normalized reliable monthly income from salary credits, reported income, career salary, or observed credit inflow fallback.",
@@ -695,7 +698,7 @@ def _build_canonical_financial_baseline_uncached(
         (
             max(_decimal_amount(account.current_balance or 0), Decimal("0"))
             for account in accounts
-            if account.account_type != "credit"
+            if account.account_type not in NON_CASH_ACCOUNT_TYPES
         ),
         Decimal("0"),
     ).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
@@ -725,7 +728,7 @@ def _build_canonical_financial_baseline_uncached(
     observed_status = "observed" if recent_buckets else "unavailable"
     balance_status = "derived" if total_assets_amount or total_liabilities_amount else "unavailable"
     # Liquid cash is known only from a non-credit account whose balance was entered; otherwise its 0 is not a measurement.
-    liquid_known = any(account.account_type != "credit" and account.current_balance is not None for account in accounts)
+    liquid_known = any(account.account_type not in NON_CASH_ACCOUNT_TYPES and account.current_balance is not None for account in accounts)
     liquid_status = "observed" if liquid_known else "unavailable"
     metric_states = {
         "monthly_income": _baseline_metric_state(
@@ -1224,12 +1227,30 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
     if loans and not payment_rows:
         payment_rows = fetch_payment_history_rows(user=user)
 
-    cash_balances = [_decimal_amount(account.current_balance or 0) for account in accounts if account.account_type != "credit"]
+    cash_balances = [_decimal_amount(account.current_balance or 0) for account in accounts if account.account_type not in NON_CASH_ACCOUNT_TYPES]
     liquid_cash = _money_float(sum((max(value, Decimal("0")) for value in cash_balances), Decimal("0")))
     # An overdraft is money owed, not zero cash.
-    overdrawn_liability = _money_float(sum((-value for value in cash_balances if value < 0), Decimal("0")))
+    overdrawn_liability = _money_float(sum(
+        (-_decimal_amount(account.current_balance or 0) for account in accounts
+         if account.account_type != "credit" and _decimal_amount(account.current_balance or 0) < 0),
+        Decimal("0"),
+    ))
     credit_liability = _money_float(sum(abs(account.current_balance or 0) for account in accounts if account.account_type == "credit"))
-    investment_assets = investment_total_float(sum(item.current_value or 0 for item in investments))
+    investment_row_total = sum((_decimal_amount(item.current_value or 0) for item in investments), Decimal("0"))
+    # An investment-type bank account counts only when no investment record already carries the same account number.
+    covered_numbers = {_normalize_account_number(item.account_number) for item in investments} - {""}
+    uncovered_accounts = [
+        account for account in accounts
+        if account.account_type == "investment" and _normalize_account_number(account.account_number) not in covered_numbers
+        and _decimal_amount(account.current_balance or 0) > 0
+    ]
+    account_investment_total = sum((_decimal_amount(account.current_balance) for account in uncovered_accounts), Decimal("0"))
+    investment_assets = investment_total_float(investment_row_total + account_investment_total)
+    investment_sources = [{"source": "investment_records", "label": "Investment records", "count": len(investments),
+                           "amount": investment_total_float(investment_row_total)}]
+    if uncovered_accounts:
+        investment_sources.append({"source": "investment_accounts", "label": "Investment-type bank account balances",
+                                   "count": len(uncovered_accounts), "amount": _money_float(account_investment_total)})
     home_ownership_positions, home_ownership_summary = _build_home_ownership_positions(loans=loans, payment_rows=payment_rows)
     home_loan_asset_proxy_total = round(home_ownership_summary["property_acquisition_cost_total"], 2)
     home_loan_upfront_cash_total = round(home_ownership_summary["upfront_cash_invested_total"], 2)
@@ -1256,7 +1277,9 @@ def _build_balance_sheet(*, user, loans: list[Loan], payment_rows: list[dict] | 
 
     assets = [
         {"label": "Cash and bank balances", "amount": liquid_cash},
-        {"label": "Investments", "amount": investment_assets},
+        {"label": "Investments", "amount": investment_assets, "sources": investment_sources,
+         "note": ("Includes balances of investment-type bank accounts with no matching investment record"
+                  if uncovered_accounts else "From investment records")},
     ]
     if home_loan_asset_proxy_total:
         assets.append({"label": "Home property acquisition-cost base (proxy)", "amount": home_loan_asset_proxy_total})

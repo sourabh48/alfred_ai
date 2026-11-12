@@ -488,7 +488,7 @@ function renderBalanceSheet(balanceSheet) {
         {
             key: "assets",
             label: "Assets",
-            value: assets.map(item => `${Alfred.escapeHtml(item.label)} ${formatCurrency(item.amount)}`).join(" | ") || "No assets tracked",
+            value: assets.map(item => `${Alfred.escapeHtml(item.label)} ${formatCurrency(item.amount)}${item.note ? ` (${Alfred.escapeHtml(item.note)})` : ""}`).join(" | ") || "No assets tracked",
         },
         {
             key: "liabilities",
