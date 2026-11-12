@@ -2579,7 +2579,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.side_effect = None; local.reason.return_value = 'Synthetic hypothesis <img src=x onerror="window.uiLeak=true">'
         self.memory_click('#intelligenceRetry')
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
-        self.assertEqual(local.reason.call_args.kwargs['max_output_tokens'], 1024)
+        from apps.ml_engine.services.hybrid_intelligence import ANSWER_STYLES
+        self.assertEqual(local.reason.call_args.kwargs['max_output_tokens'], ANSWER_STYLES['detailed'][0])
         self.assertEqual(local.reason.call_args.args[0]['response_style'], 'detailed')
         self.assertFalse(self.browser.execute_script('return Boolean(window.uiLeak)'))
         self.assertIn('Insufficient evidence', self.text('intelligenceAnswers'))
