@@ -112,7 +112,7 @@ TRAINING_SPECS = [
         minimum_samples=0,
         fallback_mode="future policy learner is excluded; product flows use deterministic guardrails",
         sample_counter=lambda: 0,
-        trainer_path="apps.ml_engine.training.train_rl_agent.train_rl_agent",
+        trainer_path="",  # planned: never trained, so no trainer exists
         description="Reserved for future reinforcement-learning policies.",
     ),
 ]
@@ -359,6 +359,10 @@ def _run_training_spec(spec: TrainingSpec, *, trigger: str, force: bool, now) ->
             note="Model is still fresh, so Alfred skipped unnecessary retraining.",
             now=now,
         )
+
+    if spec.key in PLANNED_MODEL_KEYS:
+        return _record_skip(spec=spec, state=state, trigger=trigger, sample_count=sample_count,
+                            note=f"{spec.label} is planned and not trained; product flows use deterministic guardrails.", now=now)
 
     try:
         trainer = _load_trainer(spec)
