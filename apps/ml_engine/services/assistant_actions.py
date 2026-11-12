@@ -116,7 +116,10 @@ def propose(user, text, today=None):
                 raise ActionError("That target date has already passed.")
             fields["target_date"] = due.isoformat()
             summary += f" by {due:%d %b %Y}"
-        return {"action": "create_savings_goal", "fields": fields, "summary": summary + "."}
+        if _same_name(user, name).exists():
+            raise ActionError(f"You already have a savings goal named \"{name}\". Ask to update it instead.")
+        return {"action": "create_savings_goal", "fields": fields, "summary": summary + ".",
+                "depends_on": [f"No savings goal named \"{name}\" yet"]}
     if match := UPDATE.match(text):
         name = match.group("name").strip()
         goals = list(SavingsGoal.objects.filter(user=user, name__iexact=name)[:2])
@@ -126,8 +129,14 @@ def propose(user, text, today=None):
         goal = goals[0]
         return {"action": "update_savings_goal", "fields": {"id": goal.pk, "saved_amount": str(saved)},
                 "revision": _revision(goal),
-                "summary": f"Set saved so far for \"{goal.name}\" from {_money(goal.saved_amount, goal.currency)} to {_money(saved, goal.currency)}."}
+                "summary": f"Set saved so far for \"{goal.name}\" from {_money(goal.saved_amount, goal.currency)} to {_money(saved, goal.currency)}.",
+                "depends_on": [f"\"{goal.name}\" as last saved {timezone.localtime(goal.updated_at):%d %b %Y %H:%M}"]}
     return None
+
+
+def _same_name(user, name):
+    """WEALTH2-002 dependency of a new goal: no goal of the owner's with this name, however it is spaced or cased."""
+    return SavingsGoal.objects.filter(user=user, name__iexact=" ".join(str(name).split()))
 
 
 def _serializer(user, action, fields):
@@ -206,6 +215,8 @@ def confirm(user, identity, action, fields):
     serializer = _serializer(user, action, fields)
     if serializer.instance and _revision(serializer.instance) != payload["revision"]:
         raise ActionConflict("The goal changed after this review. Make a new request.")
+    if action == "create_savings_goal" and _same_name(user, fields.get("name", "")).exists():
+        raise ActionConflict("A savings goal with this name was added after this review. Make a new request.")
     goal = serializer.save(user=user) if action == "create_savings_goal" else serializer.save()
     payload.update(state="confirmed", goal_id=goal.pk, confirmed_at=timezone.now().isoformat())
     record.payload = payload

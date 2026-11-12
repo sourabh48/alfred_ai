@@ -49,6 +49,12 @@
   A cloud model name is refused (503). Tests: analyst leak (fails on the old code), consent, no context, owner
   isolation, CSRF, sign-in, no writes; browser test (consent message, result, analyst never sees the view, escaped
   thesis, axe light/dark). Investment/research/limiter suites 166 PASS. Implemented, not accepted.
+- `sprint`: selected WEALTH2-002 slice 1/3 (AI-17 savings-goal cards). Found: two create cards for the same goal
+  name could both be confirmed and make duplicates. Now each proposal carries depends_on (shown on the card as
+  "Checked again when you confirm"); confirm refuses a create card when a same-name goal (any case/spacing) was
+  added after review (409, nothing saved), and propose refuses a duplicate name. Update cards keep the full-goal
+  fingerprint. Tests: stale create card (fails on the old code), other owner's goal is no dependency, refusal,
+  update depends_on; browser card assertion. Assistant/history-review/hybrid suites PASS. Cross-module cards pending.
 - `next` (after INVEST2-002 checkpoint, CI_PENDING on 462ea52): queue had no eligible task; owner chose CAREER2-002.
   The reviewed send already existed (manifest, signed review, stale/retry/interrupted). Added: "Reply to a recruiter's
   message" draft. It quotes the sentence behind each ask in the saved recruiter message (pay, notice period, location,

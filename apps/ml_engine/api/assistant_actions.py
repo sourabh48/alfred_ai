@@ -35,7 +35,7 @@ class AssistantActionConfirmAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        if not isinstance(request.data, dict) or set(request.data) - {"proposal_id", "action", "fields", "confirmed", "summary", "expires_at", "revision"}:
+        if not isinstance(request.data, dict) or set(request.data) - {"proposal_id", "action", "fields", "confirmed", "summary", "expires_at", "revision", "depends_on"}:
             return Response({"detail": "Use the reviewed proposal fields."}, status=400)
         if request.data.get("confirmed") is not True:
             return Response({"detail": "Confirm the action first."}, status=400)

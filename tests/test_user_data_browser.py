@@ -1961,6 +1961,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('₹150,000.00', self.browser.find_element(self.By.CSS_SELECTOR, card).text)
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR, card+' b'))
         self.assertIn('This proposal expires at', self.browser.find_element(self.By.CSS_SELECTOR, card).text)
+        self.assertIn('Checked again when you confirm: No savings goal named', self.browser.find_element(self.By.CSS_SELECTOR, card).text)
         self.assertFalse(SavingsGoal.objects.filter(user=owner).exists())
         self.memory_click(card+' .btn-outline-secondary')
         self.wait.until(lambda _: 'Cancelled. Nothing was saved.' in self.browser.find_element(self.By.CSS_SELECTOR, card).text)

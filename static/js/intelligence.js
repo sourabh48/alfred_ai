@@ -579,6 +579,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (result.proposal) {
             const status = document.createElement("p"); status.className = "small"; status.setAttribute("role", "status");
             status.textContent = `Review the exact values above. This proposal expires at ${new Date(result.proposal.expires_at).toLocaleTimeString()}.`;
+            // WEALTH2-002: what this review relied on; the server checks it again on Confirm and refuses a stale card.
+            const depends = document.createElement("p"); depends.className = "small text-body-secondary"; depends.dataset.actionDepends = "true";
+            depends.textContent = `Checked again when you confirm: ${(result.proposal.depends_on || []).join("; ")}.`;
+            if (result.proposal.depends_on?.length) reply.append(depends);
             const actions = document.createElement("div"); actions.className = "d-flex gap-2";
             const confirmButton = document.createElement("button"); confirmButton.type = "button"; confirmButton.className = "btn btn-primary btn-sm"; confirmButton.textContent = "Confirm";
             const cancelButton = document.createElement("button"); cancelButton.type = "button"; cancelButton.className = "btn btn-outline-secondary btn-sm"; cancelButton.textContent = "Cancel";

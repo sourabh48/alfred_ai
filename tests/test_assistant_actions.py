@@ -45,6 +45,22 @@ class AssistantActionTests(TestCase):
         self.assertIn(self.confirm(proposal).status_code, (200, 409))
         self.assertEqual(SavingsGoal.objects.count(), 1)
 
+    def test_a_goal_added_with_the_same_name_makes_a_create_card_stale(self):
+        first, second = self.proposal(), self.proposal()
+        self.assertEqual(first["depends_on"], ['No savings goal named "Synthetic bike" yet'])
+        SavingsGoal.objects.create(user=self.other, name="Synthetic bike", target_amount="5.00")  # another owner's goal is no dependency
+        self.assertEqual(self.confirm(first).status_code, 201)
+        response = self.confirm(second)  # the first card's goal changed what the second card was reviewed against
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("added after this review", response.json()["detail"])
+        self.assertEqual(SavingsGoal.objects.filter(user=self.owner).count(), 1)
+        SavingsGoal.objects.filter(user=self.owner).update(name="SYNTHETIC BIKE")
+        refused = self.client.post("/api/ai/actions/propose/", {"text": "add a savings goal synthetic   bike of 50"}, content_type="application/json")
+        self.assertIsNone(refused.json()["proposal"])
+        self.assertIn("already have a savings goal", json.dumps(refused.json()))
+        self.assertTrue(self.proposal("update synthetic bike saved to 10")["depends_on"][0].startswith('"SYNTHETIC BIKE" as last saved '))
+        self.assertEqual(SavingsGoal.objects.filter(user=self.owner).count(), 1)
+
     def test_changed_goal_requires_a_new_review(self):
         goal = SavingsGoal.objects.create(user=self.owner, name="Bike", target_amount="1000.00")
         proposal = self.proposal("update Bike saved to 250.10")
