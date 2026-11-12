@@ -106,7 +106,8 @@ class FinancialRecommendationEngine:
         # Investment analysis
         investments = Investment.objects.filter(user=user).in_rupee_totals()
         profile['has_investments'] = investments.exists()
-        profile['total_invested'] = float(investments.aggregate(Sum('current_value'))['current_value__sum'] or 0)
+        # Current value, not cost: the Investments page keeps 'total_invested' for the amount put in.
+        profile['investments_current_value'] = float(investments.aggregate(Sum('current_value'))['current_value__sum'] or 0)
 
         # Risk profile
         profile['risk_appetite'] = self._assess_risk_appetite(profile)
