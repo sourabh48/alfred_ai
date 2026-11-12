@@ -28,6 +28,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_home_dashboard_reminds_of_due_career_follow_ups_only": 8.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_application_kit_triage_drafts_and_offer_reading": 28.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_evaluation_batch_triage_and_reviewed_send": 14.5,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_career_recruiter_reply_quotes_asks_blocks_blanks_and_sends_only_to_the_typed_address": 13.46,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_application_progress_is_owned_page_only_offline_and_reopens": 13.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_registered_tools_permissions_real_reads_timeout_and_keyboard_accessibility": 12.125,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_source_card_record_id_is_not_money_and_limitations_are_readable": 6.61,

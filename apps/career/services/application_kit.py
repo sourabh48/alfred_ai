@@ -382,7 +382,38 @@ EMAIL_KINDS = {
     "follow_up": "Follow-up on an application",
     "process_stuck": "Application process broke",
     "confirmed_time_noshow": "Missed confirmed call",
+    "recruiter_reply": "Reply to a recruiter's message",
 }
+# CAREER2-002: what a recruiter's message asks, each left for the owner to answer. Pay, notice and location are never filled in.
+RECRUITER_ASKS = (
+    ("pay", "Pay", re.compile(r"\b(ctc|salary|compensation|pay expectations?|expected pay)\b", re.I),
+     "Pay: [your expected pay, or that you would rather discuss it later]"),
+    ("notice", "Notice period", re.compile(r"\b(notice period|how soon can you join|joining date|available to join)\b", re.I),
+     "Notice period: [your notice period]"),
+    ("location", "Location", re.compile(r"\b(relocat\w*|current location|where are you based|based out of|work from office|on-?site|hybrid)\b", re.I),
+     "Location: [where you are based and whether you would move or commute]"),
+    ("call", "A time to talk", re.compile(r"\b(call|chat|talk|speak|interview|connect)\b", re.I), "I am free to talk [two or three times]."),
+    ("cv", "Your CV", re.compile(r"\b(cv|resume|résumé)\b", re.I), "My CV is attached."),
+)
+SENSITIVE_ASKS = (
+    ("bank details", re.compile(r"\b(bank account|account number|ifsc|bank details)\b", re.I)),
+    ("identity documents or numbers", re.compile(r"\b(passport|aadhaa?r|pan (card|number)|social security|ssn|date of birth)\b", re.I)),
+    ("a password or one-time code", re.compile(r"\b(otp|one[- ]time (password|code)|password)\b", re.I)),
+    ("a fee or deposit", re.compile(r"\b(registration|processing|training|joining) (fee|charges?)\b|\bsecurity deposit\b|\bpay a fee\b", re.I)),
+)
+
+
+def recruiter_asks(analysis) -> tuple[list, list]:
+    """Each ask in the saved recruiter message with the sentence it came from; sensitive asks are listed apart."""
+    payload = _payload(analysis)
+    text = str(payload.get("intake_message_text")
+               or (payload.get("intake_combined_text") if payload.get("source_kind") == "recruiter_message" else "") or "")
+    sentences = [" ".join(part.split()) for part in re.split(r"(?<=[.!?])\s+|\n+", text) if part.strip()]
+    quote = lambda pattern: next((ats_text(sentence[:200]) for sentence in sentences if pattern.search(sentence)), None)
+    asks = [{"key": key, "label": label, "quote": found, "line": line}
+            for key, label, pattern, line in RECRUITER_ASKS if (found := quote(pattern))]
+    withheld = [{"label": label, "quote": found} for label, pattern in SENSITIVE_ASKS if (found := quote(pattern))]
+    return asks, withheld, bool(sentences)
 
 
 def email_draft(analysis, resume, profile, *, kind: str, triage_score=None) -> dict:
@@ -421,12 +452,26 @@ def email_draft(analysis, resume, profile, *, kind: str, triage_score=None) -> d
             ["Hello [name],", "", f"We confirmed a call for [date and time] about the {role} role. I was available at that time but we did not connect.",
              "Could we find another time? I am free [two or three options].", "", "Regards,", "[Your name]"]),
     }
+    asks, withheld, has_message = recruiter_asks(analysis) if kind == "recruiter_reply" else ([], [], False)
+    drafts["recruiter_reply"] = (f"Re: {role} at {company}",
+        ["Hello [name],", "", f"Thank you for getting in touch about the {role} role at {company}. I would be glad to hear more.",
+         f"I work as {me} with {_years(facts)} of experience in {fit}. One example: {win}",
+         *(["", *(ask["line"] for ask in asks)] if asks else []), "", "Regards,", "[Your name]"])
     subject, body = drafts[kind]
     notes = ["A draft only. Fill the brackets; ALFRED sends it only if you review it and press Send."]
     if kind in ("hr_application", "referral_request", "cold_application") and triage_score is not None and triage_score < 4.0:
         notes.append(f"Triage score {triage_score}/5 is below 4.0, where Career Ops advises against applying; keep the email restrained.")
-    return {"available": True, "kind": kind, "label": EMAIL_KINDS[kind], "subject": ats_text(subject),
-            "text": ats_text("\n".join(body)), "notes": notes, "source": source}
+    if kind == "recruiter_reply":
+        notes.append("Each answer line matches something the recruiter asked. Pay, notice period and location are left for you; "
+                     "ALFRED never copies them from your profile." if asks
+                     else "ALFRED found no question it recognises in the recruiter's message; answer anything it asks yourself." if has_message
+                     else "No recruiter message is saved for this job, so nothing was quoted.")
+        notes += [f"The recruiter asks for {item['label']}. Do not send it by email: genuine employers collect it through their own "
+                  "onboarding after an offer, and never charge you a fee." for item in withheld]
+    return {"available": True, "kind": kind, "label": EMAIL_KINDS[kind], "subject": ats_text(" ".join(subject.split())),
+            "text": ats_text("\n".join(body)), "notes": notes, "source": source,
+            "asks": [{key: ask[key] for key in ("label", "quote")} for ask in asks], "withheld": withheld,
+            "attach_cv_suggested": kind in ("hr_application", "cold_application", "process_stuck") or any(ask["key"] == "cv" for ask in asks)}
 
 
 # ---------- offer-prep: a reading aid, never a verdict ----------

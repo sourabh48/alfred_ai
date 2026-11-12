@@ -5391,6 +5391,64 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                                  self.browser.execute_script('return document.documentElement.clientWidth'))
             self.browser.set_window_size(1440, 1200)
 
+    def test_career_recruiter_reply_quotes_asks_blocks_blanks_and_sends_only_to_the_typed_address(self):
+        from django.core import mail
+        from django.test import override_settings
+        from selenium.webdriver.support.ui import Select
+        from apps.career.models import CareerJobAnalysis, CareerResume
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from tests.test_career_application_kit import CV
+        from tests.test_career_evaluation import JD, job
+        from tests.test_career_matching_acceptance import offline_career
+        from tests.test_career_send import MAILBOX
+        offline_career(self)
+        owner = self.scenario['user']
+        CareerResume.objects.create(user=owner, uploaded_file=SimpleUploadedFile('reply-cv.pdf', b'%PDF-synthetic'), file_name='reply-cv.pdf',
+            parser_status='parsed', extracted_text=CV, extracted_payload={'role': 'Backend Engineer', 'experience_years': 5, 'skills': ['Python', 'Django', 'SQL']})
+        message = ('Hi, we have a Senior Backend Engineer opening. Please share your CV and expected CTC <img src=x onerror="window.replyInjected=true">.\n'
+                   'What is your notice period? Send your bank account number to payroll@evil.example.test.')
+        item = CareerJobAnalysis.objects.create(user=owner, job_url='https://jobs.example.test/reply', job_title='Senior Backend Engineer',
+            company='Synthetic Reply Corp', location='Pune', extracted_text=JD,
+            extracted_payload={**job().extracted_payload, 'source_kind': 'recruiter_message', 'intake_message_text': message})
+        with override_settings(**MAILBOX):
+            self.login(); self.browser.get(self.live_server_url + '/career/')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#careerOutcomeAnalysis option[value="{item.pk}"]'))
+            Select(self.browser.find_element(self.By.ID, 'careerOutcomeAnalysis')).select_by_value(str(item.pk))
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerKit'))
+            self.browser.execute_script("document.getElementById('careerKit').open = true")
+            Select(self.browser.find_element(self.By.ID, 'careerKitEmailKind')).select_by_value('recruiter_reply')
+            self.memory_click('#careerKitEmail')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRecruiterAskList'))
+            asks = self.text('careerRecruiterAskList')
+            for label in ('Pay', 'Notice period', 'Your CV'):
+                self.assertIn(label, asks)
+            self.assertIn('What is your notice period?', asks)
+            self.assertIn('bank details', self.text('careerRecruiterWithheld'))
+            self.assertFalse(self.browser.execute_script('return Boolean(window.replyInjected)'))
+            self.assertTrue(self.browser.find_element(self.By.ID, 'careerSendAttach').is_selected())  # the recruiter asked for the CV
+            self.assertEqual(self.browser.find_element(self.By.ID, 'careerSendTo').get_attribute('value'), '')
+            self.assertNotIn('evil.example.test', self.browser.find_element(self.By.ID, 'careerSendBody').get_attribute('value'))
+            self.browser.find_element(self.By.ID, 'careerSendTo').send_keys('recruiter@synthetic.example.test')
+            self.memory_click('#careerSendReview')
+            self.wait.until(lambda _: 'Fix before sending' in self.text('careerSendReviewResult'))
+            self.assertIn('[your expected pay', self.text('careerSendReviewResult'))
+            self.assertFalse(self.browser.find_elements(self.By.ID, 'careerSendNow'))
+            body = self.browser.find_element(self.By.ID, 'careerSendBody')
+            body.clear(); body.send_keys('Hello Priya,\nThanks for reaching out. Happy to discuss pay on a call. My notice period is 30 days.\nMy CV is attached.\nRegards,\nAsha')
+            self.memory_click('#careerSendReview')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerSendNow'))
+            self.assertIn('reply-cv.pdf', self.text('careerSendManifest'))
+            self.assertEqual(len(mail.outbox), 0)
+            self.run_axe_light_dark('career-recruiter-reply')
+            self.memory_click('#careerSendNow')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerSendDone'))
+            self.assertEqual([message.recipients() for message in mail.outbox], [['recruiter@synthetic.example.test']])
+            self.assertNotIn('evil.example.test', mail.outbox[0].body)
+            self.browser.refresh()  # reopen: the sent log survives and the same email is refused as already sent
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#careerOutcomeAnalysis option[value="{item.pk}"]'))
+            self.assertEqual([entry['to'] for entry in CareerJobAnalysis.objects.get(pk=item.pk).extracted_payload['sent_messages']],
+                             ['recruiter@synthetic.example.test'])
+
     def test_career_bad_history_does_not_hide_valid_followups_or_erase_records(self):
         from datetime import timedelta
         from django.utils import timezone

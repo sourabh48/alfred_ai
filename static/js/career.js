@@ -712,7 +712,7 @@ function renderCareerApplicationKit(item) {
     const target = document.getElementById("careerApplicationKitPanel");
     if (!item) { target.replaceChildren(); return; }
     const triage = item.triage;
-    const dims = triage ? triage.dimensions.map(dim => `<li>${Alfred.escapeHtml(dim.key.replace("_", " "))}: ${dim.score === null ? "left out" : `${dim.score}/5`} (weight ${Math.round(dim.weight * 100)}%). ${Alfred.escapeHtml(dim.reason)}</li>`).join("") : "";
+    const dims = triage ? (triage.dimensions || []).map(dim => `<li>${Alfred.escapeHtml(dim.key.replace("_", " "))}: ${dim.score === null ? "left out" : `${dim.score}/5`} (weight ${Math.round(dim.weight * 100)}%). ${Alfred.escapeHtml(dim.reason)}</li>`).join("") : "";
     const field = (id, label, help = "") => `<div class="col-md-6"><label class="form-label small" for="${id}">${label}</label><input class="form-control form-control-sm" id="${id}" ${help ? `aria-describedby="${id}Help"` : ""}>${help ? `<div class="form-text" id="${id}Help">${help}</div>` : ""}</div>`;
     target.innerHTML = `
         <details class="surface-card p-3 mb-3" id="careerKit">
@@ -743,7 +743,8 @@ function renderCareerApplicationKit(item) {
                     <select class="form-select form-select-sm" id="careerKitEmailKind">
                         <option value="hr_application">Application to HR or a recruiter</option><option value="referral_request">Referral request</option>
                         <option value="cold_application">Speculative application</option><option value="follow_up">Follow-up on an application</option>
-                        <option value="process_stuck">Application process broke</option><option value="confirmed_time_noshow">Missed confirmed call</option></select></div>
+                        <option value="process_stuck">Application process broke</option><option value="confirmed_time_noshow">Missed confirmed call</option>
+                        <option value="recruiter_reply">Reply to a recruiter's message</option></select></div>
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="careerKitEmail">Email draft</button>
             </div>
             <div id="careerKitDraft" aria-live="polite"></div>
@@ -814,7 +815,10 @@ function renderCareerApplicationKit(item) {
     document.getElementById("careerKitCover").addEventListener("click", () => draft("type=cover"));
     document.getElementById("careerKitEmail").addEventListener("click", () => {
         const kind = document.getElementById("careerKitEmailKind").value;
-        draft(`type=email&kind=${encodeURIComponent(kind)}`, `<div id="careerSendPanel"></div>`, data => renderCareerSendPanel(item, data, kind));
+        draft(`type=email&kind=${encodeURIComponent(kind)}`, `<div id="careerRecruiterAsks"></div><div id="careerSendPanel"></div>`, data => {
+            renderCareerRecruiterAsks(data);
+            renderCareerSendPanel(item, data, kind);
+        });
     });
     document.getElementById("careerKitEvaluation").addEventListener("click", () => {
         Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/kit/?type=evaluation`).then(renderCareerEvaluation).catch(fail);
@@ -884,9 +888,19 @@ function renderCareerEvaluation(report) {
     });
 }
 
+function renderCareerRecruiterAsks(data) {
+    const host = document.getElementById("careerRecruiterAsks");
+    const asks = data.asks || [], withheld = data.withheld || [];
+    if (!asks.length && !withheld.length) { host.replaceChildren(); return; }
+    const quote = row => `<li><strong>${Alfred.escapeHtml(row.label)}</strong>: <q>${Alfred.escapeHtml(row.quote)}</q></li>`;
+    host.innerHTML = `${asks.length ? `<h5 class="h6 mt-2">What the recruiter asked</h5><ul class="small" id="careerRecruiterAskList">${asks.map(quote).join("")}</ul>` : ""}
+        ${withheld.length ? `<div class="alert alert-warning small" role="alert" id="careerRecruiterWithheld"><strong>Do not send these by email.</strong> The message asks for:
+            <ul class="mb-0">${withheld.map(quote).join("")}</ul></div>` : ""}`;
+}
+
 function renderCareerSendPanel(item, data, kind) {
     const host = document.getElementById("careerSendPanel");
-    const attachDefault = ["hr_application", "cold_application", "process_stuck"].includes(kind);
+    const attachDefault = data.attach_cv_suggested ?? ["hr_application", "cold_application", "process_stuck"].includes(kind);
     host.innerHTML = `<form id="careerSendForm" class="border-top pt-2 mt-2">
         <h5 class="h6">Send this email</h5>
         <p class="small muted">Edit it here, review it, then press Send. Nothing goes until you do; any change needs a new review.</p>

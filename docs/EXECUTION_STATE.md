@@ -40,6 +40,16 @@
 - CI at f89c8df (run 43222348115): all three Selenium shards refused to start because the new browser test had no
   entry in tests/browser_durations.json (shard planning fails closed). Added its local time (11.72 s); local
   collect-only shard planning passes (211 tests). No test or timeout was changed. Pushed as 8d84fa7 (owner approved).
+- `next` (after INVEST2-002 checkpoint, CI_PENDING on 462ea52): queue had no eligible task; owner chose CAREER2-002.
+  The reviewed send already existed (manifest, signed review, stale/retry/interrupted). Added: "Reply to a recruiter's
+  message" draft. It quotes the sentence behind each ask in the saved recruiter message (pay, notice period, location,
+  a call, the CV) and leaves every answer as a bracketed blank the review refuses to send; pay, notice and location are
+  never filled from the profile. Requests for bank details, ID numbers, passwords or a fee get a do-not-send warning
+  and no answer line. The recipient is never taken from the message. CV attach defaults on only when the CV was asked.
+  Tests: hostile recruiter message (injected address, bank/Aadhaar, fee, script tag), profile salary not copied,
+  CSRF 403 on review and send, comma/newline recipients refused, CRLF subject stays one header; browser test (quotes,
+  warning, blank answers blocked, send only to the typed address, axe light/dark). Career modules 256 PASS. Also
+  guarded a triage saved without dimensions (career.js crash seen in CI logs). Implemented, not accepted. Not pushed.
 - `next`: queue had no eligible task; owner chose INVEST2-002. The research journal (2026-11-07, migration 0007
   applied) already kept dated, immutable owner views separate from holdings. Added, no migration: one instrument
   identity (case and spacing ignored, also used by lesson recall); read-only GET `research/history/` grouping views

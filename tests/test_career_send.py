@@ -110,6 +110,33 @@ class SendTests(TestCase):
         self.client.force_login(self.owner)
         self.assertEqual(self.post("blast", **EMAIL).status_code, 404)
 
+    def test_csrf_and_hostile_header_values_cannot_send_or_add_recipients(self):
+        from django.test import Client
+        strict = Client(enforce_csrf_checks=True)
+        strict.force_login(self.owner)
+        for action in ("review", "send"):
+            self.assertEqual(strict.post(self.base + action + "/", {**EMAIL, "confirm": True}, content_type="application/json").status_code, 403)
+        for to in ("hr@synthetic.example.test, extra@evil.example.test", "hr@synthetic.example.test\nBcc: extra@evil.example.test"):
+            self.assertIn("Enter one valid recipient email address.", self.reviewed(to=to)["blockers"])
+        review = self.reviewed(subject="Application\r\nBcc: extra@evil.example.test")
+        self.assertEqual(review["subject"], "Application Bcc: extra@evil.example.test")  # one header line, never a new header
+        sent = self.post("send", **{**EMAIL, "subject": "Application\r\nBcc: extra@evil.example.test"}, confirmation=review["confirmation"], confirm=True)
+        self.assertLess(sent.status_code, 300, sent.content)
+        self.assertEqual([message.recipients() for message in mail.outbox], [["hr@synthetic.example.test"]])
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_recruiter_reply_draft_cannot_be_sent_until_every_answer_is_filled(self):
+        self.item.extracted_payload = {**self.item.extracted_payload, "source_kind": "recruiter_message",
+                                       "intake_message_text": "Please share your CV and expected CTC. What is your notice period?"}
+        self.item.save(update_fields=["extracted_payload"])
+        draft = self.client.get(f"/api/career/job-analyses/{self.item.pk}/kit/", {"type": "email", "kind": "recruiter_reply"}).json()
+        review = self.reviewed(subject=draft["subject"], body=draft["text"])
+        self.assertFalse(review["ready"])
+        self.assertIn("Pay: [your expected pay", draft["text"])
+        self.assertTrue(any(item.startswith("Fill or remove the bracketed parts") for item in review["blockers"]))
+        self.assertEqual(review["confirmation"], "")
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_missing_cv_file_blocks_only_when_attaching(self):
         self.resume.uploaded_file.storage.delete(self.resume.uploaded_file.name)
         self.assertTrue(any("no longer keeps" in item for item in self.reviewed()["blockers"]))
