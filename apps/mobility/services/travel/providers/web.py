@@ -434,13 +434,8 @@ def lodging_details(html):
 
 def robots_allows(url, fetch_text):
     """RFC 9309: a missing robots.txt allows; anything unreadable is treated as a refusal."""
-    from urllib.robotparser import RobotFileParser
-    status, text = fetch_text(f"https://{urlsplit(url).hostname}/robots.txt")
-    if status in (404, 410):
-        return True
-    parser = RobotFileParser()
-    parser.parse(text.splitlines())
-    return parser.can_fetch(ROBOTS_AGENT, url)
+    from alfred_ai.services.public_http import robots_allows as allows
+    return allows(url, fetch_text, ROBOTS_AGENT)
 
 
 class HotelWebsite(Provider):

@@ -152,6 +152,10 @@ JOB_PAGE_ADAPTERS = ("Generic JSON-LD", "Greenhouse", "Lever", "Workday", "Ashby
 # Public, keyless job-board APIs; a posting on these boards is never read from its HTML page.
 GREENHOUSE_BOARD_HOSTS = {"boards.greenhouse.io", "job-boards.greenhouse.io"}
 LEVER_API_HOSTS = {"jobs.lever.co": "api.lever.co", "jobs.eu.lever.co": "api.eu.lever.co"}
+# Other job pages are read only where the site's robots.txt allows this agent.
+ROBOTS_AGENT = "AlfredAI"
+ROBOTS_REFUSED_MESSAGE = ("This job site asks automated tools not to read its pages. Open the job yourself and paste "
+                          "its description into the recruiter message box instead.")
 SPECIALTY_SOURCE_CANDIDATES = (
     {
         "name": "Naukri",
@@ -275,6 +279,18 @@ class JobIntelligenceService:
         )
 
     def _read_job_page(self, job_url: str):
+        safe = public_http.normalized_link(job_url)
+        if not safe:
+            raise public_http.PublicHTTPError("unsafe_url")
+
+        def robots(url):
+            response = public_http.request("GET", url, headers={"User-Agent": self.USER_AGENT},
+                                           content_types=("text/plain", "text/html"),
+                                           accepted_statuses=(200, 404, 410), max_bytes=500_000)
+            # An HTML page in place of robots.txt has no rules, like a missing file.
+            return response.status, response.content.decode("utf-8", "replace") if response.content_type == "text/plain" else ""
+        if not public_http.robots_allows(safe, robots, ROBOTS_AGENT):
+            raise public_http.PublicHTTPError("robots_disallowed")
         response = public_http.request(
             "GET", job_url, headers={"User-Agent": self.USER_AGENT},
             content_types=("text/html", "application/xhtml+xml"), max_bytes=2_000_000,
@@ -307,7 +323,7 @@ class JobIntelligenceService:
         return data
 
     def _public_board_posting(self, job_url: str):
-        """Read a Greenhouse or Lever posting from the board's free public JSON API, or return None."""
+        """Read a Greenhouse, Ashby or Lever posting from the board's free public JSON API, or return None."""
         safe = public_http.normalized_link(job_url)
         parts = urlparse(safe)
         host, path = parts.hostname or "", parts.path
@@ -324,6 +340,35 @@ class JobIntelligenceService:
                 # Greenhouse returns the description as entity-escaped HTML.
                 description=text(html.unescape(str(data.get("content") or ""))),
                 required_skills=[], experience_years=0.0), {}
+        match = re.fullmatch(r"/([A-Za-z0-9._-]{1,100})/([0-9a-fA-F-]{36})(?:/application)?/?", path) if host == "jobs.ashbyhq.com" else None
+        if match:
+            # Ashby's public API lists the whole board; the one posting is picked from it.
+            response = public_http.request("GET", f"https://api.ashbyhq.com/posting-api/job-board/{match[1]}",
+                                           params={"includeCompensation": "true"}, headers={"User-Agent": self.USER_AGENT},
+                                           content_types=("application/json",), max_bytes=16_000_000)
+            try:
+                jobs = response.json().get("jobs")
+            except (ValueError, AttributeError):
+                raise public_http.PublicHTTPError("api_error") from None
+            data = next((job for job in jobs if isinstance(job, dict) and str(job.get("id", "")).lower() == match[2].lower()),
+                        None) if isinstance(jobs, list) else None
+            if data is None:
+                raise public_http.PublicHTTPError("posting_not_found")
+            ld_json = {"employmentType": str(data.get("employmentType") or "")}
+            compensation = data.get("compensation") if isinstance(data.get("compensation"), dict) else {}
+            components = compensation.get("summaryComponents") if isinstance(compensation.get("summaryComponents"), list) else []
+            pay = next((c for c in components if isinstance(c, dict) and c.get("compensationType") == "Salary"), None)
+            if pay:
+                # "1 YEAR" is a yearly amount; any other interval is left unstated rather than guessed.
+                unit = re.fullmatch(r"1 (YEAR|MONTH|WEEK|DAY|HOUR)", str(pay.get("interval") or "").upper())
+                ld_json["baseSalary"] = {"currency": pay.get("currencyCode"), "value": {
+                    "minValue": pay.get("minValue"), "maxValue": pay.get("maxValue"), "unitText": unit[1] if unit else ""}}
+            return JobPostingSnapshot(
+                source_name="Ashby", job_url=safe,
+                apply_url=public_http.normalized_link(str(data.get("applyUrl") or "")) or safe,
+                company=match[1].replace("-", " ").title(), title=str(data.get("title") or ""),
+                location=str(data.get("location") or ""), description=str(data.get("descriptionPlain") or ""),
+                required_skills=[], experience_years=0.0), ld_json
         api_host = LEVER_API_HOSTS.get(host)
         match = re.fullmatch(r"/([A-Za-z0-9-]{1,100})/([0-9a-fA-F-]{36})(?:/apply)?/?", path) if api_host else None
         if not match:

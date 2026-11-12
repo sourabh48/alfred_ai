@@ -18,7 +18,15 @@
   extensions 0/13 accepted; queue next_task none. Unmerged branches: work/awie-scrapling-review (2 docs commits:
   Scrapling review and approval), wip/project-dashboard-manifest-20261104 (owner-held WIP); others are
   patch-equivalent. Scrapling core 0.5.1 stays gated to 2026-11-18 (owner approval).
-- Next: Ashby (public posting API) is the remaining keyless board; robots.txt check before the generic page read.
+- Follow-up (same day): Ashby postings now come from its public posting API (the whole board, capped at 16 MB,
+  with the one posting picked by id; Salary component mapped only for "1 <unit>" intervals). Every other job page
+  is read only after its robots.txt allows agent AlfredAI; a refusal or an unreadable robots.txt stops before the
+  page request, and the Career page then asks the owner to paste the job description instead. The robots rule
+  moved to public_http.robots_allows and Travel's hotel-website check uses the same code.
+- Evidence: Career test modules 207 PASS, Travel test modules 391 PASS (24 skipped), hardening and other
+  job-service modules PASS, Career browser tests 11 PASS. Two existing tests now expect the robots.txt request
+  before the page (DNS pinning per request unchanged). Live: a Linear posting via Ashby parsed; LinkedIn's
+  robots.txt refused; Indeed refused robots.txt itself (403), so its page was not read either.
 
 ## Career Ops application kit - 2026-11-12
 

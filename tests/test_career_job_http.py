@@ -23,16 +23,19 @@ class CareerJobHTTPTests(SimpleTestCase):
         self.pool.urlopen.return_value = self.response
 
     def test_html_fetch_pins_dns_once_and_preserves_tls_identity(self):
+        # robots.txt (an HTML page here, so no rules) and then the job page: one pinned lookup each.
+        self.response.read.side_effect = [b'', b'<html><h1>Python Developer</h1></html>', b'']
         snapshot = job_intelligence.parse_job_page('https://example.org/jobs/1')
         self.assertEqual(snapshot.job_url, 'https://example.org/jobs/1')
-        self.assertEqual(self.dns.call_count, 1)
+        self.assertEqual(self.dns.call_count, 2)
+        self.assertEqual(self.pool.urlopen.call_args_list[0].args[1], '/robots.txt')
         self.assertEqual(self.pool_class.call_args.args[0], '93.184.215.14')
         self.assertEqual(self.pool_class.call_args.kwargs['assert_hostname'], 'example.org')
         self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'example.org')
         self.assertFalse(self.pool.urlopen.call_args.kwargs['redirect'])
         self.assertFalse(self.pool.urlopen.call_args.kwargs['preload_content'])
-        self.response.close.assert_called_once()
-        self.pool.close.assert_called_once()
+        self.assertEqual(self.response.close.call_count, 2)
+        self.assertEqual(self.pool.close.call_count, 2)
 
     def test_private_dns_and_unsafe_urls_never_connect(self):
         for url in ['http://example.org', 'https://127.0.0.1/',
@@ -142,6 +145,75 @@ class CareerFreeJobBoardAPITests(SimpleTestCase):
 
     def test_other_board_paths_still_read_the_page(self):
         self.response.headers = {'Content-Type': 'text/html'}
-        self.response.read.side_effect = [b'<html><h1>Careers</h1></html>', b'']
+        self.response.read.side_effect = [b'', b'<html><h1>Careers</h1></html>', b'']
         job_intelligence.parse_job_page('https://boards.greenhouse.io/synthetic')
+        self.assertEqual(self.pool.urlopen.call_args.args[1], '/synthetic')
         self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'boards.greenhouse.io')
+
+
+class CareerAshbyAndRobotsTests(SimpleTestCase):
+    POSTING = '0f0e0d0c-0b0a-4908-8706-050403020100'
+
+    def setUp(self):
+        dns = patch('alfred_ai.services.public_http._resolve_host_ips', return_value=[ip_address('93.184.215.14')])
+        dns.start()
+        self.addCleanup(dns.stop)
+        pool = patch('alfred_ai.services.public_http.urllib3.HTTPSConnectionPool')
+        self.pool_class = pool.start()
+        self.addCleanup(pool.stop)
+        self.pool = self.pool_class.return_value
+        self.responses = []
+        self.pool.urlopen.side_effect = lambda *a, **k: self.responses.pop(0)
+
+    def add(self, status, mime, body):
+        response = Mock(status=status, headers={'Content-Type': mime})
+        response.read.side_effect = [body, b''] if body else [b'']
+        self.responses.append(response)
+
+    def test_ashby_posting_is_picked_from_the_public_board_api(self):
+        import json
+        board = {'jobs': [{'id': 'other', 'title': 'Wrong job'},
+                          {'id': self.POSTING.upper(), 'title': 'Platform Engineer', 'location': 'Berlin',
+                           'employmentType': 'FullTime', 'descriptionPlain': 'Kubernetes and Python.',
+                           'applyUrl': f'https://jobs.ashbyhq.com/synthetic/{self.POSTING}/application',
+                           'compensation': {'summaryComponents': [
+                               {'compensationType': 'EquityPercentage', 'interval': '1 YEAR', 'minValue': 1, 'maxValue': 2},
+                               {'compensationType': 'Salary', 'interval': '1 YEAR', 'currencyCode': 'EUR',
+                                'minValue': 70000, 'maxValue': 85000}]}}]}
+        self.add(200, 'application/json', json.dumps(board).encode())
+        job = job_intelligence.parse_job_page(f'https://jobs.ashbyhq.com/synthetic/{self.POSTING}')
+        self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'api.ashbyhq.com')
+        self.assertEqual(self.pool.urlopen.call_args.args[1],
+                         '/posting-api/job-board/synthetic?includeCompensation=true')
+        self.assertEqual((job.source_name, job.title, job.location, job.employment_type),
+                         ('Ashby', 'Platform Engineer', 'Berlin', 'FullTime'))
+        self.assertEqual((job.salary_min, job.salary_max, job.salary_currency, job.salary_period),
+                         (70000.0, 85000.0, 'EUR', 'year'))
+
+    def test_ashby_missing_posting_is_reported(self):
+        self.add(200, 'application/json', b'{"jobs": []}')
+        with self.assertRaisesRegex(PublicHTTPError, 'posting_not_found'):
+            job_intelligence.parse_job_page(f'https://jobs.ashbyhq.com/synthetic/{self.POSTING}')
+        self.assertEqual(self.pool.urlopen.call_count, 1)
+
+    def test_robots_disallow_stops_before_the_page_is_read(self):
+        self.add(200, 'text/plain', b'User-agent: *\nDisallow: /jobs/')
+        with self.assertRaisesRegex(PublicHTTPError, 'robots_disallowed'):
+            job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')
+        self.assertEqual(self.pool.urlopen.call_count, 1)
+        self.assertEqual(self.pool.urlopen.call_args.args[1], '/robots.txt')
+
+    def test_missing_robots_or_other_agent_rules_allow_the_page(self):
+        for status, body in ((404, b''), (200, b'User-agent: SomeOtherBot\nDisallow: /')):
+            with self.subTest(status=status):
+                self.pool.urlopen.reset_mock()
+                self.add(status, 'text/plain', body)
+                self.add(200, 'text/html', b'<html><title>Analyst</title></html>')
+                job = job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')
+                self.assertEqual(self.pool.urlopen.call_count, 2)
+                self.assertEqual(job.title, 'Analyst')
+
+    def test_agent_specific_disallow_is_honoured(self):
+        self.add(200, 'text/plain', b'User-agent: AlfredAI\nDisallow: /')
+        with self.assertRaisesRegex(PublicHTTPError, 'robots_disallowed'):
+            job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')

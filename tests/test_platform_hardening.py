@@ -97,7 +97,9 @@ class OutboundUrlSafetyTests(TestCase):
 
         self.assertEqual(snapshot.job_url, "https://example.com/jobs/backend-engineer")
         self.assertEqual(snapshot.source_name, "example.com")
-        requests_get.assert_called_once()
+        # robots.txt first (this mock has no rules), then the page itself.
+        self.assertEqual([c.args[1] for c in requests_get.call_args_list],
+                         ["https://example.com/robots.txt", "https://example.com/jobs/backend-engineer"])
 
     @patch(
         "apps.career.views.verified_intelligence.macro_context",

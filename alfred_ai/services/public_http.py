@@ -180,3 +180,14 @@ def request(method, url, *, params=None, headers=None, json_body=None, data=None
         if response is not None:
             response.close()
         pool.close()
+
+
+def robots_allows(url, fetch_text, agent):
+    """RFC 9309: a missing robots.txt allows; fetch_text(url) -> (status, text) raises when unreadable."""
+    from urllib.robotparser import RobotFileParser
+    status, text = fetch_text(f"https://{urlsplit(url).hostname}/robots.txt")
+    if status in (404, 410):
+        return True
+    parser = RobotFileParser()
+    parser.parse(text.splitlines())
+    return parser.can_fetch(agent, url)
