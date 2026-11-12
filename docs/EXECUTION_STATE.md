@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Audit of sending, robots.txt and drifted docs - 2026-11-12
+
+- Owner: run the ALFRED 2.0 recovery and audit prompt, then report gaps. Source: master e548d42 in the
+  postmerge-check worktree. Nothing pushed; the owner's runtime, data and keys were not touched.
+- AUDIT-01 CONFIRMED_DEFECT, fixed: Django's SMTP backend raises when the goodbye after a delivered email fails, and
+  ALFRED then recorded "failed, nothing was sent", inviting a duplicate. Sending now opens the connection first; only
+  connect/login errors and explicit server refusals count as failed, a broken connection mid-send is recorded as
+  "unknown" and blocks a resend until the owner says they checked the Sent folder, and close errors are ignored.
+  The final log write retries against `updated_at`, so edits made during the send are kept.
+- AUDIT-02 CONFIRMED_DEFECT, fixed: a 200 HTML page (captive portal, error or sign-in page) at /robots.txt counted as
+  "no rules". Now only UTF-8 plain text is read (BOM stripped); 404/410 still mean no file (RFC 9309); HTML,
+  undecodable or page-like text refuses as robots_unreadable; 401/403/429/5xx/redirect/timeout already refused.
+  Shared by Career job pages, Travel hotel websites and the Budget notice. Career shows its own message for it.
+- AUDIT-03: no shared scraper exists yet (Scrapling pilot not before 2026-11-18), so no domain allow-list was added;
+  every page reader is listed in PUBLIC_PAGE_READS and a test enforces the list. AUDIT-04: Career and Travel views
+  filter by the signed-in owner; no cross-user gap found. AUDIT-05 runtime checks: UNVERIFIED_RUNTIME.
+- Docs: STATE.json and HANDOFF marked superseded; PROJECT_STATUS header; provider register rows; acceptance note.
+- Baseline 85/143, extensions 0/13 unchanged.
+
 ## Career Ops training, project, question checks, practice comments and course links - 2026-11-12
 
 - Owner: "do all" for the remaining Career Ops parts. Extended the existing Patterns panel and practice rounds again.
@@ -15,7 +34,7 @@
 - Evidence: tests.test_career_interview_notes and bullet rewrite 23 PASS; all Career modules plus route sweeps,
   runner and live UI contracts 281 PASS; extended Career kit browser test PASS (axe clean light and dark, XSS inert).
   The browser test does not click the local-AI button; its view and withholding rule are API-tested with a fake model.
-  Not pushed.
+  Pushed as e548d42 (owner approved); Pages passed on it.
 
 ## Career Ops research, red flags, practice, transcripts, upskill and titles - 2026-11-12
 

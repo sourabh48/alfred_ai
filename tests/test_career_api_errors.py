@@ -49,12 +49,15 @@ class CareerApiErrorTests(TestCase):
         from alfred_ai.services.public_http import PublicHTTPError
         with patch("apps.career.views.verified_intelligence.macro_context", return_value={}), patch(
             "apps.career.views.build_employment_income_signals", return_value={}
-        ), patch("apps.career.views.job_intelligence.parse_job_page", side_effect=PublicHTTPError("robots_disallowed")):
-            response = self.client.post("/api/career/job-match/",
-                                        json.dumps({"job_url": "https://jobs.example.com/role"}),
-                                        content_type="application/json")
-        self.assert_safe_response(response, "detail", 400)
-        self.assertIn("paste its description", response.json()["detail"])
+        ):
+            for code, words in (("robots_disallowed", "asks automated tools"), ("robots_unreadable", "could not confirm")):
+                with patch("apps.career.views.job_intelligence.parse_job_page", side_effect=PublicHTTPError(code)):
+                    response = self.client.post("/api/career/job-match/",
+                                                json.dumps({"job_url": "https://jobs.example.com/role"}),
+                                                content_type="application/json")
+                self.assert_safe_response(response, "detail", 400)
+                self.assertIn("paste its description", response.json()["detail"])
+                self.assertIn(words, response.json()["detail"])
 
     def test_failure_log_contains_reference_and_class_without_private_details(self):
         with patch("apps.career.views._get_profile", side_effect=RuntimeError(PRIVATE_MARKER)), self.assertLogs(

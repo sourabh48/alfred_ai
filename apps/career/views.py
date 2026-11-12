@@ -26,7 +26,7 @@ from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
 from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerializer, CareerProfileSerializer, CareerProjectionScenarioSerializer, CareerResumeSerializer
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
-from .services.job_intelligence import ROBOTS_REFUSED_MESSAGE
+from .services.job_intelligence import ROBOTS_REFUSED_MESSAGE, ROBOTS_UNREADABLE_MESSAGE
 from .services import application_kit, application_tracker, evaluation
 from .services.resume_intelligence import ParsedResume
 
@@ -620,8 +620,8 @@ class CareerJobMatchView(APIView):
         try:
             job_snapshot = job_intelligence.parse_job_page(job_url)
         except Exception as exc:
-            return _career_error_response(exc, ROBOTS_REFUSED_MESSAGE if getattr(exc, "code", "") == "robots_disallowed"
-                                          else "Job page could not be parsed. Check the URL and try again.")
+            return _career_error_response(exc, {"robots_disallowed": ROBOTS_REFUSED_MESSAGE, "robots_unreadable": ROBOTS_UNREADABLE_MESSAGE}.get(
+                getattr(exc, "code", ""), "Job page could not be parsed. Check the URL and try again."))
 
         fit = job_intelligence.compare_resume_to_job(resume_payload, job_snapshot, resume_source={
             "kind": "resume_upload" if latest_resume else "manual_profile",

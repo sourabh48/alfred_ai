@@ -1,5 +1,15 @@
 # ALFRED Project Status
 
+## Current checkpoint - master e548d42 and audit fixes, 2026-11-12
+
+All work is on `master` (single branch). Since 2026-11-06: Career Ops ports (triage, application kit, interview notes,
+patterns, training/project checks, protected-grounds and scope/pay checks, local practice comments), CAREER2-002
+reviewed email sending (owner live-tested 2026-11-12 with synthetic data; acceptance rests with the owner), free job
+board APIs (Greenhouse, Lever, Ashby) and hotel website details. The 2026-11-12 audit fixed two defects locally:
+an SMTP error after the server took an email was recorded as "nothing sent", and a 200 HTML page in place of
+robots.txt was read as permission. Implemented is not accepted: no requirement is promoted by this work.
+Baseline 85/143, extensions 0/13 unchanged. Details: EXECUTION_STATE.
+
 ## Active implementation checkpoint — phase B sprint and FIN-06, 2026-11-06
 
 All work is on `master` (single branch; the owner closed PR #16/#18/#19 on 2026-10-27). CI run 42185812614 passed every

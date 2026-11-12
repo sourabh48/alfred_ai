@@ -1,5 +1,6 @@
 """CAREER2-002: attachment manifest, explicit per-email confirmation, stale review rejection and retry without resending."""
 import hashlib
+import smtplib
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -15,6 +16,7 @@ MAILBOX = dict(ALFRED_SMTP_HOST="smtp.example.test", ALFRED_SMTP_USER="owner@exa
                ALFRED_SMTP_FROM="", ALFRED_SMTP_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 EMAIL = {"to": "hr@synthetic.example.test", "subject": "Application: Senior Backend Engineer",
          "body": "Hello,\n\nI would like to apply.\n\nRegards,\nAsha", "attach_cv": True}
+SMTP = {**MAILBOX, "ALFRED_SMTP_BACKEND": "django.core.mail.backends.smtp.EmailBackend", "ALFRED_SMTP_SSL": False}
 
 
 @override_settings(**MAILBOX)
@@ -91,7 +93,7 @@ class SendTests(TestCase):
 
     def test_mail_server_failure_is_recorded_and_can_be_retried(self):
         token = self.reviewed(attach_cv=False)["confirmation"]
-        with mock.patch("django.core.mail.backends.locmem.EmailBackend.send_messages", side_effect=OSError("refused")):
+        with mock.patch("django.core.mail.backends.locmem.EmailBackend.open", side_effect=OSError("refused")):
             failed = self.post("send", **{**EMAIL, "attach_cv": False}, confirmation=token, confirm=True)
         self.assertEqual(failed.status_code, 502)
         self.item.refresh_from_db()
@@ -149,3 +151,55 @@ class SendTests(TestCase):
         self.item.refresh_from_db()
         self.assertEqual([item["status"] for item in self.item.extracted_payload["sent_messages"]], ["sent"])
         self.assertFalse(self.reviewed(subject="Another subject")["unconfirmed_send"])
+
+    def smtp_send(self, **failures):
+        """Django's real SMTP backend against a fake smtplib.SMTP; no connection leaves the machine."""
+        server = mock.MagicMock()
+        for method, error in failures.items():
+            getattr(server, method).side_effect = error
+        token = self.reviewed()["confirmation"]
+        with override_settings(**SMTP), mock.patch("smtplib.SMTP", return_value=server):
+            response = self.post("send", **EMAIL, confirmation=token, confirm=True)
+        self.item.refresh_from_db()
+        return response, server, [item["status"] for item in self.item.extracted_payload["sent_messages"]]
+
+    def test_an_error_after_the_server_took_the_email_still_counts_as_sent(self):
+        response, server, statuses = self.smtp_send(quit=smtplib.SMTPResponseException(421, b"closing"))
+        self.assertEqual((response.status_code, statuses), (201, ["sent"]))
+        self.assertEqual(server.sendmail.call_count, 1)
+        self.assertTrue(any("already sent" in item for item in self.reviewed()["blockers"]))
+
+    def test_a_connection_lost_mid_send_is_not_called_nothing_sent(self):
+        response, _, statuses = self.smtp_send(sendmail=smtplib.SMTPServerDisconnected("lost"))
+        self.assertEqual((response.status_code, statuses), (502, ["unknown"]))
+        self.assertNotIn("Nothing was sent", response.json()["detail"])
+        self.assertIn("Sent folder", response.json()["detail"])
+        review = self.reviewed()
+        self.assertTrue(review["unconfirmed_send"])
+        self.assertTrue(any("connection to your mail server broke" in item for item in review["warnings"]))
+        self.assertEqual(self.post("send", **EMAIL, confirmation=review["confirmation"], confirm=True).status_code, 409)
+        self.assertEqual(len(mail.outbox), 0)
+        sent = self.post("send", **EMAIL, confirmation=review["confirmation"], confirm=True, resend_unconfirmed=True)
+        self.assertEqual(sent.status_code, 201, sent.content)
+
+    def test_a_refusal_is_failed_and_can_be_retried(self):
+        response, _, statuses = self.smtp_send(sendmail=smtplib.SMTPRecipientsRefused({"hr@synthetic.example.test": (550, b"no")}))
+        self.assertEqual((response.status_code, statuses), (502, ["failed"]))
+        self.assertIn("Nothing was sent", response.json()["detail"])
+        self.assertFalse(self.reviewed()["unconfirmed_send"])
+
+    def test_edits_made_during_the_send_are_kept(self):
+        from datetime import timedelta
+
+        def notes_saved_meanwhile(message):
+            row = CareerJobAnalysis.objects.get(pk=self.item.pk)
+            CareerJobAnalysis.objects.filter(pk=row.pk).update(
+                extracted_payload={**row.extracted_payload, "interview_notes": {"stories": ["kept"]}},
+                updated_at=row.updated_at + timedelta(seconds=1))
+            return "sent"
+        token = self.reviewed()["confirmation"]
+        with mock.patch.object(application_send, "_deliver", side_effect=notes_saved_meanwhile):
+            self.assertEqual(self.post("send", **EMAIL, confirmation=token, confirm=True).status_code, 201)
+        self.item.refresh_from_db()
+        payload = self.item.extracted_payload
+        self.assertEqual((payload["interview_notes"], [item["status"] for item in payload["sent_messages"]]), ({"stories": ["kept"]}, ["sent"]))

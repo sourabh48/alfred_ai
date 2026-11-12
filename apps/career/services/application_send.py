@@ -4,11 +4,12 @@ The owner approved sending on 2026-11-12 on one condition: ALFRED shows the exac
 and attachment, and sends only when the owner confirms that one email. So a send needs a signed review of
 exactly that content, made within the last 15 minutes. Any change, including a new or changed CV file, makes
 the review stale and is refused. A retry of an email already sent never sends it again, and an email whose send
-was interrupted (ALFRED stopped before the mail server answered) is sent again only after the owner says they
-checked their Sent folder.
+was interrupted (ALFRED stopped before the mail server answered) or whose answer was lost (the connection broke
+after the email was handed over) is sent again only after the owner says they checked their Sent folder.
 """
 import hashlib
 import re
+import smtplib
 
 from django.conf import settings
 from django.core import signing
@@ -19,6 +20,9 @@ from django.utils import timezone
 
 REVIEW_SECONDS = 15 * 60
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+UNCONFIRMED = ("sending", "unknown")
+# The server answered with a refusal, so it did not take the email; anything else mid-send may have delivered it.
+REFUSED = (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPAuthenticationError)
 PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{1,80}\]")
 SALT = "career-send-review"
 
@@ -69,12 +73,14 @@ def _sent_log(analysis) -> list:
 
 
 def _unconfirmed(analysis, digest):
-    return next((item for item in _sent_log(analysis) if item.get("digest") == digest and item.get("status") == "sending"), None)
+    return next((item for item in _sent_log(analysis) if item.get("digest") == digest and item.get("status") in UNCONFIRMED), None)
 
 
 def _unconfirmed_text(item) -> str:
     when = (item.get("started_at") or "")[:16].replace("T", " ")
-    return (f"ALFRED stopped while sending this exact email{f' on {when}' if when else ''}, so it may already have gone. "
+    what = ("The connection to your mail server broke after ALFRED handed over this exact email" if item.get("status") == "unknown"
+            else "ALFRED stopped while sending this exact email")
+    return (f"{what}{f' on {when}' if when else ''}, so it may already have gone. "
             "Check your mailbox's Sent folder before sending it again.")
 
 
@@ -160,18 +166,38 @@ def send(user, analysis, resume, *, to, subject, body, attach_cv, confirmation, 
     message = EmailMessage(current["subject"], current["body"], current["from"], [current["to"]])
     if attachment:
         message.attach(attachment["name"], attachment["content"])
+    status = _deliver(message)
+    record = {**record, "status": status, "sent_at": timezone.now().isoformat() if status == "sent" else ""}
+    for _ in range(5):  # keep other edits made during the send; if all attempts lose, the safe "sending" record stays
+        analysis.refresh_from_db()
+        log = [item for item in _sent_log(analysis) if item.get("digest") != digest]
+        if CareerJobAnalysis.objects.filter(pk=analysis.pk, user=user, updated_at=analysis.updated_at).update(
+                extracted_payload={**_payload(analysis), "sent_messages": [*log, record]}, updated_at=timezone.now()):
+            break
+    if status == "unknown":
+        raise SendRefused(_unconfirmed_text(record) + " If it is not there, review it and tick that you checked.", 502)
+    if status != "sent":
+        raise SendRefused("Your mail server did not accept the email. Nothing was sent; check the mailbox settings and try again.", 502)
+    return record, True
+
+
+def _deliver(message) -> str:
+    """'sent', 'failed' (the server never took it) or 'unknown' (the connection broke once the email was handed over)."""
     try:
         connection = get_connection(settings.ALFRED_SMTP_BACKEND, host=settings.ALFRED_SMTP_HOST, port=settings.ALFRED_SMTP_PORT,
                                     username=settings.ALFRED_SMTP_USER, password=settings.ALFRED_SMTP_PASSWORD,
                                     use_tls=not settings.ALFRED_SMTP_SSL, use_ssl=settings.ALFRED_SMTP_SSL, timeout=30)
-        sent = connection.send_messages([message]) == 1
-    except Exception:  # SMTP and socket errors; the record must not stay "sending"
-        sent = False
-    record = {**record, "status": "sent" if sent else "failed", "sent_at": timezone.now().isoformat() if sent else ""}
-    analysis.refresh_from_db()
-    log = [item for item in _sent_log(analysis) if item.get("digest") != digest]
-    CareerJobAnalysis.objects.filter(pk=analysis.pk, user=user).update(
-        extracted_payload={**_payload(analysis), "sent_messages": [*log, record]}, updated_at=timezone.now())
-    if not sent:
-        raise SendRefused("Your mail server did not accept the email. Nothing was sent; check the mailbox settings and try again.", 502)
-    return record, True
+        connection.open()
+    except Exception:  # connect, TLS and login errors: nothing was handed over
+        return "failed"
+    try:
+        return "sent" if connection.send_messages([message]) == 1 else "failed"
+    except REFUSED:
+        return "failed"
+    except Exception:  # disconnect or timeout mid-send: the server may already have taken it
+        return "unknown"
+    finally:
+        try:
+            connection.close()
+        except Exception:  # an error saying goodbye does not undo a send
+            pass

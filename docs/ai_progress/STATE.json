@@ -1,5 +1,6 @@
 {
     "schema":  1,
+    "status_note":  "SUPERSEDED 2026-11-12: this file records the 2026-11-11 Codex MERGE_BLOCKED checkpoint on work/master-review-fixes-20261111. Since then all work went to master (owner rule: single branch). Current checkpoint: docs/EXECUTION_STATE.md; master e548d42 plus the local SMTP/robots audit fix.",
     "canonical_checkpoint":  "docs/EXECUTION_STATE.md",
     "requirement_inventory":  "docs/PROJECT_STATUS.md",
     "test_evidence":  "docs/ai_progress/TEST_EVIDENCE.md",

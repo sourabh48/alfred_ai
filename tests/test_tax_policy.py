@@ -324,8 +324,8 @@ class TaxOverviewTests(TestCase):
         request.side_effect = PublicHTTPError("timeout")
         verified_intelligence.budget_publication_check()
         self.assertIsNone(verified_intelligence.stored_budget_publication())
-        request.side_effect = None
-        request.return_value = PublicResponse(b"<h1>Union Budget 2099-2100</h1><p>Budget 2027-2028</p>", "text/html")
+        page = PublicResponse(b"<h1>Union Budget 2099-2100</h1><p>Budget 2027-2028</p>", "text/html")
+        request.side_effect = lambda method, url, **kwargs: PublicResponse(b"", "text/html", 404) if url.endswith("/robots.txt") else page
         result = verified_intelligence.budget_publication_check(force=True)
         self.assertEqual(result.payload["latest_budget_year"], "2027-28")
         self.assertEqual(request.call_args.args[1], "https://www.indiabudget.gov.in/")

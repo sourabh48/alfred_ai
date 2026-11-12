@@ -23,7 +23,13 @@ class CareerJobHTTPTests(SimpleTestCase):
         self.pool.urlopen.return_value = self.response
 
     def test_html_fetch_pins_dns_once_and_preserves_tls_identity(self):
-        # robots.txt (an HTML page here, so no rules) and then the job page: one pinned lookup each.
+        # robots.txt (404 here, so no file) and then the job page: one pinned lookup each.
+        statuses = iter([404, 200])
+
+        def answer(*args, **kwargs):
+            self.response.status = next(statuses)
+            return self.response
+        self.pool.urlopen.side_effect = answer
         self.response.read.side_effect = [b'', b'<html><h1>Python Developer</h1></html>', b'']
         snapshot = job_intelligence.parse_job_page('https://example.org/jobs/1')
         self.assertEqual(snapshot.job_url, 'https://example.org/jobs/1')
@@ -145,6 +151,12 @@ class CareerFreeJobBoardAPITests(SimpleTestCase):
 
     def test_other_board_paths_still_read_the_page(self):
         self.response.headers = {'Content-Type': 'text/html'}
+        statuses = iter([404, 200])  # no robots.txt, then the page
+
+        def answer(*args, **kwargs):
+            self.response.status = next(statuses)
+            return self.response
+        self.pool.urlopen.side_effect = answer
         self.response.read.side_effect = [b'', b'<html><h1>Careers</h1></html>', b'']
         job_intelligence.parse_job_page('https://boards.greenhouse.io/synthetic')
         self.assertEqual(self.pool.urlopen.call_args.args[1], '/synthetic')
@@ -212,6 +224,35 @@ class CareerAshbyAndRobotsTests(SimpleTestCase):
                 job = job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')
                 self.assertEqual(self.pool.urlopen.call_count, 2)
                 self.assertEqual(job.title, 'Analyst')
+
+    def test_uncertain_robots_answers_refuse_before_the_page_is_read(self):
+        cases = [(200, 'text/html', b'<html>Sign in to this Wi-Fi</html>', 'robots_unreadable'),  # captive portal
+                 (200, 'text/plain', b'<!doctype html><p>Not found</p>', 'robots_unreadable'),  # substituted page
+                 (200, 'text/plain', b'\xff\xfeUser-agent', 'robots_unreadable'),  # not UTF-8
+                 (401, 'text/plain', b'', 'authorization_failed'), (403, 'text/html', b'', 'authorization_failed'),
+                 (429, 'text/plain', b'', 'quota_exhausted'), (503, 'text/plain', b'', 'api_error'),
+                 (301, 'text/html', b'', 'redirect_blocked'), (200, 'application/json', b'{}', 'unexpected_content_type')]
+        for status, mime, body, code in cases:
+            with self.subTest(status=status, body=body):
+                self.pool.urlopen.reset_mock()
+                self.add(status, mime, body)
+                with self.assertRaisesRegex(PublicHTTPError, code):
+                    job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')
+                self.assertEqual(self.pool.urlopen.call_count, 1)
+        self.pool.urlopen.side_effect = urllib3.exceptions.ReadTimeoutError(None, '/robots.txt', 'slow')
+        with self.assertRaisesRegex(PublicHTTPError, 'timeout'):
+            job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')
+
+    def test_robots_rules_ruleless_text_bom_and_404_page(self):
+        for status, mime, body in ((410, 'text/html', b'<html>Gone</html>'), (200, 'text/plain', b'# no rules\nnonsense line'),
+                                   (200, 'text/plain', b'\xef\xbb\xbfUser-agent: OtherBot\nDisallow: /')):
+            with self.subTest(status=status, body=body):
+                self.add(status, mime, body)
+                self.add(200, 'text/html', b'<html><title>Analyst</title></html>')
+                self.assertEqual(job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7').title, 'Analyst')
+        self.add(200, 'text/plain', b'\xef\xbb\xbfUser-agent: *\nDisallow: /jobs/')  # a BOM must not hide the rules
+        with self.assertRaisesRegex(PublicHTTPError, 'robots_disallowed'):
+            job_intelligence.parse_job_page('https://careers.synthetic.example/jobs/7')
 
     def test_agent_specific_disallow_is_honoured(self):
         self.add(200, 'text/plain', b'User-agent: AlfredAI\nDisallow: /')

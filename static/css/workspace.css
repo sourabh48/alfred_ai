@@ -88,6 +88,8 @@ html[data-theme="dark"] .alfred-body, html[data-theme="dark"] .alfred-sidebar { 
 html[data-theme="dark"] .alfred-hero, html[data-theme="dark"] .conversation-message, html[data-theme="dark"] .workspace-badge { background: #203751; color: var(--alfred-ink); }
 html[data-theme="dark"] .form-control, html[data-theme="dark"] .form-select, html[data-theme="dark"] .data-stack > *, html[data-theme="dark"] .mini-card, html[data-theme="dark"] .table { background: #182b44; color: var(--alfred-ink); }
 html[data-theme="dark"] a { color: #a8caff; }
+/* Alerts keep their light backgrounds in dark mode, so their links keep the alert's own dark text colour. */
+html[data-theme="dark"] .alert a { color: inherit; }
 html[data-theme="dark"] .alfred-nav-list .nav-link { color: #ceddf2; }
 html[data-theme="dark"] .alfred-nav-list .nav-link.active { background: #294977; color: #fff; }
 html[data-theme="dark"] .btn-primary, html[data-theme="dark"] .btn-secondary { color: #fff; }

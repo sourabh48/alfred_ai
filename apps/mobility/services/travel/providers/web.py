@@ -472,12 +472,12 @@ class HotelWebsite(Provider):
 
     def fetch(self, p):
         def robots(url):
+            from alfred_ai.services.public_http import PublicHTTPError, robots_text
             try:
                 response = self._get(url, ("text/plain", "text/html"), (200, 404, 410))
-            except ProviderError:
+                return response.status, robots_text(response)
+            except (ProviderError, PublicHTTPError):
                 raise ProviderError("robots_unreadable", retry_after=3600) from None
-            # An HTML page in place of robots.txt has no rules, like a missing file.
-            return response.status, response.content.decode("utf-8", "replace") if response.content_type == "text/plain" else ""
         if not robots_allows(p["url"], robots):
             raise ProviderError("robots_disallowed", retry_after=86400)
         response = self._get(p["url"], ("text/html", "application/xhtml+xml"))

@@ -91,7 +91,7 @@ class OutboundUrlSafetyTests(TestCase):
             </html>
         """
         response.url = "https://example.com/jobs/backend-engineer"
-        requests_get.return_value = response
+        requests_get.side_effect = [Mock(status=404, content=b"", content_type="text/html"), response]
 
         snapshot = job_intelligence.parse_job_page("https://example.com/jobs/backend-engineer")
 

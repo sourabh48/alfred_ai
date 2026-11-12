@@ -1,5 +1,10 @@
 # Codex / Claude checkpoint
 
+## Superseded - 2026-11-12
+
+SUPERSEDED 2026-11-12: this file records the 2026-11-11 Codex MERGE_BLOCKED checkpoint on work/master-review-fixes-20261111. Since then all work went to master (owner rule: single branch). Current checkpoint: docs/EXECUTION_STATE.md; master e548d42 plus the local SMTP/robots audit fix. The 2026-11-11 section below is kept as history; its MERGE_BLOCKED state and branch no longer describe the
+current work. Baseline 85/143 and extensions 0/13 are unchanged.
+
 ## Closing master merge correction - 2026-11-11
 
 Codex single writer; MASTER_MERGE on work/master-review-fixes-20261111 in the

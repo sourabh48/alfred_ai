@@ -156,6 +156,8 @@ LEVER_API_HOSTS = {"jobs.lever.co": "api.lever.co", "jobs.eu.lever.co": "api.eu.
 ROBOTS_AGENT = "AlfredAI"
 ROBOTS_REFUSED_MESSAGE = ("This job site asks automated tools not to read its pages. Open the job yourself and paste "
                           "its description into the recruiter message box instead.")
+ROBOTS_UNREADABLE_MESSAGE = ("ALFRED could not confirm that this job site allows automated reading, so it did not read the "
+                             "page. Open the job yourself and paste its description into the recruiter message box instead.")
 SPECIALTY_SOURCE_CANDIDATES = (
     {
         "name": "Naukri",

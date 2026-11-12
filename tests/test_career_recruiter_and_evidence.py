@@ -161,7 +161,8 @@ class CareerRecruiterAndEvidenceTests(TestCase):
         """
         response = PublicResponse(response.text.encode("utf-8"), "text/html")
 
-        with patch("apps.career.services.job_intelligence.public_http.request", return_value=response):
+        with patch("apps.career.services.job_intelligence.public_http.request",  # robots.txt 404 (no file), then the page
+                   side_effect=lambda method, url, **kw: PublicResponse(b"", "text/html", 404) if url.endswith("/robots.txt") else response):
             snapshot = job_intelligence.parse_job_page(
                 "https://example.wd5.myworkdayjobs.com/en-US/careers/job/Bengaluru/Senior-Data-Analyst_JR-1"
             )
@@ -193,7 +194,8 @@ class CareerRecruiterAndEvidenceTests(TestCase):
         """
         response = PublicResponse(response.text.encode("utf-8"), "text/html")
 
-        with patch("apps.career.services.job_intelligence.public_http.request", return_value=response):
+        with patch("apps.career.services.job_intelligence.public_http.request",  # robots.txt 404 (no file), then the page
+                   side_effect=lambda method, url, **kw: PublicResponse(b"", "text/html", 404) if url.endswith("/robots.txt") else response):
             snapshot = job_intelligence.parse_job_page("https://jobs.ashbyhq.com/northwind/abcd-1234")
 
         self.assertEqual(snapshot.source_name, "Ashby")

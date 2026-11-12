@@ -59,7 +59,8 @@ def recovered(snapshot) -> set[str]:
 
 
 def parse(html: str):
-    with patch('alfred_ai.services.public_http.request', return_value=Mock(content=html.encode())):
+    page = Mock(content=html.encode())  # robots.txt answers 404 (no file), then the page
+    with patch('alfred_ai.services.public_http.request', side_effect=lambda method, url, **kw: Mock(status=404, content=b"", content_type="text/html") if url.endswith('/robots.txt') else page):
         return job_intelligence.parse_job_page(URL)
 
 

@@ -114,6 +114,11 @@ class HotelWebsiteParserTests(SimpleTestCase):
                 provider.fetch({"url": "https://stay.example.org/"})
         self.assertEqual(raised.exception.code, "robots_disallowed")
         self.assertEqual([c.args[0] for c in get.call_args_list], ["https://stay.example.org/robots.txt"])
+        portal = type("R", (), {"status": 200, "content": b"<html>Sign in to Wi-Fi</html>", "content_type": "text/html"})
+        with patch.object(HotelWebsite, "_get", return_value=portal) as get:
+            with self.assertRaises(ProviderError) as raised:
+                provider.fetch({"url": "https://stay.example.org/"})
+        self.assertEqual((raised.exception.code, get.call_count), ("robots_unreadable", 1))
 
     def test_only_its_own_url_is_accepted(self):
         with self.assertRaises(ProviderError):

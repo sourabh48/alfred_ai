@@ -193,11 +193,26 @@ def robots_allows(url, fetch_text, agent):
     return parser.can_fetch(agent, url)
 
 
+def robots_text(response):
+    """The rules in a fetched robots.txt. 404/410 means no file (RFC 9309: allowed). A 200 that is not UTF-8 plain text
+    (an HTML error page, captive portal or sign-in page in its place) leaves permission uncertain: PublicHTTPError."""
+    if response.status in (404, 410):
+        return ""
+    try:
+        text = response.content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise PublicHTTPError("robots_unreadable", 3600) from None
+    if response.content_type != "text/plain" or text.lstrip()[:1] == "<":
+        raise PublicHTTPError("robots_unreadable", 3600)
+    return text
+
+
 def robots_txt_allows(url, agent, *, headers=None):
-    """Read the site's robots.txt through this boundary; failures raise PublicHTTPError (treat as refusal)."""
+    """Read the site's robots.txt through this boundary; failures raise PublicHTTPError (treat as refusal).
+    Robots permission is not permission under a site's terms; callers keep their own source rules."""
     def fetch(robots_url):
+        # text/html is accepted only so a 404 page can say "no file"; robots_text refuses a 200 HTML page.
         response = request("GET", robots_url, headers=headers, content_types=("text/plain", "text/html"),
                            accepted_statuses=(200, 404, 410), max_bytes=500_000)
-        # An HTML page in place of robots.txt has no rules, like a missing file.
-        return response.status, response.content.decode("utf-8", "replace") if response.content_type == "text/plain" else ""
+        return response.status, robots_text(response)
     return robots_allows(url, fetch, agent)

@@ -295,7 +295,7 @@ class PublicPageReadPolicyTests(TestCase):
                    for folder in ('apps', 'alfred_ai') for path in (root / folder).rglob('*.py')
                    if 'tests' not in path.parts and 'migrations' not in path.parts
                    and any(token in path.read_text(encoding='utf-8') for token in ('"text/html"', "'text/html'", 'xhtml'))}
-        # The transport itself: its robots.txt reader accepts HTML only to treat it as "no rules" and discards it.
+        # The transport itself: its robots.txt reader accepts HTML only so a 404 page means "no file"; it reads no page.
         readers.discard('alfred_ai/services/public_http.py')
         listed = {item['file'] for item in PUBLIC_PAGE_READS}
         self.assertEqual(readers, listed, 'A new web-page reader needs a free-source review and a PUBLIC_PAGE_READS entry.')
