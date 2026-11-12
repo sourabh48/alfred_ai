@@ -20,8 +20,8 @@
     <div class="card-body">
         <div class="row g-3 align-items-end">
             <div class="col-lg-4">
-                <label for="statementFile" class="form-label fw-semibold">Upload statements (PDF)</label>
-                <input id="statementFile" class="form-control" type="file" accept=".pdf,application/pdf" multiple>
+                <label for="statementFile" class="form-label fw-semibold">Upload statements (PDF, CSV or XLSX)</label>
+                <input id="statementFile" class="form-control" type="file" accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple>
             </div>
             <div class="col-lg-3">
                 <label for="statementKind" class="form-label fw-semibold">Statement Type</label>
@@ -216,6 +216,6 @@
     <div class="d-flex gap-2"><button id="bankAccountsPrevious" class="btn btn-outline-secondary" type="button" disabled>Previous page</button><button id="bankAccountsNext" class="btn btn-outline-secondary" type="button" disabled>Next page</button></div>
 </section>
 {% include "expenses/modal_add.html" %}
-<script src="/static/js/expenses.js?v=3.8.2"></script>
+<script src="/static/js/expenses.js?v=3.9.0"></script>
 </div>
 {% endblock %}

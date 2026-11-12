@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.expenses.models import BankAccount, Expense, StatementUpload
 from datetime import date
+from decimal import Decimal
 
 from apps.expenses.services.statement_import import (
     ParsedTransaction,
@@ -167,7 +168,8 @@ class DocumentCenterAndStatementImportTests(TestCase):
         self.assertEqual(parsed.parser_status, "parsed")
         self.assertEqual(len(parsed.transactions), 4)
         self.assertEqual([item.direction for item in parsed.transactions], ["debit", "credit", "credit", "debit"])
-        self.assertEqual([item.amount for item in parsed.transactions], [95.21, 1310.0, 24703.0, 779.63])
+        self.assertEqual([item.amount for item in parsed.transactions],
+                         [Decimal("95.21"), Decimal("1310.00"), Decimal("24703.00"), Decimal("779.63")])
         self.assertEqual(parsed.transactions[1].category, "transfer")
         self.assertEqual(parsed.transactions[3].classification, "expense")
         self.assertEqual(parsed.transactions[3].category, "bills")

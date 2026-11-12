@@ -775,7 +775,7 @@ function uploadStatement() {
     const fileInput = document.getElementById("statementFile");
     const files = Array.from(fileInput.files || []);
     if (!files.length) {
-        showUploadStatus("Choose at least one PDF statement first.", "warning");
+        showUploadStatus("Choose at least one PDF, CSV or XLSX statement first.", "warning");
         return;
     }
 

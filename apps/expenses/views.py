@@ -576,9 +576,9 @@ class ExpenseStatementImportView(APIView):
     def post(self, request):
         statement_file = request.FILES.get("statement")
         if statement_file is None:
-            return Response({"detail": "Upload a statement PDF first."}, status=status.HTTP_400_BAD_REQUEST)
-        if not statement_file.name.lower().endswith(".pdf"):
-            return Response({"detail": "Only PDF statements are supported right now."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Upload a statement file first."}, status=status.HTTP_400_BAD_REQUEST)
+        if not statement_file.name.lower().endswith((".pdf", ".csv", ".xlsx")):
+            return Response({"detail": "Upload a PDF, CSV or XLSX statement."}, status=status.HTTP_400_BAD_REQUEST)
         requested_kind = (request.data.get("statement_kind") or "").strip()
         if requested_kind and requested_kind not in dict(StatementUpload.SOURCE_CHOICES):
             return Response({"detail": "Choose a supported statement type."}, status=status.HTTP_400_BAD_REQUEST)

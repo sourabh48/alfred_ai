@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
-from dataclasses import dataclass
-from datetime import date, datetime
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from importlib import import_module
 from io import BytesIO
@@ -15,6 +16,7 @@ import re
 import subprocess
 import sys
 import textwrap
+import zipfile
 from typing import BinaryIO
 
 from pypdf import PdfReader
@@ -24,18 +26,43 @@ from alfred_ai.services.currency import INR_LABEL_TOKEN
 from alfred_ai.services.pdf_recovery import rebuild_orphaned_pdf
 from alfred_ai.services.ocr_process import ocr_command, hidden_process_options, private_ocr_input
 from alfred_ai.services.api_errors import safe_error_details
-from alfred_ai.services.upload_limits import check_text_budget, document_source, upload_deadline
-
-
-TXN_START_RE = re.compile(r"^\d{2}/\d{2}/\d{2}\s+")
-TXN_RE = re.compile(
-    r"^(?P<txn_date>\d{2}/\d{2}/\d{2})\s+"
-    r"(?P<body>.+?)\s+"
-    r"(?P<value_date>\d{2}/\d{2}/\d{2})\s+"
-    r"(?P<amount>[0-9,]+\.\d{2})\s+"
-    r"(?P<closing>[0-9,]+\.\d{2})"
-    r"(?:\s+(?P<tail>.*))?$"
+from alfred_ai.services.upload_limits import (
+    check_document_resources, check_text_budget, document_source, read_upload_bytes, upload_deadline,
 )
+
+
+# dd/mm/yy, dd/mm/yyyy, dd-mm-yy and dd-mm-yyyy
+DATE_TOKEN = r"\d{2}[/-]\d{2}[/-](?:\d{4}|\d{2})"
+# 1,234.56 | -1,234.56 | (1,234.56), optionally followed by a Dr/Cr marker
+MONEY_TOKEN = r"(?:-?[0-9][0-9,]*\.\d{2}|\([0-9][0-9,]*\.\d{2}\))(?:\s?(?:Dr|Cr)\.?(?![A-Za-z]))?"
+CELL_TOKEN = rf"(?:{MONEY_TOKEN}|-)"
+TXN_START_RE = re.compile(rf"^{DATE_TOKEN}\s+")
+# One amount column, or separate withdrawal and deposit columns, then the closing balance.
+TXN_RE = re.compile(
+    rf"^(?P<txn_date>{DATE_TOKEN})\s+"
+    r"(?P<body>.+?)\s+"
+    rf"(?:(?P<value_date>{DATE_TOKEN})\s+)?"
+    rf"(?P<first>{CELL_TOKEN})\s+"
+    rf"(?:(?P<second>{CELL_TOKEN})\s+)?"
+    rf"(?P<closing>{MONEY_TOKEN})"
+    r"(?:\s+(?P<tail>.*))?$",
+    re.IGNORECASE,
+)
+MONEY_MARKER_RE = re.compile(r"\s?(Dr|Cr)\.?$", re.IGNORECASE)
+MAX_UNPARSED_ROWS = 200
+TABLE_EXTENSIONS = {".csv", ".xlsx"}
+TABLE_HEADERS = {
+    "date": ("txn date", "transaction date", "tran date", "trans date", "date", "posting date", "value date"),
+    "description": ("narration", "description", "particulars", "transaction details", "details", "remarks"),
+    "debit": ("withdrawal amt", "withdrawal amount", "withdrawal", "withdrawals", "debit amount", "debit", "dr amount"),
+    "credit": ("deposit amt", "deposit amount", "deposit", "deposits", "credit amount", "credit", "cr amount"),
+    "amount": ("amount", "transaction amount", "txn amount"),
+    "marker": ("dr/cr", "cr/dr", "dr / cr", "debit/credit", "type"),
+    "balance": ("closing balance", "balance", "running balance", "available balance"),
+    "reference": ("chq./ref.no", "chq/ref no", "ref no./cheque no", "reference no", "reference", "ref no", "cheque no"),
+}
+NO_TABLE_DETAIL = "No transaction table with date, description and amount columns was found in this file."
+TABLE_SUMMARY_WORDS = ("opening balance", "closing balance", "total", "statement summary", "generated on")
 CARD_TXN_RE = re.compile(
     r"(?P<txn_date>\d{2}/\d{2}/\d{4})\|\s*\d{2}:\d{2}\s+"
     r"(?P<body>.+?)\s+"
@@ -303,8 +330,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ParsedTransaction:
     transaction_date: date
-    amount: float
-    closing_balance: float
+    amount: Decimal
+    closing_balance: Decimal | None
     direction: str
     classification: str
     category: str
@@ -335,6 +362,8 @@ class StatementParseResult:
     processed_page_count: int = 0
     total_page_count: int = 0
     preview_transaction_count: int = 0
+    # Rows that look like transactions but could not be read; never silently dropped.
+    unparsed_rows: list = field(default_factory=list)
 
 
 @dataclass
@@ -347,13 +376,19 @@ class StatementTextExtraction:
 
 
 def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int | None = None, preview_page_limit: int | None = None, enable_isolated_ocr: bool = True) -> StatementParseResult:
-    raw_bytes = _read_file_bytes(file_obj)
-    extraction = _extract_statement_text(
-        raw_bytes,
-        ocr_page_limit=ocr_page_limit or STATEMENT_OCR_PAGE_LIMIT,
-        preview_page_limit=preview_page_limit or STATEMENT_OCR_PREVIEW_PAGES,
-        enable_isolated_ocr=enable_isolated_ocr,
-    )
+    table_rows = _read_statement_table(file_obj)
+    if table_rows is not None:
+        extraction = StatementTextExtraction(
+            text="\n".join(" ".join(str(cell or "").strip() for cell in row) for row in table_rows).strip(),
+            notes=["Read the uploaded spreadsheet statement."], preview_only=False)
+    else:
+        raw_bytes = _read_file_bytes(file_obj)
+        extraction = _extract_statement_text(
+            raw_bytes,
+            ocr_page_limit=ocr_page_limit or STATEMENT_OCR_PAGE_LIMIT,
+            preview_page_limit=preview_page_limit or STATEMENT_OCR_PREVIEW_PAGES,
+            enable_isolated_ocr=enable_isolated_ocr,
+        )
     full_text = extraction.text
     check_text_budget(full_text)
     extraction_notes = list(extraction.notes)
@@ -366,17 +401,22 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
     statement_kind = _detect_statement_kind(full_text)
     loan_hints = _extract_loan_hints(full_text)
 
-    groups = _collect_transaction_groups(full_text.splitlines())
-    column_directions = _statement_column_directions(full_text)
     transactions: list[ParsedTransaction] = []
-    previous_closing: float | None = None
-
-    for group in groups:
-        transaction = _parse_transaction_group(group, previous_closing, column_directions)
-        if transaction is None:
-            continue
-        transactions.append(transaction)
-        previous_closing = transaction.closing_balance
+    unparsed_rows: list[dict] = []
+    if table_rows is not None:
+        transactions, unparsed_rows = _parse_table_rows(table_rows)
+    else:
+        column_directions = _statement_column_directions(full_text)
+        previous_closing: Decimal | None = None
+        for group in _collect_transaction_groups(full_text.splitlines()):
+            transaction, reason = _parse_transaction_group(group, previous_closing, column_directions)
+            if transaction is None:
+                _note_unparsed(unparsed_rows, group, reason)
+                continue
+            transactions.append(transaction)
+            previous_closing = transaction.closing_balance
+    if unparsed_rows:
+        extraction_notes.append(f"{len(unparsed_rows)} row(s) could not be read and were not imported; they are listed for review.")
     if statement_kind == "credit_card_statement":
         seen = {(item.transaction_date, item.raw_description, item.amount, item.direction) for item in transactions}
         for transaction in _parse_credit_card_transactions(full_text.splitlines()):
@@ -445,7 +485,189 @@ def parse_bank_statement(file_obj: BinaryIO, user=None, *, ocr_page_limit: int |
         processed_page_count=extraction.processed_page_count,
         total_page_count=extraction.total_page_count,
         preview_transaction_count=preview_transaction_count,
+        unparsed_rows=unparsed_rows,
     )
+
+
+def _note_unparsed(unparsed_rows: list[dict], text: str, reason: str) -> None:
+    if len(unparsed_rows) < MAX_UNPARSED_ROWS:
+        unparsed_rows.append({"text": _normalize_space(str(text))[:300], "reason": reason})
+
+
+def _parse_statement_date(token: str) -> date:
+    separator = "/" if "/" in token else "-"
+    year = "%Y" if len(token.rsplit(separator, 1)[-1]) == 4 else "%y"
+    try:
+        return datetime.strptime(token, f"%d{separator}%m{separator}{year}").date()
+    except ValueError:
+        raise ValueError(f"'{token}' is not a valid date")
+
+
+def _money_cell(token) -> tuple[Decimal | None, str | None]:
+    """Signed amount and its Dr/Cr marker; a blank or '-' cell is empty, not zero."""
+    text = str(token or "").strip()
+    for symbol in ("\u20b9", "INR", "Rs.", "Rs"):
+        text = text.replace(symbol, "")
+    text = text.strip()
+    if text in {"", "-"}:
+        return None, None
+    marker = None
+    found = MONEY_MARKER_RE.search(text)
+    if found:
+        marker = found.group(1).lower()
+        text = text[:found.start()].strip()
+    negative = text.startswith("-") or (text.startswith("(") and text.endswith(")"))
+    try:
+        value = Decimal(text.strip("-()").replace(",", "").strip())
+    except InvalidOperation:
+        raise ValueError(f"'{token}' is not an amount")
+    if not value.is_finite():
+        raise ValueError(f"'{token}' is not an amount")
+    return (-value if negative else value), marker
+
+
+def _signed_balance(token) -> Decimal | None:
+    value, marker = _money_cell(token)
+    if value is None:
+        return None
+    # A balance marked Dr is overdrawn.
+    return -abs(value) if marker == "dr" else (abs(value) if marker == "cr" else value)
+
+
+def _amount_and_direction(first, second, closing, previous_closing, explicit_direction=None):
+    """Read one amount column, or separate withdrawal/deposit columns, into (amount, direction or None)."""
+    first_value, first_marker = _money_cell(first)
+    if second is not None:
+        second_value, _ = _money_cell(second)
+        debit, credit = abs(first_value or 0), abs(second_value or 0)
+        if debit and credit:
+            raise ValueError("Both withdrawal and deposit columns have amounts")
+        if not debit and not credit:
+            raise ValueError("No amount in the withdrawal or deposit column")
+        amount, direction = (debit, "debit") if debit else (credit, "credit")
+        # The printed balance outranks a guess about which column a '-' filled.
+        if previous_closing is not None and closing is not None and abs(closing - previous_closing) == amount:
+            direction = "credit" if closing > previous_closing else "debit"
+        return amount, direction
+    if first_value is None or first_value == 0:
+        raise ValueError("No amount")
+    direction = explicit_direction
+    if direction is None and first_marker:
+        direction = "debit" if first_marker == "dr" else "credit"
+    if direction is None and first_value < 0:
+        direction = "debit"
+    return abs(first_value), direction
+
+
+def _read_statement_table(file_obj) -> list[list] | None:
+    """Rows of a CSV or XLSX statement, or None for a PDF."""
+    extension = os.path.splitext(str(getattr(file_obj, "name", "") or "").lower())[1]
+    if extension not in TABLE_EXTENSIONS:
+        return None
+    # shortcut: the stdlib spreadsheet readers live in the fund look-through service; move them to a shared module if a third caller appears.
+    from apps.investments.services.fund_look_through import LookThroughError, _csv_rows, _xlsx_sheets
+    from alfred_ai.services.upload_limits import UploadFormatError, UploadLimitExceeded
+
+    raw = read_upload_bytes(file_obj)
+    try:
+        if extension == ".csv":
+            rows = _csv_rows(raw)
+            if _table_columns(rows) is None:
+                raise UploadFormatError(NO_TABLE_DETAIL)
+            return rows
+        check_document_resources(raw, file_obj.name)
+        sheets = _xlsx_sheets(raw)
+    except LookThroughError:  # only raised for too many rows
+        raise UploadLimitExceeded()
+    except (zipfile.BadZipFile, KeyError, ValueError):
+        raise UploadFormatError()
+    for _, rows in sheets:
+        if _table_columns(rows) is not None:
+            return rows
+    raise UploadFormatError(NO_TABLE_DETAIL)
+
+
+def _header_label(value) -> str:
+    text = _normalize_space(str(value or "")).lower().rstrip(".:").strip()
+    return re.sub(r"\s*\((?:inr|rs\.?|\u20b9)\)$", "", text)
+
+
+def _table_columns(rows) -> tuple[int, dict[str, int]] | None:
+    for index, row in enumerate(rows[:50]):
+        labels = [_header_label(cell) for cell in row]
+        columns: dict[str, int] = {}
+        for name, synonyms in TABLE_HEADERS.items():
+            for synonym in synonyms:
+                position = next((i for i, label in enumerate(labels) if label == synonym and i not in columns.values()), None)
+                if position is not None:
+                    columns[name] = position
+                    break
+        if "date" in columns and "description" in columns and ("amount" in columns or {"debit", "credit"} <= columns.keys()):
+            return index, columns
+    return None
+
+
+def _table_date(value) -> date | None:
+    text = _normalize_space(str(value or ""))
+    if not text:
+        return None
+    if re.fullmatch(DATE_TOKEN, text):
+        return _parse_statement_date(text)
+    if re.fullmatch(r"\d{4,5}(?:\.0+)?", text):
+        # Spreadsheet date serial (1900 date system).
+        return date(1899, 12, 30) + timedelta(days=int(float(text)))
+    from apps.investments.services.fund_look_through import _date
+    found = _date(text)
+    if found is None:
+        raise ValueError(f"'{text}' is not a date")
+    return found
+
+
+def _parse_table_rows(rows) -> tuple[list[ParsedTransaction], list[dict]]:
+    located = _table_columns(rows)
+    if located is None:
+        return [], []
+    header_index, columns = located
+    cell = lambda row, name: row[columns[name]] if name in columns and columns[name] < len(row) else None
+    transactions: list[ParsedTransaction] = []
+    unparsed: list[dict] = []
+    previous_closing: Decimal | None = None
+    for row in rows[header_index + 1:]:
+        if not any(str(value or "").strip() for value in row):
+            continue
+        text = " | ".join(str(value or "").strip() for value in row)
+        try:
+            transaction_date = _table_date(cell(row, "date"))
+            if transaction_date is None:
+                if any(word in text.lower() for word in TABLE_SUMMARY_WORDS):
+                    continue
+                raise ValueError("No transaction date")
+            description = _normalize_space(str(cell(row, "description") or ""))
+            reference = _normalize_space(str(cell(row, "reference") or ""))
+            closing = _signed_balance(cell(row, "balance"))
+            marker = str(cell(row, "marker") or "").strip().lower().rstrip(".")
+            explicit = {"dr": "debit", "d": "debit", "debit": "debit", "cr": "credit", "c": "credit", "credit": "credit"}.get(marker)
+            if "debit" in columns and "credit" in columns:
+                amount, direction = _amount_and_direction(cell(row, "debit") or "-", cell(row, "credit") or "-", closing, previous_closing)
+            else:
+                amount, direction = _amount_and_direction(cell(row, "amount"), None, closing, previous_closing, explicit)
+        except ValueError as error:
+            _note_unparsed(unparsed, text, str(error))
+            continue
+        raw = f"{description} {reference}".strip()
+        if direction is None:
+            direction = _infer_direction(raw, closing, previous_closing) if closing is not None else _infer_direction(raw, Decimal("0"), None)
+        details = classify_transaction_text(raw, direction)
+        transactions.append(ParsedTransaction(
+            transaction_date=transaction_date, amount=amount, closing_balance=closing,
+            direction=details["direction"], classification=details["classification"], category=details["category"],
+            payment_mode=details["payment_mode"], merchant=details["merchant"], description=details["description"],
+            raw_description=details["raw_description"], external_reference=details["external_reference"],
+            counterparty=details["counterparty"], company_name=details["company_name"],
+        ))
+        if closing is not None:
+            previous_closing = closing
+    return transactions, unparsed
 
 
 def summarize_transactions(transactions: list[ParsedTransaction]) -> dict[str, float | int]:
@@ -607,7 +829,7 @@ def _statement_column_directions(text: str) -> dict[tuple[str, float, float], st
         cells = [line[withdrawal:deposit].strip(), line[deposit:closing].strip(), line[closing:].strip()]
         if not money.fullmatch(cells[2]) or any(cell and not money.fullmatch(cell) for cell in cells[:2]):
             continue
-        values = [_to_float(cell) if cell else 0.0 for cell in cells]
+        values = [_to_decimal(cell) if cell else Decimal("0") for cell in cells]
         if bool(values[0]) == bool(values[1]):
             continue
         key = (transaction_date, values[0] or values[1], values[2])
@@ -766,21 +988,25 @@ def _collect_transaction_groups(lines: list[str]) -> list[str]:
     return groups
 
 
-def _parse_transaction_group(group: str, previous_closing: float | None, column_directions=None) -> ParsedTransaction | None:
+def _parse_transaction_group(group: str, previous_closing: Decimal | None, column_directions=None) -> tuple[ParsedTransaction | None, str]:
     match = TXN_RE.search(_normalize_space(group))
     if match is None:
-        return None
+        return None, "No amount and closing balance could be found"
+    try:
+        transaction_date = _parse_statement_date(match.group("txn_date"))
+        closing_balance = _signed_balance(match.group("closing"))
+        amount, direction = _amount_and_direction(match.group("first"), match.group("second"), closing_balance, previous_closing)
+    except ValueError as error:
+        return None, str(error)
 
     description = match.group("body")
     if match.group("tail"):
         description = f"{description} {match.group('tail')}"
-    amount = _to_float(match.group("amount"))
-    closing_balance = _to_float(match.group("closing"))
-    direction = (column_directions or {}).get((match.group("txn_date"), amount, closing_balance))
+    direction = direction or (column_directions or {}).get((match.group("txn_date"), amount, closing_balance))
     details = classify_transaction_text(description, direction or _infer_direction(description, closing_balance, previous_closing))
 
     return ParsedTransaction(
-        transaction_date=datetime.strptime(match.group("txn_date"), "%d/%m/%y").date(),
+        transaction_date=transaction_date,
         amount=amount,
         closing_balance=closing_balance,
         direction=details["direction"],
@@ -793,7 +1019,7 @@ def _parse_transaction_group(group: str, previous_closing: float | None, column_
         external_reference=details["external_reference"],
         counterparty=details["counterparty"],
         company_name=details["company_name"],
-    )
+    ), ""
 
 
 def _parse_credit_card_transactions(lines: list[str]) -> list[ParsedTransaction]:
@@ -803,7 +1029,7 @@ def _parse_credit_card_transactions(lines: list[str]) -> list[ParsedTransaction]
         if not line:
             continue
         for match in CARD_TXN_RE.finditer(line):
-            amount = _to_float(match.group("amount"))
+            amount = _to_decimal(match.group("amount"))
             if amount <= 0:
                 continue
             description = _normalize_space(match.group("body"))
@@ -813,7 +1039,7 @@ def _parse_credit_card_transactions(lines: list[str]) -> list[ParsedTransaction]
                 ParsedTransaction(
                     transaction_date=datetime.strptime(match.group("txn_date"), "%d/%m/%Y").date(),
                     amount=amount,
-                    closing_balance=0.0,
+                    closing_balance=Decimal("0"),
                     direction=details["direction"],
                     classification=details["classification"],
                     category=details["category"],
@@ -897,7 +1123,7 @@ def _looks_like_wallet_mandate(text: str) -> bool:
     return any(keyword in text for keyword in DIGITAL_WALLET_KEYWORDS) and any(keyword in text for keyword in MANDATE_KEYWORDS)
 
 
-def _infer_direction(description: str, closing_balance: float, previous_closing: float | None) -> str:
+def _infer_direction(description: str, closing_balance: Decimal, previous_closing: Decimal | None) -> str:
     text = description.upper()
 
     if previous_closing is not None:
@@ -1071,8 +1297,8 @@ def _sanitize_description(value: str) -> str:
     return _normalize_space(cleaned)
 
 
-def _to_float(value: str) -> float:
-    return float(value.replace(",", ""))
+def _to_decimal(value: str) -> Decimal:
+    return Decimal(str(value).replace(",", ""))
 
 
 def _match_known_merchant(text: str) -> str:

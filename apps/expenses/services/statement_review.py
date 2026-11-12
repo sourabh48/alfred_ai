@@ -146,6 +146,7 @@ def statement_preview(upload, *, page=1):
         token=signing.dumps(binding, salt=SALT) if review['state'] == 'pending' and not expired else None,
         expired=expired, expires_at=review['expires_at'], token_max_age_seconds=1800, source_ok=source_ok,
         confidence=snapshot['confidence'], parser_notes=snapshot['parser_notes'], partial=bool(snapshot['preview_only']),
+        unparsed_rows=snapshot.get('unparsed_rows') or [],
         account_number=snapshot['account_number'], bank_name=snapshot['bank_name'],
         existing_account=account_data_public(account), proposed_closing_balance=preview[-1]['closing_balance'] if preview else None,
         rows=preview[(page-1)*PAGE_SIZE:page*PAGE_SIZE], page=page,
