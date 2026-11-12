@@ -73,8 +73,8 @@ def affordability_source(user):
         issues.append('UNRECONCILED_LOANS')
     try:
         # Canonical aggregate strings are exact; never route them through floats.
-        cash = Decimal(exact['liquid_cash']) - sum((max(a.current_balance or Decimal('0'), Decimal('0'))
-                    for a in accounts if a.account_type == 'investment'), Decimal('0'))
+        # The canonical liquid cash already excludes investment and credit accounts.
+        cash = Decimal(exact['liquid_cash'])
         loan = Decimal(exact['recurring_emi_burden'])
         essentials = Decimal(exact['essential_monthly_outflow']) - loan
         if any(not v.is_finite() or v < 0 for v in (cash, loan, essentials)):
