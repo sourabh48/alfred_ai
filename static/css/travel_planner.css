@@ -51,3 +51,4 @@ html[data-theme="dark"] .trip-when { color:#8fd3c4; }
 .travel-day > ul > li::before { content:""; position:absolute; left:calc(-1.25rem - 6px); top:.35rem; width:10px; height:10px; border-radius:50%; background:#248b81; box-shadow:0 0 0 3px var(--alfred-surface-strong); }
 html[data-theme="dark"] .travel-day > ul { border-left-color:#3d5d70; }
 html[data-theme="dark"] .travel-day > ul > li::before { background:#8fd3c4; box-shadow:0 0 0 3px var(--alfred-surface); }
+.trip-card-grid > .empty-state { grid-column:1 / -1; }

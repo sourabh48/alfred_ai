@@ -5134,6 +5134,63 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn('triage', analysis.extracted_payload)
         self.run_axe_light_dark('career-cv-versions-rechecked')
 
+    def test_fund_look_through_asks_which_fund_in_a_workbook_with_several(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.investments.models import Investment
+        from tests.test_fund_look_through import ALPHA, BETA_ROWS, INDEX_ROWS, workbook
+        owner = self.scenario['user']
+        beta = Investment.objects.create(user=owner, asset_type='mutual_fund', asset_name='Synthetic Beta holding', current_value='50000.00', currency='INR')
+        folder = Path(self.enterContext(TemporaryDirectory(prefix='alfred-look-through-book-browser-')))
+        injected = [['<img src=x onerror="window.sheetInjected=true"> Fund'], *ALPHA[1:]]
+        (folder / 'house.xlsx').write_bytes(workbook({'Index': INDEX_ROWS, 'Alpha': injected, 'Beta': BETA_ROWS}))
+        self.login(); self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Synthetic Beta holding' in self.text('lookThroughRows'))
+        row = '#lookThroughRows fieldset:nth-child(1) '
+        Select(self.browser.find_element(self.By.CSS_SELECTOR, row + 'select[name=investment]')).select_by_value(str(beta.pk))
+        self.browser.find_element(self.By.CSS_SELECTOR, row + 'input[type=file]').send_keys(str(folder / 'house.xlsx'))
+        self.memory_click('#lookThroughSubmit')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, row + 'select[name=sheet]'))
+        self.assertIn('several funds', self.text('lookThroughStatus'))
+        chooser = self.browser.find_element(self.By.CSS_SELECTOR, row + 'select[name=sheet]')
+        self.assertEqual(self.browser.switch_to.active_element, chooser)
+        self.assertEqual([option.get_attribute('value') for option in Select(chooser).options], ['', 'Alpha', 'Beta'])
+        self.assertFalse(self.browser.execute_script('return Boolean(window.sheetInjected)'))
+        self.assertEqual(Select(self.browser.find_element(self.By.CSS_SELECTOR, row + 'select[name=investment]')).first_selected_option.text, 'Synthetic Beta holding')
+        self.run_axe_light_dark('investment-fund-look-through-choose-fund')
+        Select(chooser).select_by_value('Beta')
+        self.memory_click('#lookThroughSubmit')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'lookThroughCompanies'))
+        self.assertIn('Synthetic Power Ltd', self.text('lookThroughResult'))
+        self.assertIn('Synthetic Beta Large Cap Fund', self.text('lookThroughResult'))
+
+    def test_travel_plan_board_shows_trip_cards_with_timing_and_no_invalid_dates(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.mobility.models import TravelPlan
+        owner, today = self.scenario['user'], timezone.localdate()
+        day = lambda offset: today + timedelta(days=offset)
+        for title, start, end, status in (
+                ('Synthetic upcoming <img src=x onerror="window.tripInjected=true">', day(10), day(12), 'confirmed'),
+                ('Synthetic undated idea', None, None, 'draft'),
+                ('Synthetic current ride', day(-1), day(1), 'on_trip'),
+                ('Synthetic finished ride', day(-20), day(-18), 'completed')):
+            TravelPlan.objects.create(user=owner, title=title, destination='Coorg', start_date=start, end_date=end, status=status)
+        self.login(); self.browser.get(self.live_server_url + '/mobility/')
+        self.wait.until(lambda _: 'Synthetic finished ride' in self.text('travelPlanList'))
+        cards = {card.find_element(self.By.CSS_SELECTOR, 'h3').text: card
+                 for card in self.browser.find_elements(self.By.CSS_SELECTOR, '#travelPlanList .trip-card')}
+        timing = lambda title: cards[title].find_element(self.By.CSS_SELECTOR, '.trip-when').text.lower()
+        upcoming = next(title for title in cards if title.startswith('Synthetic upcoming'))
+        self.assertEqual(timing(upcoming), 'starts in 10 days')
+        self.assertEqual(timing('Synthetic undated idea'), 'dates not set')
+        self.assertEqual(timing('Synthetic current ride'), 'happening now')
+        self.assertTrue(timing('Synthetic finished ride').startswith('ended '))
+        self.assertNotIn('Invalid Date', self.text('travelPlanList'))
+        self.assertTrue(cards[upcoming].find_elements(self.By.CSS_SELECTOR, '.trip-status.trip-status-confirmed'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.tripInjected)'))
+        self.browser.execute_script("document.getElementById('travelPlanList').scrollIntoView({block:'start',behavior:'instant'})")
+        self.run_axe_light_dark('travel-plan-board-cards')
+
     def run_axe_light_dark(self, name):
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
         for theme in ('light', 'dark'):
