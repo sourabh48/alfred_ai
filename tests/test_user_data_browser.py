@@ -5179,6 +5179,36 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
         self.memory_click('#careerPatternsLoad')
         self.wait.until(lambda _: 'Not enough data yet' in self.text('careerPatternsPanel'))
+        self.assertIn('Not enough finished applications', self.text('careerCalibrationVerdict'))
+        # Interview story and debrief, written by the owner and kept on this job
+        self.browser.execute_script("document.querySelectorAll('#careerInterviewPrep details').forEach(d => d.open = true)")
+        for field, value in (('careerStoryTitle', 'Faster <img src=x onerror="window.kitInjected=true"> deploys'),
+                             ('careerStoryAction', 'Moved builds to cached runners'), ('careerStoryResult', 'Deploys took 12 minutes')):
+            self.browser.find_element(self.By.ID, field).send_keys(value)
+        self.memory_click('#careerStoryForm button[type="submit"]')
+        self.wait.until(lambda _: 'Not in your CV: 12' in self.text('careerStoryList'))
+        self.browser.execute_script("document.querySelectorAll('#careerInterviewPrep details').forEach(d => d.open = true)")
+        self.browser.find_element(self.By.ID, 'careerDebriefQuestions').send_keys('How would you size a Kafka cluster?')
+        Select(self.browser.find_element(self.By.ID, 'careerDebriefRound')).select_by_value('technical')
+        self.memory_click('#careerDebriefForm button[type="submit"]')
+        self.wait.until(lambda _: 'Kafka cluster' in self.text('careerDebriefList'))
+        item.refresh_from_db()
+        self.assertEqual(item.extracted_payload['interview_notes']['debriefs'][0]['round_type'], 'technical')
+        self.assertIn('triage', item.extracted_payload)  # earlier saved data kept
+        self.memory_click('#careerStoriesLoad')
+        self.wait.until(lambda _: 'Synthetic Kit Corp - Senior Backend Engineer' in self.text('careerStoriesPanel'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
+        self.browser.execute_script("document.getElementById('careerInterviewNotes').scrollIntoView({block:'start'})")
+        self.capture('career-interview-notes')
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+            for scope in ('#careerInterviewPrep', '#careerStoriesPanel', '#careerPatternsPanel'):
+                audit = self.browser.execute_async_script("const done=arguments[1];axe.run(arguments[0],{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>done(r.violations));", scope)
+                self.assertEqual(audit, [], (theme, scope))
+        self.browser.execute_script('document.documentElement.dataset.theme="light"')
+        self.browser.execute_script("document.getElementById('careerKit').open = true")
         self.browser.execute_script("document.getElementById('careerKit').scrollIntoView({block:'start'})")
         self.capture('career-application-kit')
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))

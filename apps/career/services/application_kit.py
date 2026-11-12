@@ -547,3 +547,57 @@ def patterns(analyses) -> dict:
         "lowest_positive_score": min(positives) if positives else None,
         "basis": "Counts from the stages you recorded. Awaiting replies are silence, not rejection; no rate is a prediction.",
     }
+
+
+# ---------- calibrate: does the triage score predict the owner's outcomes? (career-ops calibrate.mjs) ----------
+CALIBRATION_BANDS = (("Below 3.5", None, 3.5), ("3.5-3.9", 3.5, 4.0), ("4.0-4.4", 4.0, 4.5), ("4.5 and up", 4.5, None))
+CALIBRATION_MIN_BAND = 5
+
+
+def calibration(analyses, *, min_band=CALIBRATION_MIN_BAND) -> dict:
+    """Interview and offer rates per triage score band. Advisory only: it never changes the score or the brief."""
+    resolved, in_flight, unscored = [], 0, 0
+    for analysis in analyses:
+        payload = _payload(analysis)
+        application = payload.get("application") if isinstance(payload.get("application"), dict) else {}
+        reached = {item.get("stage") for item in application.get("history") or [] if isinstance(item, dict)}
+        reached.add(application.get("stage"))
+        offer = bool(reached & {"offer", "hired"})
+        interview = offer or "interview" in reached
+        if not interview and application.get("stage") != "rejected":
+            in_flight += application.get("stage") in {"applied", "responded", "assessment"}
+            continue  # not sent, discarded or still waiting: no outcome to learn from
+        score = (payload.get("triage") or {}).get("score") if isinstance(payload.get("triage"), dict) else None
+        if not isinstance(score, (int, float)) or isinstance(score, bool) or score <= 0:
+            unscored += 1
+            continue
+        resolved.append((score, interview, offer))
+    bands = []
+    for label, low, high in CALIBRATION_BANDS:
+        members = [row for row in resolved if (low is None or row[0] >= low) and (high is None or row[0] < high)]
+        interviews, offers = sum(row[1] for row in members), sum(row[2] for row in members)
+        enough = len(members) >= min_band
+        bands.append({"band": label, "count": len(members), "interviews": interviews, "offers": offers,
+                      "interview_rate": round(100 * interviews / len(members)) if enough else None,
+                      "offer_rate": round(100 * offers / len(members)) if enough else None})
+    rated = [band for band in bands if band["interview_rate"] is not None]
+    if len(rated) < 2:
+        kind = "insufficient"
+        text = (f"Not enough finished applications to compare score bands yet ({len(resolved)} with an outcome; "
+                f"each band needs {min_band}). Keep recording stages and check again.")
+    else:
+        low, high = rated[0], rated[-1]
+        gap = high["interview_rate"] - low["interview_rate"]
+        if gap >= 10:
+            kind, text = "separating", (f"The score is separating for you: {high['band']} reached interviews at {high['interview_rate']}% "
+                                        f"against {low['interview_rate']}% for {low['band']}.")
+        elif gap <= -10:
+            kind, text = "inverted", (f"Inverted: {low['band']} reached interviews more often ({low['interview_rate']}%) than "
+                                      f"{high['band']} ({high['interview_rate']}%). Read what the high-scored rejections had in common.")
+        else:
+            kind, text = "flat", (f"No clear difference yet: {high['band']} {high['interview_rate']}% against {low['band']} "
+                                  f"{low['interview_rate']}%.")
+    return {"verdict": kind, "text": text, "bands": bands, "resolved": len(resolved), "in_flight": in_flight,
+            "unscored": unscored, "minimum_per_band": min_band,
+            "basis": "Reaching an interview counts even if it later ended; rejected counts as no interview. Applications still "
+                     "waiting are left out. Advisory only: ALFRED does not change your score or brief from this."}

@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Career Ops calibrate, interview stories and debriefs - 2026-11-12
+
+- `continue` on the owner's "complete the part" Career Ops request (the remaining parts). Upstream pin 775861b
+  inspected: calibrate.mjs and modes/calibrate.md, modes/retro.md, templates/story-bank.template.md,
+  lib/story-bank.mjs, modes/interview/debrief.md.
+- application_kit.calibration: interview and offer rates per triage score band (below 3.5, 3.5-3.9, 4.0-4.4,
+  4.5 and up), a rate only with 5 finished applications in a band; separating / flat / inverted / insufficient
+  verdict; reaching an interview counts even if it later ended; waiting, unsent and unscored are left out.
+  Advisory only, never changes a score or the brief. Returned with GET /api/career/patterns/.
+- Retro excluded: upstream turns agent-session corrections into rule files; ALFRED has no such layer.
+- apps/career/services/interview_notes.py: owner-written STAR + reflection stories and debriefs (date, round,
+  interviewer, outcome, questions, what went well, gaps, next steps) stored on the saved job's payload
+  (interview_notes, up to 20 each, revision and updated_at guarded); POST job-analyses/<pk>/interview-notes/,
+  GET /api/career/stories/ (story bank across jobs, no-store). Story figures the current CV does not contain are
+  listed as "Not in your CV". Nothing generated, no migration, no new dependency.
+- Evidence: all Career test modules plus browser plan/runner 252 PASS (5 new); Career browser tests 10 PASS, the kit test
+  now adds a story and a debrief, loads the story bank and checks calibration, axe clean light and dark, no script
+  run from a story title. Not pushed; CI not run on this work.
+
 ## Career Ops evaluation, batch triage, bullets, CV layouts and reviewed sending - 2026-11-12
 
 - Owner asked to complete the partly covered Career Ops parts, then approved sending applications and recruiter
@@ -24,7 +43,9 @@
   recipient, subject, attachment name and status, not the body. No migration, no new dependency.
 - Evidence: all Career test modules 231 PASS; env/readiness/data-sources/hardening/public-HTTP 79 PASS; Career and
   dashboard browser tests 11 PASS with axe clean in light and dark and no horizontal scroll at 390 px. CAREER2-002
-  stays UNACCEPTED (one slice, no owner acceptance). Not pushed; CI not run on this work.
+  stays UNACCEPTED (one slice, no owner acceptance). Pushed as 1b2825a and c14e43c (owner approved); Browser
+  Regression 43183908579 passed on its second attempt (first attempt: one Chrome shard failed, not reproduced
+  locally in two full shard runs, log not readable without sign-in).
 
 ## Websites read directly, listed and guarded - 2026-11-12
 

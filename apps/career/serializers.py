@@ -12,11 +12,23 @@ class CareerOpportunitySerializer(serializers.ModelSerializer):
     application = serializers.SerializerMethodField()
     match_freshness = serializers.SerializerMethodField()
     triage = serializers.SerializerMethodField()
+    interview_notes = serializers.SerializerMethodField()
 
     class Meta:
         model = CareerJobAnalysis
         fields = ('id','company','job_title','location','job_url','updated_at','outcome','salary_evidence','interview_prep',
-                  'application','match_freshness','triage')
+                  'application','match_freshness','triage','interview_notes')
+
+    def get_interview_notes(self, obj):
+        from .services import interview_notes
+        notes = interview_notes.clean(obj.extracted_payload.get('interview_notes') if isinstance(obj.extracted_payload, dict) else None)
+        if notes['stories'] and 'current_cv_text' not in self.context:
+            request = self.context.get('request')
+            resume = CareerResume.objects.filter(user=request.user).order_by('-created_at', '-id').only('extracted_text').first() if request else None
+            self.context['current_cv_text'] = resume.extracted_text if resume else ''
+        for story in notes['stories']:
+            story['unverified_figures'] = interview_notes.unverified_figures(story, self.context['current_cv_text'])
+        return notes
 
     def get_application(self, obj):
         from django.utils import timezone

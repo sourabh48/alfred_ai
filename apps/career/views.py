@@ -1119,10 +1119,54 @@ class CareerOfferPrepView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class CareerInterviewNotesView(APIView):
+    """Add or remove the owner's interview story or debrief on one saved job. Nothing is generated."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk):
+        from .services import interview_notes
+        analysis = _owned_analysis(request, pk)
+        if analysis is None:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not isinstance(request.data, dict) or not isinstance(analysis.extracted_payload, dict):
+            return Response({"detail": "Send one story or debrief change."}, status=status.HTTP_400_BAD_REQUEST)
+        conflict = {"detail": "This opportunity changed. Reload it before editing again."}
+        if "revision" in request.data and request.data["revision"] != CareerJobAnalysisSerializer(analysis).data["updated_at"]:
+            return Response(conflict, status=status.HTTP_409_CONFLICT)
+        try:
+            notes = interview_notes.apply_change(analysis.extracted_payload.get("interview_notes"), request.data,
+                                                 today=timezone.localdate())
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        updated = CareerJobAnalysis.objects.filter(pk=analysis.pk, user=request.user, updated_at=analysis.updated_at,
+            extracted_payload=analysis.extracted_payload).update(
+                extracted_payload={**analysis.extracted_payload, "interview_notes": notes}, updated_at=timezone.now())
+        if not updated:
+            return Response(conflict, status=status.HTTP_409_CONFLICT)
+        analysis.refresh_from_db()
+        return Response({"opportunity": CareerOpportunitySerializer(analysis, context={"request": request}).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def career_story_bank(request):
+    """The owner's stories across saved jobs; figures the current CV does not contain are listed per story."""
+    from .services import interview_notes
+    resume, _ = _draft_sources(request.user)
+    analyses = CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]
+    response = Response({"stories": interview_notes.story_bank(analyses, resume.extracted_text if resume else ""),
+                         "basis": "Your own stories. A number your current CV does not contain is listed as not in your CV: "
+                                  "say it only if you can stand behind it."})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def career_patterns(request):
-    return Response(application_kit.patterns(CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]))
+    analyses = list(CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300])
+    return Response({**application_kit.patterns(analyses), "calibration": application_kit.calibration(analyses)})
 
 
 def career_tailored_cv_print(request, pk):

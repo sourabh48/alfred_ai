@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("careerOpeningStateFilter")?.addEventListener("change", updateCareerOpeningFilters);
     document.getElementById("careerOutcomesReload").addEventListener("click", () => loadCareerOpportunities(careerOpportunityPage));
     document.getElementById("careerPatternsLoad").addEventListener("click", loadCareerPatterns);
+    document.getElementById("careerStoriesLoad").addEventListener("click", loadCareerStoryBank);
     document.getElementById("careerOutcomeAnalysis").addEventListener("change", event => {
         renderCareerOutcomeForm(careerOpportunities.find(item => String(item.id) === event.target.value));
     });
@@ -664,7 +665,12 @@ function renderCareerInterviewPrep(item) {
     const target = document.getElementById("careerInterviewPrepPanel");
     const prep = item?.interview_prep;
     if (!prep) { target.replaceChildren(); return; }
-    if (!prep.available) { target.innerHTML = `<p class="small muted" id="careerInterviewPrepUnavailable">${Alfred.escapeHtml(prep.reason)}</p>`; return; }
+    if (!prep.available) {
+        target.innerHTML = `<details class="surface-card p-3 mb-3" id="careerInterviewPrep" open><summary class="fw-semibold">Interview preparation</summary>
+            <p class="small muted mt-2" id="careerInterviewPrepUnavailable">${Alfred.escapeHtml(prep.reason)}</p><div id="careerInterviewNotes"></div></details>`;
+        renderCareerInterviewNotes(item, document.getElementById("careerInterviewNotes"));
+        return;
+    }
     const list = (items, render) => items.length ? `<ul class="small mb-3">${items.map(render).join("")}</ul>` : `<p class="small muted">None from this match.</p>`;
     const skill = entry => `<li><strong>${Alfred.escapeHtml(entry.skill)}</strong>: ${Alfred.escapeHtml(entry.prompt)}</li>`;
     target.innerHTML = `
@@ -674,7 +680,9 @@ function renderCareerInterviewPrep(item) {
             <h4 class="h6">Show your matched skills</h4>${list(prep.prove, skill)}
             <h4 class="h6">Prepare for gaps</h4>${list(prep.gaps, skill)}
             <h4 class="h6">General practice</h4>${list(prep.general, text => `<li>${Alfred.escapeHtml(text)}</li>`)}
+            <div id="careerInterviewNotes"></div>
         </details>`;
+    renderCareerInterviewNotes(item, document.getElementById("careerInterviewNotes"));
 }
 
 // Career Ops workflows (career-ops 775861b, MIT): triage, evaluation, CV-grounded drafts and offer reading. Email goes only after the owner reviews it and presses Send.
@@ -909,7 +917,8 @@ function renderCareerSendPanel(item, data, kind) {
 function loadCareerPatterns() {
     const target = document.getElementById("careerPatternsPanel");
     return Alfred.fetchJSON("/api/career/patterns/").then(data => {
-        if (!data.available) { target.innerHTML = `<p class="small" id="careerPatternsUnavailable" role="status">${Alfred.escapeHtml(data.reason)}</p>`; return; }
+        const calibration = careerCalibrationHtml(data.calibration);
+        if (!data.available) { target.innerHTML = `<p class="small" id="careerPatternsUnavailable" role="status">${Alfred.escapeHtml(data.reason)}</p>${calibration}`; return; }
         const rows = (items, render) => items.map(render).join("");
         target.innerHTML = `<div class="surface-card p-3" id="careerPatterns">
             <p class="small muted">${Alfred.escapeHtml(data.basis)}</p>
@@ -919,8 +928,97 @@ function loadCareerPatterns() {
             ${data.score_vs_outcome.length ? `<table class="table table-sm small"><caption>Triage score by outcome</caption><thead><tr><th scope="col">Outcome</th><th scope="col">Average</th><th scope="col">Range</th><th scope="col">Count</th></tr></thead>
             <tbody>${rows(data.score_vs_outcome, row => `<tr><td>${Alfred.escapeHtml(row.group)}</td><td>${row.average}/5</td><td>${row.min}-${row.max}</td><td>${row.count}</td></tr>`)}</tbody></table>` : ""}
             ${data.top_gaps.length ? `<p class="small mb-0">Skills most often missing where you were rejected or withdrew: ${Alfred.escapeHtml(data.top_gaps.map(gap => `${gap.skill} (${gap.count})`).join(", "))}.</p>` : ""}
-        </div>`;
+        </div>${calibration}`;
     }).catch(() => { target.innerHTML = '<p class="small" role="status">Patterns could not load. Try again.</p>'; });
+}
+
+function careerCalibrationHtml(cal) {
+    if (!cal) return "";
+    const rows = cal.bands.map(band => `<tr><td>${Alfred.escapeHtml(band.band)}</td><td>${band.count}</td><td>${band.interviews}</td><td>${band.offers}</td>
+        <td>${band.interview_rate === null ? "Too few" : `${band.interview_rate}%`}</td><td>${band.offer_rate === null ? "Too few" : `${band.offer_rate}%`}</td></tr>`).join("");
+    return `<div class="surface-card p-3 mt-2" id="careerCalibration">
+        <h4 class="h6">Does your triage score predict your outcomes?</h4>
+        <p class="small" id="careerCalibrationVerdict"><strong>${Alfred.escapeHtml(cal.text)}</strong></p>
+        <div class="table-responsive"><table class="table table-sm small"><caption>Finished applications by triage score (each band needs ${cal.minimum_per_band} for a rate)</caption>
+        <thead><tr><th scope="col">Score</th><th scope="col">Finished</th><th scope="col">Interviews</th><th scope="col">Offers</th><th scope="col">Interview rate</th><th scope="col">Offer rate</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+        <p class="small muted mb-0">Still waiting: ${cal.in_flight}. Finished without a triage score: ${cal.unscored}. ${Alfred.escapeHtml(cal.basis)}</p>
+    </div>`;
+}
+
+function loadCareerStoryBank() {
+    const target = document.getElementById("careerStoriesPanel");
+    return Alfred.fetchJSON("/api/career/stories/").then(data => {
+        if (!data.stories.length) { target.innerHTML = '<p class="small" id="careerStoriesEmpty" role="status">No stories yet. Add them under Interview preparation for a saved job.</p>'; return; }
+        target.innerHTML = `<div class="surface-card p-3" id="careerStoryBank"><p class="small muted">${Alfred.escapeHtml(data.basis)}</p>${data.stories.map(careerStoryHtml).join("")}</div>`;
+    }).catch(() => { target.innerHTML = '<p class="small" role="status">Stories could not load. Try again.</p>'; });
+}
+
+function careerStoryHtml(story) {
+    const line = (label, value) => value ? `<p class="small mb-1"><strong>${label}:</strong> ${Alfred.escapeHtml(value)}</p>` : "";
+    return `<article class="border-top pt-2 mt-2">
+        <h5 class="h6 mb-1">${story.theme ? `[${Alfred.escapeHtml(story.theme)}] ` : ""}${Alfred.escapeHtml(story.title)}</h5>
+        ${line("Written for", story.source)}${line("Situation", story.situation)}${line("Task", story.task)}${line("Action", story.action)}
+        ${line("Result", story.result)}${line("Reflection", story.reflection)}${line("Best for questions about", story.best_for)}
+        ${story.unverified_figures?.length ? `<p class="small mb-1"><strong>Not in your CV:</strong> ${Alfred.escapeHtml(story.unverified_figures.join(", "))}. Say these only if you can stand behind them.</p>` : ""}
+    </article>`;
+}
+
+function renderCareerInterviewNotes(item, host) {
+    const notes = item.interview_notes || {stories: [], debriefs: []};
+    const input = (id, label, type = "text") => `<div class="col-md-6"><label class="form-label small" for="${id}">${label}</label><input class="form-control form-control-sm" type="${type}" id="${id}"></div>`;
+    const area = (id, label) => `<div class="col-12"><label class="form-label small" for="${id}">${label}</label><textarea class="form-control form-control-sm" rows="2" id="${id}"></textarea></div>`;
+    const remove = (kind, index) => `<button class="btn btn-link btn-sm p-0" type="button" data-notes-remove="${kind}" data-index="${index}" aria-label="Remove ${kind} ${index + 1}">Remove</button>`;
+    const debrief = (row, index) => `<article class="border-top pt-2 mt-2"><p class="small mb-1"><strong>${Alfred.escapeHtml(row.on)} · ${Alfred.escapeHtml(row.round_type)} · ${Alfred.escapeHtml(row.outcome)}</strong>${row.interviewer ? ` with ${Alfred.escapeHtml(row.interviewer)}` : ""}</p>
+        ${[["Questions asked", row.questions], ["What went well", row.went_well], ["Gaps to close", row.gaps], ["Next steps", row.next_steps]].filter(pair => pair[1]).map(pair => `<p class="small mb-1"><strong>${pair[0]}:</strong> ${Alfred.escapeHtml(pair[1])}</p>`).join("")}${remove("debrief", index)}</article>`;
+    host.innerHTML = `
+        <h4 class="h6 mt-3">Your stories for this job</h4>
+        <p class="small muted">Situation, task, action, result and what you learned, in your own words. They also appear in your story bank.</p>
+        <div id="careerStoryList">${notes.stories.length ? notes.stories.map((story, index) => careerStoryHtml(story) + remove("story", index)).join("") : '<p class="small muted">No stories yet.</p>'}</div>
+        <details class="mt-2"><summary class="small">Add a story</summary>
+            <form id="careerStoryForm" class="row g-2 mt-1">
+                ${input("careerStoryTitle", "Title (required)")}${input("careerStoryTheme", "Theme, such as leadership")}
+                ${area("careerStorySituation", "Situation")}${area("careerStoryTask", "Task")}${area("careerStoryAction", "What you did (required)")}
+                ${area("careerStoryResult", "Result")}${area("careerStoryReflection", "What you learned")}${input("careerStoryBestFor", "Best for questions about")}
+                <div class="col-12"><button class="btn btn-outline-secondary btn-sm" type="submit">Save story</button></div>
+            </form>
+        </details>
+        <h4 class="h6 mt-3">Interview debriefs</h4>
+        <div id="careerDebriefList">${notes.debriefs.length ? notes.debriefs.map(debrief).join("") : '<p class="small muted">No debriefs yet. Write one the same day, while you remember the questions.</p>'}</div>
+        <details class="mt-2"><summary class="small">Add a debrief</summary>
+            <form id="careerDebriefForm" class="row g-2 mt-1">
+                ${input("careerDebriefOn", "Interview date", "date")}${input("careerDebriefInterviewer", "Interviewer and role")}
+                <div class="col-md-6"><label class="form-label small" for="careerDebriefRound">Round</label><select class="form-select form-select-sm" id="careerDebriefRound">
+                    <option value="screen">Screen</option><option value="hiring-manager">Hiring manager</option><option value="technical">Technical</option>
+                    <option value="system-design">Design or case study</option><option value="behavioral">Behavioural</option><option value="other">Other</option></select></div>
+                <div class="col-md-6"><label class="form-label small" for="careerDebriefOutcome">Outcome so far</label><select class="form-select form-select-sm" id="careerDebriefOutcome">
+                    <option value="pending">Waiting</option><option value="moved-forward">Moved forward</option><option value="rejected">Rejected</option></select></div>
+                ${area("careerDebriefQuestions", "Questions asked")}${area("careerDebriefWell", "What went well")}${area("careerDebriefGaps", "Gaps to close before the next round")}${area("careerDebriefNext", "Next steps they mentioned")}
+                <div class="col-12"><button class="btn btn-outline-secondary btn-sm" type="submit">Save debrief</button></div>
+            </form>
+        </details>
+        <div id="careerNotesFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>`;
+    const value = id => document.getElementById(id).value;
+    const send = change => Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/interview-notes/`, {method: "POST", body: JSON.stringify({...change, revision: item.updated_at})})
+        .then(data => {
+            const index = careerOpportunities.findIndex(row => row.id === item.id);
+            if (index >= 0) careerOpportunities[index] = data.opportunity;
+            renderCareerOutcomeForm(data.opportunity);
+            showCareerFeedback("careerNotesFeedback", "Saved.", "success");
+        })
+        .catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger"));
+    document.getElementById("careerStoryForm").addEventListener("submit", event => {
+        event.preventDefault();
+        send({action: "add", kind: "story", item: {title: value("careerStoryTitle"), theme: value("careerStoryTheme"), situation: value("careerStorySituation"),
+            task: value("careerStoryTask"), action: value("careerStoryAction"), result: value("careerStoryResult"), reflection: value("careerStoryReflection"), best_for: value("careerStoryBestFor")}});
+    });
+    document.getElementById("careerDebriefForm").addEventListener("submit", event => {
+        event.preventDefault();
+        send({action: "add", kind: "debrief", item: {on: value("careerDebriefOn"), interviewer: value("careerDebriefInterviewer"), round_type: value("careerDebriefRound"),
+            outcome: value("careerDebriefOutcome"), questions: value("careerDebriefQuestions"), went_well: value("careerDebriefWell"), gaps: value("careerDebriefGaps"), next_steps: value("careerDebriefNext")}});
+    });
+    host.querySelectorAll("[data-notes-remove]").forEach(button => button.addEventListener("click", () =>
+        send({action: "remove", kind: button.dataset.notesRemove, index: Number(button.dataset.index)})));
 }
 
 function renderCareerOutcomeForm(item) {
