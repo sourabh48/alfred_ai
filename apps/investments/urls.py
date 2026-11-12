@@ -1,7 +1,7 @@
 from django.urls import path
 from .import_review_views import InvestmentImportReviewAPI, InvestmentImportConfirmAPI
 from .alert_views import InvestmentReviewAlertView
-from .research_views import ResearchDecisionDetailView, ResearchDecisionListCreateView, ResearchDecisionSettleView, ResearchHistoryView, ResearchLessonsView, ResearchChallengeView, ResearchPacketView
+from .research_views import ResearchDecisionDetailView, ResearchDecisionListCreateView, ResearchDecisionSettleView, ResearchHistoryView, ResearchLessonsView, ResearchChallengeView, ResearchPacketView, ResearchPersonalChallengeView
 from .views import (
     InvestmentAllocationView,
     InvestmentDetailView,
@@ -19,6 +19,7 @@ urlpatterns = [
     path("research/history/", ResearchHistoryView.as_view(), name="research_history"),
     path("research/packet/", ResearchPacketView.as_view(), name="research_packet"),
     path("research/packet/challenge/", ResearchChallengeView.as_view(), name="research_packet_challenge"),
+    path("research/packet/personal-challenge/", ResearchPersonalChallengeView.as_view(), name="research_packet_personal_challenge"),
     path("research/<int:pk>/", ResearchDecisionDetailView.as_view(), name="research_decision"),
     path("research/<int:pk>/settle/", ResearchDecisionSettleView.as_view(), name="research_decision_settle"),
     path("", InvestmentListCreateView.as_view()),

@@ -185,3 +185,25 @@ class ResearchChallengeView(APIView):
         except (EmbeddingUnavailable, ValueError):
             return Response({"detail": "The local model could not challenge this packet. Check that Ollama is running and try again."},
                             status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class ResearchPersonalChallengeView(APIView):
+    """WEALTH2-004: the local model challenges the owner's own view and position; only with consent for this request."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+        from .services.research_challenge import personal_challenge
+
+        data = request.data if isinstance(request.data, dict) else {}
+        if data.get("include_personal") is not True:
+            return Response({"detail": "Tick that ALFRED may use your holding and saved views for this check."}, status=status.HTTP_400_BAD_REQUEST)
+        packet, error = _packet(request.user, data)
+        if error:
+            return error
+        try:
+            return Response(personal_challenge(request.user, packet, today=timezone.localdate()))
+        except (EmbeddingUnavailable, ValueError):
+            return Response({"detail": "The local model could not challenge your view. Check that Ollama is running and try again."},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)

@@ -8933,6 +8933,46 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual((list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()), (holdings, calls))
         self.capture('investment-research-packet')
 
+    def test_personal_challenger_needs_consent_and_keeps_the_owners_view_out_of_the_public_analyst(self):
+        from datetime import timedelta
+        from unittest.mock import patch
+        from django.utils import timezone
+        from apps.investments.models import Investment, ResearchDecision
+        from tests.test_research_packet import GOOD, RISING, FakeReasoner, _fund, _prices
+        owner, today = self.scenario['user'], timezone.localdate()
+        thesis = 'Margins keep rising <img src=x onerror="window.viewInjected=true">'
+        ResearchDecision.objects.create(user=owner, instrument='SYNTH.NS', rating='buy', thesis=thesis, decided_on=today - timedelta(days=40),
+                                        review_on=today + timedelta(days=200), entry_price=200)
+        holdings, calls = list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()
+        personal = FakeReasoner('{"objections":[{"point":"V","why":"Rising margins need pricing power the evidence does not show."}],'
+                                '"overlooked":["Whether you need this money soon"]}')
+        analyst = FakeReasoner(GOOD)
+        self.login()
+        with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund()), \
+                patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)), \
+                patch('apps.investments.services.research_challenge.local_reasoner', side_effect=[analyst, personal]):
+            self.browser.get(self.live_server_url + '/investments/')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketSymbol'))
+            self.browser.find_element(self.By.ID, 'researchPacketSymbol').send_keys('synth.ns')
+            self.memory_click('#researchPacketForm button[type=submit]')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketResult'))
+            self.memory_click('#researchPersonalButton')
+            self.wait.until(lambda _: 'Tick that ALFRED may use' in self.text('researchPersonalResult'))
+            self.memory_click('#researchChallengeButton')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchChallengeResult'))
+            self.memory_click('#researchPersonalConsent')
+            self.memory_click('#researchPersonalButton')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPersonalChallenge'))
+        result = self.text('researchPersonalChallenge')
+        self.assertIn(f'Your buy view of {(today - timedelta(days=40)).isoformat()}', result)
+        self.assertIn('pricing power', result)
+        self.assertIn('did not leave this computer', result)
+        self.assertNotIn('Margins keep rising', str(analyst.payloads))  # the public analyst never saw the owner's view
+        self.assertEqual(personal.payloads[0]['owner_view_notes'], thesis)
+        self.assertFalse(self.browser.execute_script('return Boolean(window.viewInjected)'))
+        self.assertEqual((list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()), (holdings, calls))
+        self.run_axe_light_dark('investment-personal-challenger')
+
     def test_loan_prepayment_what_if_reports_savings_and_cash_left_without_writing(self):
         from decimal import Decimal
         from django.utils import timezone

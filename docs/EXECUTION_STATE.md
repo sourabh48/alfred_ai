@@ -40,6 +40,15 @@
 - CI at f89c8df (run 43222348115): all three Selenium shards refused to start because the new browser test had no
   entry in tests/browser_durations.json (shard planning fails closed). Added its local time (11.72 s); local
   collect-only shard planning passes (211 tests). No test or timeout was changed. Pushed as 8d84fa7 (owner approved).
+- `sprint` (owner 2026-11-12: keep selecting, do not wait for CI, fix and push on results): selected WEALTH2-004.
+  Found a leak: the public second opinion (research/packet/challenge) sent the owner's holding share ("It is already
+  30.0% of your holdings") to the analyst model. Private metrics are now filtered out of the analyst packet. Added
+  POST research/packet/personal-challenge/: a separate local-only challenger of the owner's own saved view, holding
+  share and same-stock lessons; it runs only with include_personal=true (strict boolean) on that request, the owner's
+  notes go in a data field, never the task, objections with numbers or unknown points are dropped, nothing is stored.
+  A cloud model name is refused (503). Tests: analyst leak (fails on the old code), consent, no context, owner
+  isolation, CSRF, sign-in, no writes; browser test (consent message, result, analyst never sees the view, escaped
+  thesis, axe light/dark). Investment/research/limiter suites 166 PASS. Implemented, not accepted.
 - `next` (after INVEST2-002 checkpoint, CI_PENDING on 462ea52): queue had no eligible task; owner chose CAREER2-002.
   The reviewed send already existed (manifest, signed review, stale/retry/interrupted). Added: "Reply to a recruiter's
   message" draft. It quotes the sentence behind each ask in the saved recruiter message (pay, notice period, location,

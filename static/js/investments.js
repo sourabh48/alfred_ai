@@ -530,6 +530,7 @@ async function loadResearchPacket(event) {
         target.innerHTML = researchPacketHtml(packet);
         prefillResearchView(packet);
         document.getElementById("researchChallengeButton").addEventListener("click", () => loadResearchChallenge(Object.fromEntries(query)));
+        document.getElementById("researchPersonalButton").addEventListener("click", () => loadResearchPersonalChallenge(Object.fromEntries(query)));
     } catch (error) {
         target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${Alfred.escapeHtml(error.message || "The packet could not be built.")}</div>`;
     }
@@ -557,7 +558,35 @@ function researchPacketHtml(p) {
         <p class="muted small mt-2 mb-0">${(p.limits || []).map(e).join(" ")}</p>
         <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="researchChallengeButton">Get a second opinion (local AI)</button>
         <div id="researchChallenge" class="mt-2" aria-live="polite"></div>
+        <div class="border-top mt-3 pt-2" id="researchPersonal">
+            <p class="fw-semibold mb-1">Challenge your own view</p>
+            <p class="muted small mb-1">The second opinion above sees only public data. This check also reads your saved view of this stock and your holding's share, on your local AI only.</p>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="researchPersonalConsent">
+                <label class="form-check-label small" for="researchPersonalConsent">Use my holding's share and my saved views of this stock for this check. They stay on this computer.</label></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="researchPersonalButton">Challenge my own view (local AI)</button>
+            <div id="researchPersonalResult" class="mt-2" aria-live="polite"></div>
+        </div>
     </div>`;
+}
+
+async function loadResearchPersonalChallenge(params) {
+    const target = document.getElementById("researchPersonalResult"), button = document.getElementById("researchPersonalButton");
+    const e = Alfred.escapeHtml;
+    button.disabled = true;
+    target.innerHTML = `<p class="muted small mb-0">Your local AI is checking your view; on this PC it can take up to two minutes…</p>`;
+    try {
+        const body = { ...params, include_personal: document.getElementById("researchPersonalConsent").checked };
+        const c = await Alfred.fetchJSON("/api/investments/research/packet/personal-challenge/", { method: "POST", body: JSON.stringify(body) });
+        if (c.status !== "challenged") { target.innerHTML = `<p class="muted small mb-0">${e(c.detail || "")}</p>`; return; }
+        target.innerHTML = `<div id="researchPersonalChallenge"><p class="small mb-1">Used: ${c.context_used.map(e).join("; ")}.</p>
+            ${c.objections.length ? `<ul class="mb-2">${c.objections.map(o => `<li><span class="muted">${e(o.point)}</span> — ${e(o.objection)}</li>`).join("")}</ul>` : ""}
+            ${c.overlooked.length ? `<p class="fw-semibold mb-1">Personal risks to check</p><ul class="mb-2">${c.overlooked.map(item => `<li>${e(item)}</li>`).join("")}</ul>` : ""}
+            <p class="muted small mb-0">${c.dropped ? `${e(String(c.dropped))} reply item(s) were dropped. ` : ""}${c.limits.map(e).join(" ")}</p></div>`;
+    } catch (error) {
+        target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${e(error.message || "The check failed.")}</div>`;
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function prefillResearchView(packet) {
