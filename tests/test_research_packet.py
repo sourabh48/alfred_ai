@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from tempfile import TemporaryDirectory
 
 from alfred_ai.services.public_http import PublicHTTPError
 from apps.investments.models import Investment, ResearchDecision
@@ -85,6 +86,8 @@ class PacketRuleTests(SimpleTestCase):
 class PacketApiTests(TestCase):
     def setUp(self):
         cache.clear()
+        # Each test gets its own limiter folder; a shared one fills up over repeated local runs (429s).
+        self.enterContext(override_settings(ALFRED_ABUSE_THROTTLE_DIR=self.enterContext(TemporaryDirectory(prefix="alfred-packet-limits-"))))
         self.user = get_user_model().objects.create_user(username="packet", password="pw-synthetic-1")
         self.other = get_user_model().objects.create_user(username="packet-other", password="pw-synthetic-2")
         self.client.force_login(self.user)
