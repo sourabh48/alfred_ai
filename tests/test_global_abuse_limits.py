@@ -101,6 +101,16 @@ class GlobalAbuseLimitTests(TestCase):
                 self.assertIn('Retry-After', response)
                 search.assert_not_called()
 
+    def test_research_journal_reads_do_not_consume_the_expensive_packet_budget(self):
+        self.client.force_login(self.user)
+        with override_settings(ALFRED_API_ACCOUNT_LIMIT=100):
+            for path in ('/api/investments/research/', '/api/investments/research/history/', '/api/investments/research/lessons/'):
+                for _ in range(3):
+                    self.assertEqual(self.client.get(path).status_code, 200, path)
+            # The expensive account limit here is 1: the first packet request still goes through.
+            self.assertNotEqual(self.client.post('/api/investments/research/packet/', '{}', content_type='application/json').status_code, 429)
+            self.assertEqual(self.client.post('/api/investments/research/packet/challenge/', '{}', content_type='application/json').status_code, 429)
+
     def test_document_discovery_does_not_consume_expensive_search_budget(self):
         self.client.force_login(self.user)
         with override_settings(ALFRED_API_ACCOUNT_LIMIT=100):

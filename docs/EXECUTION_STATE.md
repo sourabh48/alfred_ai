@@ -39,7 +39,20 @@
   name only. Implemented, not accepted: owner acceptance pending. Pushed as f89c8df (owner approved).
 - CI at f89c8df (run 43222348115): all three Selenium shards refused to start because the new browser test had no
   entry in tests/browser_durations.json (shard planning fails closed). Added its local time (11.72 s); local
-  collect-only shard planning passes (211 tests). No test or timeout was changed.
+  collect-only shard planning passes (211 tests). No test or timeout was changed. Pushed as 8d84fa7 (owner approved).
+- `next`: queue had no eligible task; owner chose INVEST2-002. The research journal (2026-11-07, migration 0007
+  applied) already kept dated, immutable owner views separate from holdings. Added, no migration: one instrument
+  identity (case and spacing ignored, also used by lesson recall); read-only GET `research/history/` grouping views
+  per instrument as versions with rating change, which view replaced which and whether it was replaced before being
+  checked; freshness of the current view (review_due / current / checked); "You own this" vs "Watching only" by
+  holding name. Investments page: "Your views by stock" panel. Tests: API (versions, overdue, identity, owner
+  isolation, zero holding/decision writes, sign-in required) and browser (save second view, reload, history, axe
+  light/dark). Limits: owned-or-watching matches the holding name only, not a symbol or ISIN. Implemented, not
+  accepted. Not pushed.
+  Limiter fix: every `/research/` request counted as "expensive" (30/hour per account), so ordinary Investments
+  page loads could lock the owner out of uploads, job matching and packets for the rest of the hour. Only
+  `research/packet` (and its challenge) now count; regression test in tests/test_global_abuse_limits.py fails
+  without the fix. Combined investment/research/limiter suites: 163 PASS (16 pre-existing 429 failures gone).
 - Baseline 85/143, extensions 0/13 unchanged.
 
 ## Career Ops training, project, question checks, practice comments and course links - 2026-11-12

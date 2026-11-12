@@ -114,6 +114,34 @@ class ResearchJournalApiTests(TestCase):
         self.assertEqual([row["id"] for row in data["other_instruments"]], [item.pk for item in others[:3]])
         self.assertEqual(self.client.get("/api/investments/research/lessons/").json()["other_instruments"], [])
 
+    def test_history_groups_versions_by_instrument_and_flags_overdue_views_without_writing(self):
+        Investment.objects.create(user=self.owner, asset_name="Synth  Ltd", invested_amount=Decimal("10.00"), current_value=Decimal("11.00"))
+        day = lambda n: (self.today - timedelta(days=n)).isoformat()
+        first = self.create(instrument="SYNTH LTD", rating="buy", decided_on=day(60), review_on=day(10)).json()
+        second = self.create(instrument="synth   ltd", rating="sell", thesis="Debt doubled", decided_on=day(20), review_on=day(1)).json()
+        watched = self.create(instrument="WATCHED", rating="hold", decided_on=day(5), review_on=(self.today + timedelta(days=30)).isoformat()).json()
+        ResearchDecision.objects.create(user=self.other, instrument="SYNTH LTD", rating="buy", thesis="foreign", decided_on=self.today,
+                                        review_on=self.today + timedelta(days=1), entry_price=Decimal("1"))
+        holdings, decisions = list(Investment.objects.values()), list(ResearchDecision.objects.values())
+        rows = self.client.get("/api/investments/research/history/").json()["instruments"]
+        self.assertEqual([row["key"] for row in rows], ["synth ltd", "watched"])  # the overdue one first
+        synth, watch = rows
+        self.assertEqual((synth["held"], synth["freshness"], synth["current_id"]), (True, "review_due", second["id"]))
+        self.assertEqual([(v["id"], v["version"], v["rating"], v["previous_rating"]) for v in synth["versions"]],
+                         [(second["id"], 2, "sell", "buy"), (first["id"], 1, "buy", None)])
+        self.assertEqual((synth["versions"][1]["replaced_by"], synth["versions"][1]["replaced_on"], synth["versions"][1]["replaced_unchecked"]),
+                         (second["id"], day(20), True))
+        self.assertEqual((watch["held"], watch["freshness"], watch["current_id"]), (False, "current", watched["id"]))
+        self.assertNotIn("foreign", str(rows))
+        self.settle(second["id"], exit_price="90", lesson="Debt mattered")
+        self.assertEqual(self.client.get("/api/investments/research/history/").json()["instruments"][1]["freshness"], "checked")
+        self.assertEqual(self.client.get("/api/investments/research/lessons/", {"instrument": " Synth Ltd "}).json()["same_instrument"][0]["id"],
+                         second["id"])  # same stock however it is typed
+        self.assertEqual(list(Investment.objects.values()), holdings)
+        self.assertEqual(len(decisions), ResearchDecision.objects.count())
+        self.client.logout()
+        self.assertIn(self.client.get("/api/investments/research/history/").status_code, (401, 403))
+
     def test_data_reset_removes_the_journal(self):
         self.create()
         clear_user_fed_data(self.owner)

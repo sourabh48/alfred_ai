@@ -8808,6 +8808,47 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(list(Investment.objects.filter(user=owner).values()), holdings)
         self.capture('investment-research-journal')
 
+    def test_research_view_history_shows_versions_overdue_check_and_reopens(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.investments.models import Investment, ResearchDecision
+        owner, today = self.scenario['user'], timezone.localdate()
+        Investment.objects.create(user=owner, asset_name='Synthetic Owned Co', invested_amount=Decimal('10.00'), current_value=Decimal('11.00'))
+        ResearchDecision.objects.create(user=owner, instrument='Synthetic Owned Co', rating='buy', thesis='Synthetic first thesis',
+            decided_on=today - timedelta(days=60), review_on=today + timedelta(days=30), entry_price=Decimal('100'))
+        ResearchDecision.objects.create(user=get_user_model().objects.create_user(username='synthetic-research-history-other'),
+            instrument='OTHER-OWNER-STOCK', rating='sell', thesis='foreign', decided_on=today, review_on=today + timedelta(days=1), entry_price=Decimal('1'))
+        holdings = list(Investment.objects.filter(user=owner).values())
+        self.login()
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Synthetic Owned Co' in self.text('researchHistory'))
+        form = '#researchDecisionForm '
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=instrument]').send_keys('synthetic owned  co')
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').send_keys('Synthetic second thesis')
+        self.browser.execute_script("arguments[0].value = arguments[1]", self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=decided_on]'),
+                                    (today - timedelta(days=10)).isoformat())
+        self.browser.execute_script("arguments[0].value = arguments[1]", self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=review_on]'),
+                                    today.isoformat())
+        from selenium.webdriver.support.ui import Select
+        Select(self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=rating]')).select_by_value('sell')
+        self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=entry_price]').send_keys('80')
+        self.memory_click(form + 'button[type=submit]')
+        self.wait.until(lambda _: 'View saved' in self.text('researchFeedback'))
+        self.browser.refresh()  # reopen: the history comes back from the server
+        self.wait.until(lambda _: 'past its check date' in self.text('researchHistory'))
+        history = self.text('researchHistory')
+        self.assertIn('You own this · 2 views', history)
+        self.assertNotIn('OTHER-OWNER', history)
+        self.memory_click('[data-research-history="synthetic owned co"] summary')
+        self.wait.until(lambda _: 'Synthetic first thesis' in self.text('researchHistory'))
+        history = self.text('researchHistory')
+        self.assertIn('(was Buy)', history)
+        self.assertIn(f'replaced on {(today - timedelta(days=10)).isoformat()}, before you checked it', history)
+        self.assertEqual(list(Investment.objects.filter(user=owner).values()), holdings)
+        self.capture('investment-research-history')
+        self.run_axe_light_dark('investment-research-history')
+
     def test_research_packet_shows_dated_case_for_and_against_without_writing(self):
         from unittest.mock import patch
         from apps.investments.models import Investment, ResearchDecision

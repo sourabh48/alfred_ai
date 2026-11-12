@@ -646,7 +646,38 @@ function researchDecisionCard(item, today) {
         </div>`;
 }
 
+function researchHistoryCard(row) {
+    const e = Alfred.escapeHtml, rating = value => e(RESEARCH_RATING[value] || value);
+    const current = row.versions[0];
+    const state = {
+        review_due: `Your view is past its check date (${e(current.review_on)}). Check it below or save a new view.`,
+        current: `Next check on ${e(current.review_on)}.`,
+        checked: "Your latest view has been checked.",
+    }[row.freshness];
+    const version = item => `<li class="mb-2"><strong>Version ${item.version}, ${e(item.decided_on)}: ${rating(item.rating)}</strong>${
+        item.previous_rating && item.previous_rating !== item.rating ? ` (was ${rating(item.previous_rating)})` : ""}
+        ${item.replaced_on ? `<span class="muted">· replaced on ${e(item.replaced_on)}${item.replaced_unchecked ? ", before you checked it" : ""}</span>` : `<span class="muted">· current</span>`}
+        <div>${e(item.thesis)}</div></li>`;
+    return `<div class="mini-card" data-research-history="${e(row.key)}">
+        <div class="d-flex justify-content-between flex-wrap gap-2">
+            <strong>${e(row.instrument)} · ${rating(current.rating)}</strong>
+            <span class="small">${row.held ? "You own this" : "Watching only"} · ${row.versions.length} view${row.versions.length === 1 ? "" : "s"}</span>
+        </div>
+        <p class="small mb-1${row.freshness === "review_due" ? " fw-semibold" : ""}">${state}</p>
+        ${row.versions.length > 1 ? `<details class="small"><summary>How your view changed</summary><ol class="list-unstyled mt-2 mb-0">${row.versions.map(version).join("")}</ol></details>` : ""}
+    </div>`;
+}
+
+function loadResearchHistory() {
+    const target = document.getElementById("researchHistory");
+    return Alfred.fetchJSON("/api/investments/research/history/").then(data => {
+        target.innerHTML = data.instruments.length ? data.instruments.map(researchHistoryCard).join("")
+            : `<p class="small muted mb-0">No views saved yet.</p>`;
+    }).catch(() => { target.innerHTML = `<p class="small mb-0">Your view history could not load. Reload the page to retry; nothing was changed.</p>`; });
+}
+
 function loadResearchDecisions() {
+    loadResearchHistory();
     return Alfred.fetchJSON("/api/investments/research/").then(data => {
         const items = Array.isArray(data) ? data : (data.results || []);
         const target = document.getElementById("researchDecisionList");

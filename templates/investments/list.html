@@ -257,6 +257,9 @@
         <div id="researchFeedback" class="d-none alert mb-0" role="status" aria-live="polite"></div>
         <div><button class="btn btn-primary" type="submit">Save my view</button></div>
     </form>
+    <h3 class="h6 mt-4 mb-1" id="researchHistoryTitle">Your views by stock</h3>
+    <p class="small muted mb-2">Every view you save is kept. A newer view on the same stock replaces the older one here without deleting it. Owning a stock is shown only for reference; nothing here changes your holdings.</p>
+    <div id="researchHistory" class="data-stack" aria-labelledby="researchHistoryTitle" aria-live="polite"></div>
     <h3 class="h6 mt-4 mb-0">Step 3 · Your saved views</h3>
     <div id="researchDecisionList" class="data-stack mt-2"></div>
 </section>
@@ -288,5 +291,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.12.0"></script>
+<script src="/static/js/investments.js?v=2.13.0"></script>
 {% endblock %}

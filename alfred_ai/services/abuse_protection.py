@@ -14,7 +14,7 @@ from .api_errors import safe_error_details
 from .throttling import reserve_attempts
 
 
-EXPENSIVE_PATH = re.compile(r'/(?:import-pdf|import-statement|upload|upload-report|retry|refresh|research|discover|train|analyze|generate|job-match|recruiter-match|explain|personal-insights|runtime-control|transcribe|speak)(?:/|$)|/payoff/$|/bike-services/import/$')
+EXPENSIVE_PATH = re.compile(r'/(?:import-pdf|import-statement|upload|upload-report|retry|refresh|research/packet|discover|train|analyze|generate|job-match|recruiter-match|explain|personal-insights|runtime-control|transcribe|speak)(?:/|$)|/payoff/$|/bike-services/import/$')
 
 
 def _identity(value):

@@ -14,7 +14,7 @@ from alfred_ai.services.api_parsing import TextJSONParser as JSONParser
 from alfred_ai.services import public_http
 from alfred_ai.services.currency import CURRENCY_CHOICES
 from .models import ResearchDecision
-from .services.research_journal import lessons, outcome
+from .services.research_journal import lessons, outcome, thesis_history
 
 PRICE = dict(max_digits=18, decimal_places=4, min_value=Decimal("0.0001"))
 
@@ -120,6 +120,14 @@ class ResearchDecisionSettleView(APIView):
         decision.lesson = (data.get("lesson") or "").strip()
         decision.save(update_fields=["settled_on", "exit_price", "benchmark_exit", "lesson", "updated_at"])
         return Response(ResearchDecisionSerializer(decision).data)
+
+
+class ResearchHistoryView(APIView):
+    """Each instrument's views as versions, newest first; reading it changes nothing."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"instruments": thesis_history(request.user, today=timezone.localdate())})
 
 
 class ResearchLessonsView(APIView):
