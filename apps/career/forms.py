@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 
 from .models import CareerJobAnalysis
 from .services.job_intelligence import job_intelligence
@@ -139,8 +140,12 @@ class CareerOpportunityOutcomeForm(forms.Form):
         if self.normalized_outcome is None:
             raise ValueError("Cannot save an unvalidated opportunity outcome.")
         analysis = self.cleaned_data["analysis"]
-        extracted_payload = dict(analysis.extracted_payload or {})
-        extracted_payload["opportunity_outcome"] = self.normalized_outcome
-        analysis.extracted_payload = extracted_payload
-        analysis.save(update_fields=["extracted_payload", "updated_at"])
-        return analysis
+        for _ in range(5):  # merge into the latest payload so a concurrent edit (such as an email send log) is kept
+            analysis.refresh_from_db(fields=["extracted_payload", "updated_at"])
+            payload = {**(analysis.extracted_payload if isinstance(analysis.extracted_payload, dict) else {}),
+                       "opportunity_outcome": self.normalized_outcome}
+            if CareerJobAnalysis.objects.filter(pk=analysis.pk, updated_at=analysis.updated_at).update(
+                    extracted_payload=payload, updated_at=timezone.now()):
+                analysis.refresh_from_db(fields=["extracted_payload", "updated_at"])
+                return analysis
+        raise RuntimeError("The job analysis kept changing; the outcome was not saved.")

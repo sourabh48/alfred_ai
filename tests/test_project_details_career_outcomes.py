@@ -81,6 +81,22 @@ class ProjectDetailsCareerOutcomeEntryTests(TestCase):
         self.assertEqual(entry["remaining_rejected"], 3)
         self.assertTrue(entry["recent_outcomes"][0]["counts_toward_maturity"])
 
+    def test_saving_an_outcome_keeps_a_concurrent_payload_change(self):
+        from datetime import timedelta
+
+        from apps.career.forms import CareerOpportunityOutcomeForm
+        form = CareerOpportunityOutcomeForm({"analysis": self.analysis.id, "outcome": "accepted", "salary_text": "INR 24-30 LPA",
+                                             "source_url": "https://example.com/jobs/entry", "location": "Bengaluru, Karnataka, India",
+                                             "notes": "Accepted.", "salary_currency": "INR", "salary_period": "year"})
+        form.fields["analysis"].queryset = CareerJobAnalysis.objects.all()
+        self.assertTrue(form.is_valid(), form.errors)
+        CareerJobAnalysis.objects.filter(pk=self.analysis.pk).update(  # an email send logged after the form loaded the row
+            extracted_payload={"sent_messages": [{"digest": "d", "status": "sending"}]},
+            updated_at=self.analysis.updated_at + timedelta(seconds=1))
+        saved = form.save()
+        self.assertEqual(saved.extracted_payload["sent_messages"], [{"digest": "d", "status": "sending"}])
+        self.assertEqual(saved.extracted_payload["opportunity_outcome"]["outcome"], "accepted")
+
     def test_entry_form_rejects_missing_salary_source_location_or_required_reason(self):
         self.client.force_login(self.superuser)
 

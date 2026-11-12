@@ -24,7 +24,11 @@
   status; it passed locally, so it is treated as a CI timing flake and not changed.
 - Evidence (c2487af): Career, Travel guide, platform hardening, data sources and tax modules plus route sweeps,
   runner and live UI contracts 356 PASS; browser: dashboard follow-up, Career kit and reviewed-send tests 11 PASS.
-  Not pushed.
+  Pushed as 035351a (owner approved).
+- Sprint (owner: "sprint... complete tasks"): EXECUTION_QUEUE has no eligible task; all 58 original rows are blocked
+  on owner checks, approvals, external hosts or dependencies, and the 13 extensions wait for baseline closure. Fixed the
+  audit's remaining PLAUSIBLE gap instead: the superuser career-outcome form saved a stale payload copy and could drop
+  an email send record; it now merges into the latest payload against `updated_at` (regression test). Not pushed.
 - Baseline 85/143, extensions 0/13 unchanged.
 
 ## Career Ops training, project, question checks, practice comments and course links - 2026-11-12
