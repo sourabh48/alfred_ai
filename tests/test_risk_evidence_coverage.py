@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.behavioral.models import BehavioralSignal
-from apps.career.models import CareerJobAnalysis
+from apps.career.models import CareerJobAnalysis, CareerProfile
 from apps.expenses.models import BankAccount
 from apps.risk.models import RiskSignal
 from apps.risk.serializers import RiskSignalSerializer
@@ -61,9 +61,12 @@ class RiskEvidenceCoverageTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("risk_coverage", password="synthetic-pass-123")
 
-    def outlook(self, *, user=None, market=None):
-        with patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook",
-                   return_value=market or market_payload()):
+    def outlook(self, *, user=None, market=None, role="Synthetic analyst"):
+        if role:
+            CareerProfile.objects.update_or_create(user=user or self.user, defaults={"role": role, "experience_years": 3, "skills": ""})
+        market = market or market_payload()
+        with patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook", return_value=market),                 patch("apps.risk.services.risk_intelligence.verified_intelligence.macro_context",
+                      return_value={"payload": market["macro_context"], "evidence": market["evidence"]}):
             result = risk_intelligence.build_outlook(user or self.user)
         return result, {item["key"]: item for item in result["consolidated_risks"]}
 
@@ -82,6 +85,17 @@ class RiskEvidenceCoverageTests(TestCase):
         self.assertNotIn("Average sleep 0.0h", items["health"]["drivers"])
         self.assertNotIn("Condition score 0/100", items["mobility"]["drivers"])
         self.assertEqual(result["action_items"], [])
+
+    def test_no_job_role_means_no_news_search_and_no_career_score(self):
+        evidence = {"title": "Synthetic market", "source_url": "https://example.test/market", "status": "fresh"}
+        with patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook") as outlook:
+            result, items = self.outlook(market=market_payload(risk_score=48, evidence=[evidence]), role="")
+        outlook.assert_not_called()
+        self.assertEqual(items["career"]["coverage"]["status"], "insufficient_data")
+        self.assertEqual(items["career"]["score"], 0)
+        self.assertIn("Job role not set in Career; job market not scored", items["career"]["drivers"])
+        self.assertEqual(result["summary"]["highest_label"], "No data")
+        self.assertEqual(result["related_news"], [])
 
     def test_all_insufficient_summary_abstains(self):
         with patch("apps.risk.services.risk_intelligence._category_coverage",
@@ -254,9 +268,10 @@ class RiskEvidenceCoverageTests(TestCase):
     def test_news_search_gets_the_role_but_not_the_analyzed_company(self):
         CareerJobAnalysis.objects.create(user=self.user, job_url="https://example.test/job", company="Synthetic Employer Ltd",
                                          fit_score=0, extracted_payload={"fit": {"score_status": "UNAVAILABLE"}})
+        CareerProfile.objects.create(user=self.user, role="Synthetic analyst", experience_years=3, skills="")
         with patch("apps.risk.services.risk_intelligence.job_intelligence.market_outlook", return_value=market_payload()) as outlook:
             risk_intelligence.build_outlook(self.user)
-        self.assertEqual(outlook.call_args.args[1], "")
+        self.assertEqual(outlook.call_args.args, ("Synthetic analyst", ""))
 
     def test_required_documents_not_added_are_listed_but_not_scored(self):
         summary = {"critical_faults": 0, "expired_documents": 0, "expiring_documents": 0, "latest_condition_score": 0,

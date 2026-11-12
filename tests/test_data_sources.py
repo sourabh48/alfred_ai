@@ -74,6 +74,8 @@ class DataSourcesTests(TestCase):
         self.assertEqual(finance['imports']['awaiting_review'], 1)
 
     def test_empty_career_profile_is_not_onboarding_readiness(self):
+        CareerProfile.objects.create(user=self.other, role='Profile pending', skills='', experience_years=0)
+        self.assertEqual(data_sources_snapshot(self.other)['sources'][4]['records'][0]['count'], 0)  # Career's own placeholder
         profile = CareerProfile.objects.create(user=self.owner, role='  ', skills='', experience_years=0)
         result = data_sources_snapshot(self.owner)
         self.assertEqual(result['populated'], 0)

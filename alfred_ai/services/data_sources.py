@@ -90,7 +90,9 @@ def data_sources_snapshot(user):
                 owned = model.objects.filter(user=user)
                 if model is CareerProfile:
                     profile = owned.values('role', 'skills').first()
-                    count = int(bool(profile and any((profile[field] or '').strip() for field in ('role', 'skills'))))
+                    # Opening Career saves a 'Profile pending' placeholder; that is not a role you entered.
+                    count = int(bool(profile and ((profile['skills'] or '').strip()
+                                                  or (profile['role'] or '').strip() not in ('', 'Profile pending'))))
                 else:
                     count = owned.count()
                 source['records'].append(dict(label=name, count=count))
