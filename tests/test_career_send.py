@@ -125,3 +125,27 @@ class SendTests(TestCase):
             response = self.post("send", **EMAIL, confirmation=token, confirm=True)
         self.assertEqual(response.status_code, 409)
         self.assertEqual(len(mail.outbox), 0)
+
+    def test_an_interrupted_send_is_not_resent_until_the_owner_checks(self):
+        class Stopped(BaseException):
+            """ALFRED stopping mid-send: the mail server may or may not have taken the email."""
+        token = self.reviewed()["confirmation"]
+        with mock.patch("django.core.mail.backends.locmem.EmailBackend.send_messages", side_effect=Stopped()):
+            with self.assertRaises(Stopped):
+                self.post("send", **EMAIL, confirmation=token, confirm=True)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.extracted_payload["sent_messages"][0]["status"], "sending")
+        review = self.reviewed()
+        self.assertTrue(review["ready"] and review["unconfirmed_send"])
+        self.assertTrue(any("Sent folder" in item for item in review["warnings"]))
+        refused = self.post("send", **EMAIL, confirmation=review["confirmation"], confirm=True)
+        self.assertEqual(refused.status_code, 409)
+        self.assertIn("Sent folder", refused.json()["detail"])
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(self.post("send", **EMAIL, confirmation=review["confirmation"], confirm=True, resend_unconfirmed="yes").status_code, 409)
+        sent = self.post("send", **EMAIL, confirmation=review["confirmation"], confirm=True, resend_unconfirmed=True)
+        self.assertEqual(sent.status_code, 201, sent.content)
+        self.assertEqual(len(mail.outbox), 1)
+        self.item.refresh_from_db()
+        self.assertEqual([item["status"] for item in self.item.extracted_payload["sent_messages"]], ["sent"])
+        self.assertFalse(self.reviewed(subject="Another subject")["unconfirmed_send"])

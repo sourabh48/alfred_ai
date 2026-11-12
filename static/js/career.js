@@ -887,8 +887,9 @@ function renderCareerSendPanel(item, data, kind) {
         body: document.getElementById("careerSendBody").value, attach_cv: document.getElementById("careerSendAttach").checked});
     const result = document.getElementById("careerSendReviewResult");
     const form = document.getElementById("careerSendForm");
-    form.addEventListener("input", () => result.replaceChildren());
-    form.addEventListener("change", () => result.replaceChildren());
+    const edited = event => { if (!result.contains(event.target)) result.replaceChildren(); };
+    form.addEventListener("input", edited);
+    form.addEventListener("change", edited);
     form.addEventListener("submit", event => {
         event.preventDefault();
         const reviewed = fields();
@@ -900,15 +901,21 @@ function renderCareerSendPanel(item, data, kind) {
                 <p class="mb-1"><strong>Subject:</strong> ${e(review.subject)}</p><p class="mb-1"><strong>Attachments:</strong> ${files}</p>
                 ${review.blockers.length ? `<p class="mb-1 text-danger"><strong>Fix before sending:</strong></p><ul>${review.blockers.map(text => `<li>${e(text)}</li>`).join("")}</ul>` : ""}
                 ${review.warnings.length ? `<p class="mb-1"><strong>Check:</strong></p><ul>${review.warnings.map(text => `<li>${e(text)}</li>`).join("")}</ul>` : ""}
+                ${review.ready && review.unconfirmed_send ? `<div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="careerSendResend"><label class="form-check-label" for="careerSendResend">I checked my Sent folder and this email is not there</label></div>` : ""}
                 ${review.ready ? `<button class="btn btn-primary btn-sm" type="button" id="careerSendNow">Send to ${e(review.to)}</button>` : ""}
                 <p class="muted mb-0 mt-1">${e(review.note)}</p></div>`;
             if (!review.ready) return;
             document.getElementById("careerSendNow").addEventListener("click", event => {
                 event.currentTarget.disabled = true;
                 Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/email/send/`, {method: "POST",
-                    body: JSON.stringify({...reviewed, confirmation: review.confirmation, confirm: true})}).then(sent => {
+                    body: JSON.stringify({...reviewed, confirmation: review.confirmation, confirm: true,
+                        resend_unconfirmed: Boolean(document.getElementById("careerSendResend")?.checked)})}).then(sent => {
                     result.innerHTML = `<p class="small alert alert-success mb-0" id="careerSendDone" role="status">${sent.already_sent ? "Already sent earlier; not sent again." : "Sent"} to ${e(sent.sent.to)}.</p>`;
-                }).catch(error => { result.innerHTML = `<p class="small alert alert-danger mb-0" role="alert">${e(error.message)}</p>`; });
+                }).catch(error => {
+                    const button = document.getElementById("careerSendNow");
+                    if (button) button.disabled = false;
+                    result.insertAdjacentHTML("beforeend", `<p class="small alert alert-danger mb-0 mt-2" role="alert">${e(error.message)}</p>`);
+                });
             });
         }).catch(error => { result.innerHTML = `<p class="small alert alert-danger mb-0" role="alert">${Alfred.escapeHtml(error.message)}</p>`; });
     });

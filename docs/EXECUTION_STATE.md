@@ -1,5 +1,15 @@
 # ALFRED execution state
 
+## CAREER2-002 interrupted send is not resent blindly - 2026-11-12
+
+- Closed the known gap from the reviewed-send slice: if ALFRED stopped after claiming a send but before the mail
+  server answered, the record stayed "sending" and a retry sent the same email again. Now review warns that it may
+  already have gone, and send refuses (409) until the owner ticks "I checked my Sent folder and this email is not
+  there" (resend_unconfirmed=true, strictly boolean). The sending record also keeps started_at.
+- Evidence: tests.test_career_send 10 PASS (new: interrupted send simulated with a BaseException); all Career test
+  modules 233 PASS; Career kit and reviewed-send browser tests 2 PASS. 2e1ce9a pushed to master (owner approved);
+  this fix is not pushed.
+
 ## Career Ops calibrate, interview stories and debriefs - 2026-11-12
 
 - `continue` on the owner's "complete the part" Career Ops request (the remaining parts). Upstream pin 775861b

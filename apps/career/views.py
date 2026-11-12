@@ -1095,7 +1095,8 @@ class CareerSendEmailView(APIView):
                 return Response(application_send.review(request.user, analysis, resume, **fields))
             if data.get("confirm") is not True:
                 return Response({"detail": "Confirm that you want to send this email."}, status=status.HTTP_400_BAD_REQUEST)
-            record, created = application_send.send(request.user, analysis, resume, confirmation=data.get("confirmation"), **fields)
+            record, created = application_send.send(request.user, analysis, resume, confirmation=data.get("confirmation"),
+                                                    resend_unconfirmed=data.get("resend_unconfirmed") is True, **fields)
         except application_send.SendRefused as exc:
             return Response({"detail": str(exc)}, status=exc.status)
         return Response({"sent": record, "already_sent": not created}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

@@ -3,7 +3,9 @@
 The owner approved sending on 2026-11-12 on one condition: ALFRED shows the exact recipient, subject, body
 and attachment, and sends only when the owner confirms that one email. So a send needs a signed review of
 exactly that content, made within the last 15 minutes. Any change, including a new or changed CV file, makes
-the review stale and is refused. A retry of an email already sent never sends it again.
+the review stale and is refused. A retry of an email already sent never sends it again, and an email whose send
+was interrupted (ALFRED stopped before the mail server answered) is sent again only after the owner says they
+checked their Sent folder.
 """
 import hashlib
 import re
@@ -66,6 +68,16 @@ def _sent_log(analysis) -> list:
     return [item for item in _payload(analysis).get("sent_messages") or [] if isinstance(item, dict)]
 
 
+def _unconfirmed(analysis, digest):
+    return next((item for item in _sent_log(analysis) if item.get("digest") == digest and item.get("status") == "sending"), None)
+
+
+def _unconfirmed_text(item) -> str:
+    when = (item.get("started_at") or "")[:16].replace("T", " ")
+    return (f"ALFRED stopped while sending this exact email{f' on {when}' if when else ''}, so it may already have gone. "
+            "Check your mailbox's Sent folder before sending it again.")
+
+
 def review(user, analysis, resume, *, to, subject, body, attach_cv) -> dict:
     """The attachment manifest and checklist; a signed token only when nothing blocks the send."""
     to = to.strip() if isinstance(to, str) else ""
@@ -99,6 +111,9 @@ def review(user, analysis, resume, *, to, subject, body, attach_cv) -> dict:
     digest = _digest(user, analysis, to, subject, body, attachment)
     if any(item.get("digest") == digest and item.get("status") == "sent" for item in _sent_log(analysis)):
         blockers.append("You already sent this exact email for this job.")
+    interrupted = _unconfirmed(analysis, digest)
+    if interrupted and not blockers:
+        warnings.append(_unconfirmed_text(interrupted))
     previous = [item for item in _sent_log(analysis) if item.get("status") == "sent" and item.get("to", "").casefold() == to.casefold()]
     if previous and not blockers:
         warnings.append(f"You emailed {to} about this job on {previous[-1].get('sent_at', '')[:10]}.")
@@ -106,13 +121,13 @@ def review(user, analysis, resume, *, to, subject, body, attach_cv) -> dict:
     return {
         "to": to, "from": sender, "subject": subject, "body": body,
         "attachments": [{key: attachment[key] for key in ("name", "bytes", "sha256")}] if attachment else [],
-        "blockers": blockers, "warnings": warnings, "ready": not blockers,
+        "blockers": blockers, "warnings": warnings, "ready": not blockers, "unconfirmed_send": bool(interrupted),
         "confirmation": signing.TimestampSigner(salt=SALT).sign(digest) if not blockers else "",
         "note": "Nothing is sent until you press Send for this email. Any change needs a new review.",
     }
 
 
-def send(user, analysis, resume, *, to, subject, body, attach_cv, confirmation):
+def send(user, analysis, resume, *, to, subject, body, attach_cv, confirmation, resend_unconfirmed=False):
     """Send exactly what was reviewed. Returns (result, created): created is False when it was already sent."""
     from apps.career.models import CareerJobAnalysis
     try:
@@ -131,8 +146,12 @@ def send(user, analysis, resume, *, to, subject, body, attach_cv, confirmation):
         raise SendRefused("The email, recipient or CV file changed since you reviewed it. Review it again before sending.", 409)
     if current["blockers"]:
         raise SendRefused(" ".join(current["blockers"]))
+    interrupted = _unconfirmed(analysis, digest)
+    if interrupted and resend_unconfirmed is not True:
+        raise SendRefused(_unconfirmed_text(interrupted) + " If it is not there, tick that you checked and send again.", 409)
     record = {"digest": digest, "to": current["to"], "subject": current["subject"],
-              "attachment": attachment["name"] if attachment else "", "status": "sending", "sent_at": ""}
+              "attachment": attachment["name"] if attachment else "", "status": "sending", "sent_at": "",
+              "started_at": timezone.now().isoformat()}
     log = [item for item in _sent_log(analysis) if item.get("digest") != digest]
     claimed = CareerJobAnalysis.objects.filter(pk=analysis.pk, user=user, updated_at=analysis.updated_at).update(
         extracted_payload={**_payload(analysis), "sent_messages": [*log, record]}, updated_at=timezone.now())
