@@ -1,5 +1,25 @@
 # ALFRED execution state
 
+## Owner decisions 2026-11-12: bugs, credit score, local AI limits, agent rules
+
+- Source: origin/master in the owner-decisions-1112 worktree, branch work/owner-decisions-2026-11-12. Committed
+  locally, NOT pushed (owner OK needed). The owner's runtime, data and keys were not touched.
+- Phase 1 bugs: overdraft as liability 6bae15f; investment accounts not liquid cash 1f26cff + 2e9410f; loan
+  estimate label 1f7dd31; Recommendations stop inventing facts 5ecb4c4; statement import layouts 85c801d; budget
+  spent from transactions fe2bd3c (column kept, never written; dropping it needs an approved migration); Decimal
+  suggested amounts af2e3ca; unreachable mail scanner and rl trainer removed b3676c2 + docs 2033128.
+- Phase 2 (FIN-17 OWNER_DESCOPED, count stays 143) 3309d64: CreditScore/CreditScoreFactor/CreditReportUpload
+  removed. Migration integrations 0007_drop_credit_score is NOT applied to the owner runtime: owner backup first.
+  It refuses if any score row holds a non-zero total_credit_limit; files in media/credit_reports/ stay on disk.
+- Phase 3 01b3432: local AI limits in config/local.env (host LAN-only, timeout 300 s, output 4096, num_ctx = model
+  window capped at 32768, document knowledge limits); search across all private documents; cited record figures
+  allowed; sceptic/advocate/risk-manager research roles. Phase 4 e236074: AGENTS.md and CLAUDE.md.
+- Evidence: budget-related 1008 PASS; bug 8 37 + 531 PASS; recommendations 103 + browser 1 PASS; phase 2 491 run
+  (18 alias errors fixed: the guard now uses the migrating alias) then 96 PASS; phase 3 AI modules 859 PASS; browser
+  Documents/Investments 7 PASS (2 updated for search-all). project_execution --check: baseline 85, changed [].
+- Not done: owner app checks; CI on push; scripts/development_council.py still names development/alfred-integrated.
+- Next: owner decides on the push and on applying 0007 after a backup.
+
 ## Audit of sending, robots.txt and drifted docs - 2026-11-12
 
 - Owner: run the ALFRED 2.0 recovery and audit prompt, then report gaps. Source: master e548d42 in the
