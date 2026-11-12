@@ -12,8 +12,11 @@ from io import StringIO
 from django.test import SimpleTestCase
 
 from scripts import release_gate as release
-from scripts.development_council import BRANCH, MAX_REVIEW_DECISIONS, Council, CouncilError, LocalCouncilAdvisor, feature_queue, main
+from scripts.development_council import BRANCH_PREFIX, MAX_REVIEW_DECISIONS, Council, CouncilError, LocalCouncilAdvisor, feature_queue, main
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
+
+
+BRANCH = BRANCH_PREFIX + 'synthetic-council'
 
 
 class DevelopmentCouncilTests(SimpleTestCase):
@@ -656,8 +659,9 @@ class DevelopmentCouncilTests(SimpleTestCase):
         self.assertEqual(result['roles']['tester']['code'],'source_changed_during_tests')
 
     def test_production_branch_and_linked_status_outputs_are_rejected(self):
-        self.git('switch','-c','master')
-        with self.assertRaises(CouncilError): Council(self.repo)
+        for retired in ('master', 'development/alfred-integrated'):
+            self.git('switch','-c',retired)
+            with self.assertRaises(CouncilError): Council(self.repo)
         self.git('switch',BRANCH)
         outside=self.repo/'outside.txt'; outside.write_text('preserved',encoding='utf-8')
         os.link(outside,self.council.directory/'status.html')

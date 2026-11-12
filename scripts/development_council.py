@@ -20,7 +20,13 @@ from scripts import release_gate as release
 from scripts.release_validation import SECRET, PRIVATE, environment, run, privacy
 from apps.ml_engine.services.local_embeddings import OllamaEmbeddings, EmbeddingUnavailable
 
-BRANCH = 'development/alfred-integrated'
+# Owner flow since 2026-11-12: each scope is a work/* branch in a worktree from master (the former single
+# development/alfred-integrated branch is retired). master and other branches stay refused; each task also pins its base.
+BRANCH_PREFIX = 'work/'
+
+
+def development_branch(repo):
+    return release.git(repo, 'branch', '--show-current').startswith(BRANCH_PREFIX)
 ROLES = ('planner', 'developer', 'reviewer', 'security', 'tester', 'coordinator')
 CURRENT_ROLES = ('coordinator', 'architect', 'developer', 'reviewer', 'security', 'tester', 'release_guardian')
 MAX_REVIEW_DECISIONS = 64
@@ -81,7 +87,7 @@ class Council:
         self.repo = Path(repo).resolve()
         if (str(self.repo).replace('\\', '/').casefold() == 'f:/alfred/alfred_ai'
                 or Path(release.git(self.repo, 'rev-parse', '--show-toplevel')).resolve() != self.repo
-                or release.git(self.repo, 'branch', '--show-current') != BRANCH):
+                or not development_branch(self.repo)):
             raise CouncilError('development_checkout_required')
         self.directory = self.repo / 'artifacts/council'
         if self.directory.is_symlink() or not self.directory.resolve().is_relative_to(self.repo):
@@ -158,7 +164,7 @@ class Council:
         return task
 
     def snapshot(self, task, *, commit=None):
-        if release.git(self.repo, 'branch', '--show-current') != BRANCH: raise CouncilError('development_branch_changed')
+        if not development_branch(self.repo): raise CouncilError('development_branch_changed')
         if commit is None and release.git(self.repo, 'rev-parse', 'HEAD') != task['base']:
             raise CouncilError('pinned_base_changed')
         changed = set(release.git(self.repo, 'diff', '--name-only', task['base'], commit or 'HEAD').splitlines()) if commit else set(release.git(self.repo, 'diff', '--name-only', 'HEAD').splitlines())
@@ -208,7 +214,7 @@ class Council:
                 return route('confirm_guardian_stopped_before_resume','release_guardian')
             return route('wait_for_active_guardian','release_guardian','WAIT')
         head=release.git(self.repo,'rev-parse','HEAD')
-        if release.git(self.repo,'branch','--show-current')!=BRANCH:
+        if not development_branch(self.repo):
             return route('pinned_branch_or_base_changed',status='BLOCKED')
         if head!=task['base']:
             try:
@@ -495,7 +501,7 @@ class Council:
                 production_authorized=False,release_ready=False,seconds=round(time.monotonic()-started,3))
             if result['status']=='PASS':
                 try:
-                    if (release.git(self.repo,'rev-parse','HEAD')!=commit or release.git(self.repo,'branch','--show-current')!=BRANCH
+                    if (release.git(self.repo,'rev-parse','HEAD')!=commit or not development_branch(self.repo)
                             or release.git(self.repo,'status','--porcelain','--untracked-files=all')
                             or self.snapshot(current,commit=commit)[0]!=claimed[0]
                             or not self._reviews_valid(current,claimed[0])):
