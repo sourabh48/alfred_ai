@@ -924,7 +924,7 @@ function renderCareerSendPanel(item, data, kind) {
 function loadCareerPatterns() {
     const target = document.getElementById("careerPatternsPanel");
     return Alfred.fetchJSON("/api/career/patterns/").then(data => {
-        const calibration = careerCalibrationHtml(data.calibration);
+        const calibration = careerCalibrationHtml(data.calibration) + careerGapsHtml(data.skill_gaps) + careerTitlesHtml(data.titles) + careerRedFlagsHtml(data.red_flags);
         if (!data.available) { target.innerHTML = `<p class="small" id="careerPatternsUnavailable" role="status">${Alfred.escapeHtml(data.reason)}</p>${calibration}`; return; }
         const rows = (items, render) => items.map(render).join("");
         target.innerHTML = `<div class="surface-card p-3" id="careerPatterns">
@@ -953,6 +953,36 @@ function careerCalibrationHtml(cal) {
     </div>`;
 }
 
+function careerGapsHtml(gaps) {
+    if (!gaps) return "";
+    const body = !gaps.available ? `<p class="small mb-0" role="status">${Alfred.escapeHtml(gaps.reason)}</p>` : `
+        <div class="table-responsive" role="region" tabindex="0" aria-label="Skills to learn"><table class="table table-sm small"><caption>Skills to learn, most pressing first (${gaps.low_fit} of ${gaps.scored} scored jobs were a low fit)</caption>
+        <thead><tr><th scope="col">Tier</th><th scope="col">Skill</th><th scope="col">Missing in jobs</th><th scope="col">Of low-fit jobs</th><th scope="col">Weight</th></tr></thead>
+        <tbody>${gaps.gaps.map(gap => `<tr><td>${gap.tier}</td><td>${Alfred.escapeHtml(gap.skill)}</td><td>${gap.jobs}</td><td>${gap.low_fit_jobs}/${gaps.low_fit}</td><td>${gap.weight}</td></tr>`).join("")}</tbody></table></div>
+        ${gaps.already_on_cv.length ? `<p class="small">Already on your CV, so not counted: ${Alfred.escapeHtml(gaps.already_on_cv.join(", "))}.</p>` : ""}`;
+    return `<div class="surface-card p-3 mt-2" id="careerSkillGaps"><h4 class="h6">What to learn next</h4>${body}<p class="small muted mb-0">${Alfred.escapeHtml(gaps.basis)}</p></div>`;
+}
+
+function careerTitlesHtml(titles) {
+    if (!titles) return "";
+    const rows = titles.suggestions.map(row => `<li class="mb-2"><strong>${Alfred.escapeHtml(row.title)}</strong>${row.company ? ` at ${Alfred.escapeHtml(row.company)}` : ""}${row.reached_interview ? " · reached an interview" : ""}${row.triage_score ? ` · triage ${row.triage_score}/5` : ""}
+        <br><span class="muted">From your CV:</span> ${row.evidence.map(line => `"${Alfred.escapeHtml(line)}"`).join(" ")}</li>`).join("");
+    return `<div class="surface-card p-3 mt-2" id="careerTitleSuggestions"><h4 class="h6">Titles you are not searching for</h4>
+        <p class="small">Your target roles: ${titles.targets.length ? Alfred.escapeHtml(titles.targets.join(", ")) : "none set"}.</p>
+        ${rows ? `<ul class="small ps-3">${rows}</ul>` : '<p class="small" role="status">No uncovered titles with CV evidence among your saved jobs.</p>'}
+        <p class="small muted mb-0">${Alfred.escapeHtml(titles.basis)}</p></div>`;
+}
+
+function careerRedFlagsHtml(flags) {
+    if (!flags) return "";
+    const rows = flags.companies.map(row => `<tr><th scope="row">${Alfred.escapeHtml(row.company)}</th><td>${row.rounds} (${Alfred.escapeHtml(row.first)} to ${Alfred.escapeHtml(row.last)})</td>
+        <td>${Alfred.escapeHtml(row.level)} (${row.score})</td><td>${row.signals.length ? Alfred.escapeHtml(row.signals.map(signal => `${signal.label.split(":")[0]} ${signal.rounds}/${row.rounds}${signal.pattern ? ", pattern" : ""}`).join("; ")) : "None marked"}</td></tr>`).join("");
+    return `<div class="surface-card p-3 mt-2" id="careerRedFlags"><h4 class="h6">How companies interviewed you</h4>
+        ${rows ? `<div class="table-responsive" role="region" tabindex="0" aria-label="Signals you marked"><table class="table table-sm small"><caption>Signals you marked in real rounds</caption><thead><tr><th scope="col">Company</th><th scope="col">Real rounds</th><th scope="col">Level</th><th scope="col">Signals</th></tr></thead><tbody>${rows}</tbody></table></div>`
+            : '<p class="small" role="status">No real-interview debriefs or transcripts yet. Practice rounds are not counted.</p>'}
+        <p class="small muted mb-0">${Alfred.escapeHtml(flags.basis)}</p></div>`;
+}
+
 function loadCareerStoryBank() {
     const target = document.getElementById("careerStoriesPanel");
     return Alfred.fetchJSON("/api/career/stories/").then(data => {
@@ -971,13 +1001,46 @@ function careerStoryHtml(story) {
     </article>`;
 }
 
+const CAREER_SIGNALS = {
+    scope_ambiguity: "Scope ambiguity: no clear criteria for a good answer, or the role described in circles",
+    defensive_closure: "Defensive closure: cut short or redirected after a complete answer",
+    evaluator_gap: "Evaluator gap: the interviewer could not engage with a correct answer in your field",
+    process: "Process: criteria contradicted between interviewers or changed mid-round",
+};
+const CAREER_RESEARCH_AXES = {products: "Products and technology", "recent-moves": "Recent moves (last 6 months)", culture: "How they work",
+    challenges: "Likely challenges", competitors: "Competitors and differentiation", "your-angle": "Your angle"};
+const CAREER_ROUNDS = {screen: "Screen", "hiring-manager": "Hiring manager", technical: "Technical", "system-design": "Design or case study",
+    behavioral: "Behavioural", onsite: "Onsite", final: "Final", other: "Other"};
+
+function careerSignalBoxes(prefix) {
+    return `<fieldset class="col-12"><legend class="form-label small mb-1">What you noticed about how they interviewed (optional, real rounds only)</legend>
+        ${Object.entries(CAREER_SIGNALS).map(([key, label]) => `<div class="form-check"><input class="form-check-input" type="checkbox" id="${prefix}-${key}" value="${key}" data-signal-box="${prefix}">
+        <label class="form-check-label small" for="${prefix}-${key}">${label}</label></div>`).join("")}</fieldset>`;
+}
+
+function careerSessionHtml(session, index, removeButton) {
+    const real = session.source === "debrief" || session.source === "manual";
+    const turns = session.turns.map((turn, number) => `<li class="mb-2"><p class="small mb-1"><strong>Q:</strong> ${Alfred.escapeHtml(turn.question)}</p>
+        ${turn.answer ? `<p class="small mb-1"><strong>Your answer:</strong> ${Alfred.escapeHtml(turn.answer)}</p>` : ""}
+        ${turn.competency ? `<p class="small mb-1"><strong>Tests:</strong> ${Alfred.escapeHtml(turn.competency)}</p>` : ""}
+        ${turn.rating ? `<p class="small mb-1"><strong>Your rating:</strong> ${Alfred.escapeHtml(turn.rating)}</p>` : ""}
+        ${(turn.checks || []).length ? `<ul class="small mb-1" aria-label="Checks for answer ${number + 1}">${turn.checks.map(check => `<li>${Alfred.escapeHtml(check)}</li>`).join("")}</ul>` : ""}</li>`).join("");
+    return `<article class="border-top pt-2 mt-2"><p class="small mb-1"><strong>${Alfred.escapeHtml(session.on)} · ${Alfred.escapeHtml(CAREER_ROUNDS[session.round_type] || session.round_type)} · ${real ? "Real interview" : "Practice"}</strong>${session.interviewer_role ? ` with ${Alfred.escapeHtml(session.interviewer_role)}` : ""}</p>
+        ${session.stated_priorities.length ? `<p class="small mb-1"><strong>What they said the role needs:</strong> ${session.stated_priorities.map(item => `${Alfred.escapeHtml(item.speaker)}: "${Alfred.escapeHtml(item.quote)}"`).join("; ")}</p>` : ""}
+        ${session.signals.length ? `<p class="small mb-1"><strong>You noticed:</strong> ${Alfred.escapeHtml(session.signals.map(key => CAREER_SIGNALS[key].split(":")[0]).join(", "))}</p>` : ""}
+        <ol class="ps-3 mb-1">${turns}</ol>${removeButton("session", index)}</article>`;
+}
+
 function renderCareerInterviewNotes(item, host) {
-    const notes = item.interview_notes || {stories: [], debriefs: []};
+    const notes = {stories: [], debriefs: [], research: [], sessions: [], ...(item.interview_notes || {})};
     const input = (id, label, type = "text") => `<div class="col-md-6"><label class="form-label small" for="${id}">${label}</label><input class="form-control form-control-sm" type="${type}" id="${id}"></div>`;
     const area = (id, label) => `<div class="col-12"><label class="form-label small" for="${id}">${label}</label><textarea class="form-control form-control-sm" rows="2" id="${id}"></textarea></div>`;
     const remove = (kind, index) => `<button class="btn btn-link btn-sm p-0" type="button" data-notes-remove="${kind}" data-index="${index}" aria-label="Remove ${kind} ${index + 1}">Remove</button>`;
     const debrief = (row, index) => `<article class="border-top pt-2 mt-2"><p class="small mb-1"><strong>${Alfred.escapeHtml(row.on)} · ${Alfred.escapeHtml(row.round_type)} · ${Alfred.escapeHtml(row.outcome)}</strong>${row.interviewer ? ` with ${Alfred.escapeHtml(row.interviewer)}` : ""}</p>
-        ${[["Questions asked", row.questions], ["What went well", row.went_well], ["Gaps to close", row.gaps], ["Next steps", row.next_steps]].filter(pair => pair[1]).map(pair => `<p class="small mb-1"><strong>${pair[0]}:</strong> ${Alfred.escapeHtml(pair[1])}</p>`).join("")}${remove("debrief", index)}</article>`;
+        ${[["Questions asked", row.questions], ["What went well", row.went_well], ["Gaps to close", row.gaps], ["Next steps", row.next_steps]].filter(pair => pair[1]).map(pair => `<p class="small mb-1"><strong>${pair[0]}:</strong> ${Alfred.escapeHtml(pair[1])}</p>`).join("")}
+        ${(row.signals || []).length ? `<p class="small mb-1"><strong>You noticed:</strong> ${Alfred.escapeHtml(row.signals.map(key => CAREER_SIGNALS[key].split(":")[0]).join(", "))}</p>` : ""}${remove("debrief", index)}</article>`;
+    const research = (row, index) => `<article class="border-top pt-2 mt-2"><p class="small mb-1"><strong>${Alfred.escapeHtml(CAREER_RESEARCH_AXES[row.axis] || row.axis)}</strong> · checked ${Alfred.escapeHtml(row.checked_on)}</p>
+        <p class="small mb-1">${Alfred.escapeHtml(row.note)}</p>${row.source_url ? `<p class="small mb-1"><a href="${Alfred.escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">Source</a></p>` : ""}${remove("research", index)}</article>`;
     host.innerHTML = `
         <h4 class="h6 mt-3">Your stories for this job</h4>
         <p class="small muted">Situation, task, action, result and what you learned, in your own words. They also appear in your story bank.</p>
@@ -997,11 +1060,47 @@ function renderCareerInterviewNotes(item, host) {
                 ${input("careerDebriefOn", "Interview date", "date")}${input("careerDebriefInterviewer", "Interviewer and role")}
                 <div class="col-md-6"><label class="form-label small" for="careerDebriefRound">Round</label><select class="form-select form-select-sm" id="careerDebriefRound">
                     <option value="screen">Screen</option><option value="hiring-manager">Hiring manager</option><option value="technical">Technical</option>
-                    <option value="system-design">Design or case study</option><option value="behavioral">Behavioural</option><option value="other">Other</option></select></div>
+                    <option value="system-design">Design or case study</option><option value="behavioral">Behavioural</option><option value="onsite">Onsite</option><option value="final">Final</option><option value="other">Other</option></select></div>
                 <div class="col-md-6"><label class="form-label small" for="careerDebriefOutcome">Outcome so far</label><select class="form-select form-select-sm" id="careerDebriefOutcome">
                     <option value="pending">Waiting</option><option value="moved-forward">Moved forward</option><option value="rejected">Rejected</option></select></div>
-                ${area("careerDebriefQuestions", "Questions asked")}${area("careerDebriefWell", "What went well")}${area("careerDebriefGaps", "Gaps to close before the next round")}${area("careerDebriefNext", "Next steps they mentioned")}
+                ${area("careerDebriefQuestions", "Questions asked, one per line")}${area("careerDebriefWell", "What went well")}${area("careerDebriefGaps", "Gaps to close before the next round")}${area("careerDebriefNext", "Next steps they mentioned")}
+                ${careerSignalBoxes("careerDebriefSignal")}
                 <div class="col-12"><button class="btn btn-outline-secondary btn-sm" type="submit">Save debrief</button></div>
+            </form>
+        </details>
+        <h4 class="h6 mt-3">Company research</h4>
+        <p class="small muted">What you found about the company, each with the link you found it at. Your angle can be your own notes.</p>
+        <div id="careerResearchList">${notes.research.length ? notes.research.map(research).join("") : '<p class="small muted">No research yet.</p>'}</div>
+        <details class="mt-2"><summary class="small">Add research</summary>
+            <button class="btn btn-link btn-sm px-0" type="button" id="careerResearchPromptLoad">Show a research checklist to copy</button>
+            <div id="careerResearchPrompt"></div>
+            <form id="careerResearchForm" class="row g-2 mt-1">
+                <div class="col-md-6"><label class="form-label small" for="careerResearchAxis">Topic</label><select class="form-select form-select-sm" id="careerResearchAxis">
+                    ${Object.entries(CAREER_RESEARCH_AXES).map(([key, label]) => `<option value="${key}">${label}</option>`).join("")}</select></div>
+                ${input("careerResearchChecked", "Checked on", "date")}
+                ${area("careerResearchNote", "What you found (required)")}
+                <div class="col-12"><label class="form-label small" for="careerResearchSource">Source link (required except for Your angle)</label><input class="form-control form-control-sm" type="url" id="careerResearchSource" placeholder="https://"></div>
+                <div class="col-12"><button class="btn btn-outline-secondary btn-sm" type="submit">Save research</button></div>
+            </form>
+        </details>
+        <h4 class="h6 mt-3">Interview rounds and practice</h4>
+        <div id="careerSessionList">${notes.sessions.length ? notes.sessions.map((session, index) => careerSessionHtml(session, index, remove)).join("") : '<p class="small muted">No transcripts or practice rounds yet.</p>'}</div>
+        <details class="mt-2"><summary class="small">Practise a round</summary>
+            <div class="row g-2 mt-1">
+                <div class="col-md-6"><label class="form-label small" for="careerPracticeRound">Round</label><select class="form-select form-select-sm" id="careerPracticeRound">
+                    <option value="screen">Screen</option><option value="hiring-manager">Hiring manager</option><option value="technical">Technical</option>
+                    <option value="system-design">Design or case study</option><option value="behavioral">Behavioural</option></select></div>
+                <div class="col-md-6 d-flex align-items-end"><button class="btn btn-outline-secondary btn-sm" type="button" id="careerPracticeStart">Get questions</button></div>
+            </div>
+            <form id="careerPracticeForm" class="mt-2"></form>
+        </details>
+        <details class="mt-2"><summary class="small">Import an interview transcript</summary>
+            <form id="careerTranscriptForm" class="row g-2 mt-1">
+                <div class="col-12"><label class="form-label small" for="careerTranscriptText">Transcript (Career Ops session format)</label>
+                    <textarea class="form-control form-control-sm" rows="6" id="careerTranscriptText" aria-describedby="careerTranscriptHelp"></textarea>
+                    <p class="small muted mb-0" id="careerTranscriptHelp">Start with a block between two --- lines holding round, date, interviewer_role and source (debrief, manual, practice or mock), then one <code>**Interviewer:**</code> line per question and a <code>**Candidate:**</code> line for your answer. Kept only on this job.</p></div>
+                ${careerSignalBoxes("careerTranscriptSignal")}
+                <div class="col-12"><button class="btn btn-outline-secondary btn-sm" type="submit">Import transcript</button></div>
             </form>
         </details>
         <div id="careerNotesFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>`;
@@ -1019,10 +1118,45 @@ function renderCareerInterviewNotes(item, host) {
         send({action: "add", kind: "story", item: {title: value("careerStoryTitle"), theme: value("careerStoryTheme"), situation: value("careerStorySituation"),
             task: value("careerStoryTask"), action: value("careerStoryAction"), result: value("careerStoryResult"), reflection: value("careerStoryReflection"), best_for: value("careerStoryBestFor")}});
     });
+    const signals = prefix => [...host.querySelectorAll(`[data-signal-box="${prefix}"]:checked`)].map(box => box.value);
     document.getElementById("careerDebriefForm").addEventListener("submit", event => {
         event.preventDefault();
         send({action: "add", kind: "debrief", item: {on: value("careerDebriefOn"), interviewer: value("careerDebriefInterviewer"), round_type: value("careerDebriefRound"),
-            outcome: value("careerDebriefOutcome"), questions: value("careerDebriefQuestions"), went_well: value("careerDebriefWell"), gaps: value("careerDebriefGaps"), next_steps: value("careerDebriefNext")}});
+            outcome: value("careerDebriefOutcome"), questions: value("careerDebriefQuestions"), went_well: value("careerDebriefWell"), gaps: value("careerDebriefGaps"), next_steps: value("careerDebriefNext"),
+            signals: signals("careerDebriefSignal")}});
+    });
+    document.getElementById("careerResearchForm").addEventListener("submit", event => {
+        event.preventDefault();
+        send({action: "add", kind: "research", item: {axis: value("careerResearchAxis"), note: value("careerResearchNote"), source_url: value("careerResearchSource"), checked_on: value("careerResearchChecked")}});
+    });
+    document.getElementById("careerTranscriptForm").addEventListener("submit", event => {
+        event.preventDefault();
+        send({action: "add", kind: "transcript", item: {text: value("careerTranscriptText"), signals: signals("careerTranscriptSignal")}});
+    });
+    const guideUrl = `/api/career/job-analyses/${item.id}/interview-notes/`;
+    document.getElementById("careerResearchPromptLoad").addEventListener("click", () => Alfred.fetchJSON(guideUrl).then(data => {
+        document.getElementById("careerResearchPrompt").innerHTML = `<label class="form-label small" for="careerResearchPromptText">Paste this into the search or assistant you choose. It names only the company and role.</label>
+            <textarea class="form-control form-control-sm" rows="7" id="careerResearchPromptText" readonly>${Alfred.escapeHtml(data.research_prompt)}</textarea>`;
+    }).catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger")));
+    document.getElementById("careerPracticeStart").addEventListener("click", () => {
+        const round = value("careerPracticeRound");
+        Alfred.fetchJSON(`${guideUrl}?round=${encodeURIComponent(round)}`).then(data => {
+            const practice = data.practice, form = document.getElementById("careerPracticeForm");
+            form.innerHTML = `<p class="small muted">${Alfred.escapeHtml(practice.basis)}</p>
+                ${practice.stated_priorities.length ? `<p class="small"><strong>What they said the role needs:</strong> ${practice.stated_priorities.map(row => `"${Alfred.escapeHtml(row.quote)}"`).join("; ")}</p>` : ""}
+                ${practice.questions.map((row, index) => `<div class="mb-2" data-practice-turn="${index}"><label class="form-label small" for="careerPracticeAnswer${index}"><strong>${index + 1}. ${Alfred.escapeHtml(row.question)}</strong> <span class="muted">(${Alfred.escapeHtml(row.origin)})</span></label>
+                    <textarea class="form-control form-control-sm" rows="3" id="careerPracticeAnswer${index}"></textarea>
+                    <label class="form-label small mt-1" for="careerPracticeRating${index}">How did it feel?</label>
+                    <select class="form-select form-select-sm w-auto" id="careerPracticeRating${index}"><option value="">Not rated</option><option value="strong">Strong</option><option value="solid">Solid</option><option value="gap">Gap</option></select></div>`).join("")}
+                <button class="btn btn-outline-secondary btn-sm" type="submit">Save practice round and check answers</button>`;
+            form.onsubmit = event => {
+                event.preventDefault();
+                const turns = practice.questions.map((row, index) => ({question: row.question, answer: value(`careerPracticeAnswer${index}`).trim(),
+                    rating: value(`careerPracticeRating${index}`)})).filter(turn => turn.answer);
+                if (!turns.length) { showCareerFeedback("careerNotesFeedback", "Answer at least one question first.", "danger"); return; }
+                send({action: "add", kind: "practice", item: {round_type: practice.round_type, turns}});
+            };
+        }).catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger"));
     });
     host.querySelectorAll("[data-notes-remove]").forEach(button => button.addEventListener("click", () =>
         send({action: "remove", kind: button.dataset.notesRemove, index: Number(button.dataset.index)})));

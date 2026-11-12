@@ -601,3 +601,86 @@ def calibration(analyses, *, min_band=CALIBRATION_MIN_BAND) -> dict:
             "unscored": unscored, "minimum_per_band": min_band,
             "basis": "Reaching an interview counts even if it later ended; rejected counts as no interview. Applications still "
                      "waiting are left out. Advisory only: ALFRED does not change your score or brief from this."}
+
+
+
+# ---------- Skill-gap map and adjacent titles (career-ops upskill.mjs, modes/upskill.md and modes/titles.md, pin 775861b) ----------
+LOW_FIT_SCORE = 4.0
+UPSKILL_MIN_SCORED = 5
+TITLE_LIMIT = 10
+
+
+def _on_cv(skill: str, cv_text: str) -> bool:
+    return re.search(rf"(?<![a-z0-9]){re.escape(skill.casefold())}(?![a-z0-9])", cv_text) is not None
+
+
+def _triage_score(payload: dict):
+    score = (payload.get("triage") or {}).get("score") if isinstance(payload.get("triage"), dict) else None
+    return score if isinstance(score, (int, float)) and not isinstance(score, bool) and score > 0 else None
+
+
+def skill_gaps(analyses, cv_text: str, *, min_scored=UPSKILL_MIN_SCORED) -> dict:
+    """Skills your saved job matches found missing, weighted by how low each job scored. A skill on your CV is never a gap."""
+    cv = (cv_text or "").casefold()
+    rows = []
+    for analysis in analyses:
+        payload = _payload(analysis)
+        fit = payload.get("fit") if isinstance(payload.get("fit"), dict) else {}
+        missing = {item.strip().casefold(): item.strip() for item in fit.get("missing_skills") or [] if isinstance(item, str) and item.strip()}
+        if missing:
+            rows.append((_triage_score(payload), missing))
+    scored = [row for row in rows if row[0] is not None]
+    basis = (f"From the missing skills in your saved job matches. Each job counts a skill once and weighs 5 minus its triage "
+             f"score (1 if unscored), so a poor fit says more about a gap. Tiers use the share of low-fit jobs (triage under "
+             f"{LOW_FIT_SCORE}) that name the skill. No courses are suggested: ALFRED does not search the web for them.")
+    if len(scored) < min_scored:
+        return {"available": False, "basis": basis, "scored": len(scored), "minimum": min_scored,
+                "reason": f"Triage at least {min_scored} job matches that list missing skills first ({len(scored)} so far)."}
+    low_fit = sum(score < LOW_FIT_SCORE for score, _ in scored)
+    gaps, known = {}, set()
+    for score, missing in rows:
+        for key, label in missing.items():
+            if _on_cv(key, cv):
+                known.add(label)
+                continue
+            entry = gaps.setdefault(key, {"skill": label, "jobs": 0, "low_fit_jobs": 0, "weight": 0.0})
+            entry["jobs"] += 1
+            entry["weight"] += 1.0 if score is None else max(0.0, 5.0 - score)
+            entry["low_fit_jobs"] += score is not None and score < LOW_FIT_SCORE
+    for entry in gaps.values():
+        share = entry["low_fit_jobs"] / low_fit if low_fit else 0
+        entry["tier"] = ("Critical" if share >= 0.5 and entry["low_fit_jobs"] >= 3 else "High" if share >= 0.3 and entry["low_fit_jobs"] >= 2
+                         else "Medium" if entry["low_fit_jobs"] >= 2 else "Low")
+        entry["weight"] = round(entry["weight"], 2)
+    ordered = sorted(gaps.values(), key=lambda entry: (-entry["weight"], -entry["jobs"], entry["skill"].casefold()))
+    return {"available": True, "basis": basis, "scored": len(scored), "low_fit": low_fit, "gaps": ordered[:15],
+            "already_on_cv": sorted(known, key=str.casefold)}
+
+
+def title_suggestions(analyses, targets: list[str], cv_text: str) -> dict:
+    """Posted titles from your saved jobs that your target roles do not cover, each with CV lines quoted as evidence."""
+    lines = _cv_lines(cv_text)
+    covered = [target.casefold() for target in targets if target]
+    seen, suggestions = set(), []
+    for analysis in analyses:
+        payload = _payload(analysis)
+        snapshot = payload.get("job_snapshot") if isinstance(payload.get("job_snapshot"), dict) else {}
+        title = " ".join((analysis.job_title or snapshot.get("title") or "").split())
+        if not title or title.casefold() in seen or any(target in title.casefold() for target in covered):
+            continue
+        fit = payload.get("fit") if isinstance(payload.get("fit"), dict) else {}
+        matched = [item.strip() for item in fit.get("matched_skills") or [] if isinstance(item, str) and item.strip()]
+        evidence = [line for line in lines if any(_on_cv(skill, line.casefold()) for skill in matched)][:2]
+        if not evidence:
+            continue  # titles.md: if a CV line cannot be quoted, the title is not suggested
+        seen.add(title.casefold())
+        application = payload.get("application") if isinstance(payload.get("application"), dict) else {}
+        reached = {item.get("stage") for item in application.get("history") or [] if isinstance(item, dict)} | {application.get("stage")}
+        suggestions.append({"title": title, "company": analysis.company, "analysis_id": analysis.pk, "evidence": evidence,
+                            "matched_skills": matched[:5], "reached_interview": bool(reached & {"interview", "offer", "hired"}),
+                            "triage_score": _triage_score(payload)})
+    suggestions.sort(key=lambda row: (not row["reached_interview"], -(row["triage_score"] or 0), -len(row["matched_skills"])))
+    return {"targets": targets, "suggestions": suggestions[:TITLE_LIMIT],
+            "basis": "Titles as posted in jobs you saved that none of your target roles match, with lines quoted from your CV "
+                     "that show the matched skills. Nothing is added for you: put a title in Target roles in your triage "
+                     "brief if you want it."}

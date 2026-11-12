@@ -22,12 +22,16 @@ class CareerOpportunitySerializer(serializers.ModelSerializer):
     def get_interview_notes(self, obj):
         from .services import interview_notes
         notes = interview_notes.clean(obj.extracted_payload.get('interview_notes') if isinstance(obj.extracted_payload, dict) else None)
-        if notes['stories'] and 'current_cv_text' not in self.context:
+        if (notes['stories'] or notes['sessions']) and 'current_cv_text' not in self.context:
             request = self.context.get('request')
             resume = CareerResume.objects.filter(user=request.user).order_by('-created_at', '-id').only('extracted_text').first() if request else None
             self.context['current_cv_text'] = resume.extracted_text if resume else ''
         for story in notes['stories']:
             story['unverified_figures'] = interview_notes.unverified_figures(story, self.context['current_cv_text'])
+        for session in notes['sessions']:
+            if session['source'] == 'practice':
+                for turn in session['turns']:
+                    turn['checks'] = interview_notes.answer_checks(turn, session['round_type'], self.context['current_cv_text'])
         return notes
 
     def get_application(self, obj):
