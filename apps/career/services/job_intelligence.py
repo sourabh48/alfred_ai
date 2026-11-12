@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal, DecimalException
 import hashlib
+import html
 import json
 import math
 import re
@@ -148,6 +149,9 @@ JOB_FEED_ADAPTERS = (
     },
 )
 JOB_PAGE_ADAPTERS = ("Generic JSON-LD", "Greenhouse", "Lever", "Workday", "Ashby")
+# Public, keyless job-board APIs; a posting on these boards is never read from its HTML page.
+GREENHOUSE_BOARD_HOSTS = {"boards.greenhouse.io", "job-boards.greenhouse.io"}
+LEVER_API_HOSTS = {"jobs.lever.co": "api.lever.co", "jobs.eu.lever.co": "api.eu.lever.co"}
 SPECIALTY_SOURCE_CANDIDATES = (
     {
         "name": "Naukri",
@@ -241,6 +245,36 @@ class JobIntelligenceService:
     USER_AGENT = "AlfredAI/1.0 (career-intelligence)"
 
     def parse_job_page(self, job_url: str) -> JobPostingSnapshot:
+        # Free public job-board APIs come first; the page itself is read only where no free API exists.
+        board = self._public_board_posting(job_url)
+        if board is not None:
+            (raw, ld_json), soup = board, None
+            job_url = raw.job_url
+        else:
+            raw, soup, job_url, ld_json = self._read_job_page(job_url)
+        description = " ".join((raw.description or "").split())[:12000]
+        salary_min, salary_max, salary_currency, salary_period = self._extract_salary(
+            ld_json, description or (soup.get_text(" ", strip=True) if soup is not None else ""))
+        domain = urlparse(job_url).netloc.replace("www.", "")
+        return JobPostingSnapshot(
+            source_name=raw.source_name,
+            job_url=job_url,
+            apply_url=raw.apply_url or job_url,
+            company=(raw.company or _domain_company(domain))[:180],
+            title=(raw.title or "")[:180],
+            location=(raw.location or "")[:180],
+            description=description,
+            required_skills=self._extract_skills(description),
+            experience_years=self._extract_experience(description),
+            employment_type=self._extract_employment_type(ld_json, description),
+            salary_min=salary_min,
+            salary_max=salary_max,
+            salary_currency=salary_currency,
+            salary_period=salary_period,
+            source_kind="job_page",
+        )
+
+    def _read_job_page(self, job_url: str):
         response = public_http.request(
             "GET", job_url, headers={"User-Agent": self.USER_AGENT},
             content_types=("text/html", "application/xhtml+xml"), max_bytes=2_000_000,
@@ -259,25 +293,61 @@ class JobIntelligenceService:
             raw = self._parse_ashby_page(soup, job_url, domain, ld_json)
         else:
             raw = self._parse_generic_page(soup, job_url, domain, ld_json)
-        description = " ".join((raw.description or "").split())[:12000]
-        salary_min, salary_max, salary_currency, salary_period = self._extract_salary(ld_json, description or soup.get_text(" ", strip=True))
+        return raw, soup, job_url, ld_json
+
+    def _board_json(self, url: str) -> dict:
+        response = public_http.request("GET", url, headers={"User-Agent": self.USER_AGENT},
+                                       content_types=("application/json",), max_bytes=2_000_000)
+        try:
+            data = response.json()
+        except ValueError:
+            raise public_http.PublicHTTPError("api_error") from None
+        if not isinstance(data, dict):
+            raise public_http.PublicHTTPError("api_error")
+        return data
+
+    def _public_board_posting(self, job_url: str):
+        """Read a Greenhouse or Lever posting from the board's free public JSON API, or return None."""
+        safe = public_http.normalized_link(job_url)
+        parts = urlparse(safe)
+        host, path = parts.hostname or "", parts.path
+        text = lambda value: BeautifulSoup(str(value or ""), "html.parser").get_text(" ", strip=True)
+        match = re.fullmatch(r"/([A-Za-z0-9_-]{1,100})/jobs/(\d{1,20})/?", path) if host in GREENHOUSE_BOARD_HOSTS else None
+        if match:
+            data = self._board_json(f"https://boards-api.greenhouse.io/v1/boards/{match[1]}/jobs/{match[2]}")
+            location = data.get("location") if isinstance(data.get("location"), dict) else {}
+            return JobPostingSnapshot(
+                source_name="Greenhouse", job_url=safe,
+                apply_url=public_http.normalized_link(str(data.get("absolute_url") or "")) or safe,
+                company=str(data.get("company_name") or "") or match[1].replace("-", " ").title(),
+                title=str(data.get("title") or ""), location=str(location.get("name") or ""),
+                # Greenhouse returns the description as entity-escaped HTML.
+                description=text(html.unescape(str(data.get("content") or ""))),
+                required_skills=[], experience_years=0.0), {}
+        api_host = LEVER_API_HOSTS.get(host)
+        match = re.fullmatch(r"/([A-Za-z0-9-]{1,100})/([0-9a-fA-F-]{36})(?:/apply)?/?", path) if api_host else None
+        if not match:
+            return None
+        data = self._board_json(f"https://{api_host}/v0/postings/{match[1]}/{match[2]}")
+        categories = data.get("categories") if isinstance(data.get("categories"), dict) else {}
+        sections = [str(data.get("descriptionPlain") or "")]
+        for item in data.get("lists") if isinstance(data.get("lists"), list) else []:
+            if isinstance(item, dict):
+                sections += [str(item.get("text") or ""), text(item.get("content"))]
+        sections.append(str(data.get("additionalPlain") or ""))
+        # Expressed as schema.org data so the existing salary and job-type parsing applies unchanged.
+        ld_json = {"employmentType": str(categories.get("commitment") or "")}
+        pay = data.get("salaryRange")
+        if isinstance(pay, dict):
+            unit = re.search(r"year|month|week|day|hour", str(pay.get("interval") or "").lower())
+            ld_json["baseSalary"] = {"currency": pay.get("currency"), "value": {
+                "minValue": pay.get("min"), "maxValue": pay.get("max"), "unitText": unit[0].upper() if unit else ""}}
         return JobPostingSnapshot(
-            source_name=raw.source_name,
-            job_url=job_url,
-            apply_url=raw.apply_url or job_url,
-            company=(raw.company or _domain_company(domain))[:180],
-            title=(raw.title or "")[:180],
-            location=(raw.location or "")[:180],
-            description=description,
-            required_skills=self._extract_skills(description),
-            experience_years=self._extract_experience(description),
-            employment_type=self._extract_employment_type(ld_json, description),
-            salary_min=salary_min,
-            salary_max=salary_max,
-            salary_currency=salary_currency,
-            salary_period=salary_period,
-            source_kind="job_page",
-        )
+            source_name="Lever", job_url=safe,
+            apply_url=public_http.normalized_link(str(data.get("applyUrl") or "")) or safe,
+            company=match[1].replace("-", " ").title(), title=str(data.get("text") or ""),
+            location=str(categories.get("location") or ""), description=" ".join(s for s in sections if s),
+            required_skills=[], experience_years=0.0), ld_json
 
     def parse_recruiter_message(self, message_text: str, *, attachment=None, filename: str = "") -> JobPostingSnapshot:
         attachment_text = ""

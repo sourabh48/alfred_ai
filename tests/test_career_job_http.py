@@ -70,3 +70,78 @@ class CareerJobHTTPTests(SimpleTestCase):
         with self.assertRaisesRegex(PublicHTTPError, '^timeout$'):
             job_intelligence.parse_job_page('https://example.org/')
         self.pool.close.assert_called_once()
+
+
+class CareerFreeJobBoardAPITests(SimpleTestCase):
+    """Greenhouse and Lever postings come from their free public JSON APIs, never their HTML pages."""
+
+    def setUp(self):
+        dns = patch('alfred_ai.services.public_http._resolve_host_ips', return_value=[ip_address('93.184.215.14')])
+        dns.start()
+        self.addCleanup(dns.stop)
+        pool = patch('alfred_ai.services.public_http.urllib3.HTTPSConnectionPool')
+        self.pool_class = pool.start()
+        self.addCleanup(pool.stop)
+        self.pool = self.pool_class.return_value
+        self.response = Mock(status=200, headers={'Content-Type': 'application/json'})
+        self.pool.urlopen.return_value = self.response
+
+    def reply(self, payload):
+        import json
+        self.response.read.side_effect = [json.dumps(payload).encode(), b'']
+
+    def test_greenhouse_posting_uses_job_board_api(self):
+        self.reply({'title': 'Data Engineer', 'company_name': 'Synthetic Co', 'location': {'name': 'Pune, India'},
+                    'absolute_url': 'https://job-boards.greenhouse.io/synthetic/jobs/4821',
+                    'content': '&lt;p&gt;Build Python and SQL pipelines. 3+ years experience.&lt;/p&gt;'
+                               '&lt;script&gt;alert(1)&lt;/script&gt;'})
+        job = job_intelligence.parse_job_page('https://boards.greenhouse.io/synthetic/jobs/4821?gh_src=x')
+        self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'boards-api.greenhouse.io')
+        self.assertEqual(self.pool.urlopen.call_args.args[1], '/v1/boards/synthetic/jobs/4821')
+        self.assertEqual(self.pool.urlopen.call_count, 1)
+        self.assertEqual((job.source_name, job.company, job.title, job.location),
+                         ('Greenhouse', 'Synthetic Co', 'Data Engineer', 'Pune, India'))
+        self.assertIn('Python', job.required_skills)
+        self.assertNotIn('<', job.description)
+        self.assertEqual(job.apply_url, 'https://job-boards.greenhouse.io/synthetic/jobs/4821')
+
+    def test_lever_posting_uses_postings_api_with_stated_pay(self):
+        posting = '0f0e0d0c-0b0a-4908-8706-050403020100'
+        self.reply({'text': 'Backend Engineer', 'categories': {'location': 'Remote', 'commitment': 'Full-time'},
+                    'descriptionPlain': 'Django services.', 'additionalPlain': '',
+                    'lists': [{'text': 'Requirements', 'content': '<li>Docker</li><li>SQL</li>'}],
+                    'applyUrl': f'https://jobs.lever.co/synthetic-labs/{posting}/apply',
+                    'salaryRange': {'currency': 'USD', 'interval': 'per-year-salary', 'min': 90000, 'max': 120000}})
+        job = job_intelligence.parse_job_page(f'https://jobs.lever.co/synthetic-labs/{posting}')
+        self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'api.lever.co')
+        self.assertEqual(self.pool.urlopen.call_args.args[1], f'/v0/postings/synthetic-labs/{posting}')
+        self.assertEqual((job.company, job.title, job.location, job.employment_type),
+                         ('Synthetic Labs', 'Backend Engineer', 'Remote', 'Full-time'))
+        self.assertEqual((job.salary_min, job.salary_max, job.salary_currency, job.salary_period),
+                         (90000.0, 120000.0, 'USD', 'year'))
+        self.assertIn('Docker', job.required_skills)
+
+    def test_unknown_pay_interval_is_not_guessed(self):
+        posting = '0f0e0d0c-0b0a-4908-8706-050403020100'
+        self.reply({'text': 'Analyst', 'salaryRange': {'currency': 'EUR', 'interval': 'one-time', 'min': 5, 'max': 9}})
+        job = job_intelligence.parse_job_page(f'https://jobs.eu.lever.co/synthetic/{posting}')
+        self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'api.eu.lever.co')
+        self.assertEqual(job.salary_period, '')
+
+    def test_api_failure_does_not_fall_back_to_reading_the_page(self):
+        for payload in (['not', 'an', 'object'], None):
+            with self.subTest(payload=payload):
+                self.pool.urlopen.reset_mock()
+                if payload is None:
+                    self.response.read.side_effect = [b'{broken', b'']
+                else:
+                    self.reply(payload)
+                with self.assertRaisesRegex(PublicHTTPError, 'api_error'):
+                    job_intelligence.parse_job_page('https://boards.greenhouse.io/synthetic/jobs/1')
+                self.assertEqual(self.pool.urlopen.call_count, 1)
+
+    def test_other_board_paths_still_read_the_page(self):
+        self.response.headers = {'Content-Type': 'text/html'}
+        self.response.read.side_effect = [b'<html><h1>Careers</h1></html>', b'']
+        job_intelligence.parse_job_page('https://boards.greenhouse.io/synthetic')
+        self.assertEqual(self.pool_class.call_args.kwargs['server_hostname'], 'boards.greenhouse.io')

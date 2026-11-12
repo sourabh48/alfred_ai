@@ -1,5 +1,25 @@
 # ALFRED execution state
 
+## Free job-board APIs before page reading - 2026-11-12
+
+- Owner directive with the ALFRED 2.0 master prompt: do not crawl sites whose data is free; read a page only where
+  no free source exists. Applied first to Career job links: Greenhouse (boards-api.greenhouse.io/v1) and Lever
+  (api.lever.co / api.eu.lever.co v0 postings) are public keyless JSON APIs, so those postings are now read from
+  the API and never from their HTML page. Other job sites keep the existing bounded page read. All requests still
+  go through alfred_ai/services/public_http.py (DNS pinning, no redirects, size/MIME bounds); only the board token
+  and posting id leave the device. An API failure is reported, with no fallback to reading the page.
+- Lever pay is mapped to schema.org baseSalary so the existing Decimal-bounded salary parser applies; an unknown
+  pay interval is not guessed. No migration, no new dependency.
+- Evidence: tests/test_career_job_http.py 10 PASS (5 new, synthetic); all Career test modules 201 PASS; live
+  read-only check of a public GitLab Greenhouse posting and the Lever demo board parsed title, company, location,
+  skills, job type and stated pay. CI not yet run on this work.
+- Audit at this checkpoint: master aa4f61e = origin/master, Browser Regression 43117394975 PASS; no open PRs;
+  tracker 85/143 COMPLETE_VERIFIED, 21 implemented-not-accepted, 25 partial, 3 not implemented, 9 blocked;
+  extensions 0/13 accepted; queue next_task none. Unmerged branches: work/awie-scrapling-review (2 docs commits:
+  Scrapling review and approval), wip/project-dashboard-manifest-20261104 (owner-held WIP); others are
+  patch-equivalent. Scrapling core 0.5.1 stays gated to 2026-11-18 (owner approval).
+- Next: Ashby (public posting API) is the remaining keyless board; robots.txt check before the generic page read.
+
 ## Career Ops application kit - 2026-11-12
 
 - Owner asked to complete the Career Ops port in this sprint. Pinned career-ops 775861b (MIT, Santiago Fernandez de
