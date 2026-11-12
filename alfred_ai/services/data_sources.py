@@ -25,7 +25,7 @@ PUBLIC_PAGE_READS = (
          sent="The hotel's website address", safeguard="Only when you ask for that hotel; robots.txt is checked first."),
     dict(module='Tax', file='apps/integrations/services/verified_intelligence.py',
          what='The official Union Budget website (indiabudget.gov.in), to notice a new Budget year.',
-         sent='Nothing about you', safeguard='It has no API. Used as a notice only; tax rules are not changed from it.'),
+         sent='Nothing about you', safeguard='It has no API; robots.txt is checked first. A notice only: tax rules are not changed from it.'),
     dict(module='Investments', file='apps/investments/services/portfolio_intelligence.py',
          what="AMFI's official NAV history download (portal.amfiindia.com).",
          sent='The date range', safeguard='A free official text download that the server may label as a web page.'),

@@ -338,6 +338,13 @@ class TaxOverviewTests(TestCase):
         self.assertEqual(data["regime_comparison"]["new_regime"]["final_tax"],
                          self.client.get(self.url, {"financial_year": "2025-26"}).json()["regime_comparison"]["new_regime"]["final_tax"])
 
+    @patch("apps.integrations.services.verified_intelligence.public_http.request")
+    def test_budget_check_respects_robots_txt(self, request):
+        request.return_value = PublicResponse(b"User-agent: AlfredAI\nDisallow: /", "text/plain")
+        verified_intelligence.budget_publication_check(force=True)
+        self.assertIsNone(verified_intelligence.stored_budget_publication())
+        self.assertEqual([c.args[1] for c in request.call_args_list], ["https://www.indiabudget.gov.in/robots.txt"])
+
     def test_other_users_income_is_not_reused(self):
         self.client.get(self.url)
         other = get_user_model().objects.create_user(username="other-tax-policy", monthly_income=10000)

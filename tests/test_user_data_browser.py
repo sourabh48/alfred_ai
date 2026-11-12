@@ -398,6 +398,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         (self.artifacts/'data-sources-accessibility.json').write_text(json.dumps(audit, indent=2), encoding='utf-8')
         self.assertEqual(audit['violations'], [])
         self.browser.save_screenshot(str(self.artifacts/'data-sources.png'))
+        # At phone width the page-reads list wraps; nothing scrolls sideways.
+        self.browser.set_window_size(390, 900)
+        self.browser.execute_script("document.getElementById('pageReadsTitle').scrollIntoView()")
+        self.browser.execute_async_script('const done=arguments[0];requestAnimationFrame(()=>requestAnimationFrame(done));')
+        self.assertFalse(self.browser.execute_script('return document.documentElement.scrollWidth > innerWidth'))
+        self.browser.save_screenshot(str(self.artifacts/'data-sources-page-reads-390.png'))
+        self.browser.set_window_size(1440, 1200)
 
     def test_data_sources_explicit_knowledge_check_keyboard_reopen_and_key_recovery(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

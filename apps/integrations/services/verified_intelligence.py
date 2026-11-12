@@ -740,6 +740,8 @@ class VerifiedIntelligenceService:
                 "checked_at": _iso_or_empty(record.verified_at), "status": record.status}
 
     def _fetch_budget_publication(self) -> tuple[dict, str, str]:
+        if not public_http.robots_txt_allows(self.BUDGET_SOURCE_URL, "AlfredAI", headers={"User-Agent": self.USER_AGENT}):
+            raise ValueError("The official Budget site's robots.txt does not allow automated reading.")
         response = public_http.request("GET", self.BUDGET_SOURCE_URL, headers={"User-Agent": self.USER_AGENT},
                                        content_types=("text/html",), max_bytes=3_000_000)
         latest = latest_budget_year(response.content.decode("utf-8", "replace"), timezone.localdate().year)

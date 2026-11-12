@@ -282,14 +282,7 @@ class JobIntelligenceService:
         safe = public_http.normalized_link(job_url)
         if not safe:
             raise public_http.PublicHTTPError("unsafe_url")
-
-        def robots(url):
-            response = public_http.request("GET", url, headers={"User-Agent": self.USER_AGENT},
-                                           content_types=("text/plain", "text/html"),
-                                           accepted_statuses=(200, 404, 410), max_bytes=500_000)
-            # An HTML page in place of robots.txt has no rules, like a missing file.
-            return response.status, response.content.decode("utf-8", "replace") if response.content_type == "text/plain" else ""
-        if not public_http.robots_allows(safe, robots, ROBOTS_AGENT):
+        if not public_http.robots_txt_allows(safe, ROBOTS_AGENT, headers={"User-Agent": self.USER_AGENT}):
             raise public_http.PublicHTTPError("robots_disallowed")
         response = public_http.request(
             "GET", job_url, headers={"User-Agent": self.USER_AGENT},

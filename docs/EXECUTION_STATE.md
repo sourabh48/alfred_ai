@@ -10,8 +10,13 @@
   AMFI's NAV history download, each with what is sent and the safeguard. tests/test_data_sources.py fails when a
   non-test file under apps/ or alfred_ai/ starts accepting HTML responses without an entry, so a new page reader
   needs a free-source review first.
-- Evidence: tests.test_data_sources 19 PASS; Data Sources browser tests 4 PASS with axe clean (the table's
-  scroll region is keyboard-focusable). Not checked: phone-width screenshot of the new table.
+- Evidence: tests.test_data_sources 19 PASS; Data Sources browser tests 4 PASS with axe clean.
+- Follow-up `next` (same day): the list is a stacked definition list (the first table needed sideways scrolling at
+  390 px); the Data Sources browser test now checks 390 px has no horizontal page scroll and saves a screenshot.
+  public_http.robots_txt_allows is the shared robots.txt read (Career uses it); the Union Budget notice now checks
+  robots.txt before its page read. Live: with its own user agent indiabudget.gov.in robots.txt is 404 (no rules)
+  and the check lists Budget 2026-27. Tests: data sources 19, Career 207, tax/hardening/public-HTTP/Travel stays
+  115 PASS; Data Sources browser 4 PASS.
 
 ## Free job-board APIs before page reading - 2026-11-12
 

@@ -191,3 +191,13 @@ def robots_allows(url, fetch_text, agent):
     parser = RobotFileParser()
     parser.parse(text.splitlines())
     return parser.can_fetch(agent, url)
+
+
+def robots_txt_allows(url, agent, *, headers=None):
+    """Read the site's robots.txt through this boundary; failures raise PublicHTTPError (treat as refusal)."""
+    def fetch(robots_url):
+        response = request("GET", robots_url, headers=headers, content_types=("text/plain", "text/html"),
+                           accepted_statuses=(200, 404, 410), max_bytes=500_000)
+        # An HTML page in place of robots.txt has no rules, like a missing file.
+        return response.status, response.content.decode("utf-8", "replace") if response.content_type == "text/plain" else ""
+    return robots_allows(url, fetch, agent)
