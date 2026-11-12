@@ -3,7 +3,10 @@
 ## WEALTH2-001 slice 2: saved fund portfolios - 2026-11-13
 
 - Owner approved the plan 2026-11-13. Source: origin/master 3395bbc, branch work/wealth2-001-snapshots in the
-  owner-decisions-1112 worktree. Committed locally, not pushed.
+  owner-decisions-1112 worktree; pushed to master with the owner's OK ("Yes, pin and push").
+- CI at 3395bbc failed: (1) a browser test still expected the old 1024-token detailed budget, fixed d32b9d0;
+  (2) the release gate's migrations check, because 0007 was not in CI's reviewed source. Owner approved moving the
+  CI reviewed-source pin from bde1ea6 to 717761b (integrations 0007 and investments 0008).
 - New additive migration investments 0008_fund_portfolio_snapshot (not applied to the owner runtime; the app
   launcher applies pending migrations on start, so applying it needs the owner's OK and a backup).
 - Only a ticked Save keeps a file's parsed rows, never the file; latest 3 per holding; saved look-through uses the
