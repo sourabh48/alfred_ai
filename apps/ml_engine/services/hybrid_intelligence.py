@@ -1,6 +1,7 @@
 """Ollama-first Insights reasoning; read-only sources, explicit public cloud fallback."""
 import json
 from datetime import date
+from decimal import Decimal, InvalidOperation
 import re
 import time
 from unicodedata import category
@@ -9,6 +10,7 @@ from django.conf import settings
 from alfred_ai.services.api_errors import safe_error_details
 
 from .local_embeddings import KEEP_ALIVE, OllamaEmbeddings, EmbeddingUnavailable
+from .local_ai_limits import context_bytes, context_tokens, deadline as local_deadline, learn_window, max_output_tokens as output_token_cap, payload_bytes
 from .persistent_memory import _owner, MemoryConflict
 from .memory_reasoning import reason_with_memory, reasoning_provider
 
@@ -17,7 +19,7 @@ CURRENCY_LANGUAGE = re.compile(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollar
 
 ANSWER_STYLES = {
     'concise': (192, 'Answer briefly in a few clear sentences.'),
-    'detailed': (1024, 'Give a detailed, readable explanation with short labelled sections.'),
+    'detailed': (2048, 'Give a detailed, readable explanation with short labelled sections.'),
     'comparison': (768, 'Compare the options using labelled side-by-side points and state missing evidence.'),
     'steps': (768, 'Explain the requested process in ordered steps with word labels. Do not claim to have performed actions.'),
 }
@@ -31,11 +33,8 @@ def answer_budget(query, scope, style='auto'):
         elif re.search(r'\bstep[- ]by[- ]step\b|\bwalk me through\b', query, re.I): style = 'steps'
         elif re.search(r'\b(?:compare|comparison|versus|vs)\b', query, re.I): style = 'comparison'
         elif re.search(r'\bin detail\b|\bdetailed\b|\bin[- ]depth\b', query, re.I): style = 'detailed'
-        else: return 'concise', 384 if scope == 'general' else 256
-    limit = ANSWER_STYLES[style][0]
-    if scope in ('finance', 'documents', 'bank_statements', 'financial_records', 'financial_document'):
-        limit = min(limit, 512)
-    return style, limit
+        else: return 'concise', min(384 if scope == 'general' else 256, output_token_cap())
+    return style, min(ANSWER_STYLES[style][0], output_token_cap())
 
 
 class OllamaReasoner(OllamaEmbeddings):
@@ -47,15 +46,21 @@ class OllamaReasoner(OllamaEmbeddings):
         if not isinstance(self.model,str) or not re.fullmatch(r'[\w.:-]{1,100}',self.model) or 'cloud' in self.model.lower():
             raise EmbeddingUnavailable('A fixed installed local model is required.')
 
+    def _digest(self, *, deadline=None):
+        digest = super()._digest(**({'deadline': deadline} if deadline is not None else {}))
+        learn_window(self, digest, deadline=deadline)
+        return digest
+
     def reason(self,payload,*,max_output_tokens=256,deadline):
-        if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 1024:
+        if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= output_token_cap():
             raise ValueError('Choose a bounded local output budget.')
         style = payload.get('response_style', 'concise')
         if not isinstance(style, str) or style not in ANSWER_STYLES:
             raise ValueError('Choose a supported answer style.')
         before=self._digest(deadline=deadline)
+        num_ctx=context_tokens(self)  # after the model check, which learns this model's window
         body={'model':self.model,'stream':False,'think':False,'keep_alive':KEEP_ALIVE,
-            'options':{'num_predict':max_output_tokens,'num_ctx':8192,'temperature':0},
+            'options':{'num_predict':max_output_tokens,'num_ctx':num_ctx,'temperature':0},
             'messages':[{'role':'system','content':
                 'You are ALFRED. Answer general questions using general knowledge. '
                 'Fictional stories: use details stated in the query or dialogue as story premises, not verified personal facts. '
@@ -68,19 +73,21 @@ class OllamaReasoner(OllamaEmbeddings):
                 'General explanations and clearly labelled fiction do not require personal sources. '
                 'Owner-verified memories are supplementary statements, not financial authority. '
                 'Only canonical financial tool data is authoritative; do not calculate or invent financial values. '
-                'Never repeat monetary figures or currency in prose; controlled source cards display recorded amounts separately. '
+                'You may state a monetary amount only when it is copied exactly from a supplied source amount, written as digits '
+                'with that source ref in brackets beside it and its recorded currency code if it has one. Never calculate, total, '
+                'convert, round or estimate amounts, and never state a figure that no supplied source records. '
                 'If sources do not establish a requested personal or document fact, say it is unavailable. '
                 'Never infer an account number, loan balance, date or evidence from missing context. '
                 'Label advice and uncertain conclusions as hypotheses. Use word labels for lists. Never invoke tools or change records. '
                 + ANSWER_STYLES[style][1]},
                 {'role':'user','content':json.dumps(payload,ensure_ascii=False,allow_nan=False)}]}
-        if len(body['messages'][1]['content'].encode())>4096: raise ValueError('Local context exceeds its limit.')
+        if len(body['messages'][1]['content'].encode())>context_bytes(num_ctx,max_output_tokens): raise ValueError('Local context exceeds its limit.')
         result=(self._request('POST','/api/chat',body,deadline=deadline) if self.cancellation is None
                 else self.cancellation.chat(body,deadline=deadline))
         message=result.get('message',{})
         if (result.get('model')!=self.model or result.get('done') is not True or not isinstance(message,dict)
                 or message.get('role')!='assistant' or message.get('tool_calls') or not isinstance(message.get('content'),str)
-                or not message['content'].strip() or len(message['content'].encode())>8192):
+                or not message['content'].strip() or len(message['content'].encode())>max(8192,8*max_output_tokens)):
             raise EmbeddingUnavailable('Invalid local reasoning response.')
         if self._digest(deadline=deadline)!=before: raise EmbeddingUnavailable('Local reasoning model changed.')
         return message['content']
@@ -189,6 +196,47 @@ def _read_source_context(user,scope,document_id=None,transaction_id=None,record_
             'closure_date':document.closure_date.isoformat() if document.closure_date else None}}]
 
 
+NUMBER = re.compile(r'(?<![\w.])\d[\d,]*(?:\.\d+)?(?![\w])')
+ISO_DATE = re.compile(r'\b\d{4}-\d{2}-\d{2}\b')
+
+
+def _decimal(value):
+    try:
+        number = Decimal(str(value).replace(',', ''))
+    except (InvalidOperation, ValueError):
+        return None
+    return number if number.is_finite() else None
+
+
+def _cited_record_figures(answer, sources):
+    """True when every figure in the answer is a recorded amount of a source the answer cites, in that source's currency."""
+    amounts, currencies, dates = {}, {}, set()
+    for source in sources:
+        data = source.get('data') if isinstance(source.get('data'), dict) else {}
+        recorded = data.get('amounts') if isinstance(data.get('amounts'), dict) else {}
+        for value in recorded.values():
+            amount = _decimal(value.get('amount')) if isinstance(value, dict) and value.get('amount') is not None else None
+            if amount is not None:
+                amounts.setdefault(str(source['ref']), set()).add(amount)
+                if isinstance(value.get('currency'), str):
+                    currencies.setdefault(str(source['ref']), set()).add(value['currency'].upper())
+        dates.update(v for v in data.values() if isinstance(v, str) and ISO_DATE.fullmatch(v))
+    # A figure counts as cited only beside its exact bracketed ref: "loan-closure-1" never matches "[loan-closure-12]".
+    cited = [ref for ref in amounts if '[' + ref + ']' in answer]
+    if not cited:
+        return False
+    claims = ISO_DATE.sub(lambda m: '' if m.group() in dates else m.group(), answer)
+    for ref in sorted({str(source['ref']) for source in sources}, key=len, reverse=True):
+        claims = claims.replace('[' + ref + ']', '').replace(ref, '')
+    allowed = set().union(*(amounts[ref] for ref in cited))
+    allowed_currencies = set().union(*(currencies.get(ref, set()) for ref in cited))
+    if any(category(char) == 'Sc' for char in claims):
+        return False
+    if any(code.upper() not in allowed_currencies for code in CURRENCY_LANGUAGE.findall(claims)):
+        return False
+    return all(_decimal(token) in allowed for token in NUMBER.findall(claims))
+
+
 def present_answer(result,scope,query=''):
     # Financial models currently have no currency column; never infer it from model prose or OCR.
     claims=result['answer']
@@ -198,6 +246,9 @@ def present_answer(result,scope,query=''):
     financial=scope in ('finance','documents','bank_statements','financial_records','financial_document') or FINANCIAL_LANGUAGE.search(intent)
     numbers=re.search(r'\d',claims)
     withheld=bool((currency and (numbers or financial)) or (financial and numbers))
+    # Owner decision 2026-11-12: figures copied from the owner's own records and cited to them may stay.
+    if withheld and result.get('provider')=='ollama' and _cited_record_figures(result['answer'],result.get('sources',[])):
+        withheld=False; result['cited_record_figures']=True
     if withheld:
         result['answer']='The numerical or currency claims in the AI narrative were withheld. Review the recorded values and evidence below; missing currency or financial evidence cannot be inferred.'
     result['narrative_withheld']=withheld
@@ -315,22 +366,25 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
              'record_type','record_id','applicable_date','start_date','status','missed_payments','last_payment_date','last_applied_payment_date','closure_date')}
             |{'amounts':{key:{field:value[field] for field in ('amount','currency','currency_status','evidence_status')}
                 for key,value in source['data']['amounts'].items()}}} for source in tools]
+    try: reasoner=local if local is not None else OllamaReasoner()
+    except EmbeddingUnavailable: reasoner=None
+    limit=context_bytes(context_tokens(reasoner),output_limit)  # the window learned by an earlier call, else the safe fallback
     payload={'query':query,'sources':model_tools.copy(),'response_style':style}; included=[]
-    if len(json.dumps(payload,ensure_ascii=False,allow_nan=False).encode())>4096: raise ValueError('Select smaller local source context.')
+    if payload_bytes(payload)>limit: raise ValueError('Select smaller local source context.')
     history = []
     for index in range(len(conversation_context or []) - 2, -1, -2):
         candidate = conversation_context[index:index + 2] + history
-        if len(json.dumps(payload | {'history': candidate}, ensure_ascii=False, allow_nan=False).encode()) <= 4096:
+        if payload_bytes(payload | {'history': candidate}) <= limit:
             history = candidate
     if history:
         payload['history'] = history
     for item in memories:
         source={'ref':item['id'],'classification':'owner_verified_statement','data':item['content']}
-        if len(json.dumps(payload|{'sources':payload['sources']+[source]},ensure_ascii=False,allow_nan=False).encode())<=4096:
+        if payload_bytes(payload|{'sources':payload['sources']+[source]})<=limit:
             payload['sources'].append(source); included.append(item)
     try:
-        answer=(local if local is not None else OllamaReasoner()).reason(payload,max_output_tokens=output_limit,deadline=time.monotonic()+30)
-        if not isinstance(answer,str) or not answer.strip() or len(answer.encode())>8192: raise EmbeddingUnavailable('Invalid local answer.')
+        answer=(reasoner or OllamaReasoner()).reason(payload,max_output_tokens=output_limit,deadline=local_deadline())
+        if not isinstance(answer,str) or not answer.strip() or len(answer.encode())>max(8192,8*output_limit): raise EmbeddingUnavailable('Invalid local answer.')
     except EmbeddingUnavailable:
         kind = 'expense' if scope == 'bank_statements' else 'baseline' if scope == 'finance' else record_type
         if (scope in ('bank_statements', 'financial_records', 'financial_document', 'finance')

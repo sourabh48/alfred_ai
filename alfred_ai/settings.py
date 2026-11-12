@@ -543,6 +543,21 @@ ALFRED_MEMORY_REASONING_DAILY_MICROUSD = env.int('ALFRED_MEMORY_REASONING_DAILY_
 ALFRED_MEMORY_OPENAI_AUTHORIZED = env.bool('ALFRED_MEMORY_OPENAI_AUTHORIZED', default=False)
 ALFRED_MEMORY_OPENAI_PRICING_DATE = env('ALFRED_MEMORY_OPENAI_PRICING_DATE', default='')
 ALFRED_MEMORY_OLLAMA_MODEL = env('ALFRED_MEMORY_OLLAMA_MODEL', default='qwen3.5:4b')
+# Local AI limits (owner decision 2026-11-12): configurable in config/local.env with generous defaults.
+# The host must be this PC or a private LAN address; a public or cloud host is refused.
+ALFRED_OLLAMA_HOST = env('ALFRED_OLLAMA_HOST', default='127.0.0.1')
+ALFRED_OLLAMA_PORT = env.int('ALFRED_OLLAMA_PORT', default=11434)
+ALFRED_LOCAL_AI_TIMEOUT_SECONDS = env.int('ALFRED_LOCAL_AI_TIMEOUT_SECONDS', default=300)
+# num_ctx is the model's own context window, capped here so a large window cannot exhaust RAM.
+ALFRED_LOCAL_AI_MAX_CONTEXT_TOKENS = env.int('ALFRED_LOCAL_AI_MAX_CONTEXT_TOKENS', default=32768)
+ALFRED_LOCAL_AI_MAX_OUTPUT_TOKENS = env.int('ALFRED_LOCAL_AI_MAX_OUTPUT_TOKENS', default=4096)
+ALFRED_DOCUMENT_KNOWLEDGE_MAX_DOCUMENTS = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_DOCUMENTS', default=200)
+ALFRED_DOCUMENT_KNOWLEDGE_MAX_UPLOAD_BYTES = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_UPLOAD_BYTES', default=10 * 1024 * 1024)
+ALFRED_DOCUMENT_KNOWLEDGE_MAX_TEXT_BYTES = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_TEXT_BYTES', default=4 * 1024 * 1024)
+ALFRED_DOCUMENT_KNOWLEDGE_MAX_STORAGE_BYTES = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_STORAGE_BYTES', default=2 * 1024 ** 3)
+# Upper bound only: copies also follow the owner's shorter Memory retention choice.
+ALFRED_DOCUMENT_KNOWLEDGE_RETENTION_DAYS = env.int('ALFRED_DOCUMENT_KNOWLEDGE_RETENTION_DAYS', default=365)
+ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT = env.int('ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT', default=24)
 # Owner's own mailbox for Career emails the owner approves one at a time (CAREER2-002). Empty means sending is off.
 # Keep the password (an app password, not the account password) only in the untracked config/local.env.
 ALFRED_SMTP_HOST = env('ALFRED_SMTP_HOST', default='')

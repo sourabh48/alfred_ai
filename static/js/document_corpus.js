@@ -9,7 +9,8 @@ function initDocumentCorpus(getSelected) {
     const uploadConsent=document.getElementById('documentCorpusUploadConsent');
     const question=document.getElementById('documentCorpusQuestion'), ask=document.getElementById('documentCorpusAsk');
     const contextMode=document.getElementById('documentCorpusContextMode');
-    let active=true, busy=false, generation=0, controller=null, expiryTimer=null;
+    const uploadDays=document.getElementById('documentCorpusUploadDays');
+    let active=true, busy=false, generation=0, controller=null, expiryTimer=null, waitMs=30000;
     function clearResults() { clearTimeout(expiryTimer); expiryTimer=null; results.replaceChildren(); }
     function node(tag, text, className='') {
         const element=document.createElement(tag); element.textContent=text; element.className=className; return element;
@@ -29,9 +30,12 @@ function initDocumentCorpus(getSelected) {
     }
     function renderList(data) {
         const selected=new Set([...listing.querySelectorAll('input:checked')].map(input=>input.value));
-        listing.replaceChildren(); days.max=String(data.maximum_retention_days);
+        listing.replaceChildren(); days.max=uploadDays.max=String(data.maximum_retention_days);
         days.value=String(Math.min(Number(days.value),data.maximum_retention_days));
-        limits.textContent=`Up to ${data.maximum_documents} copies, ${data.maximum_selected} selected per search, `+
+        uploadDays.value=String(Math.min(Number(uploadDays.value),data.maximum_retention_days));
+        // The local model may take up to the owner's configured timeout; wait a little longer than the server.
+        waitMs=(Number(data.local_ai_timeout_seconds)||30)*1000+15000;
+        limits.textContent=`Up to ${data.maximum_documents} copies. With none selected, the best ${data.result_limit} passages across all copies are searched. `+
             `${data.maximum_text_bytes/1024} KiB of text and ${data.maximum_index_tokens} indexed words per document, `+
             `${data.maximum_linked_records} linked records per source, ${data.maximum_owner_bytes/1048576} MiB encrypted storage per owner. `+
             `General PDF/text uploads are at most ${data.maximum_upload_bytes/1024} KiB including the original. `+
@@ -44,7 +48,7 @@ function initDocumentCorpus(getSelected) {
             check.type='checkbox'; check.value=source.id; check.className='form-check-input me-2'; check.checked=selected.has(source.id);
             check.addEventListener('change',()=>{
                 if (listing.querySelectorAll('input:checked').length>data.maximum_selected) {
-                    check.checked=false; status.textContent='Select at most three private documents.';
+                    check.checked=false; status.textContent=`Select at most ${data.maximum_selected} private documents.`;
                 }
                 clearResults();
             });
@@ -84,7 +88,7 @@ function initDocumentCorpus(getSelected) {
         if (!active || busy) return;
         const ticket=++generation, request=new AbortController(); controller=request; busy=true;
         clearResults(); status.textContent='Checking private document knowledge…'; controls();
-        const timer=setTimeout(()=>request.abort(),30000);
+        const timer=setTimeout(()=>request.abort(),waitMs);
         try {
             const data=await job(request.signal);
             if (!active || ticket!==generation) return;
@@ -96,7 +100,7 @@ function initDocumentCorpus(getSelected) {
             if (ticket!==generation) return;
             clearResults();
             status.textContent=error.status===409 ? 'Private sources changed, expired or were cleared. Refresh and re-ingest the selected original.' :
-                error.code==='local_model_unavailable' ? 'The local model is unavailable or did not complete within its unchanged deadline. Your question and keywords are preserved; no cloud fallback or answer was accepted.' :
+                error.code==='local_model_unavailable' ? 'The local model is unavailable or did not complete within its configured deadline. Your question and keywords are preserved; no cloud fallback or answer was accepted.' :
                 error.status===413 ? 'The document exceeds a processing or storage limit. Choose a smaller file.' :
                 error.status===400 ? 'Check explicit consent, retention, keywords, selected documents and storage limits. Your query is preserved.' :
                 'Encrypted document knowledge is unavailable. Existing vault data is preserved. Refresh and check your session before retrying.';
@@ -136,12 +140,11 @@ function initDocumentCorpus(getSelected) {
     form.addEventListener('submit',event=>{
         event.preventDefault();
         const ids=[...listing.querySelectorAll('input:checked')].map(input=>input.value);
-        if (!ids.length) { status.textContent='Select one to three private documents before searching.'; return; }
         perform(signal=>Alfred.fetchJSON(base+'search/',{method:'POST',body:JSON.stringify({ids,query:query.value}),signal}));
     });
     ask.addEventListener('click',()=>{
         const ids=[...listing.querySelectorAll('input:checked')].map(input=>input.value);
-        if (!ids.length) { status.textContent='Explicitly select one to three private documents first.'; return; }
+        if (!ids.length && contextMode.value!=='keywords') { status.textContent='Select the documents to read in full, or use keywords to search all copies.'; return; }
         if ((contextMode.value==='keywords' && !query.reportValidity()) || !question.reportValidity()) return;
         const body={ids,question:question.value,context_mode:contextMode.value};
         if (contextMode.value==='keywords') body.keywords=query.value;

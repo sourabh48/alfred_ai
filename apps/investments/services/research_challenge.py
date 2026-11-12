@@ -1,8 +1,8 @@
 """INVEST2-001 independent challenge: the local model argues against the evidence packet, point by point.
 
-TradingAgents (Apache-2.0, pin e8f5503e) has bull and bear researchers debate before a decision. Here the debate is one
-bounded round on the local Ollama model only: it sees the packet's dated points, never the owner's records, and may only
-question them. It cannot add figures: any objection that states a number is dropped, because only the packet's dated
+TradingAgents (Apache-2.0, pin e8f5503e) has bull and bear researchers and a risk manager weigh a decision. Here each
+role is an independent, one-round prompt on the local Ollama model only (owner approval 2026-11-12): it sees the packet's
+dated points, never the owner's records, and may only comment on them. It cannot add figures: any objection that states a number is dropped, because only the packet's dated
 values count. Output is labelled as hypotheses; nothing is stored or changed.
 """
 from __future__ import annotations
@@ -28,15 +28,29 @@ def public_points(packet: dict) -> tuple[list, list]:
     return public(packet["bullish"]), public(packet["bearish"])
 
 
-def challenge_payload(packet: dict) -> dict:
+# role: (label, what the role does with up to three points, what it names that the packet does not cover)
+ROLES = {
+    "sceptic": ("Sceptic: reasons to doubt",
+                "say in under twenty-five words why the point could mislead (one-off items, accounting, cycle, sector norms, stale data)",
+                "risks the packet does not cover"),
+    "advocate": ("Advocate: the case for",
+                 "say in under twenty-five words why a worrying point may be overstated or a supportive point may last",
+                 "possible strengths the packet does not cover"),
+    "risk_manager": ("Risk manager: what could go wrong",
+                     "say in under twenty-five words what would have to go wrong for the point to hurt an investor, and what to watch",
+                     "downside scenarios or limits to set before acting"),
+}
+
+
+def challenge_payload(packet: dict, role: str = "sceptic") -> dict:
     bullish, bearish = public_points(packet)
     points = {f"F{i}": p for i, p in enumerate(bullish, 1)} | {f"A{i}": p for i, p in enumerate(bearish, 1)}
     lean = "for" if len(bullish) > len(bearish) else "against" if bearish else "neither way"
+    label, per_point, uncovered = ROLES[role]
     return {
-        "task": ("Act as an independent sceptic of this stock evidence packet. The packet leans " + lean + ". "
-                 "For up to three points, say in under twenty-five words why the point could mislead (one-off items, accounting, "
-                 "cycle, sector norms, stale data). Then name up to two risks the packet does not cover. Do not state any number, "
-                 "price, rating or recommendation. Reply only with JSON: "
+        "task": ("Act as an independent " + label.split(":")[0].lower() + " reviewing this stock evidence packet. The packet leans "
+                 + lean + ". For up to three points, " + per_point + ". Then name up to two " + uncovered + ". "
+                 "Do not state any number, price, rating or recommendation. Reply only with JSON: "
                  '{"objections":[{"point":"F1","why":"..."}],"overlooked":["..."]}'),
         "symbol": packet["symbol"],
         "points": {key: {"point": p["point"], "as_of": p["as_of"]} for key, p in points.items()},
@@ -79,18 +93,31 @@ def local_reasoner():
     from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
 
     class ChallengeReasoner(OllamaReasoner):
-        READ_SECONDS = SECONDS  # only this owner-started call waits longer; other AI features keep 30 seconds
+        READ_SECONDS = wait_seconds()  # never shorter than the measured CPU time, nor the owner's local AI timeout
 
     return ChallengeReasoner()
 
 
-def challenge_packet(packet: dict, *, reasoner=None) -> dict:
+def wait_seconds():
+    from apps.ml_engine.services.local_ai_limits import timeout_seconds
+    return max(SECONDS, timeout_seconds())
+
+
+def output_tokens():
+    from apps.ml_engine.services.local_ai_limits import max_output_tokens
+    return max_output_tokens()
+
+
+def challenge_packet(packet: dict, *, reasoner=None, role: str = "sceptic") -> dict:
+    if role not in ROLES:
+        raise ValueError("Choose the sceptic, advocate or risk manager.")
     reasoner = reasoner or local_reasoner()
-    payload, points = challenge_payload(packet)
+    payload, points = challenge_payload(packet, role)
     if not points:
         return {"status": "nothing_to_challenge", "detail": "The packet has no screen points to question."}
-    raw = reasoner.reason(payload, max_output_tokens=256, deadline=time.monotonic() + SECONDS)
-    return {"status": "challenged", "model": reasoner.model, "symbol": packet["symbol"], **parse_challenge(raw, points),
+    raw = reasoner.reason(payload, max_output_tokens=output_tokens(), deadline=time.monotonic() + wait_seconds())
+    return {"status": "challenged", "model": reasoner.model, "symbol": packet["symbol"], "role": role, "role_label": ROLES[role][0],
+            **parse_challenge(raw, points),
             "limits": ["Hypotheses from a local model, not facts or advice.",
                        "Objections that stated a number were dropped; only the packet's dated figures count.",
                        "Nothing is stored, bought, sold or changed."]}
@@ -143,7 +170,7 @@ def personal_challenge(user, packet: dict, *, today, reasoner=None) -> dict:
                 "detail": "Save your view of this stock in step 2, or choose your matching holding, to have it challenged."}
     payload, points = personal_challenge_payload(packet, context)
     reasoner = reasoner or local_reasoner()
-    raw = reasoner.reason(payload, max_output_tokens=256, deadline=time.monotonic() + SECONDS)
+    raw = reasoner.reason(payload, max_output_tokens=output_tokens(), deadline=time.monotonic() + wait_seconds())
     used = ([f"Your {context['view']['rating']} view of {context['view']['decided_on']}"] if context["view"] else []) \
         + (["Your holding's share of your portfolio"] if context["position"] else []) \
         + ([f"{len(context['lessons'])} of your lessons on this stock"] if context["lessons"] else [])

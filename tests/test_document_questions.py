@@ -5,7 +5,8 @@ from unittest.mock import Mock, patch
 from django.test import Client, TestCase
 
 from apps.ml_engine.services.canonical_evidence import SourceSelectionConflict, document_record_page
-from apps.ml_engine.services.document_questions import answer_question, DocumentQuestionReasoner, SCHEMA
+from apps.ml_engine.services.document_questions import answer_question, DocumentQuestionReasoner, SCHEMA, schema
+from apps.ml_engine.services.local_ai_limits import timeout_seconds
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from tests import test_document_corpus as fixtures
 
@@ -96,7 +97,8 @@ class DocumentQuestionTests(TestCase):
         self.local.select.side_effect=EmbeddingUnavailable('synthetic local failure')
         with self.assertRaises(EmbeddingUnavailable): self.ask()
         self.local.select.side_effect=None
-        with patch('apps.ml_engine.services.document_questions.time.monotonic',side_effect=[10,40]):
+        # The deadline is the owner's configured local AI timeout; a reply at that instant is late.
+        with patch('apps.ml_engine.services.document_questions.time.monotonic',side_effect=[10,10+timeout_seconds()]):
             with self.assertRaises(EmbeddingUnavailable): self.ask()
 
     def test_question_bounds_and_post_only_session_csrf_contract(self):
@@ -121,8 +123,10 @@ class DocumentQuestionTests(TestCase):
         with patch.object(reasoner,'_digest',return_value='a'*64), patch.object(reasoner,'_request',return_value=valid) as request:
             self.assertTrue(reasoner.select({'question':'synthetic','passages':[]},deadline=123))
         body=request.call_args.args[2]
-        self.assertIn(json.dumps(SCHEMA,separators=(',',':')),body['messages'][0]['content'])
-        self.assertEqual(body['format'],SCHEMA); self.assertEqual(body['keep_alive'],'5m'); self.assertFalse(body['think'])
+        # The output schema only allows indices of the passages actually sent.
+        self.assertEqual(schema(6),SCHEMA); self.assertEqual(schema(0)['properties']['evidence']['maxItems'],0)
+        self.assertIn(json.dumps(schema(0),separators=(',',':')),body['messages'][0]['content'])
+        self.assertEqual(body['format'],schema(0)); self.assertEqual(body['keep_alive'],'5m'); self.assertFalse(body['think'])
         self.assertEqual(body['model'],reasoner.model); self.assertEqual(request.call_args.kwargs['deadline'],123)
         for change in ({'done_reason':'length'},{'done':False},{'model':'different'},
                 {'message':dict(role='assistant',content='{}',tool_calls=[{}])}):

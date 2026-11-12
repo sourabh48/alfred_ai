@@ -58,7 +58,7 @@ class LocalStreamProtocolTests(SimpleTestCase):
         body = json.loads(connection.request.call_args.kwargs['body'])
         self.assertTrue(body['stream']); self.assertFalse(body['think']); self.assertNotIn('tools',body)
         self.assertEqual(body['options']['num_predict'],1024); self.assertEqual(body['options']['num_ctx'],8192)
-        self.assertIn('Never repeat monetary figures',body['messages'][0]['content'])
+        self.assertIn('never state a figure that no supplied source records',body['messages'][0]['content'])
         self.assertEqual([stream.queue.get_nowait()['text'] for _ in range(2)],['Synthetic ','hypothesis.'])
         connection.close.assert_called(); self.assertEqual(connection.auto_open,0)
 

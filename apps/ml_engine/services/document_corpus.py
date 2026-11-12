@@ -9,6 +9,7 @@ import re
 from uuid import uuid4
 
 from cryptography.fernet import Fernet, InvalidToken
+from django.conf import settings
 from django.http import Http404
 from django.core.files.uploadedfile import UploadedFile
 from django.utils import timezone
@@ -20,16 +21,19 @@ from .document_knowledge import document_text, matching_passages, _passages, _te
 from .memory_sync import valid_id
 from .persistent_memory import _owner, MemoryConflict
 
-MAX_DOCUMENTS = 10
-MAX_GLOBAL_DOCUMENTS = 128
-MAX_SELECTED = 3
-MAX_TOKENS = 20000
-MAX_RECORD_BYTES = 1024 * 1024
-MAX_OWNER_BYTES = 4 * 1024 * 1024
-MAX_GLOBAL_BYTES = 32 * 1024 * 1024
+# Owner decision 2026-11-12: limits come from config/local.env (alfred_ai/settings.py), with generous defaults.
+MAX_DOCUMENTS = max(1, settings.ALFRED_DOCUMENT_KNOWLEDGE_MAX_DOCUMENTS)
+MAX_GLOBAL_DOCUMENTS = max(128, 8 * MAX_DOCUMENTS)
+MAX_UPLOAD_BYTES = max(512 * 1024, settings.ALFRED_DOCUMENT_KNOWLEDGE_MAX_UPLOAD_BYTES)
+MAX_TOKENS = max(20000, TEXT_BYTES // 4)
+# Base64 original + text + span index ([start,end] is about 20 bytes a word) + metadata.
+MAX_RECORD_BYTES = 2 * MAX_UPLOAD_BYTES + 2 * TEXT_BYTES + 24 * MAX_TOKENS + 1024 * 1024
+MAX_OWNER_BYTES = MAX_GLOBAL_BYTES = max(32 * 1024 * 1024, settings.ALFRED_DOCUMENT_KNOWLEDGE_MAX_STORAGE_BYTES)
+MAX_RETENTION_DAYS = max(1, settings.ALFRED_DOCUMENT_KNOWLEDGE_RETENTION_DAYS)
+RESULT_LIMIT_ALL = max(RESULT_LIMIT, settings.ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT)
 MAX_LINKED_RECORDS = 256
-MAX_UPLOAD_BYTES = 512 * 1024
 LIMITATION = (EVIDENCE_LIMITATION + 'Only explicitly selected local encrypted copies are searched. '
+    'With no selection, the most relevant passages across all your retained copies are searched. '
     'No model, verified memory, conversation history or cloud sync is used. Missing matches do not prove absence. '
     'Linked financial sources are checked again on access; changed/unavailable copies are removed. '
     'Uploaded originals remain encrypted with their index until deletion or expiry. Scanned/image-only PDFs remain unsupported.')
@@ -102,7 +106,7 @@ class DocumentCorpus:
                         raise ValueError()
                     previous = span[0]
             created, expiry = (datetime.fromisoformat(record[key]) for key in ('created_at', 'expires_at'))
-            if created.tzinfo is None or expiry.tzinfo is None or not created < expiry <= created + timedelta(days=30):
+            if created.tzinfo is None or expiry.tzinfo is None or not created < expiry <= created + timedelta(days=MAX_RETENTION_DAYS):
                 raise ValueError()
             _encoded(record)
             return record
@@ -110,7 +114,7 @@ class DocumentCorpus:
             raise RuntimeError('Document knowledge verification failed; existing data is preserved.') from None
 
     def _prune(self, db, owner):
-        now = timezone.now(); days = min(30, self.store._retention(db, owner))
+        now = timezone.now(); days = min(MAX_RETENTION_DAYS, self.store._retention(db, owner))
         for identity, wrapped, ciphertext in self._rows(db, owner):
             record = self._decode(db, owner, identity, wrapped, ciphertext)
             expiry = min(datetime.fromisoformat(record['expires_at']),
@@ -155,7 +159,8 @@ class DocumentCorpus:
             records = [self._decode(db, owner, *row) for row in self._rows(db, owner)]
             records = self._live(db, user, records)
             return dict(documents=[self._summary(record) for record in records], maximum_documents=MAX_DOCUMENTS,
-                maximum_selected=MAX_SELECTED, maximum_retention_days=min(30, self.store._retention(db, owner)),
+                maximum_selected=MAX_DOCUMENTS, maximum_retention_days=min(MAX_RETENTION_DAYS, self.store._retention(db, owner)),
+                result_limit=RESULT_LIMIT_ALL, local_ai_timeout_seconds=settings.ALFRED_LOCAL_AI_TIMEOUT_SECONDS,
                 maximum_text_bytes=TEXT_BYTES, maximum_index_tokens=MAX_TOKENS, maximum_owner_bytes=MAX_OWNER_BYTES,
                 maximum_linked_records=MAX_LINKED_RECORDS, maximum_upload_bytes=MAX_UPLOAD_BYTES,
                 maximum_record_bytes=MAX_RECORD_BYTES,
@@ -163,8 +168,8 @@ class DocumentCorpus:
 
     def _begin(self, user, consent, days):
         owner = _owner(user)
-        if consent is not True or type(days) is not int or not 1 <= days <= 30:
-            raise ValueError('Explicit local document consent and 1–30 days retention are required.')
+        if consent is not True or type(days) is not int or not 1 <= days <= MAX_RETENTION_DAYS:
+            raise ValueError(f'Explicit local document consent and 1–{MAX_RETENTION_DAYS} days retention are required.')
         with self.store._transaction() as db:
             self.store._cipher(db)
             return db.execute('SELECT epoch FROM owner_epochs WHERE owner=?', (owner,)).fetchone()
@@ -268,9 +273,13 @@ class DocumentCorpus:
 
     def search(self, user, identities, query, *, full_context=False):
         owner = _owner(user); terms = None if full_context else _terms(query)
-        if (not isinstance(identities, list) or not 1 <= len(identities) <= MAX_SELECTED
+        if identities in (None, []):
+            if full_context:
+                raise ValueError('Whole-extraction mode needs selected documents; search all copies with keywords.')
+            return self._search_all(user, owner, terms)
+        if (not isinstance(identities, list) or not 1 <= len(identities) <= MAX_DOCUMENTS
                 or any(not valid_id(identity) for identity in identities) or len(set(identities)) != len(identities)):
-            raise ValueError('Select one to three distinct private documents.')
+            raise ValueError('Select distinct private documents, or none to search all of them.')
         with self.store._transaction() as db:
             self._prune(db, owner)
             rows = {row[0]: row for row in self._rows(db, owner) if row[0] in identities}
@@ -290,6 +299,24 @@ class DocumentCorpus:
             raise SourceSelectionConflict()
         return dict(results=matches[:RESULT_LIMIT], more_matches=len(matches) > RESULT_LIMIT,
             checked_at=timezone.now().isoformat(), result_limit=RESULT_LIMIT,
+            full_text_qa=False, financial_authority=False, limitation=LIMITATION)
+
+    def _search_all(self, user, owner, terms):
+        """Passages from every retained copy that hold all keywords, the most keyword hits first."""
+        with self.store._transaction() as db:
+            self._prune(db, owner)
+            records = self._live(db, user, [self._decode(db, owner, *row) for row in self._rows(db, owner)])
+            scored = []
+            for record in records:
+                for hit in matching_passages(record['text'], terms, record['index']):
+                    hits = sum(1 for word in re.finditer(r'\w+', hit['excerpt']) if word.group().casefold() in terms)
+                    scored.append((hits, dict(hit, **self._summary(record))))
+            scored.sort(key=lambda item: item[0], reverse=True)  # stable: equal scores keep document order
+            ids = [record['id'] for record in records]
+            if [record['id'] for record in self._live(db, user, records)] != ids:
+                raise SourceSelectionConflict()
+        return dict(results=[hit for _, hit in scored[:RESULT_LIMIT_ALL]], more_matches=len(scored) > RESULT_LIMIT_ALL,
+            checked_at=timezone.now().isoformat(), result_limit=RESULT_LIMIT_ALL, searched_documents=len(ids),
             full_text_qa=False, financial_authority=False, limitation=LIMITATION)
 
     def delete(self, user, identity):

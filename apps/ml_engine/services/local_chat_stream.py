@@ -10,6 +10,8 @@ from unicodedata import category
 
 from django.db import close_old_connections
 
+from .local_ai_limits import deadline as local_deadline, ollama_address
+
 from .local_embeddings import EmbeddingUnavailable
 
 _slots = BoundedSemaphore(2)
@@ -34,7 +36,7 @@ class GenerationLimitReached(GenerationIncomplete):
 
 class LocalChatStream:
     def __init__(self, run, error, check_session):
-        self.deadline = time.monotonic()+30
+        self.deadline = local_deadline()
         self.cancelled = Event()
         self.queue = Queue(maxsize=8)
         self.lock = Lock()
@@ -122,8 +124,10 @@ class LocalChatStream:
         from .hybrid_intelligence import present_answer, FINANCIAL_LANGUAGE, CURRENCY_LANGUAGE
         self.check()
         deadline = min(deadline,self.deadline)
-        connection = HTTPConnection('127.0.0.1',11434,timeout=max(.001,deadline-time.monotonic()))
+        connection = HTTPConnection(*ollama_address(),timeout=max(.001,deadline-time.monotonic()))
         answer, pending, received, frames, final = '', b'', 0, 0, None
+        tokens = int(body.get('options', {}).get('num_predict') or 1024)
+        answer_cap, frame_cap = max(8192, 8 * tokens), max(2048, 2 * tokens + 64)
         context = json.loads(body['messages'][1]['content'])
         dialogue = context.get('query','')+' '+' '.join(turn['content'] for turn in context.get('history',[]))
         preview = self.allow_preview and not context.get('sources') and not FINANCIAL_LANGUAGE.search(dialogue)
@@ -147,11 +151,11 @@ class LocalChatStream:
                 chunk = response.read1(8192)
                 if not chunk: break
                 received += len(chunk); pending += chunk
-                if received > 256*1024: raise GenerationIncomplete('Local stream exceeds its limit.')
+                if received > max(256*1024, 512*frame_cap): raise GenerationIncomplete('Local stream exceeds its limit.')
                 while b'\n' in pending:
                     raw,pending = pending.split(b'\n',1)
                     frames += 1
-                    if not raw or len(raw)>16384 or frames>2048 or final is not None:
+                    if not raw or len(raw)>16384 or frames>frame_cap or final is not None:
                         raise GenerationIncomplete('Invalid local stream frame.')
                     item = json.loads(raw); message = item.get('message',{}) if isinstance(item,dict) else {}
                     if (not isinstance(item,dict) or item.get('model') != body['model'] or type(item.get('done')) is not bool
@@ -159,7 +163,7 @@ class LocalChatStream:
                             or message.get('tool_calls') or not isinstance(message.get('content'),str)):
                         raise GenerationIncomplete('Invalid local stream frame.')
                     text = message['content']; answer += text
-                    if len(answer.encode())>8192: raise GenerationIncomplete('Local answer exceeds its limit.')
+                    if len(answer.encode())>answer_cap: raise GenerationIncomplete('Local answer exceeds its limit.')
                     if preview:
                         safe = not any(c.isnumeric() or category(c)=='Sc' for c in answer)
                         safe = safe and not (_NUMBER_WORDS.search(answer) or CURRENCY_LANGUAGE.search(answer))

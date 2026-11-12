@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase, SimpleTestCase
@@ -307,7 +308,7 @@ class LocalEmbeddingBoundaryTests(SimpleTestCase):
         connection.getresponse.return_value = response
         with patch('apps.ml_engine.services.local_embeddings.HTTPConnection', return_value=connection) as connect, self.assertRaisesRegex(EmbeddingUnavailable, '^Local embedding service is unavailable.$'):
             OllamaEmbeddings()._request('POST', '/api/embed', {'input': 'synthetic-sensitive-input'})
-        connect.assert_called_once_with('127.0.0.1', 11434, timeout=30)
+        connect.assert_called_once_with('127.0.0.1', 11434, timeout=settings.ALFRED_LOCAL_AI_TIMEOUT_SECONDS)
         response.read.assert_not_called()
         connection.close.assert_called_once()
 

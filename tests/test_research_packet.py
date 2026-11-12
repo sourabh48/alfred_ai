@@ -153,10 +153,29 @@ class ChallengeTests(SimpleTestCase):
         self.assertEqual(set(sent), {"task", "symbol", "points", "valuation", "already_missing"})  # no portfolio record
         self.assertIn("leans for", sent["task"])
 
-    def test_only_the_challenge_waits_longer(self):
+    def test_challenge_waits_for_the_slow_cpu_and_the_owner_timeout(self):
+        from django.test import override_settings
         from apps.investments.services.research_challenge import SECONDS, local_reasoner
         from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
-        self.assertEqual((local_reasoner().READ_SECONDS, OllamaReasoner().READ_SECONDS, SECONDS), (120, 30, 120))
+        with override_settings(ALFRED_LOCAL_AI_TIMEOUT_SECONDS=30):
+            self.assertEqual((local_reasoner().READ_SECONDS, OllamaReasoner().READ_SECONDS, SECONDS), (120, None, 120))
+        with override_settings(ALFRED_LOCAL_AI_TIMEOUT_SECONDS=600):
+            self.assertEqual(local_reasoner().READ_SECONDS, 600)
+
+    def test_each_role_gets_its_own_brief_and_the_same_number_filter(self):
+        from apps.investments.services.research_challenge import ROLES, challenge_packet
+        packet = build_packet("SYNTH.NS", _fund(), _prices(RISING))
+        tasks = set()
+        for role in ROLES:
+            reasoner = FakeReasoner(GOOD)
+            result = challenge_packet(packet, reasoner=reasoner, role=role)
+            self.assertEqual((result["role"], result["role_label"]), (role, ROLES[role][0]))
+            self.assertEqual(([o["point_id"] for o in result["objections"]], result["dropped"]), (["F1"], 3))
+            self.assertEqual(set(reasoner.payloads[0]), {"task", "symbol", "points", "valuation", "already_missing"})
+            tasks.add(reasoner.payloads[0]["task"])
+        self.assertEqual(len(tasks), len(ROLES))
+        with self.assertRaises(ValueError):
+            challenge_packet(packet, reasoner=FakeReasoner(GOOD), role="trader")
 
     def test_unusable_replies_and_empty_packets(self):
         from apps.investments.services.research_challenge import challenge_packet
@@ -182,6 +201,8 @@ class ChallengeApiTests(TestCase):
         self.assertEqual(response.json()["objections"][0]["point"][:12], "Revenue grew")
         self.assertEqual(self._post(GOOD, symbol="SYNTH", holding=self.stranger.pk).status_code, 404)
         self.assertEqual(self._post(GOOD, symbol="../x").status_code, 400)
+        self.assertEqual(self._post(GOOD, symbol="SYNTH.NS", role="advocate").json()["role"], "advocate")
+        self.assertEqual(self._post(GOOD, symbol="SYNTH.NS", role="buy_now").status_code, 400)
 
     def test_local_model_unavailable_is_reported(self):
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable

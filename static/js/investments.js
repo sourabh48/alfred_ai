@@ -531,7 +531,8 @@ async function loadResearchPacket(event) {
         const packet = await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`);
         target.innerHTML = researchPacketHtml(packet);
         prefillResearchView(packet);
-        document.getElementById("researchChallengeButton").addEventListener("click", () => loadResearchChallenge(Object.fromEntries(query)));
+        document.getElementById("researchChallengeButton").addEventListener("click", () =>
+            loadResearchChallenge({ ...Object.fromEntries(query), role: document.getElementById("researchChallengeRole").value }));
         document.getElementById("researchPersonalButton").addEventListener("click", () => loadResearchPersonalChallenge(Object.fromEntries(query)));
     } catch (error) {
         target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${Alfred.escapeHtml(error.message || "The packet could not be built.")}</div>`;
@@ -558,7 +559,15 @@ function researchPacketHtml(p) {
         <p class="fw-semibold mt-2 mb-1">Not checked here</p>${list(p.missing_evidence || [])}
         <p class="fw-semibold mt-2 mb-1">What you can do</p>${list(p.options || [])}
         <p class="muted small mt-2 mb-0">${(p.limits || []).map(e).join(" ")}</p>
-        <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="researchChallengeButton">Get a second opinion (local AI)</button>
+        <div class="d-flex flex-wrap gap-2 align-items-end mt-3">
+            <div><label for="researchChallengeRole" class="form-label small mb-1">Second opinion from</label>
+            <select id="researchChallengeRole" class="form-select form-select-sm">
+                <option value="sceptic" selected>Sceptic: reasons to doubt</option>
+                <option value="advocate">Advocate: the case for</option>
+                <option value="risk_manager">Risk manager: what could go wrong</option>
+            </select></div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="researchChallengeButton">Get a second opinion (local AI)</button>
+        </div>
         <div id="researchChallenge" class="mt-2" aria-live="polite"></div>
         <div class="border-top mt-3 pt-2" id="researchPersonal">
             <p class="fw-semibold mb-1">Challenge your own view</p>
@@ -605,11 +614,11 @@ async function loadResearchChallenge(params) {
     const target = document.getElementById("researchChallenge"), button = document.getElementById("researchChallengeButton");
     const e = Alfred.escapeHtml;
     button.disabled = true;
-    target.innerHTML = `<p class="muted small mb-0">Your local AI is looking for reasons to doubt this; on this PC it can take up to two minutes…</p>`;
+    target.innerHTML = `<p class="muted small mb-0">Your local AI is reviewing this packet; on this PC it can take a few minutes…</p>`;
     try {
         const c = await Alfred.fetchJSON("/api/investments/research/packet/challenge/", { method: "POST", body: JSON.stringify(params) });
         if (c.status !== "challenged") { target.innerHTML = `<p class="muted small mb-0">${e(c.detail || "")}</p>`; return; }
-        target.innerHTML = `<div id="researchChallengeResult"><p class="fw-semibold mb-1">Second opinion: reasons to doubt (${e(c.model)})</p>
+        target.innerHTML = `<div id="researchChallengeResult"><p class="fw-semibold mb-1">Second opinion: ${e(c.role_label)} (${e(c.model)})</p>
             ${c.objections.length ? `<ul class="mb-2">${c.objections.map(o => `<li><span class="muted">${e(o.point)}</span> — ${e(o.objection)}</li>`).join("")}</ul>` : ""}
             ${c.overlooked.length ? `<p class="fw-semibold mb-1">Not covered by the packet</p><ul class="mb-2">${c.overlooked.map(item => `<li>${e(item)}</li>`).join("")}</ul>` : ""}
             <p class="muted small mb-0">${c.dropped ? `${e(String(c.dropped))} reply item(s) were dropped for citing no packet point or stating a number. ` : ""}${c.limits.map(e).join(" ")}</p></div>`;

@@ -8,6 +8,7 @@ from django.conf import settings
 
 from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
 from apps.ml_engine.services.local_embeddings import OllamaEmbeddings, EmbeddingUnavailable, KEEP_ALIVE
+from apps.ml_engine.services.local_ai_limits import deadline as local_deadline, ollama_address
 
 
 def _seconds(value):
@@ -19,7 +20,7 @@ def _seconds(value):
 def _chat_probe(reasoner, deadline):
     before = reasoner._digest(deadline=deadline)
     started = time.monotonic()
-    connection = HTTPConnection('127.0.0.1', 11434, timeout=max(.001, deadline - started))
+    connection = HTTPConnection(*ollama_address(), timeout=max(.001, deadline - started))
     first_token = None
     total = 0
     final = None
@@ -77,7 +78,7 @@ def _chat_probe(reasoner, deadline):
 
 
 def benchmark_local_ai():
-    deadline = time.monotonic() + 30
+    deadline = local_deadline()
     results = []
     for capability, model in (('Embeddings', OllamaEmbeddings.model), ('Local chat', settings.ALFRED_MEMORY_OLLAMA_MODEL)):
         result = {'label': capability, 'model': model, 'state': 'error'}

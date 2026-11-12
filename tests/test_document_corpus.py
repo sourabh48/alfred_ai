@@ -50,7 +50,7 @@ class DocumentCorpusTests(TestCase):
             return db.execute('SELECT COUNT(*) FROM document_corpus').fetchone()[0]
 
     def test_consent_and_retention_are_explicit_and_no_record_is_written_on_rejection(self):
-        for args in ({'consent':False}, {'consent':'true'}, {'days':True}, {'days':0}, {'days':31}):
+        for args in ({'consent':False}, {'consent':'true'}, {'days':True}, {'days':0}, {'days':corpus.MAX_RETENTION_DAYS+1}):
             with self.subTest(args=args), self.assertRaises(ValueError): self.ingest(**args)
         with self.assertRaises(ValueError): self.ingest(catalog_token='wrong-token')
         with self.assertRaises(Http404): self.ingest(self.make_document(self.other))
@@ -84,11 +84,25 @@ class DocumentCorpusTests(TestCase):
         self.assertEqual({hit['id'] for hit in self.search([second, first])['results']}, {first, second})
         self.assertEqual(self.search([third])['results'], [])
         foreign = self.ingest(self.make_document(self.other), self.other)['document']['id']
-        for identities in ([foreign], [first,foreign], [first,first], [], [first,second,third,foreign], [True]):
+        # An empty selection now searches every copy (see the next test); a selection must still be distinct and the owner's.
+        for identities in ([foreign], [first,foreign], [first,first], [first,second,third,foreign], [True], 'all', {}):
             with self.subTest(ids=identities), self.assertRaises((ValueError, SourceSelectionConflict)):
                 self.search(identities)
         self.assertEqual(self.corpus.list(self.other)['documents'][0]['id'], foreign)
         self.assertEqual(len(self.corpus.list(self.owner)['documents']), 3)
+
+    def test_no_selection_searches_every_copy_of_this_owner_only_best_passages_first(self):
+        first = self.ingest()['document']['id']
+        second = self.ingest(self.make_document(text='Exit load, exit load and exit load again.'))['document']['id']
+        self.ingest(self.make_document(text='Exit options only, nothing about the other word.'))
+        foreign = self.ingest(self.make_document(self.other), self.other)['document']['id']
+        everything = self.search(None)
+        self.assertEqual([hit['id'] for hit in everything['results']], [second, first])  # most hits first; partial matches never
+        self.assertEqual((everything['searched_documents'], everything['result_limit']), (3, corpus.RESULT_LIMIT_ALL))
+        self.assertEqual(self.search([])['results'], everything['results'])
+        self.assertEqual([hit['id'] for hit in self.search(None, user=self.other)['results']], [foreign])
+        with self.assertRaises(ValueError):
+            self.corpus.search(self.owner, None, None, full_context=True)
 
     def test_query_terms_do_not_match_across_documents_or_inside_words(self):
         first = self.ingest(self.make_document(text='Exit options only.'))['document']['id']
@@ -330,7 +344,7 @@ class DocumentCorpusTests(TestCase):
     def test_general_upload_validates_consent_encoding_format_and_size_without_storage(self):
         from alfred_ai.services.upload_limits import UploadLimitExceeded
         for name,raw,changes in (('notes.txt',b'Exit load',{'consent':False}),
-                ('notes.txt',b'Exit load',{'days':31}), ('notes.txt',b'\xff\xfe',{}),
+                ('notes.txt',b'Exit load',{'days':corpus.MAX_RETENTION_DAYS+1}), ('notes.txt',b'\xff\xfe',{}),
                 ('notes.txt',b'Private\0binary',{}), ('notes.html',b'<p>Untrusted</p>',{}),
                 ('x'*157+'.txt',b'Private text',{})):
             with self.subTest(name=name,changes=changes), self.assertRaises(ValueError):

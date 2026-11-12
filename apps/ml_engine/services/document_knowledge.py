@@ -3,6 +3,7 @@ import re
 from bisect import bisect_left, bisect_right
 from hashlib import sha256
 
+from django.conf import settings
 from django.utils import timezone
 
 from apps.expenses.services.statement_evidence import document_name, file_reference
@@ -11,7 +12,7 @@ from alfred_ai.services.upload_limits import read_upload_bytes, UploadLimitExcee
 from .canonical_evidence import _discovery_catalog, _load_catalog, SourceSelectionConflict
 from .persistent_memory import _owner
 
-TEXT_BYTES = 256 * 1024
+TEXT_BYTES = max(256 * 1024, settings.ALFRED_DOCUMENT_KNOWLEDGE_MAX_TEXT_BYTES)
 PASSAGE_CHARS = 600
 RESULT_LIMIT = 6
 EVIDENCE_LIMITATION = ('These are unverified extracted excerpts, not current financial facts or answers. '

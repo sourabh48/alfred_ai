@@ -4,6 +4,8 @@ import json
 import time
 from math import isfinite, hypot
 
+from .local_ai_limits import ollama_address, timeout_seconds
+
 
 # Owner decision 2026-11-05: keep a model loaded for five idle minutes (Ollama's default). Reloading on every call
 # took 23-30 s on this PC against the 30-second deadline.
@@ -24,16 +26,17 @@ def validate_vector(value):
 
 class OllamaEmbeddings:
     model = 'all-minilm:latest'
-    READ_SECONDS = 30  # per socket wait; an owner-started slow task may raise it on its own subclass
+    READ_SECONDS = None  # per socket wait; None uses ALFRED_LOCAL_AI_TIMEOUT_SECONDS
     cancellation = None
 
     def _request(self, method, path, payload=None, *, deadline=None):
         if self.cancellation is not None:
             self.cancellation.check()
             deadline = min(deadline if deadline is not None else self.cancellation.deadline, self.cancellation.deadline)
-        timeout=self.READ_SECONDS if deadline is None else min(self.READ_SECONDS,deadline-time.monotonic())
+        read_seconds=self.READ_SECONDS or timeout_seconds()
+        timeout=read_seconds if deadline is None else min(read_seconds,deadline-time.monotonic())
         if timeout<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
-        connection = HTTPConnection('127.0.0.1', 11434, timeout=timeout)
+        connection = HTTPConnection(*ollama_address(), timeout=timeout)
         try:
             if self.cancellation is not None:
                 connection.connect()
@@ -52,7 +55,7 @@ class OllamaEmbeddings:
                     left=deadline-time.monotonic()
                     if left<=0: raise EmbeddingUnavailable('Local inference deadline exceeded.')
                     sock=connection.sock or response.fp.raw._sock
-                    sock.settimeout(min(self.READ_SECONDS,left))
+                    sock.settimeout(min(read_seconds,left))
                     chunk=response.read1(min(8192,256*1024+1-len(raw)))
                     if not chunk: break
                     raw.extend(chunk)

@@ -4,11 +4,12 @@ from datetime import timedelta
 from unittest.mock import Mock, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
 from apps.ml_engine.services.canonical_evidence import SourceSelectionConflict
 from apps.ml_engine.services.document_questions import answer_question
+from apps.ml_engine.services.local_ai_limits import timeout_seconds
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 from tests import test_document_corpus as fixtures
 
@@ -84,8 +85,9 @@ class DocumentFullContextTests(TestCase):
         self.assertEqual(self.corpus.original(self.owner, source['id'])[1], raw)
 
     def test_passage_and_utf8_request_limits_refuse_before_any_inference(self):
+        # Too many passages, or (with a small configured context window) too many UTF-8 bytes for the prompt.
         for text in ('Retained context. ' * 300, 'गग ' * 700):
-            with self.subTest(kind='unicode' if 'ग' in text else 'passages'):
+            with self.subTest(kind='unicode' if 'ग' in text else 'passages'), override_settings(ALFRED_LOCAL_AI_MAX_CONTEXT_TOKENS=2048):
                 identity = self.save_text(text)
                 result = self.ask([identity])
                 self.assertEqual(result['status'], 'context_limit')
@@ -162,7 +164,7 @@ class DocumentFullContextTests(TestCase):
         with self.assertRaises(EmbeddingUnavailable):
             self.ask([identity])
         self.local.select.side_effect = None
-        with patch('apps.ml_engine.services.document_questions.time.monotonic', side_effect=[10, 40]):
+        with patch('apps.ml_engine.services.document_questions.time.monotonic', side_effect=[10, 10 + timeout_seconds()]):
             with self.assertRaises(EmbeddingUnavailable):
                 self.ask([identity])
 

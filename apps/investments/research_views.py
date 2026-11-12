@@ -177,11 +177,17 @@ class ResearchChallengeView(APIView):
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         from .services.research_challenge import challenge_packet
 
-        packet, error = _packet(request.user, request.data if isinstance(request.data, dict) else {})
+        from .services.research_challenge import ROLES
+
+        data = request.data if isinstance(request.data, dict) else {}
+        role = data.get("role") or "sceptic"
+        if role not in ROLES:
+            return Response({"detail": "Choose the sceptic, advocate or risk manager."}, status=status.HTTP_400_BAD_REQUEST)
+        packet, error = _packet(request.user, data)
         if error:
             return error
         try:
-            return Response(challenge_packet(packet))
+            return Response(challenge_packet(packet, role=role))
         except (EmbeddingUnavailable, ValueError):
             return Response({"detail": "The local model could not challenge this packet. Check that Ollama is running and try again."},
                             status=status.HTTP_503_SERVICE_UNAVAILABLE)

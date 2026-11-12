@@ -4211,7 +4211,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         mode = self.browser.find_element(self.By.ID, 'documentCorpusContextMode')
         Select(mode).select_by_value('full_extraction')
         self.memory_click('#documentCorpusAsk')
-        self.assertIn('Explicitly select', self.text('documentCorpusStatus'))
+        # Whole-extraction reads named documents only; keyword questions may search every copy.
+        self.assertIn('Select the documents to read in full', self.text('documentCorpusStatus'))
         local.select.assert_not_called()
         self.memory_click('#documentCorpusRefresh')
         self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
@@ -4301,8 +4302,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'documentCorpusAsk').is_enabled())
         query=self.browser.find_element(self.By.ID,'documentCorpusQuery'); query.send_keys('exit load')
         question=self.browser.find_element(self.By.ID,'documentCorpusQuestion'); question.send_keys('For how long does the exit load apply?')
+        # Owner decision 2026-11-12: with nothing selected, the question uses passages from every retained copy.
         self.memory_click('#documentCorpusAsk')
-        self.assertIn('Explicitly select',self.text('documentCorpusStatus')); local.select.assert_not_called()
+        self.wait.until(lambda _: 'selected these exact unverified excerpts' in self.text('documentCorpusStatus'))
+        self.assertEqual(local.select.call_count,1)
+        self.assertEqual({passage['document'] for passage in local.select.call_args.args[0]['passages']},{0,1})
+        self.assertFalse(self.browser.execute_script('return Boolean(window.questionLeak)'))
         self.memory_click('#documentCorpusRefresh')
         self.wait.until(lambda _: 'list refreshed' in self.text('documentCorpusStatus'))
         self.memory_click(f'#documentCorpusList input[value="{sources[0]["id"]}"]')

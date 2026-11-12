@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, SimpleTestCase, Client, override_settings
 from django.utils import timezone
 
+from apps.ml_engine.services.local_ai_limits import FALLBACK_CONTEXT_TOKENS, context_bytes, max_output_tokens, timeout_seconds
 from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict, _owner
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable, OllamaEmbeddings
 from apps.ml_engine.services.hybrid_intelligence import hybrid_answer, OllamaReasoner, source_context, answer_budget
@@ -49,23 +50,25 @@ class HybridIntelligenceTests(TestCase):
         self.save(); result=self.answer('coast')
         self.assertEqual(result['sources'],[])
         self.store.save_verified(self.alice,{'statement':'mountain '+'x'*5000},{'source':'synthetic large'},verified=True)
-        result=self.answer()
-        self.assertEqual(result['context_omitted'],1)
-        self.assertLessEqual(len(str(self.local.reason.call_args.args[0]).encode()),4096)
+        # A small configured context window (4096 prompt bytes) cannot hold that memory, so it is left out.
+        with override_settings(ALFRED_LOCAL_AI_MAX_CONTEXT_TOKENS=2048):
+            result=self.answer()
+            self.assertEqual(result['context_omitted'],1)
+            self.assertLessEqual(len(str(self.local.reason.call_args.args[0]).encode()),4096)
 
     def test_answer_styles_bound_local_generation_and_keep_numeric_and_source_guards(self):
         self.save()
-        for style, limit in (('concise',192),('detailed',1024),('comparison',768),('steps',768)):
+        for style, limit in (('concise',192),('detailed',2048),('comparison',768),('steps',768)):
             with self.subTest(style=style):
                 result = self.answer(answer_style=style)
                 self.assertEqual(result['answer_style'], style)
                 self.assertEqual(result['local_output_token_limit'], limit)
                 self.assertEqual(self.local.reason.call_args.kwargs['max_output_tokens'], limit)
-                # Compare the way the deadline is built: (t+30)-t can exceed 30 in floating point near 2**n seconds of uptime.
-                self.assertLessEqual(self.local.reason.call_args.kwargs['deadline'], time.monotonic()+30)
+                # Compare the way the deadline is built: (t+n)-t can exceed n in floating point near 2**n seconds of uptime.
+                self.assertLessEqual(self.local.reason.call_args.kwargs['deadline'], time.monotonic()+timeout_seconds())
                 payload = self.local.reason.call_args.args[0]
                 self.assertEqual(payload['response_style'], style)
-                self.assertLessEqual(len(json.dumps(payload,ensure_ascii=False).encode()),4096)
+                self.assertLessEqual(len(json.dumps(payload,ensure_ascii=False).encode()),context_bytes(FALLBACK_CONTEXT_TOKENS,limit))
                 self.local.reason.return_value = 'Savings of 99999.'
                 self.assertTrue(self.answer(answer_style=style)['narrative_withheld'])
                 self.local.reason.return_value = 'Synthetic local hypothesis.'
@@ -122,7 +125,8 @@ class HybridIntelligenceTests(TestCase):
                    for role, text in (('user', 'Explain my savings '+ 'x'*700), ('assistant', 'Unverified hypothesis '+ 'y'*700))]
         result = self.answer(query='Explain further', conversation_context=context)
         payload = self.local.reason.call_args.args[0]
-        self.assertLessEqual(len(json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()), 4096)
+        self.assertLessEqual(len(json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()),
+                             context_bytes(FALLBACK_CONTEXT_TOKENS, result['local_output_token_limit']))
         self.assertEqual([t['role'] for t in payload['history']], ['user', 'assistant'] * result['conversation_context_turns'])
         self.assertTrue(result['conversation_context_turns'] > 0)
         self.assertEqual(result['sources'], [])
@@ -259,17 +263,21 @@ class HybridIntelligenceTests(TestCase):
 class OllamaReasonerBoundaryTests(SimpleTestCase):
     def test_task_budgets_are_bounded_and_explicit_style_overrides_query(self):
         for query, style, tokens in (('Briefly explain','concise',192),('Compare options','comparison',768),
-                ('Walk me through this','steps',768),('Explain in detail','detailed',1024),('Hello','concise',384)):
+                ('Walk me through this','steps',768),('Explain in detail','detailed',2048),('Hello','concise',384)):
             self.assertEqual(answer_budget(query,'general'), (style,tokens))
         self.assertEqual(answer_budget('Compare options','general','concise'),('concise',192))
         self.assertEqual(answer_budget('Hello','travel'),('concise',256))
+        # Owner decision 2026-11-12: finance answers are no longer cut to 512 tokens; the owner's output cap bounds every style.
         for scope in ('finance','documents','bank_statements','financial_records','financial_document'):
-            self.assertEqual(answer_budget('Explain in detail',scope),('detailed',512))
+            self.assertEqual(answer_budget('Explain in detail',scope),('detailed',2048))
+        with override_settings(ALFRED_LOCAL_AI_MAX_OUTPUT_TOKENS=300):
+            self.assertEqual(answer_budget('Explain in detail','finance'),('detailed',300))
+            self.assertEqual(answer_budget('Hello','general'),('concise',300))
 
     def test_model_budget_and_style_validation_precede_any_network_access(self):
         reasoner = OllamaReasoner()
         with patch.object(reasoner,'_digest') as digest:
-            for limit in (True,0,-1,1025,1.5,'1024',None):
+            for limit in (True,0,-1,max_output_tokens()+1,1.5,'1024',None):
                 with self.subTest(limit=limit), self.assertRaises(ValueError):
                     reasoner.reason({'query':'Synthetic'},max_output_tokens=limit,deadline=time.monotonic()+5)
             for style in ('auto','unlimited',[],None):
@@ -283,7 +291,8 @@ class OllamaReasonerBoundaryTests(SimpleTestCase):
         self.assertEqual(body['options']['num_predict'],1024)
         self.assertEqual(body['options']['num_ctx'],8192)
         self.assertIn('detailed, readable explanation',body['messages'][0]['content'])
-        self.assertIn('Never repeat monetary figures',body['messages'][0]['content'])
+        self.assertIn('copied exactly from a supplied source amount',body['messages'][0]['content'])
+        self.assertIn('never state a figure that no supplied source records',body['messages'][0]['content'])
         self.assertIn('including recalling details of explicitly fictional stories',body['messages'][0]['content'])
         self.assertIn('never treat history as verified personal facts',body['messages'][0]['content'])
 
