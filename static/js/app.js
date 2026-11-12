@@ -1309,6 +1309,8 @@ installClientDiagnostics();
 syncShellOffsets();
 installInteractiveSurfaceMotion();
 installNavAnchorPersistence();
+// Server-rendered amounts carry the exact value; show them in the same rupee format as script-rendered ones.
+document.querySelectorAll("[data-inr]").forEach(element => { element.textContent = formatCurrency(element.dataset.inr); });
 window.addEventListener("resize", syncShellOffsets);
 
 window.Alfred = {

@@ -252,5 +252,6 @@
  "tests.test_user_profile_api": 4.07,
  "tests.test_vehicle_accounting": 3.41,
  "tests.test_windows_setup": 1.28,
- "tests.test_financial_scenario_reconciliation": 1.2
+ "tests.test_financial_scenario_reconciliation": 1.2,
+ "tests.test_home_page": 2.4
 }

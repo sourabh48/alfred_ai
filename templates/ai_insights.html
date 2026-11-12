@@ -142,8 +142,10 @@
     </details>
 </section>
 
-<div class="workspace-heading"><h2 class="h4">Financial patterns</h2><p>Insights from your recorded activity. Review the evidence before acting.</p></div>
-<section id="aiInsightsRoot" class="surface-card mb-3">
+<details class="surface-card mb-4 home-more">
+<summary class="page-section-title">Spending insights from your records</summary>
+<p class="page-section-copy mt-2">Patterns ALFRED sees in your recorded activity. Review the evidence before acting.</p>
+<section id="aiInsightsRoot" class="mb-3">
     <div class="d-flex justify-content-between flex-wrap gap-3">
         <div><p class="metric-kicker">Activity profile</p><div class="h4" id="aiPersonality">Awaiting data</div></div>
         <div><p class="metric-caption mb-1">Coach tone: <span id="aiCoachTone">energetic</span></p>
@@ -155,15 +157,15 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Behavioral Recommendations</h2>
-            <p class="page-section-copy mb-3">Behavior-sensitive guidance generated from your current profile and recent ledger patterns.</p>
+            <h2 class="page-section-title">Suggestions</h2>
+            <p class="page-section-copy mb-3">Ideas based on how you have been spending.</p>
             <ul class="insight-list" id="aiRecommendationList"></ul>
         </div>
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Signal Breakdown</h2>
-            <p class="page-section-copy mb-3">Core metrics ALFRED uses to detect changing behavior patterns.</p>
+            <h2 class="page-section-title">Key measures</h2>
+            <p class="page-section-copy mb-3">The measures behind these suggestions.</p>
             <canvas id="aiSignalChart" height="130"></canvas>
         </div>
     </div>
@@ -172,22 +174,22 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Pattern Flags</h2>
+            <h2 class="page-section-title">Things to notice</h2>
             <p class="page-section-copy mb-3">Where ALFRED sees leverage or fragility.</p>
             <ul class="insight-list" id="aiPatternFlags"></ul>
         </div>
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Stress Drivers</h2>
+            <h2 class="page-section-title">Pressure points</h2>
             <p class="page-section-copy mb-3">Signals contributing to burnout and cash-flow pressure.</p>
             <ul class="insight-list" id="aiStressDrivers"></ul>
         </div>
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Minute Details</h2>
-            <p class="page-section-copy mb-3">Small but actionable observations extracted from your ledger.</p>
+            <h2 class="page-section-title">Small details</h2>
+            <p class="page-section-copy mb-3">Small things you could act on.</p>
             <ul class="detail-list" id="aiMinuteDetails"></ul>
         </div>
     </div>
@@ -196,19 +198,20 @@
 <section class="row g-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recurring Commitments</h2>
-            <p class="page-section-copy mb-3">ALFRED's current map of recurring outflows and obligations.</p>
+            <h2 class="page-section-title">Regular payments</h2>
+            <p class="page-section-copy mb-3">Payments that repeat every month.</p>
             <div id="aiRecurringCommitments"></div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Alerts</h2>
+            <h2 class="page-section-title">Unusual spending</h2>
             <p class="page-section-copy mb-3">Largest detected spend spikes and notable timing effects.</p>
             <div id="aiSpikeDays"></div>
         </div>
     </div>
 </section>
+</details>
 {% endblock %}
 
 {% block extra_js %}

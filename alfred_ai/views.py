@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib import messages
@@ -141,9 +142,60 @@ def health_api_view(request):
     )
 
 
+def _home_context(user):
+    """Four plain figures from the canonical baseline every page uses, and the setup steps still open."""
+    from apps.expenses.models import Expense
+    from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+    from .services.data_sources import data_sources_snapshot
+
+    base = resolve_canonical_financial_baseline(user)
+    known = lambda key: (base["metric_states"].get(key) or {}).get("status", "unavailable") != "unavailable"
+    spent = Expense.objects.filter(user=user).exists()
+    glance = [
+        dict(label="Money in your bank accounts", amount=base["liquid_cash"] if known("liquid_cash") else None,
+             note="Latest balances you entered", missing="Add a bank account", url="/expenses/#bankAccountsPanel"),
+        dict(label="What you owe", amount=base["total_liabilities"] if known("total_liabilities") else None,
+             note="Loans, card balances and overdrafts", missing="Add a loan or card", url="/loans/"),
+        dict(label=f"Spent in {base['reference_month']}", amount=base["current_month_variable_spend"] if spent else None,
+             note="Day-to-day spending; EMIs are counted separately", missing="Add or import transactions", url="/expenses/"),
+        dict(label="Left this month", amount=base["savings_capacity"] if known("savings_capacity") else None,
+             note="Income minus EMIs and this month's spending", missing="Add your monthly income", url="/settings/"),
+    ]
+    setup = data_sources_snapshot(user)
+    steps = [dict(label=source["label"], done=source["has_data"] and not source.get("next_action"),
+                  action=source.get("next_action")) for source in setup["sources"]]
+    return {"glance": glance, "setup_steps": steps, "setup_done": sum(step["done"] for step in steps),
+            "attention": _attention_items(user, setup["sources"])}
+
+
+def _attention_items(user, sources):
+    """What needs the owner now, read from the services each page already uses. Reading writes nothing."""
+    from apps.budgets.services.budget_intelligence import budget_spent, current_budget_plan
+    from apps.mobility.services.bike_service_intelligence import bike_service_intelligence
+
+    items = []
+    for source in sources:
+        if source["state"] in ("Review needed", "Import needs attention", "Unavailable") and source.get("next_action"):
+            items.append(dict(tone="warning", text=f"{source['label']}: {source['state'].lower()}.",
+                              action=source["next_action"]["label"], url=source["next_action"]["url"]))
+    plan = current_budget_plan(user)
+    # The figures are shown in rupees, so only a rupee plan is compared here (FIN-15: nothing is converted).
+    spent = budget_spent(plan) if plan and plan.currency in (None, "", "INR") else None
+    if spent is not None and plan.inflation_adjusted and spent >= plan.inflation_adjusted * Decimal("0.8"):
+        over = spent > plan.inflation_adjusted
+        items.append(dict(tone="danger" if over else "warning", spent=spent, limit=plan.inflation_adjusted,
+                          text="over this month's budget" if over else "used 80% or more of this month's budget",
+                          action="Open budgets", url="/budgets/"))
+    vehicles = bike_service_intelligence.risk_snapshot(user).get("summary", {})
+    for key, tone, words in (("expired_documents", "danger", "expired"), ("expiring_documents", "warning", "expiring soon")):
+        if vehicles.get(key):
+            items.append(dict(tone=tone, text=f"Vehicle documents {words}: {vehicles[key]}.", action="Open vehicles", url="/bike-service/"))
+    return items
+
+
 def index_view(request):
     if request.user.is_authenticated:
-        return render(request, "dashboard.html")
+        return render(request, "dashboard.html", _home_context(request.user))
 
     form = AuthenticationForm(request, data=request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -234,7 +286,7 @@ def server_error_view(request):
 
 @login_required
 def dashboard_view(request):
-    return render(request, "dashboard.html")
+    return render(request, "dashboard.html", _home_context(request.user))
 
 
 @login_required

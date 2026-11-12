@@ -113,3 +113,15 @@ html[data-theme="dark"] :focus-visible { outline-color: #a8caff; }
   .conversation-header { flex-wrap: wrap; }
   .form-control, .form-select { font-size: 16px; }
 }
+
+/* Home: plain figures and the first-run checklist. */
+.home-glance-tile .metric-value { font-size: 1.6rem; }
+.home-setup-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.home-setup-list li { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem; border: 1px solid var(--bs-border-color, #dce4ef); border-radius: .6rem; }
+.home-setup-mark { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; background: var(--alfred-primary-soft); color: var(--alfred-primary); flex: none; }
+.home-setup-list li.is-done .home-setup-mark { background: #1f8a4c; color: #fff; }
+.home-setup-list li.is-done .home-setup-label { color: var(--alfred-muted); }
+.home-more > summary { cursor: pointer; margin: 0; }
+.home-attention-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
+.home-attention-list li { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem; border-radius: .6rem; border-left: 4px solid #d97904; background: var(--alfred-primary-soft); }
+.home-attention-list li.home-attention-danger { border-left-color: #c44a3d; }

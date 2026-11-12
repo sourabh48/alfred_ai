@@ -6687,7 +6687,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_sample_totals_and_explanations_on_real_pages(self):
         self.login()
         summary = self.text("dashboardSummaryCards")
-        for expected in ("30,000", "80,000", "47,000", "1,00,000", "Confirmed Outflow"):
+        for expected in ("30,000", "80,000", "47,000", "1,00,000", "Money out"):
             self.assertIn(expected.lower(), summary.lower())
         self.assertIn("33,000", self.text("dashboardFocusStrip"))
         self.assertIn("48.8%", self.text("dashboardFocusStrip"))

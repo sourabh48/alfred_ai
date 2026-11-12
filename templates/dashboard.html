@@ -5,11 +5,10 @@
 <section class="alfred-hero fade-in" id="dashboardRoot">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div class="dashboard-heading-copy">
-            <div class="alfred-chip mb-3">Your money at a glance</div>
-            <h1 class="alfred-hero-title">Your financial overview</h1>
-            <p class="alfred-hero-copy">Totals use your recorded transactions. Account balances and investment values come from your latest entries.</p>
-            <div class="d-flex gap-2 flex-wrap mt-3"><a class="btn btn-primary" href="/ai/insights/?scope=finance#intelligencePanel">Ask about my finances</a>
-                <a class="btn btn-outline-primary" href="/expenses/">Review transactions</a><a class="btn btn-outline-primary" href="/budgets/">Review budgets</a></div>
+            <div class="alfred-chip mb-3">Home</div>
+            <h1 class="alfred-hero-title">Hello{% if request.user.first_name %}, {{ request.user.first_name }}{% endif %}</h1>
+            <p class="alfred-hero-copy">Here is where your money stands. Every figure comes from what you have entered or imported.</p>
+            <div class="d-flex gap-2 flex-wrap mt-3"><a class="btn btn-primary" href="/ai/insights/?scope=finance#intelligencePanel">Ask about my finances</a></div>
         </div>
         <div class="surface-card text-center dashboard-health-card">
             <p class="metric-kicker">Estimated Financial Health</p>
@@ -30,8 +29,57 @@
     </div>
 </section>
 
+<section class="home-glance mb-4" aria-labelledby="homeGlanceTitle">
+    <h2 class="page-section-title" id="homeGlanceTitle">At a glance</h2>
+    <div class="soft-grid four-up">
+        {% for tile in glance %}
+        <article class="surface-card home-glance-tile">
+            <p class="metric-kicker">{{ tile.label }}</p>
+            {% if tile.amount is not None %}
+            <p class="metric-value mb-1" data-inr="{{ tile.amount }}">₹{{ tile.amount }}</p>
+            <p class="metric-caption mb-0">{{ tile.note }}</p>
+            {% else %}
+            <p class="metric-value mb-1 text-muted">Not added yet</p>
+            <a class="btn btn-sm btn-outline-primary" href="{{ tile.url }}">{{ tile.missing }}</a>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+{% if attention %}
+<section class="surface-card mb-4" aria-labelledby="homeAttentionTitle">
+    <h2 class="page-section-title" id="homeAttentionTitle">Needs your attention</h2>
+    <ul class="home-attention-list">
+        {% for item in attention %}
+        <li class="home-attention-{{ item.tone }}">
+            <span>{% if item.spent is not None %}You have spent <strong data-inr="{{ item.spent }}">₹{{ item.spent }}</strong> of <span data-inr="{{ item.limit }}">₹{{ item.limit }}</span>: {{ item.text }}.{% else %}{{ item.text }}{% endif %}</span>
+            <a class="btn btn-sm btn-outline-primary ms-auto" href="{{ item.url }}">{{ item.action }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if setup_done < setup_steps|length %}
+<section class="surface-card mb-4 home-setup" aria-labelledby="homeSetupTitle">
+    <h2 class="page-section-title" id="homeSetupTitle">Get started: {{ setup_done }} of {{ setup_steps|length }} done</h2>
+    <p class="page-section-copy">Add what applies to you. Skip anything you don't use.</p>
+    <ol class="home-setup-list">
+        {% for step in setup_steps %}
+        <li class="{% if step.done %}is-done{% endif %}">
+            <span class="home-setup-mark" aria-hidden="true">{% if step.done %}✓{% else %}{{ forloop.counter }}{% endif %}</span>
+            <span class="home-setup-label">{{ step.label }}{% if step.done %}<span class="visually-hidden"> (done)</span>{% endif %}</span>
+            {% if step.action %}<a class="btn btn-sm btn-outline-primary ms-auto" href="{{ step.action.url }}">{{ step.action.label }}</a>{% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</section>
+{% endif %}
+
+<h2 class="page-section-title mt-2">Details</h2>
 <p class="page-section-copy mb-3" id="dashboardPeriodNote">Loading reporting period…</p>
-<p class="small text-muted">Dashboard amounts follow ALFRED's existing INR display convention. These records do not separately record currency codes. The assistant marks missing currency rather than inferring it.</p>
+<p class="small text-muted">Amounts are shown in rupees.</p>
 <div class="alert alert-warning" id="dashboardReviewNotice" role="status" hidden></div>
 <div class="alert alert-info" id="dashboardCareerFollowUps" role="status" hidden></div>
 
@@ -44,7 +92,7 @@
         <div class="surface-card h-100">
             <div class="d-flex justify-content-between align-items-start mb-3">
                 <div>
-                    <h2 class="page-section-title">Monthly Financial Flow</h2>
+                    <h2 class="page-section-title">Money in and out each month</h2>
                     <p class="page-section-copy">Income and confirmed outflows by month, including loan payments, investments and card payments. Own-account transfers and debits awaiting review are excluded.</p>
                 </div>
                 <div class="alfred-chip" id="dashboardReferenceMonth">Latest month</div>
@@ -54,51 +102,54 @@
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Category Distribution</h2>
-            <p class="page-section-copy mb-3">Where your money is actually going.</p>
+            <h2 class="page-section-title">Where your money goes</h2>
+            <p class="page-section-copy mb-3">Spending by category.</p>
             <canvas id="dashboardCategoryChart" height="200"></canvas>
             <div class="mt-4" id="dashboardCategoryList"></div>
         </div>
     </div>
 </section>
 
-<section class="row g-4 mb-4">
+<details class="surface-card mb-4 home-more">
+<summary class="page-section-title">Spending habits and alerts</summary>
+<section class="row g-4 mt-1">
     <div class="col-xl-4">
-        <div class="surface-card h-100">
-            <h2 class="page-section-title">Behavior Fingerprint</h2>
-            <p class="page-section-copy mb-3">ALFRED's current reading of your expenditure pattern.</p>
+        <div class="h-100">
+            <h2 class="page-section-title">Spending pattern</h2>
+            <p class="page-section-copy mb-3">How you tend to spend, from your recorded history.</p>
             <div class="soft-grid" id="dashboardBehaviorCards"></div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Pattern Flags</h3>
+                <h3 class="h6 fw-bold mb-3">Things to notice</h3>
                 <ul class="insight-list" id="dashboardPatternFlags"></ul>
             </div>
         </div>
     </div>
     <div class="col-xl-4">
-        <div class="surface-card h-100">
-            <h2 class="page-section-title">Recurring Commitments</h2>
-            <p class="page-section-copy mb-3">Commitments ALFRED believes are structurally shaping your month.</p>
+        <div class="h-100">
+            <h2 class="page-section-title">Regular payments</h2>
+            <p class="page-section-copy mb-3">Payments that repeat every month.</p>
             <div id="dashboardRecurring"></div>
         </div>
     </div>
     <div class="col-xl-4">
-        <div class="surface-card h-100">
-            <h2 class="page-section-title">Stress & Alerts</h2>
-            <p class="page-section-copy mb-3">Drivers behind the current pressure score and spike detection.</p>
+        <div class="h-100">
+            <h2 class="page-section-title">Alerts</h2>
+            <p class="page-section-copy mb-3">What is putting pressure on your money.</p>
             <ul class="insight-list mb-4" id="dashboardStressDrivers"></ul>
             <div>
-                <h3 class="h6 fw-bold mb-3">Spike Days</h3>
+                <h3 class="h6 fw-bold mb-3">Unusually high spending days</h3>
                 <div id="dashboardSpikeDays"></div>
             </div>
         </div>
     </div>
 </section>
+</details>
 
 <section class="surface-card">
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
-            <h2 class="page-section-title">Recent Transactions</h2>
-            <p class="page-section-copy">Latest classified transactions flowing into ALFRED's decision engine.</p>
+            <h2 class="page-section-title">Recent transactions</h2>
+            <p class="page-section-copy">Your latest transactions.</p>
         </div>
         <a class="btn btn-soft-primary" href="/expenses/">Open expense timeline</a>
     </div>
@@ -121,5 +172,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/dashboard.js?v=2.3.1"></script>
+<script src="/static/js/dashboard.js?v=2.4.0"></script>
 {% endblock %}

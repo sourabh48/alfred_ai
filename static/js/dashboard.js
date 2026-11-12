@@ -57,19 +57,19 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
 
     const items = [
         {
-            label: "Recorded Cash Left",
+            label: "Cash left in transactions",
             value: Alfred.formatCurrency(summary.current_month_net),
-            meta: `${summary.reference_month}: income minus confirmed outflow`,
+            meta: `${summary.reference_month}: money received minus money out, from your transactions only`,
             tone: summary.current_month_net >= 0 ? "success" : "danger",
         },
         {
-            label: "Debt Payments / Income",
+            label: "Share of income going to debt",
             value: summary.history_income > 0 ? Alfred.formatPercent(summary.debt_service_ratio) : "—",
             meta: "All recorded months; includes loan and card payments",
             tone: "primary",
         },
         {
-            label: "Cash Retained / Income",
+            label: "Share of income kept",
             value: summary.history_income > 0 ? Alfred.formatPercent(summary.savings_rate) : "—",
             meta: "All recorded months; after investments and card payments",
             tone: "good",
@@ -121,22 +121,22 @@ function renderHero(summary, behavior) {
 function renderSummaryCards(summary, loanPortfolio) {
     const cards = [
         {
-            kicker: "Living Expenses",
+            kicker: "Living costs",
             value: Alfred.formatCurrency(summary.current_month_expense),
-            caption: `${summary.reference_month}; includes recorded rent`,
+            caption: `${summary.reference_month}; day-to-day spending, including rent`,
         },
         {
-            kicker: "Recorded Income",
+            kicker: "Money received",
             value: Alfred.formatCurrency(summary.current_month_income),
-            caption: `${summary.reference_month}; excludes transfers between accounts`,
+            caption: `${summary.reference_month}; salary and other credits in your transactions (not your stated income)`,
         },
         {
-            kicker: "Confirmed Outflow",
+            kicker: "Money out",
             value: Alfred.formatCurrency(summary.current_month_outflow || 0),
-            caption: "Living costs, loan payments, investments, card payments and other confirmed debits",
+            caption: "Spending, EMIs, investments and card payments you confirmed",
         },
         {
-            kicker: "Recorded Loan Balance",
+            kicker: "Loan balance",
             value: Alfred.formatCurrency(loanPortfolio.manual_total_outstanding),
             caption: `${loanPortfolio.active_loans} active loan${loanPortfolio.active_loans === 1 ? "" : "s"}`,
         },
@@ -144,7 +144,7 @@ function renderSummaryCards(summary, loanPortfolio) {
     const homeSummary = loanPortfolio.home_ownership_summary || {};
     if (Number(homeSummary.positions || 0) > 0) {
         cards.push({
-            kicker: "Home Acquisition Base",
+            kicker: "Home cost on record",
             value: Alfred.formatCurrency(homeSummary.property_acquisition_cost_total || 0),
             caption: `${Alfred.formatCurrency(homeSummary.down_payment_total || 0)} down payment | ${Alfred.formatCurrency(homeSummary.other_upfront_payments_total || 0)} other upfront`,
         });
