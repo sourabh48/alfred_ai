@@ -19,6 +19,7 @@ import urllib3
 from .url_safety import BLOCKED_HOSTNAMES, _resolve_host_ips
 
 _dns_slots = BoundedSemaphore(4)
+DEFAULT_SECONDS = 20  # one call's whole limit: DNS lookup, connect, send and read
 
 def _deadline_addresses(host, deadline):
     # A late DNS answer may finish, but cannot open a socket or send credentials.
@@ -87,9 +88,8 @@ Server fetches additionally validate DNS and pin the socket target below.
 def request(method, url, *, params=None, headers=None, json_body=None, data=None,
             content_types=("application/json", "application/geo+json", "application/sparql-results+json"),
             max_bytes=4_000_000, accepted_statuses=(200, 201), deadline=None):
-    bounded_dns = deadline is not None
     started = monotonic()
-    deadline = min(deadline, started+20) if deadline is not None else started+20
+    deadline = min(deadline, started+DEFAULT_SECONDS) if deadline is not None else started+DEFAULT_SECONDS
     def budget():
         seconds = deadline-monotonic()
         if seconds <= 0: raise PublicHTTPError("timeout")
@@ -100,7 +100,7 @@ def request(method, url, *, params=None, headers=None, json_body=None, data=None
         raise PublicHTTPError("unsafe_url")
     parts = urlsplit(safe)
     try:
-        addresses = _deadline_addresses(parts.hostname,deadline) if bounded_dns else _resolve_host_ips(parts.hostname, 443)
+        addresses = _deadline_addresses(parts.hostname,deadline)  # always: an unbounded lookup could outlast the whole limit
         if not addresses or any(not a.is_global for a in addresses):
             raise ValueError()
     except (ValueError, OSError):

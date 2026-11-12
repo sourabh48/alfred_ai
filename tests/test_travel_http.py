@@ -102,6 +102,18 @@ class TravelHTTPTests(SimpleTestCase):
             request('GET','https://example.org/',headers={'Authorization':'synthetic'},deadline=time.monotonic()+0.02)
         released.set(); self.pool_class.assert_not_called()
 
+    def test_slow_dns_counts_against_the_default_limit_when_the_caller_gives_no_deadline(self):
+        from threading import Event
+        from unittest.mock import patch
+        import time
+        released=Event(); self.addCleanup(released.set)
+        self.dns.side_effect=lambda *args: released.wait(2) or []
+        started=time.monotonic()
+        with patch('alfred_ai.services.public_http.DEFAULT_SECONDS',0.05), self.assertRaisesRegex(PublicHTTPError,'timeout'):
+            request('GET','https://example.org/',headers={'Authorization':'synthetic'})
+        self.assertLess(time.monotonic()-started,1)  # the lookup itself blocks for 2 seconds
+        released.set(); self.pool_class.assert_not_called()
+
     def test_delete_no_content_and_redirect_rules_remain_enforced(self):
         self.response.status=204; self.response.headers={}; self.response.read.side_effect=[b'']
         self.assertEqual(request('DELETE','https://example.org/object',accepted_statuses=(204,)).status,204)
