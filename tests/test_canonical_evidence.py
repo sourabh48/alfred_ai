@@ -149,6 +149,31 @@ class CanonicalEvidenceTests(TestCase):
         document.linked_loans.add(self.loan)
         with self.assertRaises(Http404): record_source(self.owner,'loan',self.loan.pk)
 
+    def test_cash_and_emi_are_given_only_when_every_active_account_and_loan_records_inr(self):
+        amounts=lambda: baseline_source(self.owner)['data']['amounts']
+        self.assertIsNone(amounts()['liquid_cash']['amount'])  # the fixture's account and loan record no currency
+        BankAccount.objects.filter(pk=self.account.pk).update(currency='INR')
+        Loan.objects.filter(pk=self.loan.pk).update(currency='INR')
+        given=amounts()
+        self.assertEqual({key:(given[key]['amount'],given[key]['currency'],given[key]['currency_status']) for key in ('liquid_cash','recurring_emi_burden')},
+            {'liquid_cash':('987.65','INR','recorded'),'recurring_emi_burden':('100.01','INR','recorded')})
+        for field in ('total_assets','total_liabilities','net_worth'):  # these include a labelled proxy and stay withheld
+            self.assertIsNone(given[field]['amount'])
+        # One more active account without a recorded currency withholds cash again; EMI is unaffected.
+        legacy=BankAccount.objects.create(user=self.owner,account_number='SYNTHETIC-LEGACY',current_balance='5.00')
+        self.assertIsNone(amounts()['liquid_cash']['amount']); self.assertEqual(amounts()['recurring_emi_burden']['amount'],'100.01')
+        BankAccount.objects.filter(pk=legacy.pk).update(currency='USD')
+        self.assertIsNone(amounts()['liquid_cash']['amount'])
+        BankAccount.objects.filter(pk=legacy.pk).update(is_active=False)  # an inactive account does not count
+        self.assertEqual(amounts()['liquid_cash']['amount'],'987.65')
+        Loan.objects.create(user=self.owner,principal='1.00',emi='1.00',remaining_balance='1.00',interest_rate=1,tenure_months=1,
+            start_date=date(2026,1,1),verification_status='confirmed',currency='USD')
+        self.assertIsNone(amounts()['recurring_emi_burden']['amount'])
+        # Another owner's INR records never release this owner's figures.
+        BankAccount.objects.filter(user=self.owner).update(currency=None)
+        BankAccount.objects.create(user=self.other,account_number='SYNTHETIC-OTHER',current_balance='1.00',currency='INR')
+        self.assertIsNone(amounts()['liquid_cash']['amount'])
+
     def test_baseline_totals_withheld_without_currency_and_uncached_user_reload(self):
         source=baseline_source(self.owner)
         for field in ('liquid_cash','recurring_emi_burden','total_assets','total_liabilities','net_worth'):

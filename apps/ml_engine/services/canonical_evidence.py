@@ -12,7 +12,8 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.expenses.models import Expense
+from alfred_ai.services.currency import RUPEE
+from apps.expenses.models import BankAccount, Expense
 from apps.expenses.money import expense_money
 from apps.budgets.models import Budget
 from apps.budgets.money import budget_money
@@ -364,13 +365,20 @@ def baseline_source(user):
         limitations=['Legacy totals require approved matching currency evidence and are withheld.',
             'Reported income and housing are not independently verified.',
             *(['Recent salary credits disagree with the confirmed income.'] if baseline.get('income_conflict') else [])],amounts={},metric_states={})
+    # FIN-15: cash and EMI are given only when every active account or loan records INR itself; a legacy record with no
+    # currency keeps them withheld. Asset, liability and net-worth totals stay withheld: they include a labelled proxy.
+    recorded_inr=lambda rows: bool(rows) and all(currency==RUPEE for currency in rows)
+    in_rupees=dict(liquid_cash=recorded_inr(list(BankAccount.objects.filter(user=owner,is_active=True).values_list('currency',flat=True))),
+        recurring_emi_burden=recorded_inr(list(Loan.objects.filter(user=owner,is_active=True).values_list('currency',flat=True))))
     for key in (*BASELINE_KEYS,'rent_burden'):
         state=baseline['metric_states'][key]
         supported=((key=='rent_burden' and owner.rupee_rent_or_emi==owner.rent_or_emi) or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'
-            and owner.rupee_monthly_income>0 and baseline['decimal_amounts']['monthly_income']==format(profile_money(owner.rupee_monthly_income),'.2f')))
+            and owner.rupee_monthly_income>0 and baseline['decimal_amounts']['monthly_income']==format(profile_money(owner.rupee_monthly_income),'.2f'))
+            or in_rupees.get(key,False))
         value=owner.rent_or_emi if key=='rent_burden' else baseline['decimal_amounts'].get(key)
         available=supported and state['status']!='unavailable'
         data['amounts'][key]=_amount(value if available else None,profile_money,state['status'],state['source'])
+        if available and in_rupees.get(key): data['amounts'][key].update(currency=RUPEE,currency_status='recorded')
         data['amounts'][key]['limitation']=None if available else 'Unavailable or requires approved currency/source compatibility.'
         data['metric_states'][key]=dict(status=state['status'] if available else 'unavailable',source=state['source'])
         data[key]=float(value) if available else None
