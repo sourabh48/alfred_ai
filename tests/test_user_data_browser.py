@@ -9059,6 +9059,45 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual((list(Investment.objects.filter(user=owner).values()), InvestmentImportDocument.objects.count()), before)
         self.run_axe_light_dark('investment-fund-look-through')
 
+    def test_fund_look_through_saves_reuses_and_removes_parsed_portfolios(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.investments.models import FundPortfolioSnapshot, Investment
+        from tests.test_fund_look_through import BETA_CSV
+        owner = self.scenario['user']
+        beta = Investment.objects.create(user=owner, asset_type='mutual_fund', asset_name='Synthetic Beta holding', current_value='50000.00', currency='INR')
+        folder = Path(self.enterContext(TemporaryDirectory(prefix='alfred-look-through-saved-browser-')))
+        # The scheme line is shown again from the saved rows, so it must stay text there too.
+        (folder / 'beta.csv').write_bytes(BETA_CSV.replace(b'Synthetic Beta Large Cap Fund', b'<img src=x onerror="window.fundInjected=true"> Fund'))
+        holdings = list(Investment.objects.filter(user=owner).values())
+        self.login(); self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Synthetic Beta holding' in self.text('lookThroughRows'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'lookThroughSavedBlock').is_displayed())
+        Select(self.browser.find_element(self.By.CSS_SELECTOR, '#lookThroughRows fieldset:nth-child(1) select')).select_by_value(str(beta.pk))
+        self.browser.find_element(self.By.CSS_SELECTOR, '#lookThroughRows fieldset:nth-child(1) input[type=file]').send_keys(str(folder / 'beta.csv'))
+        self.memory_click('#lookThroughSave')
+        self.memory_click('#lookThroughSubmit')
+        self.wait.until(lambda _: 'Saved 1 portfolio(s)' in self.text('lookThroughStatus'))
+        snapshot = FundPortfolioSnapshot.objects.get(user=owner, investment=beta)
+        self.assertEqual(len(snapshot.securities), 2)
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Synthetic Beta holding' in self.text('lookThroughSaved'))
+        self.assertIn('portfolio of 2026-08-31', self.text('lookThroughSaved'))
+        self.memory_click('#lookThroughSavedSubmit')
+        self.wait.until(lambda _: 'Tick at least one saved portfolio' in self.text('lookThroughStatus'))
+        self.memory_click(f'#lookThroughSaved{snapshot.pk}')
+        self.memory_click('#lookThroughSavedSubmit')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'lookThroughCompanies'))
+        self.assertIn('Used 1 saved portfolio(s)', self.text('lookThroughStatus'))
+        self.assertIn('Synthetic Power Ltd', self.text('lookThroughResult'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.fundInjected)'))
+        self.run_axe_light_dark('investment-fund-look-through-saved')
+        self.browser.execute_script('window.confirm = () => true')
+        self.memory_click(f'[data-remove-portfolio="{snapshot.pk}"]')
+        self.wait.until(lambda _: 'Saved portfolio removed' in self.text('lookThroughStatus'))
+        self.wait.until(lambda _: not self.browser.find_element(self.By.ID, 'lookThroughSavedBlock').is_displayed())
+        self.assertFalse(FundPortfolioSnapshot.objects.exists())
+        self.assertEqual(list(Investment.objects.filter(user=owner).values()), holdings)
+
     def test_loan_prepayment_what_if_reports_savings_and_cash_left_without_writing(self):
         from decimal import Decimal
         from django.utils import timezone

@@ -774,7 +774,7 @@ function deleteResearchDecision(id) {
         .catch(error => showResearchFeedback(error.message, "danger"));
 }
 
-// WEALTH2-001: the owner uploads each fund's monthly portfolio file; the server reads it once and stores nothing.
+// WEALTH2-001: the owner uploads each fund's monthly portfolio file; the server keeps its parsed rows only when Save is ticked.
 let lookThroughHoldings = [], lookThroughCount = 0;
 
 function initLookThrough() {
@@ -786,6 +786,50 @@ function initLookThrough() {
         document.querySelector("#lookThroughRows fieldset:last-child select")?.focus();
     });
     form.addEventListener("submit", submitLookThrough);
+    document.getElementById("lookThroughSavedForm").addEventListener("submit", submitSavedLookThrough);
+    loadSavedPortfolios();
+}
+
+function loadSavedPortfolios() {
+    return Alfred.fetchJSON("/api/investments/look-through/saved/").then(rows => {
+        const latest = new Map();
+        rows.forEach(row => { if (!latest.has(row.investment_id)) latest.set(row.investment_id, row); });  // newest first from the server
+        const esc = Alfred.escapeHtml, list = document.getElementById("lookThroughSaved");
+        Alfred.setHTML(list, [...latest.values()].map(row => `<li class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <input class="form-check-input mt-0" type="checkbox" id="lookThroughSaved${row.id}" value="${row.investment_id}">
+            <label class="form-check-label" for="lookThroughSaved${row.id}"><strong>${esc(row.holding)}</strong>: ${esc(row.scheme || "scheme name not found")},
+                ${row.as_of ? `portfolio of ${esc(row.as_of)}` : "portfolio date not found"} · ${row.securities} companies</label>
+            <button type="button" class="btn btn-link btn-sm p-0" data-remove-portfolio="${row.id}" aria-label="Remove the saved portfolio of ${esc(row.holding)}">Remove</button></li>`).join(""));
+        list.querySelectorAll("[data-remove-portfolio]").forEach(button => button.addEventListener("click", () => removeSavedPortfolio(button.dataset.removePortfolio)));
+        document.getElementById("lookThroughSavedBlock").hidden = latest.size === 0;
+    }).catch(() => {});
+}
+
+function removeSavedPortfolio(id) {
+    if (!window.confirm("Remove this saved portfolio? Your holdings are not affected.")) return;
+    const status = document.getElementById("lookThroughStatus");
+    Alfred.fetchJSON(`/api/investments/look-through/saved/${id}/`, { method: "DELETE" })
+        .then(() => { status.textContent = "Saved portfolio removed."; return loadSavedPortfolios(); })
+        .catch(error => { status.textContent = error.message || "The saved portfolio could not be removed."; });
+}
+
+async function submitSavedLookThrough(event) {
+    event.preventDefault();
+    const status = document.getElementById("lookThroughStatus"), button = document.getElementById("lookThroughSavedSubmit");
+    const ids = [...document.querySelectorAll("#lookThroughSaved input:checked")].map(box => Number(box.value));
+    if (!ids.length) { status.textContent = "Tick at least one saved portfolio."; document.querySelector("#lookThroughSaved input")?.focus(); return; }
+    button.disabled = true;
+    status.textContent = "Reading the saved portfolios…";
+    try {
+        const data = await Alfred.fetchJSON("/api/investments/look-through/saved/", { method: "POST", body: JSON.stringify({ investment: ids }) });
+        renderLookThrough(data);
+        status.textContent = `Used ${data.funds.length} saved portfolio(s).`;
+    } catch (error) {
+        document.getElementById("lookThroughResult").replaceChildren();
+        status.textContent = error.message || "The saved portfolios could not be read.";
+    } finally {
+        button.disabled = false;
+    }
 }
 
 function addLookThroughRow() {
@@ -832,12 +876,16 @@ async function submitLookThrough(event) {
         payload.append("file", file);
     }
     if (!payload.has("file")) { status.textContent = "Add at least one fund's portfolio file."; return; }
+    const save = document.getElementById("lookThroughSave").checked;
+    if (save) payload.append("save", "1");
     button.disabled = true;
     status.textContent = "Reading the files…";
     try {
         const data = await Alfred.fetchJSON("/api/investments/look-through/analyze/", { method: "POST", body: payload });
         renderLookThrough(data);
-        status.textContent = `Read ${data.funds.length} file(s). Nothing was saved.`;
+        const kept = data.funds.filter(fund => fund.saved_snapshot).length;
+        status.textContent = save ? `Read ${data.funds.length} file(s). Saved ${kept} portfolio(s).` : `Read ${data.funds.length} file(s). Nothing was saved.`;
+        if (save) loadSavedPortfolios();
     } catch (error) {
         result.replaceChildren();
         status.textContent = error.message || "The files could not be read.";

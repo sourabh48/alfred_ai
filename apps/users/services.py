@@ -15,7 +15,7 @@ from apps.career.models import CareerJobAnalysis, CareerProfile, CareerProfileMo
 from apps.expenses.models import BankAccount, BankAccountMoneySnapshot, Expense, ExpenseMoneySnapshot, StatementUpload
 from apps.family.models import Dependent, FamilyAccountLink
 from apps.integrations.models import EmailConnection, VerifiedExternalInsight
-from apps.investments.models import Investment, InvestmentImportDocument, InvestmentMoneySnapshot, ResearchDecision
+from apps.investments.models import FundPortfolioSnapshot, Investment, InvestmentImportDocument, InvestmentMoneySnapshot, ResearchDecision
 from apps.loans.models import Loan, LoanClosureDocument, LoanForeclosureSnapshot, LoanImportDocument, LoanMoneySnapshot, LoanPaymentHistory, LoanRelatedMoneySnapshot
 from apps.ml_engine.models.parser_memory import DocumentParserLearningMemory
 from apps.mobility.models import (
@@ -125,6 +125,7 @@ def clear_user_fed_data(user) -> dict:
         "investment_money_snapshots": InvestmentMoneySnapshot.objects.filter(user=user).count(),
         "investment_import_documents": investment_doc_qs.count(),
         "research_decisions": ResearchDecision.objects.filter(user=user).count(),
+        "fund_portfolio_snapshots": FundPortfolioSnapshot.objects.filter(user=user).count(),
         "vehicle_profiles": BikeProfile.objects.filter(user=user).count(),
         "vehicle_documents": bike_document_qs.count(),
         "vehicle_services": BikeServiceRecord.objects.filter(user=user).count(),
@@ -161,6 +162,7 @@ def clear_user_fed_data(user) -> dict:
 
         InvestmentMoneySnapshot.objects.filter(user=user).delete()
         investment_doc_qs.delete()
+        FundPortfolioSnapshot.objects.filter(user=user).delete()
         Investment.objects.filter(user=user).delete()
         ResearchDecision.objects.filter(user=user).delete()
 

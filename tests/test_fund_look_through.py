@@ -1,4 +1,4 @@
-"""WEALTH2-001: look-through of owner-uploaded fund portfolio files; synthetic files only, nothing stored."""
+"""WEALTH2-001: look-through of owner-uploaded fund portfolio files; synthetic files only."""
 import io
 import zipfile
 from datetime import date
@@ -10,9 +10,11 @@ from xml.sax.saxutils import escape
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase, override_settings
+from django.db import connection, connections
+from django.db.migrations.executor import MigrationExecutor
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 
-from apps.investments.models import Investment, InvestmentImportDocument
+from apps.investments.models import FundPortfolioSnapshot, Investment, InvestmentImportDocument
 from apps.investments.services.fund_look_through import LookThroughError, parse_portfolio
 
 TODAY = date(2026, 11, 12)
@@ -166,3 +168,108 @@ class FundLookThroughApiTests(TestCase):
         guarded = Client(enforce_csrf_checks=True)
         guarded.force_login(self.owner)
         self.assertEqual(self.post(self.pairs(), guarded).status_code, 403)
+
+
+def beta_csv(as_of="August 31, 2026"):
+    return BETA_CSV.replace(b"August 31, 2026", as_of.encode())
+
+
+class SavedFundPortfolioTests(FundLookThroughApiTests):
+    def post(self, pairs, client=None, save=True):
+        files = [SimpleUploadedFile(name, raw) for _, raw, name in pairs]
+        data = {"file": files, "investment": [str(identity) for identity, _, _ in pairs]}
+        return (client or self.client).post("/api/investments/look-through/analyze/", {**data, "save": "1"} if save else data)
+
+    def saved(self, ids, client=None):
+        return (client or self.client).post("/api/investments/look-through/saved/", {"investment": ids}, content_type="application/json")
+
+    def test_save_keeps_only_parsed_rows_and_saved_look_through_matches_the_files(self):
+        fresh = self.post(self.pairs(), save=False).json()
+        self.assertFalse(FundPortfolioSnapshot.objects.exists())
+        saved = self.post(self.pairs()).json()
+        self.assertTrue(all(fund["saved_snapshot"] for fund in saved["funds"]))
+        self.assertIn("not the file itself", saved["limits"][-1])
+        self.post(self.pairs())  # the same files again are not saved twice
+        self.assertEqual(FundPortfolioSnapshot.objects.filter(user=self.owner).count(), 2)
+        alpha = FundPortfolioSnapshot.objects.get(investment=self.alpha)
+        self.assertEqual((alpha.scheme, alpha.as_of, len(alpha.securities)), ("Synthetic Alpha Flexi Cap Fund", date(2026, 10, 31), 3))
+        self.assertEqual(Decimal(alpha.securities[0]["weight_pct"]), Decimal("40"))
+        self.assertFalse(self.media.exists() and any(self.media.rglob("*")))
+        listing = self.client.get("/api/investments/look-through/saved/")
+        self.assertIn("no-store", listing["Cache-Control"])
+        self.assertEqual({row["holding"] for row in listing.json()}, {"Alpha fund", "Beta fund"})
+        reused = self.saved([self.alpha.pk, self.beta.pk])
+        self.assertEqual(reused.status_code, 200, reused.content)
+        data = reused.json()
+        for key in ("total_value", "companies", "sectors", "countries", "opaque", "overlaps"):
+            self.assertEqual(data[key], fresh[key], key)
+        self.assertEqual([fund["warnings"] for fund in data["funds"]], [fund["warnings"] for fund in fresh["funds"]])
+        self.assertEqual(data["funds"][0]["source"]["saved_snapshot"], alpha.pk)
+        self.alpha.refresh_from_db()
+        self.assertEqual(self.alpha.current_value, Decimal("100000.00"))
+
+    def test_the_latest_three_portfolios_per_holding_are_kept(self):
+        for day in ("May 31, 2026", "June 30, 2026", "July 31, 2026", "August 31, 2026"):
+            self.assertEqual(self.post([(self.beta.pk, beta_csv(day), "beta.csv")]).status_code, 200)
+        kept = list(FundPortfolioSnapshot.objects.filter(investment=self.beta).values_list("as_of", flat=True))
+        self.assertEqual(kept, [date(2026, 8, 31), date(2026, 7, 31), date(2026, 6, 30)])
+        older = self.post([(self.beta.pk, beta_csv("April 30, 2026"), "beta.csv")]).json()["funds"][0]
+        self.assertIsNone(older["saved_snapshot"])
+        self.assertTrue(any("Not saved" in warning for warning in older["warnings"]))
+        self.assertEqual(FundPortfolioSnapshot.objects.filter(investment=self.beta).count(), 3)
+        self.assertEqual(self.saved([self.beta.pk]).json()["funds"][0]["as_of"], "2026-08-31")
+
+    def test_saved_portfolios_stay_with_their_owner(self):
+        self.post(self.pairs())
+        mine = FundPortfolioSnapshot.objects.get(investment=self.alpha)
+        other = Client()
+        other.force_login(self.other)
+        self.assertEqual(other.get("/api/investments/look-through/saved/").json(), [])
+        self.assertEqual(self.saved([self.alpha.pk], other).status_code, 400)
+        self.assertEqual(other.delete(f"/api/investments/look-through/saved/{mine.pk}/").status_code, 404)
+        no_snapshot = Investment.objects.create(user=self.owner, asset_type="mutual_fund", asset_name="Gamma fund", current_value="1.00", currency="INR")
+        for body in ({"investment": [no_snapshot.pk]}, {"investment": [str(self.alpha.pk)]}, {"investment": [True]}, {"investment": []}, [self.alpha.pk]):
+            with self.subTest(body=body):
+                response = self.client.post("/api/investments/look-through/saved/", body, content_type="application/json")
+                self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn(Client().get("/api/investments/look-through/saved/").status_code, (401, 403))
+        self.assertEqual(self.client.delete(f"/api/investments/look-through/saved/{mine.pk}/").status_code, 204)
+        self.assertFalse(FundPortfolioSnapshot.objects.filter(pk=mine.pk).exists())
+        self.assertTrue(Investment.objects.filter(pk=self.alpha.pk).exists())
+
+    def test_data_reset_and_deleting_the_holding_remove_saved_portfolios(self):
+        from apps.users.services import clear_user_fed_data
+        self.post(self.pairs())
+        self.beta.delete()
+        self.assertEqual(list(FundPortfolioSnapshot.objects.values_list("investment_id", flat=True)), [self.alpha.pk])
+        clear_user_fed_data(self.owner)
+        self.assertFalse(FundPortfolioSnapshot.objects.exists())
+
+
+class FundPortfolioSnapshotMigrationTests(TransactionTestCase):
+    def test_forward_and_guarded_reverse_on_a_disposable_database(self):
+        leaves = MigrationExecutor(connection).loader.graph.leaf_nodes()
+        before = [("investments", "0007_research_decision") if app == "investments" else (app, name) for app, name in leaves]
+        target = [("investments", "0008_fund_portfolio_snapshot") if app == "investments" else (app, name) for app, name in leaves]
+        with TemporaryDirectory(prefix="alfred-fund-snapshot-synthetic-") as directory:
+            alias = "fund_snapshot_rehearsal"
+            db = connection.copy(alias=alias)
+            db.settings_dict["NAME"] = str(Path(directory) / "snapshots.sqlite3")
+            connections[alias] = db
+            try:
+                MigrationExecutor(db).migrate(target)
+                apps = MigrationExecutor(db).loader.project_state(target).apps
+                owner = apps.get_model("users", "User").objects.using(alias).create(username="synthetic-snapshot-owner")
+                holding = apps.get_model("investments", "Investment").objects.using(alias).create(
+                    user_id=owner.pk, asset_type="mutual_fund", asset_name="Synthetic fund")
+                row = apps.get_model("investments", "FundPortfolioSnapshot").objects.using(alias).create(
+                    user_id=owner.pk, investment_id=holding.pk, source_sha256="0" * 64)
+                with self.assertRaisesMessage(RuntimeError, "Restore the verified pre-migration backup"):
+                    MigrationExecutor(db).migrate(before)
+                self.assertIn("investments_fundportfoliosnapshot", db.introspection.table_names())
+                apps.get_model("investments", "FundPortfolioSnapshot").objects.using(alias).filter(pk=row.pk).delete()
+                MigrationExecutor(db).migrate(before)
+                self.assertNotIn("investments_fundportfoliosnapshot", db.introspection.table_names())
+                self.assertEqual(apps.get_model("investments", "Investment").objects.using(alias).count(), 1)
+            finally:
+                db.close()

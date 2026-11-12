@@ -1,7 +1,7 @@
 from django.urls import path
 from .import_review_views import InvestmentImportReviewAPI, InvestmentImportConfirmAPI
 from .alert_views import InvestmentReviewAlertView
-from .look_through_views import FundLookThroughView
+from .look_through_views import FundLookThroughView, SavedFundPortfolioDetailView, SavedFundPortfolioView
 from .research_views import ResearchDecisionDetailView, ResearchDecisionListCreateView, ResearchDecisionSettleView, ResearchHistoryView, ResearchLessonsView, ResearchChallengeView, ResearchPacketView, ResearchPersonalChallengeView
 from .views import (
     InvestmentAllocationView,
@@ -16,6 +16,8 @@ from .views import (
 urlpatterns = [
     path("review-alerts/", InvestmentReviewAlertView.as_view()),
     path("look-through/analyze/", FundLookThroughView.as_view(), name="fund_look_through"),
+    path("look-through/saved/", SavedFundPortfolioView.as_view(), name="fund_look_through_saved"),
+    path("look-through/saved/<int:pk>/", SavedFundPortfolioDetailView.as_view(), name="fund_look_through_saved_detail"),
     path("research/", ResearchDecisionListCreateView.as_view(), name="research_decisions"),
     path("research/lessons/", ResearchLessonsView.as_view(), name="research_lessons"),
     path("research/history/", ResearchHistoryView.as_view(), name="research_history"),

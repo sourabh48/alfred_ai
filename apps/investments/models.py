@@ -144,3 +144,27 @@ class ResearchDecision(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.instrument} - {self.rating}"
+
+
+class FundPortfolioSnapshot(models.Model):
+    """A fund's monthly portfolio the owner chose to save for look-through (WEALTH2-001).
+
+    Only the parsed rows are kept (security ISIN, name, sector, country and weight as text); the uploaded file is
+    never stored. The file's SHA-256 stops the same file being saved twice for a holding.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="fund_portfolio_snapshots")
+    investment = models.ForeignKey(Investment, on_delete=models.CASCADE, related_name="portfolio_snapshots")
+    scheme = models.CharField(max_length=160, blank=True)
+    as_of = models.DateField(null=True, blank=True)
+    source_sha256 = models.CharField(max_length=64)
+    securities = models.JSONField(default=list)
+    opaque = models.JSONField(default=list)
+    parser_version = models.PositiveSmallIntegerField(default=1)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = [models.F("as_of").desc(nulls_last=True), "-uploaded_at", "-id"]
+        constraints = [models.UniqueConstraint(fields=["investment", "source_sha256"], name="unique_fund_portfolio_file")]
+
+    def __str__(self):
+        return f"{self.investment_id} - {self.as_of}"

@@ -1,7 +1,8 @@
 """WEALTH2-001: look through the owner's funds using the monthly portfolio file each fund house publishes.
 
 The owner downloads the file (SEBI requires every scheme to disclose its portfolio monthly) and uploads it here;
-ALFRED does not fetch it. The file is read in memory and nothing is stored. Company, sector and country exposure
+ALFRED does not fetch it. The file is read in memory. Only when the owner asks to save are the parsed rows kept
+(FundPortfolioSnapshot, the latest KEEP_PER_HOLDING per holding); the file itself is never stored. Company, sector and country exposure
 comes only from the file's dated weights; rows without a security ISIN (cash, TREPS, receivables, derivatives) and
 any weight the file does not account for are shown as opaque. Each security's currency is not in these files, so
 currency exposure is reported as unavailable rather than guessed.
@@ -9,6 +10,7 @@ currency exposure is reported as unavailable rather than guessed.
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import re
 import zipfile
@@ -17,14 +19,18 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree
 
+from django.db import transaction
+
 from alfred_ai.services.upload_limits import UploadFormatError, check_document_resources
 
-from ..models import Investment
+from ..models import FundPortfolioSnapshot, Investment
 from ..money import investment_money
 
 MAX_FILES = 5
 MAX_ROWS = 5000
 STALE_DAYS = 45
+KEEP_PER_HOLDING = 3
+PARSER_VERSION = 1
 ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december"
@@ -211,23 +217,83 @@ def _pct(value):
     return str(value.quantize(Decimal("0.01")))
 
 
-def look_through(user, uploads: list[tuple[int, bytes, str]], *, today: date) -> dict:
-    """uploads: (investment id, file bytes, file name). Owner's chosen holdings only; nothing is stored."""
-    if not 1 <= len(uploads) <= MAX_FILES:
-        raise LookThroughError(f"Upload between one and {MAX_FILES} fund portfolio files.")
-    ids = [identity for identity, _, _ in uploads]
+def _holdings(user, ids):
+    if not 1 <= len(ids) <= MAX_FILES:
+        raise LookThroughError(f"Choose between one and {MAX_FILES} funds.")
     if len(set(ids)) != len(ids):
         raise LookThroughError("Choose a different fund for each file.")
     holdings = {item.pk: item for item in Investment.objects.filter(user=user, pk__in=ids)}
     if len(holdings) != len(ids):
         raise LookThroughError("Choose one of your own holdings for each file.")
+    return holdings
+
+
+def look_through(user, uploads: list[tuple[int, bytes, str]], *, today: date, save: bool = False) -> dict:
+    """uploads: (investment id, file bytes, file name). Owner's chosen holdings only; parsed rows are kept only if save."""
+    if not 1 <= len(uploads) <= MAX_FILES:
+        raise LookThroughError(f"Upload between one and {MAX_FILES} fund portfolio files.")
+    holdings = _holdings(user, [identity for identity, _, _ in uploads])
+    parsed = [(identity, parse_portfolio(raw, filename), None) for identity, raw, filename in uploads]
+    result = _combine(holdings, parsed, today)
+    if save:
+        with transaction.atomic():
+            saved = [_save(user, holdings[identity], portfolio, raw)
+                     for (identity, raw, _), (_, portfolio, _) in zip(uploads, parsed)]
+        for fund, snapshot in zip(result["funds"], saved):
+            fund["saved_snapshot"] = snapshot.pk if snapshot else None
+            if snapshot is None:
+                fund["warnings"].append(f"Not saved: you already keep {KEEP_PER_HOLDING} newer portfolios for this holding.")
+        result["limits"][-1] = ("Only each file's parsed rows were saved on this computer, not the file itself; "
+                                f"the latest {KEEP_PER_HOLDING} per holding are kept.")
+    return result
+
+
+def look_through_saved(user, ids: list[int], *, today: date) -> dict:
+    """The latest saved portfolio of each chosen holding, combined exactly as freshly uploaded files are."""
+    holdings = _holdings(user, ids)
+    parsed = []
+    for identity in ids:
+        snapshot = FundPortfolioSnapshot.objects.filter(user=user, investment_id=identity).first()
+        if snapshot is None:
+            raise LookThroughError(f"No saved portfolio for {holdings[identity].asset_name}; upload its file first.")
+        parsed.append((identity, _from_snapshot(snapshot), snapshot))
+    result = _combine(holdings, parsed, today)
+    result["limits"][-1] = "Uses the portfolios you saved earlier; upload a newer file each month to keep this current."
+    return result
+
+
+def _row(item):
+    return {**item, "weight_pct": str(item["weight_pct"])}
+
+
+def _save(user, holding, portfolio, raw):
+    digest = hashlib.sha256(raw).hexdigest()
+    snapshot, _ = FundPortfolioSnapshot.objects.update_or_create(
+        user=user, investment=holding, source_sha256=digest,
+        defaults={"scheme": portfolio["scheme"] or "", "as_of": portfolio["as_of"], "parser_version": PARSER_VERSION,
+                  "securities": [_row(item) for item in portfolio["securities"]],
+                  "opaque": [_row(item) for item in portfolio["opaque"]]})
+    stale = list(FundPortfolioSnapshot.objects.filter(user=user, investment=holding).values_list("pk", flat=True)[KEEP_PER_HOLDING:])
+    FundPortfolioSnapshot.objects.filter(pk__in=stale).delete()
+    return None if snapshot.pk in stale else snapshot  # an older file than the kept ones is not kept
+
+
+def _from_snapshot(snapshot):
+    weigh = lambda items: [{**item, "weight_pct": Decimal(item["weight_pct"])} for item in items]
+    securities, opaque = weigh(snapshot.securities), weigh(snapshot.opaque)
+    return {"scheme": snapshot.scheme or None, "as_of": snapshot.as_of, "securities": securities, "opaque": opaque,
+            "total_pct": sum((item["weight_pct"] for item in [*securities, *opaque]), Decimal(0))}
+
+
+def _combine(holdings, portfolios, today):
+    ids = [identity for identity, _, _ in portfolios]
     currencies = {holdings[identity].currency for identity in ids}
     if len(currencies) != 1:
         raise LookThroughError("Choose funds recorded in the same currency; amounts are never converted here.")
     funds, companies, sectors, countries = [], {}, defaultdict(Decimal), defaultdict(Decimal)
     opaque_total, total_value = Decimal(0), Decimal(0)
-    for identity, raw, filename in uploads:
-        holding, parsed = holdings[identity], parse_portfolio(raw, filename)
+    for identity, parsed, snapshot in portfolios:
+        holding = holdings[identity]
         value = investment_money(holding.current_value)
         total_value += value
         warnings = []
@@ -256,7 +322,8 @@ def look_through(user, uploads: list[tuple[int, bytes, str]], *, today: date) ->
                       "opaque_pct": _pct(fund_opaque),
                       "opaque_rows": [{**item, "weight_pct": _pct(item["weight_pct"])} for item in parsed["opaque"][:20]],
                       "unaccounted_pct": _pct(max(unaccounted, Decimal(0))), "weights": {item["isin"]: item["weight_pct"] for item in parsed["securities"]},
-                      "warnings": warnings})
+                      "warnings": warnings,
+                      "source": {"saved_snapshot": snapshot.pk, "saved_at": snapshot.uploaded_at.isoformat()} if snapshot else "uploaded file"})
     share = lambda amount: _pct(amount * 100 / total_value) if total_value else None
     ranked = lambda groups: [{"name": key, "amount": str(investment_money(amount)), "share_pct": share(amount)}
                              for key, amount in sorted(groups.items(), key=lambda pair: -pair[1])]
