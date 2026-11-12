@@ -17,6 +17,14 @@
   every page reader is listed in PUBLIC_PAGE_READS and a test enforces the list. AUDIT-04: Career and Travel views
   filter by the signed-in owner; no cross-user gap found. AUDIT-05 runtime checks: UNVERIFIED_RUNTIME.
 - Docs: STATE.json and HANDOFF marked superseded; PROJECT_STATUS header; provider register rows; acceptance note.
+- CI at e548d42 (run 43215189839): FAIL in selenium shard 2 only. (1) The home dashboard's Career follow-up
+  reminder failed axe in dark mode: the global dark link colour (#a8caff) sat on the light info alert (1.43:1). It
+  reproduces locally; fixed with dark-mode alert links inheriting the alert text colour (workspace.css v6). Why
+  2ed81da passed with the same CSS is not explained. (2) Document upload timed out waiting for the encrypted-storage
+  status; it passed locally, so it is treated as a CI timing flake and not changed.
+- Evidence (c2487af): Career, Travel guide, platform hardening, data sources and tax modules plus route sweeps,
+  runner and live UI contracts 356 PASS; browser: dashboard follow-up, Career kit and reviewed-send tests 11 PASS.
+  Not pushed.
 - Baseline 85/143, extensions 0/13 unchanged.
 
 ## Career Ops training, project, question checks, practice comments and course links - 2026-11-12
