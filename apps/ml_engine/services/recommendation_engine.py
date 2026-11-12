@@ -6,10 +6,12 @@ premium, cover amount or credit score is assumed: where a figure would need an o
 the payload says "Not available".
 """
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional
 from django.db.models import Sum
 from django.utils import timezone
 
+from apps.expenses.money import money_float
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 
 NOT_AVAILABLE = "Not available"
@@ -216,8 +218,14 @@ class FinancialRecommendationEngine:
         amount_source = 'entered'
         if not investment_amount:
             # Half of the owner's own monthly savings capacity; never a guessed amount.
-            investment_amount = max(profile['monthly_savings'] * 0.5, 0)
+            investment_amount = Decimal(str(profile['financial_baseline'].get('savings_capacity') or 0)) / 2
             amount_source = 'half_of_monthly_savings_capacity'
+        try:
+            investment_amount = Decimal(str(investment_amount))
+        except InvalidOperation:
+            investment_amount = Decimal('0')
+        if not investment_amount.is_finite() or investment_amount < 0:
+            investment_amount = Decimal('0')
 
         recommendations = []
 
@@ -252,7 +260,7 @@ class FinancialRecommendationEngine:
                 'investment_id': inv_id,
                 'score': score,
                 'suggested_allocation': suggested_allocation,
-                'suggested_amount': round(investment_amount * suggested_allocation / 100, 2),
+                'suggested_amount': money_float(investment_amount * suggested_allocation / 100),
                 'expected_return': None,
                 'expected_return_status': NO_RETURN_SOURCE,
                 'match_reason': f"Matches your {risk_appetite} risk profile, worked out from your own records"
@@ -269,7 +277,7 @@ class FinancialRecommendationEngine:
             'suggested_portfolio': portfolio,
             'your_profile': {
                 'risk_appetite': risk_appetite,
-                'available_amount': investment_amount,
+                'available_amount': money_float(investment_amount),
                 'amount_source': amount_source,
                 'time_horizon': time_horizon
             }
@@ -326,10 +334,10 @@ class FinancialRecommendationEngine:
             else:
                 return 10
 
-    def _create_diversified_portfolio(self, recommendations: List, amount: float, risk: str) -> Dict:
+    def _create_diversified_portfolio(self, recommendations: List, amount: Decimal, risk: str) -> Dict:
         """Create a diversified investment portfolio."""
         portfolio = {
-            'total_amount': amount,
+            'total_amount': money_float(amount),
             'allocations': [],
             'expected_return': None,
             'expected_return_status': NO_RETURN_SOURCE,

@@ -365,6 +365,21 @@ class InvestmentAndRelationshipAdvisoryTests(TestCase):
         self.assertEqual(payload["grounding"]["modules"][2]["status"], "disabled")
         self.assertEqual(payload["grounding"]["modules"][3]["key"], "personal_loans")
 
+    def test_suggested_amounts_round_half_up_in_decimal(self):
+        from decimal import Decimal
+        from apps.ml_engine.services.recommendation_engine import recommendation_engine
+        # 25% of 10000.06 is 2500.015: float rounding gives 2500.01, cents HALF_UP gives 2500.02.
+        with patch.object(recommendation_engine, "_calculate_allocation", return_value=25):
+            result = recommendation_engine.recommend_investments(self.user, investment_amount=10000.06)
+        self.assertEqual(result["your_profile"]["available_amount"], 10000.06)
+        self.assertTrue(result["recommendations"])
+        self.assertEqual({item["suggested_amount"] for item in result["recommendations"]}, {2500.02})
+        self.assertEqual(Decimal(str(result["suggested_portfolio"]["total_amount"])), Decimal("10000.06"))
+        for bad in (float("nan"), float("inf"), -5):
+            with self.subTest(bad), patch.object(recommendation_engine, "_calculate_allocation", return_value=25):
+                self.assertEqual(recommendation_engine.recommend_investments(self.user, investment_amount=bad)["your_profile"]["available_amount"],
+                                 0.0)
+
 
 def _insight(payload, source_name, summary):
     class DummyInsight:
