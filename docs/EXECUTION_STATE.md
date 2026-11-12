@@ -49,6 +49,12 @@
   A cloud model name is refused (503). Tests: analyst leak (fails on the old code), consent, no context, owner
   isolation, CSRF, sign-in, no writes; browser test (consent message, result, analyst never sees the view, escaped
   thesis, axe light/dark). Investment/research/limiter suites 166 PASS. Implemented, not accepted.
+- Owner chose WEALTH2-001 via upload (2026-11-12). Slice 1: the owner uploads each fund's monthly portfolio file (.xlsx
+  read with the standard library, or .csv) and picks the holding; POST investments/look-through/analyze/ reads it in
+  memory, stores nothing, and returns company/sector/country exposure from recorded values, overlap between funds, the
+  opaque share and date/weight warnings. Currency exposure is reported unavailable (not in these files). .xlsx now
+  gets the shared archive bounds. Investments page panel "What your funds own". Look-through, upload-limit and
+  abuse suites PASS; Chrome test with axe. Pending: multi-scheme workbooks, saved snapshots (needs migration approval).
 - `sprint`: selected WEALTH2-002 slice 1/3 (AI-17 savings-goal cards). Found: two create cards for the same goal
   name could both be confirmed and make duplicates. Now each proposal carries depends_on (shown on the card as
   "Checked again when you confirm"); confirm refuses a create card when a same-name goal (any case/spacing) was

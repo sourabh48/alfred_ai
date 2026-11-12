@@ -184,6 +184,20 @@
     </div>
 </section>
 
+<section class="surface-card mb-4" id="lookThroughSection" aria-labelledby="lookThroughTitle">
+    <h2 id="lookThroughTitle" class="page-section-title mb-1">What your funds own</h2>
+    <p class="muted small mb-3">Download each fund's monthly portfolio file (.xlsx or .csv) from its fund house website, then pick the holding it belongs to. The files are read once on this computer and nothing is saved.</p>
+    <form id="lookThroughForm" data-live-refresh-hold="true" novalidate>
+        <div id="lookThroughRows" class="soft-grid"></div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="lookThroughAdd">Add another fund</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="lookThroughSubmit">Show what my funds own</button>
+        </div>
+    </form>
+    <div id="lookThroughStatus" class="small mt-2" role="status" aria-live="polite"></div>
+    <div id="lookThroughResult" class="mt-3"></div>
+</section>
+
 <section class="surface-card mb-4" id="researchJournalSection" aria-labelledby="researchJournalTitle">
     <h2 id="researchJournalTitle" class="page-section-title mb-1">Research journal</h2>
     <p class="page-section-copy mb-2">A notebook for your stock ideas, so you can learn which of your guesses work. Nothing here buys, sells or changes your holdings.</p>
@@ -291,5 +305,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.14.0"></script>
+<script src="/static/js/investments.js?v=2.15.0"></script>
 {% endblock %}

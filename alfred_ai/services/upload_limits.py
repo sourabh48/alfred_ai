@@ -197,7 +197,7 @@ def check_document_resources(raw_bytes, filename):
     if len(raw_bytes) > limit("ALFRED_UPLOAD_FILE_BYTES"):
         raise UploadLimitExceeded()
     extension = os.path.splitext(filename.lower())[1]
-    if extension in {".docx", ".odt"}:
+    if extension in {".docx", ".odt", ".xlsx"}:
         with zipfile.ZipFile(BytesIO(raw_bytes)) as archive:
             members = archive.infolist()
             if len(members) > limit("ALFRED_UPLOAD_ARCHIVE_MEMBERS"):

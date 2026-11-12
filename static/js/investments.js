@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadInvestmentDashboard();
     initInvestmentReviewAlerts();
     initResearchJournal();
+    initLookThrough();
     Alfred.enableLiveRefresh("investments-live", loadInvestmentDashboard, { rootId: "investmentRoot" });
 });
 
@@ -84,6 +85,7 @@ function loadInvestmentDashboard() {
             renderInvestmentWatchlist(summaryData.watchlist || {});
             renderInvestmentPositions(summaryData.positions || []);
             fillPacketHoldings(summaryData.positions || []);
+            fillLookThroughHoldings(summaryData.positions || []);
             renderInvestmentImports(importUploads || []);
             Alfred.clearPageAlert("investmentRoot");
         })
@@ -761,4 +763,102 @@ function deleteResearchDecision(id) {
     Alfred.fetchJSON(`/api/investments/research/${id}/`, { method: "DELETE" })
         .then(() => { showResearchFeedback("View deleted.", "success"); return loadResearchDecisions(); })
         .catch(error => showResearchFeedback(error.message, "danger"));
+}
+
+// WEALTH2-001: the owner uploads each fund's monthly portfolio file; the server reads it once and stores nothing.
+let lookThroughHoldings = [], lookThroughCount = 0;
+
+function initLookThrough() {
+    const form = document.getElementById("lookThroughForm");
+    if (!form) return;
+    addLookThroughRow();
+    document.getElementById("lookThroughAdd").addEventListener("click", () => {
+        addLookThroughRow();
+        document.querySelector("#lookThroughRows fieldset:last-child select")?.focus();
+    });
+    form.addEventListener("submit", submitLookThrough);
+}
+
+function addLookThroughRow() {
+    const rows = document.getElementById("lookThroughRows");
+    if (rows.children.length >= 5) return;
+    const n = ++lookThroughCount;
+    const row = document.createElement("fieldset");
+    row.className = "border rounded p-2";
+    row.innerHTML = `<legend class="h6 small fw-bold float-none w-auto px-1 mb-1">Fund ${rows.children.length + 1}</legend>
+        <div class="row g-2">
+            <div class="col-md-5"><label class="form-label small" for="lookThroughHolding${n}">Your holding</label>
+                <select class="form-select form-select-sm" id="lookThroughHolding${n}" name="investment" required></select></div>
+            <div class="col-md-7"><label class="form-label small" for="lookThroughFile${n}">Its monthly portfolio file</label>
+                <input class="form-control form-control-sm" id="lookThroughFile${n}" name="file" type="file" accept=".xlsx,.csv" required></div>
+        </div>`;
+    rows.append(row);
+    fillLookThroughHoldings(lookThroughHoldings);
+    document.getElementById("lookThroughAdd").disabled = rows.children.length >= 5;
+}
+
+function fillLookThroughHoldings(items) {
+    lookThroughHoldings = items;
+    document.querySelectorAll("#lookThroughRows select").forEach(select => {
+        const chosen = select.value;
+        select.replaceChildren(new Option("Choose a holding", ""), ...items.map(item => new Option(item.asset_name, String(item.id))));
+        select.value = items.some(item => String(item.id) === chosen) ? chosen : "";
+    });
+}
+
+async function submitLookThrough(event) {
+    event.preventDefault();
+    const status = document.getElementById("lookThroughStatus"), result = document.getElementById("lookThroughResult");
+    const button = document.getElementById("lookThroughSubmit");
+    const payload = new FormData();
+    for (const row of document.querySelectorAll("#lookThroughRows fieldset")) {
+        const select = row.querySelector("select"), file = row.querySelector("input[type=file]").files[0];
+        if (!select.value && !file) continue;
+        if (!select.value || !file) {
+            status.textContent = "Choose both a holding and its file for each fund, or leave the row empty.";
+            (select.value ? row.querySelector("input") : select).focus();
+            return;
+        }
+        payload.append("investment", select.value);
+        payload.append("file", file);
+    }
+    if (!payload.has("file")) { status.textContent = "Add at least one fund's portfolio file."; return; }
+    button.disabled = true;
+    status.textContent = "Reading the files…";
+    try {
+        const data = await Alfred.fetchJSON("/api/investments/look-through/analyze/", { method: "POST", body: payload });
+        renderLookThrough(data);
+        status.textContent = `Read ${data.funds.length} file(s). Nothing was saved.`;
+    } catch (error) {
+        result.replaceChildren();
+        status.textContent = error.message || "The files could not be read.";
+    } finally {
+        button.disabled = false;
+    }
+}
+
+function renderLookThrough(data) {
+    const esc = Alfred.escapeHtml;
+    const money = value => data.currency ? Alfred.formatCurrency(Number(value), data.currency) : `${Alfred.formatNumber(Number(value), 2)} (currency not recorded)`;
+    const names = Object.fromEntries(data.funds.map(fund => [fund.investment_id, fund.holding]));
+    const funds = data.funds.map(fund => `<li class="mb-2"><strong>${esc(fund.holding)}</strong>: ${esc(fund.scheme_in_file || "scheme name not found in the file")},
+        ${fund.as_of ? `portfolio of ${esc(fund.as_of)}` : "portfolio date not found"} · ${fund.securities} companies · ${esc(fund.opaque_pct)}% not looked through
+        ${fund.warnings.map(warning => `<div class="text-warning-emphasis">${esc(warning)}</div>`).join("")}</li>`).join("");
+    const overlaps = data.overlaps.map(item => `<li>${esc(names[item.funds[0]])} and ${esc(names[item.funds[1]])}: ${item.common_securities} companies in common, ${esc(item.overlap_pct)}% overlap</li>`).join("");
+    const companies = data.companies.slice(0, 15).map(item => `<tr><td>${esc(item.name)}</td><td>${esc(item.sector || "Not stated")}</td><td>${esc(item.country)}</td>
+        <td class="text-end">${money(item.amount)}</td><td class="text-end">${esc(item.share_pct)}%</td><td>${item.funds.map(fund => esc(names[fund.investment_id])).join(", ")}</td></tr>`).join("");
+    const groups = items => items.slice(0, 10).map(item => `<li>${esc(item.name)}: ${money(item.amount)} (${esc(item.share_pct)}%)</li>`).join("");
+    Alfred.setHTML(document.getElementById("lookThroughResult"), `
+        <p class="mb-2">Recorded value looked at: <strong>${money(data.total_value)}</strong>. Not looked through (cash, other funds' units, unlisted rows): ${money(data.opaque.amount)} (${esc(data.opaque.share_pct)}%).</p>
+        <h3 class="h6">Files</h3><ul class="small">${funds}</ul>
+        ${overlaps ? `<h3 class="h6">Overlap between funds</h3><ul class="small">${overlaps}</ul>` : ""}
+        <h3 class="h6">Largest companies across your funds</h3>
+        <div class="table-responsive"><table class="table table-sm small" id="lookThroughCompanies">
+            <caption class="visually-hidden">Largest companies across the chosen funds</caption>
+            <thead><tr><th scope="col">Company</th><th scope="col">Sector</th><th scope="col">Country</th><th scope="col" class="text-end">Amount</th><th scope="col" class="text-end">Share</th><th scope="col">In funds</th></tr></thead>
+            <tbody>${companies}</tbody></table></div>
+        <div class="row g-3 small"><div class="col-md-6"><h3 class="h6">By sector</h3><ul>${groups(data.sectors)}</ul></div>
+            <div class="col-md-6"><h3 class="h6">By country</h3><ul>${groups(data.countries)}</ul></div></div>
+        <p class="small mb-1">Currency: ${esc(data.currency_exposure)}</p>
+        <ul class="small muted mb-0">${data.limits.map(item => `<li>${esc(item)}</li>`).join("")}</ul>`);
 }

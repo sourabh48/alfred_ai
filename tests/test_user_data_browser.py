@@ -8974,6 +8974,38 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual((list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()), (holdings, calls))
         self.run_axe_light_dark('investment-personal-challenger')
 
+    def test_fund_look_through_reads_uploaded_portfolio_files_without_saving(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.investments.models import Investment, InvestmentImportDocument
+        from tests.test_fund_look_through import ALPHA, BETA_CSV, xlsx
+        owner = self.scenario['user']
+        alpha = Investment.objects.create(user=owner, asset_type='mutual_fund', asset_name='Synthetic Alpha holding', current_value='100000.00', currency='INR')
+        beta = Investment.objects.create(user=owner, asset_type='mutual_fund', asset_name='Synthetic Beta holding', current_value='50000.00', currency='INR')
+        folder = Path(self.enterContext(TemporaryDirectory(prefix='alfred-look-through-browser-')))
+        (folder / 'alpha.xlsx').write_bytes(xlsx(ALPHA))
+        (folder / 'beta.csv').write_bytes(BETA_CSV.replace(b'Synthetic Power Ltd', b'<img src=x onerror="window.fundInjected=true">'))
+        before = (list(Investment.objects.filter(user=owner).values()), InvestmentImportDocument.objects.count())
+        self.login(); self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Synthetic Beta holding' in self.text('lookThroughRows'))
+        Select(self.browser.find_element(self.By.CSS_SELECTOR, '#lookThroughRows fieldset:nth-child(1) select')).select_by_value(str(alpha.pk))
+        self.memory_click('#lookThroughSubmit')
+        self.wait.until(lambda _: 'Choose both a holding and its file' in self.text('lookThroughStatus'))
+        self.browser.find_element(self.By.CSS_SELECTOR, '#lookThroughRows fieldset:nth-child(1) input[type=file]').send_keys(str(folder / 'alpha.xlsx'))
+        self.memory_click('#lookThroughAdd')
+        Select(self.browser.find_element(self.By.CSS_SELECTOR, '#lookThroughRows fieldset:nth-child(2) select')).select_by_value(str(beta.pk))
+        self.browser.find_element(self.By.CSS_SELECTOR, '#lookThroughRows fieldset:nth-child(2) input[type=file]').send_keys(str(folder / 'beta.csv'))
+        self.memory_click('#lookThroughSubmit')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'lookThroughCompanies'))
+        result = self.text('lookThroughResult')
+        self.assertIn('1 companies in common, 25.00% overlap', result)
+        self.assertIn('Synthetic Bank Ltd', result)
+        self.assertIn('35.00%', result)
+        self.assertIn('31 Aug 2026', result)
+        self.assertIn('Nothing was saved', self.text('lookThroughStatus'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.fundInjected)'))
+        self.assertEqual((list(Investment.objects.filter(user=owner).values()), InvestmentImportDocument.objects.count()), before)
+        self.run_axe_light_dark('investment-fund-look-through')
+
     def test_loan_prepayment_what_if_reports_savings_and_cash_left_without_writing(self):
         from decimal import Decimal
         from django.utils import timezone
