@@ -20,9 +20,6 @@ PUBLIC_PAGE_READS = (
          what='A job page whose link you paste, when the job site has no free job API. Greenhouse, Lever and Ashby '
               'jobs come from their free public APIs instead.',
          sent='The link you pasted', safeguard="Only on your request, and only if the site's robots.txt allows it."),
-    dict(module='Travel', file='apps/mobility/services/travel/providers/web.py',
-         what="A guide-listed hotel's own website, for the details it publishes about itself.",
-         sent="The hotel's website address", safeguard="Only when you ask for that hotel; robots.txt is checked first."),
     dict(module='Tax', file='apps/integrations/services/verified_intelligence.py',
          what='The official Union Budget website (indiabudget.gov.in), to notice a new Budget year.',
          sent='Nothing about you', safeguard='It has no API; robots.txt is checked first. A notice only: tax rules are not changed from it.'),
