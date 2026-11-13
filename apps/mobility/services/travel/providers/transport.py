@@ -17,7 +17,7 @@ class TravelpayoutsFlights(Provider):
     source_url = "https://www.aviasales.com"
     attribution = "Aviasales via Travelpayouts: fares other travellers found recently, not live; check before you book"
     ttl = timedelta(hours=6)
-    limits = {"minute": 5, "hour": 30, "day": 100, "month": 1500}  # shortcut: ALFRED's own budget, not Travelpayouts' published limit
+    limits = {"minute": 5, "hour": 30, "day": 100, "month": 1500}  # ALFRED's own budget; Travelpayouts allows 600/minute with no monthly cap (checked 2026-11-13)
     allowed_parameters = {"origin", "destination", "departure_date", "return_date"}
 
     def unavailable_reason(self):
