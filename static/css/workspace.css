@@ -125,7 +125,7 @@ html[data-theme="dark"] :focus-visible { outline-color: #a8caff; }
 .home-attention-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .5rem; }
 .home-attention-list li { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem; border-radius: .6rem; border-left: 4px solid #d97904; background: var(--alfred-primary-soft); }
 .home-attention-list li.home-attention-danger { border-left-color: #c44a3d; }
-.settings-index { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
-.settings-index a { padding: .3rem .75rem; border-radius: 999px; background: var(--alfred-primary-soft); color: var(--alfred-primary); text-decoration: none; font-size: .9rem; }
-.settings-index a:hover, .settings-index a:focus-visible { text-decoration: underline; }
-#settingsProfile, #settingsFamily, #travelPreferences, #privateMemoryPanel, #settingsAccountData { scroll-margin-top: 5rem; }
+.page-index { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.page-index a { padding: .3rem .75rem; border-radius: 999px; background: var(--alfred-primary-soft); color: var(--alfred-primary); text-decoration: none; font-size: .9rem; }
+.page-index a:hover, .page-index a:focus-visible { text-decoration: underline; }
+#settingsProfile, #settingsFamily, #travelPreferences, #privateMemoryPanel, #settingsAccountData, [id^="vehicle"] { scroll-margin-top: 5rem; }
