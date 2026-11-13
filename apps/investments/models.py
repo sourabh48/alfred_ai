@@ -34,6 +34,12 @@ class Investment(models.Model):
     invested_amount = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
     monthly_sip = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
     current_value = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
+    # Mutual funds: with an AMFI scheme code and units, the value follows AMFI's daily NAV (services/fund_prices.py).
+    amfi_scheme_code = models.CharField(max_length=12, blank=True, default="")
+    units = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    nav = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    nav_date = models.DateField(null=True, blank=True)
+    value_before_nav = InvestmentMoneyField(max_digits=14, decimal_places=2, null=True, blank=True)
     # Denomination of the three amounts above; null means not recorded and is never guessed (FIN-15).
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, null=True, blank=True, default=None)
     annual_return_rate = models.FloatField(default=0)

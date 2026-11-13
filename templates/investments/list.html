@@ -90,6 +90,17 @@
                         <label class="form-label" for="investmentInvested">Invested Amount</label>
                         <input id="investmentInvested" name="invested_amount" type="number" step="0.01" class="form-control" required>
                     </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="investmentFund">Mutual fund (optional)</label>
+                        <input id="investmentFund" class="form-control" list="investmentFundList" autocomplete="off" placeholder="Type the fund name, then pick it" aria-describedby="investmentFundHelp">
+                        <datalist id="investmentFundList"></datalist>
+                        <input type="hidden" id="investmentFundCode" name="amfi_scheme_code">
+                        <div id="investmentFundHelp" class="form-text">With the fund and your units, ALFRED updates the value every day from AMFI's official prices and tells you on Home.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="investmentUnits">Units</label>
+                        <input id="investmentUnits" name="units" type="number" step="0.0001" min="0" class="form-control">
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label" for="investmentCurrent">Current Value</label>
                         <input id="investmentCurrent" name="current_value" type="number" step="0.01" class="form-control" required>
@@ -315,5 +326,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.18.0"></script>
+<script src="/static/js/investments.js?v=2.19.0"></script>
 {% endblock %}

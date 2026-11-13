@@ -50,6 +50,11 @@ class InvestmentSerializer(serializers.ModelSerializer):
             "invested_amount",
             "monthly_sip",
             "current_value",
+            "amfi_scheme_code",
+            "units",
+            "nav",
+            "nav_date",
+            "value_before_nav",
             "currency",
             "currency_status",
             "annual_return_rate",
@@ -59,7 +64,18 @@ class InvestmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ["user", "gain_loss", "created_at", "updated_at"]
+        read_only_fields = ["user", "gain_loss", "nav", "nav_date", "value_before_nav", "created_at", "updated_at"]
+
+    def validate_amfi_scheme_code(self, value):
+        value = (value or "").strip()
+        if value and not (value.isdigit() and len(value) <= 12):
+            raise serializers.ValidationError("Pick the fund from the list so ALFRED has its AMFI code.")
+        return value
+
+    def validate_units(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Units must be more than zero.")
+        return value
 
     def get_currency_status(self, obj):
         return currency_status(obj.currency)

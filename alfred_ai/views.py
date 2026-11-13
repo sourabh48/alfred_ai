@@ -197,6 +197,17 @@ def _attention_items(user, sources):
         items.append(dict(tone="danger" if over else "warning", spent=spent, limit=plan.inflation_adjusted,
                           text="over this month's budget" if over else "used 80% or more of this month's budget",
                           action="Open budgets", url="/budgets/"))
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.investments.models import Investment
+    revalued = list(Investment.objects.filter(user=user, currency="INR", value_before_nav__isnull=False,
+                                              nav_date__gte=timezone.localdate()-timedelta(days=3)))
+    if revalued:
+        change = sum(item.current_value - item.value_before_nav for item in revalued)
+        latest = max(item.nav_date for item in revalued)
+        items.append(dict(tone="info", text=(f"{len(revalued)} fund{'s' if len(revalued) > 1 else ''} revalued from AMFI prices of "
+                          f"{latest:%d %b}: {'up' if change >= 0 else 'down'} ₹{abs(change):,.2f} since the last update."),
+                          action="Open investments", url="/investments/"))
     vehicles = bike_service_intelligence.risk_snapshot(user).get("summary", {})
     for key, tone, words in (("expired_documents", "danger", "expired"), ("expiring_documents", "warning", "expiring soon")):
         if vehicles.get(key):

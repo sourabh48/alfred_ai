@@ -22,6 +22,15 @@ from .money import investment_money, investment_total_float
 from .serializers import InvestmentImportDocumentSerializer, InvestmentSerializer
 
 
+class FundSearchView(APIView):
+    """AMFI funds by name, so a holding gets its scheme code without the person knowing it."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .services.fund_prices import search_funds
+        return Response({"funds": search_funds(request.query_params.get("q", "")[:80])})
+
+
 class InvestmentListCreateView(ListCreateAPIView):
     serializer_class = InvestmentSerializer
     permission_classes = [IsAuthenticated]

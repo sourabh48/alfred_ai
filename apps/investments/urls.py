@@ -4,6 +4,7 @@ from .alert_views import InvestmentReviewAlertView
 from .look_through_views import FundLookThroughView, SavedFundPortfolioDetailView, SavedFundPortfolioView
 from .research_views import ResearchDecisionDetailView, ResearchDecisionListCreateView, ResearchDecisionSettleView, ResearchHistoryView, ResearchLessonsView, ResearchChallengeView, ResearchPacketView, ResearchPersonalChallengeView
 from .views import (
+    FundSearchView,
     InvestmentAllocationView,
     InvestmentDetailView,
     InvestmentGrowthView,
@@ -28,6 +29,7 @@ urlpatterns = [
     path("research/<int:pk>/settle/", ResearchDecisionSettleView.as_view(), name="research_decision_settle"),
     path("", InvestmentListCreateView.as_view()),
     path("summary/", InvestmentSummaryView.as_view()),
+    path("funds/", FundSearchView.as_view(), name="fund_search"),
     path("import-uploads/", InvestmentImportDocumentListView.as_view()),
     path("import-uploads/<int:pk>/preview/", InvestmentImportReviewAPI.as_view()),
     path("import-uploads/<int:pk>/confirm/", InvestmentImportConfirmAPI.as_view()),

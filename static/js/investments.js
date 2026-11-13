@@ -387,6 +387,7 @@ function submitInvestmentForm(event) {
     ["invested_amount", "monthly_sip", "current_value", "annual_return_rate"].forEach(key => {
         payload[key] = Number(payload[key] || 0);
     });
+    if (!payload.units) delete payload.units;  // units are a decimal string; empty means not recorded
 
     Alfred.fetchJSON("/api/investments/", {
         method: "POST",
@@ -399,6 +400,31 @@ function submitInvestmentForm(event) {
         })
         .catch(error => showInvestmentFeedback(error.message, "danger"));
 }
+
+// Fund picker: the name is looked up in AMFI's list; picking one stores its scheme code for daily revaluation.
+let fundSearchTimer = null, fundMatches = [];
+function setupFundPicker() {
+    const input = document.getElementById("investmentFund"), list = document.getElementById("investmentFundList"), code = document.getElementById("investmentFundCode");
+    if (!input) return;
+    input.addEventListener("input", () => {
+        const picked = fundMatches.find(fund => fund.name === input.value);
+        code.value = picked ? picked.scheme_code : "";
+        if (picked) {
+            const name = document.getElementById("investmentName") || document.querySelector('[name="asset_name"]');
+            if (name && !name.value) name.value = picked.name.slice(0, 120);
+            return;
+        }
+        clearTimeout(fundSearchTimer);
+        if (input.value.trim().length < 3) return;
+        fundSearchTimer = setTimeout(async () => {
+            try {
+                fundMatches = (await Alfred.fetchJSON(`/api/investments/funds/?q=${encodeURIComponent(input.value.trim())}`)).funds;
+                list.replaceChildren(...fundMatches.map(fund => Object.assign(document.createElement("option"), {value: fund.name, label: `NAV ₹${fund.nav} on ${fund.nav_date}`})));
+            } catch (error) { fundMatches = []; }
+        }, 300);
+    });
+}
+document.addEventListener("DOMContentLoaded", setupFundPicker);
 
 function showInvestmentFeedback(message, tone) {
     const box = document.getElementById("investmentFormFeedback");

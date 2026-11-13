@@ -65,6 +65,13 @@ def native_intelligence_refresh():
     return refresh_verified_external_intelligence(batch_size=75)
 
 
+@db_periodic_task(crontab(minute="30", hour="7,23"))
+def native_fund_value_refresh():
+    # AMFI publishes the day's NAVs late in the evening; the morning run catches a late file.
+    from apps.investments.services.fund_prices import refresh_fund_values
+    return refresh_fund_values()
+
+
 @db_periodic_task(crontab(minute="5"))
 def native_exchange_rate_refresh():
     # Fetches only when the stored ECB table is older than 12 hours; pages read the stored copy.
