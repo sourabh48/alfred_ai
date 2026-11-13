@@ -1,4 +1,5 @@
-"""Public web results for a general Ask ALFRED question, when the owner ticks "Look this up online".
+"""Public web results for a general Ask ALFRED question: when the owner ticks "Look this up online", or when ALFRED decides
+the question needs current or public information that saved memories do not hold.
 
 Only the question text leaves this PC, and only when it carries nothing that looks private. No records,
 memories or history are ever sent, and results are not cached, so the question is not kept anywhere.
@@ -26,6 +27,25 @@ PRIVATE_MESSAGE = ("This question has details that look private (an amount, numb
 
 class PrivateQuestion(PermissionError):
     pass
+
+
+# Questions about the person or about ALFRED itself are answered from memory, never searched.
+PERSONAL = re.compile(r"(?i)\b(?:my|me|mine|myself|i|i'm|i've|i'd|our|ours|we|you|your|alfred)\b")
+# Words that mean the answer changes over time, so saved memories cannot hold it.
+CURRENT = re.compile(r"(?i)\b(?:latest|today|tonight|tomorrow|yesterday|now|current(?:ly)?|recent(?:ly)?|news|this (?:week|month|year)"
+                     r"|20\d\d|prices?|rates?|scores?|weather|forecast|who won|elections?|released?|launch(?:ed|es)?|happening|update[sd]?)\b")
+GENERAL = re.compile(r"(?i)^\s*(?:who|what|when|where|which|why|how|is|are|was|were|does|did|tell me about|explain)\b")
+
+
+def should_search(question, memories=()):
+    """Look online for current or general-knowledge questions that saved memories do not answer; private-looking ones never."""
+    try:
+        check_public(question)
+    except PrivateQuestion:
+        return False
+    if PERSONAL.search(question):
+        return False
+    return bool(CURRENT.search(question)) or (not memories and bool(GENERAL.search(question)))
 
 
 def check_public(question):

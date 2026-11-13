@@ -2639,7 +2639,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         identity=store.save_verified(owner,{'statement':'synthetic mountain preference'},{'source':'synthetic owner review'},verified=True)
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: self.text('conversationHistoryStatus') in (
-            'Off', 'Unavailable · operator retention/recovery approval required'))
+            'Off', 'On · local only', 'Switched off on this PC'))
         self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
         self.ask_history_question('synthetic mountain question')
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
@@ -2792,7 +2792,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
         self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
-        expected_policy = 'Off' if authorized else 'Unavailable · operator retention/recovery approval required'
+        expected_policy = 'On · local only' if authorized else 'Switched off on this PC'  # on by default since 2026-11-14
         self.wait.until(lambda _: self.text('conversationHistoryStatus') == expected_policy)
         self.memory_click('#conversationHistoryPanel > summary')
         return ConversationHistory(MemoryStore(root/'vault')), local
@@ -3093,12 +3093,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from django.conf import settings
         from django.contrib.sessions.models import Session
         history, local = self.private_history_fixture(authorized=False); owner = self.scenario['user']
-        self.assertIn('operator retention/recovery approval', self.text('conversationHistoryStatus'))
+        self.assertIn('Switched off on this PC', self.text('conversationHistoryStatus'))
         self.assertFalse(self.browser.find_element(self.By.ID, 'conversationHistoryConsent').is_enabled())
         self.assertFalse(history.policy(owner)['enabled'])
         settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED = True
         self.browser.refresh()
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'Off')
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') == 'On · local only')
         self.memory_click('#conversationHistoryPanel > summary'); self.enable_private_history_ui()
         self.ask_history_question('Synthetic sensitive conversation')
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
@@ -3300,7 +3300,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login(); assistant=self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}'
         self.browser.get(assistant)
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         self.ask_history_question('What period does this statement cover?')
         self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'What period does this statement cover?')
@@ -3310,7 +3310,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.text('statementEvidenceStatus')=='owner_confirmed')
         self.browser.get(assistant)
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         for record,period in ((row,'2026-09-01 through 2026-09-30 (inclusive)'),
                 (other,'2026-08-01 through 2026-08-31 (inclusive)'),(row,'2026-09-01 through 2026-09-30 (inclusive)')):
             self.browser.execute_script("document.getElementById('intelligenceStatement').scrollIntoView({block:'center',behavior:'instant'})")
@@ -3440,7 +3440,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login(); assistant=self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={row.pk}'
         self.browser.get(assistant)
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         question='What is the transaction direction?'
         self.ask_history_question(question)
         self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
@@ -3454,7 +3454,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for selected in (row,credit):
             self.browser.get(self.live_server_url+f'/ai/insights/?scope=bank_statements&transaction={selected.pk}')
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(selected.pk))
-            self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+            self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
             self.ask_history_question(question)
             self.wait.until(lambda _: 'Recorded transaction directions ready' in self.text('intelligenceFeedback'))
             answer=self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers > article:last-child .conversation-message:not(.conversation-message--user) > p').text
@@ -3493,7 +3493,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(assistant)
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
         question='What is the recorded category?'
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         self.ask_history_question(question)
         self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
@@ -3503,7 +3503,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.execute_script("return document.getElementById('statementEvidenceStatus')?.textContent.trim()")=='owner_confirmed')
         self.browser.get(assistant)
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceStatement').get_property('value')==str(row.pk))
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         for field,choices in (('category',Expense.CATEGORY_CHOICES),('classification',Expense.CLASSIFICATION_CHOICES)):
             self.ask_history_question(f'What is the recorded {field}?')
             self.wait.until(lambda _: 'Recorded transaction classifications ready' in self.text('intelligenceFeedback'))
@@ -3675,7 +3675,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
         local.reason.assert_not_called(); cloud.assert_not_called()
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),question)
-        self.assertEqual(self.text('conversationHistoryStatus'),'Unavailable · operator retention/recovery approval required')
+        self.assertEqual(self.text('conversationHistoryStatus'),'Switched off on this PC')
         self.capture('bank-grounding-outage-revocation-draft')
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         self.assertEqual(self.text('intelligenceAnswers'),'')
@@ -4971,7 +4971,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         owner = self.scenario['user']
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/?scope=finance')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_property('value') == 'finance')
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         from apps.ml_engine.services import hybrid_intelligence
         original_read = hybrid_intelligence._read_source_context
         def injected_limitations(*args, **kwargs):
@@ -4997,7 +4997,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         row = rows['investment']; Investment.objects.filter(pk=row.pk).update(currency='USD')
         self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=investment&record_id={row.pk}')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'investment:{row.pk}')
-        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
         self.ask_history_question('Explain this record')
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         self.assertIn('current value: $2,345.67 USD', self.text('intelligenceAnswers'))
@@ -5861,7 +5861,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for _ in range(2):
             self.browser.get(assistant)
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'investment:{row.pk}')
-            self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','Unavailable · operator retention/recovery approval required'))
+            self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
             self.ask_history_question('Explain this record')
             self.wait.until(lambda _: 'Recorded values ready. Local AI is unavailable' in self.text('intelligenceFeedback'))
             self.assertIn('current value: 2,345.67 · Currency not recorded', self.text('intelligenceAnswers'))

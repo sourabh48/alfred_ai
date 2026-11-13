@@ -378,6 +378,8 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             'memory_retrieval_available':None}
     from . import web_lookup
     web=web_lookup.search(query) if web_search else []
+    auto_web=not web_search and scope=='general' and settings.ALFRED_ASSISTANT_AUTO_WEB
+    if auto_web and provider=='openai' and web_lookup.should_search(query): web=web_lookup.search(query)
     if provider=='openai':
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
@@ -386,6 +388,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     except EmbeddingUnavailable as exc:
         memories=[]
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
+    if auto_web and web_lookup.should_search(query,memories): web=web_lookup.search(query)  # memory first; the web only for what it lacks
     # Filenames and private citation URLs are UI metadata, never model instructions.
     model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{
         'ref':source['ref'],'classification':source['classification'],

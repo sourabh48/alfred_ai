@@ -33,6 +33,18 @@ class QuestionFilterTests(SimpleTestCase):
             with self.subTest(private=private), self.assertRaises(web_lookup.PrivateQuestion):
                 web_lookup.check_public(private)
 
+    def test_alfred_decides_memory_for_personal_and_web_for_current_or_unknown_public_questions(self):
+        for question in ("latest repo rate in India", "who won the election today", "petrol price in Kolkata",
+                         "what is a mutual fund", "explain index funds", "interest rates in the US this year"):
+            with self.subTest(question=question):
+                self.assertTrue(web_lookup.should_search(question))
+        for question in ("what did I save about my trip", "where is my nearest bank", "what can you do", "who is ALFRED",
+                         "is 12 lakh a good salary today", "suggest a quiet hobby", ""):
+            with self.subTest(question=question):
+                self.assertFalse(web_lookup.should_search(question))
+        self.assertFalse(web_lookup.should_search("what is a mutual fund", [{"id": "saved"}]))  # memory answers it
+        self.assertTrue(web_lookup.should_search("latest mutual fund news", [{"id": "saved"}]))  # memory cannot be current
+
     def test_search_sends_only_the_question_cleans_results_and_skips_a_failed_source(self):
         with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
             results = web_lookup.search("current repo rate in India")
@@ -95,6 +107,16 @@ class HybridWebLookupTests(TestCase):
         self.assertFalse(any(s.get("classification") == "public_web_result" for s in result["sources"]))
         with self.assertRaises(ValueError): self.ask(scope="finance", web_search=True)
         with self.assertRaises(web_lookup.PrivateQuestion): self.ask("is 12 lakh a good salary", web_search=True)
+
+    def test_without_the_tick_alfred_looks_online_only_when_the_question_needs_it(self):
+        self.local.reason.return_value = "Synthetic general answer."
+        web = lambda result: [s["ref"] for s in result["sources"] if s.get("classification") == "public_web_result"]
+        with override_settings(ALFRED_ASSISTANT_AUTO_WEB=True):
+            self.assertEqual(web(self.ask("latest repo rate news")), ["web-1", "web-2"])
+            self.assertEqual(web(self.ask("what did I note about my trip")), [])
+            self.assertEqual(web(self.ask("is 12 lakh a good salary today")), [])  # private-looking: never searched
+            self.assertEqual(web(self.ask("latest repo rate news", scope="finance")), [])
+        self.assertEqual(web(self.ask("latest repo rate news")), [])  # switched off
 
     def test_openai_answers_directly_when_chosen_with_consent(self):
         result = self.ask(web_search=True, provider="openai", cloud_consent=True, query_sensitivity="public")

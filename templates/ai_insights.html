@@ -25,7 +25,7 @@
         <ul id="modelReadinessItems" class="list-unstyled"></ul>
         <p id="modelReadinessScope" class="small"></p>
     </details>
-    <details id="conversationHistoryPanel" class="conversation-evidence mb-3" open>
+    <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
         <summary>Your chats · <span id="conversationHistoryStatus">loading</span></summary>
         <ul id="conversationHistoryList" class="list-unstyled mt-2" aria-label="Your saved chats"></ul>
         <p id="conversationHistoryFeedback" class="small" role="status" aria-live="polite"></p>
@@ -35,9 +35,9 @@
             <button id="conversationHistorySearchMessages" class="btn btn-outline-primary btn-sm" type="button" disabled aria-describedby="conversationSearchHelp">Search messages too</button>
         </div>
         <p id="conversationHistoryMatches" class="small" role="status" aria-live="polite"></p>
-        <details class="small">
-            <summary>Chat settings</summary>
-            <p class="mt-2">Chats are kept encrypted on this PC, never synced or sent to a cloud model, until you delete them. Older backups may still hold deleted chats. ALFRED uses the last few messages of a chat to follow up; answers about your money always use your current records.</p>
+        <div class="small">
+            <h3 class="h6 mt-3">Chat settings</h3>
+            <p>Chats are kept encrypted on this PC, never synced or sent to a cloud model, until you delete them. Older backups may still hold deleted chats. ALFRED uses the last few messages of a chat to follow up; answers about your money always use your current records.</p>
             <p id="conversationSearchHelp">Search messages checks your saved questions and answers on this PC only.</p>
             <form id="conversationTitleForm" data-live-refresh-hold="true">
                 <label for="conversationHistoryTitle" class="form-label">Name of the open chat</label>
@@ -56,7 +56,7 @@
                 <button id="conversationHistoryDisable" class="btn btn-outline-secondary btn-sm" type="button" disabled>Turn history off and delete chats</button>
                 <button id="conversationHistoryClear" class="btn btn-outline-danger btn-sm" type="button" disabled>Delete all chats</button>
             </div>
-        </details>
+        </div>
     </details>
     <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
     <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
@@ -107,7 +107,7 @@
             <a class="btn btn-outline-primary btn-sm" href="/documents/#documentSourcesTitle">Choose a financial document</a>
         </div>
         <label class="d-block mb-2"><input id="intelligenceWebSearch" type="checkbox">
-            Look this up online. Only your question goes to Wikipedia and Google News, never your records; questions with amounts, long numbers, emails or keys are not sent.</label>
+            Always look this up online. Without the tick ALFRED decides: questions about you stay in your memory, and current or general questions your memory does not answer are looked up. Only the question goes to Wikipedia and Google News, never your records; questions with amounts, long numbers, emails or keys are never sent.</label>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Answer it with OpenAI using your own key from Settings.</label>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>

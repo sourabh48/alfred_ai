@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
             historyFeedback.textContent = "Conversation no longer available. Its displayed turns were cleared; your unsent draft is preserved.";
         }
         document.getElementById("conversationHistoryStatus").textContent = !historyPolicy.available
-            ? "switched off on this PC" : historyEnabled() ? `${(data.conversations || []).length} saved on this PC` : "history is off";
+            ? "Switched off on this PC" : historyEnabled() ? "On · local only" : "Off";
         historyDays.value = historyPolicy.retention_days || "";
         historyList.replaceChildren();
         (data.conversations || []).forEach(record => {

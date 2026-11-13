@@ -559,6 +559,9 @@ ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE
 ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)
 # Owner decision 2026-11-14: keep chats like a chat app, each person can delete them; set false to switch history off for everyone.
 ALFRED_CONVERSATION_HISTORY_AUTHORIZED = env.bool('ALFRED_CONVERSATION_HISTORY_AUTHORIZED', default=True)
+# Owner decision 2026-11-14: Ask ALFRED decides itself when a question needs the web. Off while the test suite runs,
+# so tests never reach the internet; tests that check it switch it on.
+ALFRED_ASSISTANT_AUTO_WEB = env.bool('ALFRED_ASSISTANT_AUTO_WEB', default=sys.argv[1:2] != ['test'])
 
 
 # ---------------------------------------------------------
