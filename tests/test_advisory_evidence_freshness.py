@@ -79,18 +79,15 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
         self.assertIn("Open-Meteo / GeoNames, CC BY 4.0", payload["proof_contract"]["observed_sources"])
 
     def test_risk_outlook_exposes_evidence_freshness(self):
+        # No job role, so the outlook uses only macro evidence; mock it so the test never reaches World Bank or Yahoo.
         with patch(
-            "apps.risk.services.risk_intelligence.job_intelligence.market_outlook",
+            "apps.risk.services.risk_intelligence.verified_intelligence.macro_context",
             return_value={
-                "risk_score": 28,
-                "layoff_news": [],
-                "job_market_news": [],
-                "macro_context": {
+                "payload": {
                     "unemployment": {"latest_value": 5.1},
                     "inflation": {"latest_value": 4.8},
                     "market": {"one_month_return_pct": 2.1, "india_vix": 14.0},
                 },
-                "insights": ["Signals are stable."],
                 "evidence": [
                     {
                         "source_name": "World Bank",
