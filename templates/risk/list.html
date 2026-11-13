@@ -7,6 +7,14 @@
         <div>
             <h1 class="alfred-hero-title">Risk radar</h1>
             <p class="alfred-hero-copy">One view of the risks to your job, money, health, home and vehicles, from your own records and current news.</p>
+            <nav aria-label="On this page" class="page-index">
+                <a href="#riskBoardTitle">All your risks</a>
+                <a href="#riskActions">What to do</a>
+                <a href="#riskRecord">Record how things stand</a>
+                <a href="#riskHistory">Past records</a>
+                <a href="#riskNews">News</a>
+                <a href="#riskEconomy">The economy</a>
+            </nav>
         </div>
         <div class="surface-card" style="min-width: 260px;">
             <p class="metric-kicker">Highest Current Risk</p>
@@ -20,7 +28,7 @@
 <section class="soft-grid four-up mb-4" id="riskSummaryCards"></section>
 
 <section class="surface-card mb-4">
-    <h2 class="page-section-title">Consolidated Risk Board</h2>
+    <h2 class="page-section-title" id="riskBoardTitle">All your risks</h2>
     <p class="page-section-copy mb-3">Each category blends your own signals with the relevant system data and current internet-backed context.</p>
     <div id="riskBoard" class="data-stack"></div>
 </section>
@@ -28,14 +36,14 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Verified Macro Context</h2>
+            <h2 class="page-section-title" id="riskEconomy">The economy right now</h2>
             <p class="page-section-copy mb-3">External trend signals that are currently influencing Alfred's risk outlook.</p>
             <div id="riskMacroContext" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Evidence Log</h2>
+            <h2 class="page-section-title">Where these figures come from</h2>
             <p class="page-section-copy mb-3">Freshness and proof for the external signals used in the risk outlook.</p>
             <div id="riskEvidenceFreshnessCards" class="soft-grid three-up mb-3"></div>
             <ul id="riskGroundingList" class="insight-list mb-3"></ul>
@@ -47,14 +55,14 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Module Signals</h2>
+            <h2 class="page-section-title">Signals from each part of ALFRED</h2>
             <p class="page-section-copy mb-3">The live inputs pushing the overall risk stack.</p>
             <div id="riskSignalBoard" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Action Queue</h2>
+            <h2 class="page-section-title" id="riskActions">Action Queue</h2>
             <p class="page-section-copy mb-3">Practical actions ordered by current risk pressure.</p>
             <div id="riskActionList" class="data-stack"></div>
         </div>
@@ -64,7 +72,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Capture Snapshot</h2>
+            <h2 class="page-section-title" id="riskRecord">Record how things stand</h2>
             <p class="page-section-copy mb-3">Add your current manual snapshot for the three life-event signals that still anchor the broader consolidated model.</p>
             <form id="riskForm" class="soft-grid">
                 <div class="row g-3">
@@ -86,14 +94,14 @@
             </form>
 
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Mitigation Notes</h3>
+                <h3 class="h6 fw-bold mb-3">What you are doing about it</h3>
                 <ul class="insight-list" id="riskInsightList"></ul>
             </div>
         </div>
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Current Risk Radar</h2>
+            <h2 class="page-section-title">Risk chart</h2>
             <p class="page-section-copy mb-3">Current category spread across the full consolidated risk stack.</p>
             <canvas id="riskRadar" height="150"></canvas>
             <p id="riskRadarMeta" class="page-section-copy mt-3 mb-0">Current category spread from live consolidated risk items.</p>
@@ -102,7 +110,7 @@
 </section>
 
 <section class="surface-card">
-    <h2 class="page-section-title">Risk History</h2>
+    <h2 class="page-section-title" id="riskHistory">Past records</h2>
     <p class="page-section-copy mb-3">A chronological record of the snapshots ALFRED is tracking.</p>
     <div class="table-responsive">
         <table class="table table-alfred align-middle mb-0 metric-table">
@@ -120,7 +128,7 @@
 </section>
 
 <section class="surface-card mt-4">
-    <h2 class="page-section-title">Related News</h2>
+    <h2 class="page-section-title" id="riskNews">Related News</h2>
     <p class="page-section-copy mb-3">Live layoff and hiring-market news relevant to the current consolidated risk view.</p>
     <div id="riskNewsList" class="data-stack"></div>
 </section>

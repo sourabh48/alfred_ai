@@ -130,4 +130,4 @@ html[data-theme="dark"] :focus-visible { outline-color: #a8caff; }
 .page-index { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
 .page-index a { padding: .3rem .75rem; border-radius: 999px; background: var(--alfred-primary-soft); color: var(--alfred-primary); text-decoration: none; font-size: .9rem; }
 .page-index a:hover, .page-index a:focus-visible { text-decoration: underline; }
-#settingsProfile, #settingsFamily, #travelPreferences, #privateMemoryPanel, #settingsAccountData, [id^="vehicle"], [id^="expense"], #bankAccountsPanel { scroll-margin-top: 5rem; }
+#settingsProfile, #settingsFamily, #travelPreferences, #privateMemoryPanel, #settingsAccountData, [id^="vehicle"], [id^="expense"], #bankAccountsPanel, h2[id] { scroll-margin-top: 5rem; }

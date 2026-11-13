@@ -377,7 +377,7 @@ function renderUnwantedExpenses(unwanted) {
 function renderLatestUpload(upload) {
     const target = document.getElementById("lastUploadMeta");
     if (!upload) {
-        target.textContent = "No statement imported yet. Upload a PDF to auto-populate your timeline and document history.";
+        target.textContent = "No statement added yet. Upload one and ALFRED lists its transactions for you to check.";
         return;
     }
 

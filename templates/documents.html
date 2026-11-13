@@ -8,6 +8,14 @@
         <div>
             <h1 class="alfred-hero-title">Your documents</h1>
             <p class="alfred-hero-copy">Upload statements, loan papers, vehicle files and resumes here. ALFRED reads each file on this computer and sends it to the right page for you to check.</p>
+            <nav aria-label="On this page" class="page-index">
+                <a href="#docUpload">Upload a file</a>
+                <a href="#documentSourcesTitle">Check what ALFRED read</a>
+                <a href="#docReview">Waiting for review</a>
+                <a href="#documentCorpusTitle">Search your documents</a>
+                <a href="#docChats">ChatGPT chats</a>
+                <a href="#docRecent">Recent files</a>
+            </nav>
         </div>
         <div class="surface-card" style="min-width: 280px;">
             <p class="metric-kicker">Document Principles</p>
@@ -21,7 +29,7 @@
 <section class="soft-grid four-up mb-4" id="documentCenterCards"></section>
 
 <section class="surface-card mb-4" aria-labelledby="documentSourcesTitle" data-live-refresh-hold="true">
-    <h2 id="documentSourcesTitle" class="page-section-title">Review financial document sources</h2>
+    <h2 id="documentSourcesTitle" class="page-section-title">Check what ALFRED read</h2>
     <p>Browse your bank, loan and investment files, then review their linked records. Only current owner-reviewed structured fields can ground local answers. Other documents and full-document Q&amp;A are unsupported. Confirmation does not authenticate a bank or broker, and no currency is inferred.</p>
     <label class="form-label" for="documentSourcesKind">Document type</label>
     <select id="documentSourcesKind" class="form-select mb-2">
@@ -69,7 +77,7 @@
 </section>
 
 <section class="surface-card mb-4" aria-labelledby="documentCorpusTitle" data-live-refresh-hold="true">
-    <h2 id="documentCorpusTitle" class="page-section-title">Private document knowledge</h2>
+    <h2 id="documentCorpusTitle" class="page-section-title">Documents ALFRED can search</h2>
     <p>Search all your encrypted copies with whole keywords, or select the copies to search. Excerpts link to your original files; current corrected financial records remain authoritative. This is document retrieval, not an inferred answer or independent verification.</p>
     <form id="documentCorpusUpload" method="post" enctype="multipart/form-data" class="mb-3" autocomplete="off">
         {% csrf_token %}
@@ -112,7 +120,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Statements</h2>
+            <h2 class="page-section-title" id="docUpload">Statements</h2>
             <p class="page-section-copy mb-3">Upload one or more bank, credit-card, loan, investment, or other statements. ALFRED will classify each document, import transactions when possible, and still retain the statement metadata when parsing is partial.</p>
             <form id="documentStatementForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
@@ -189,7 +197,7 @@
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Service Bills and Notes</h2>
+            <h2 class="page-section-title">Service bills and notes</h2>
             <p class="page-section-copy mb-3">Import one or more workshop bills or work notes and let ALFRED derive the service log automatically.</p>
             <form id="documentServiceForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
@@ -231,7 +239,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">ChatGPT Dashboard / Chat Import</h2>
+            <h2 class="page-section-title" id="docChats">Import your ChatGPT chats</h2>
             <p class="page-section-copy mb-3">Bring an existing ChatGPT dashboard, chat transcript, or exported conversation into ALFRED as reviewable context before mapping it into live records.</p>
             <form id="documentChatGPTImportForm" class="soft-grid">
                 <div class="row g-3">
@@ -263,7 +271,7 @@
     </div>
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Chat Imports</h2>
+            <h2 class="page-section-title">Recent chat imports</h2>
             <div id="documentChatGPTImportList" class="data-stack stack-scroll"></div>
         </div>
     </div>
@@ -272,7 +280,7 @@
 <section class="row g-4 mb-4">
     <div class="col-12">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Review Queue</h2>
+            <h2 class="page-section-title" id="docReview">Waiting for your review</h2>
             <p class="page-section-copy mb-3">Low-confidence documents stay here until Alfred retries them or you accept a correction. Accepted corrections are fed back into parser learning for future uploads.</p>
             <div id="documentReviewQueue" class="data-stack stack-scroll"></div>
         </div>
@@ -282,7 +290,7 @@
 <section class="row g-4">
     <div class="col-12">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Diagnostics Log</h2>
+            <h2 class="page-section-title">Import log</h2>
             <p class="page-section-copy mb-3">These logs explain why data did not populate, why a parser stayed in review, or why a document or visualization failed.</p>
             <div id="documentDiagnosticsList" class="data-stack stack-scroll"></div>
         </div>
@@ -292,7 +300,7 @@
 <section class="row g-4 mt-0">
     <div class="col-xl-3">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Statements</h2>
+            <h2 class="page-section-title" id="docRecent">Recent statements</h2>
             <div id="documentStatementList" class="data-stack stack-scroll stack-scroll-sm"></div>
         </div>
     </div>
@@ -304,13 +312,13 @@
     </div>
     <div class="col-xl-3">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Vehicle Docs</h2>
+            <h2 class="page-section-title">Recent vehicle documents</h2>
             <div id="documentVehicleList" class="data-stack stack-scroll stack-scroll-sm"></div>
         </div>
     </div>
     <div class="col-xl-3">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Career Files</h2>
+            <h2 class="page-section-title">Recent career files</h2>
             <div id="documentResumeList" class="data-stack stack-scroll stack-scroll-sm"></div>
         </div>
     </div>

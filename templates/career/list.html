@@ -8,6 +8,16 @@
         <div>
             <h1 class="alfred-hero-title">Your career</h1>
             <p class="alfred-hero-copy">Your job, skills and pay, and how your income could grow over the next five years.</p>
+            <nav aria-label="On this page" class="page-index">
+                <a href="#careerProfileTitle">Your job details</a>
+                <a href="#careerCvTitle">Your CV</a>
+                <a href="#careerJobTitle">Check a job</a>
+                <a href="#careerPathTitle">Your pay path</a>
+                <a href="#careerWhatIfTitle">What if</a>
+                <a href="#careerLearnTitle">What to learn</a>
+                <a href="#careerNewsTitle">Job news</a>
+                <a href="#careerEconomy">The economy</a>
+            </nav>
             <a class="btn btn-outline-primary" href="{% url 'ai_insights' %}?scope=career">Review application progress with ALFRED</a>
         </div>
         <div class="surface-card" style="min-width: 260px;">
@@ -25,14 +35,14 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Macro Context</h2>
+            <h2 class="page-section-title" id="careerEconomy">The economy right now</h2>
             <p class="page-section-copy mb-3">External demand and inflation signals feeding the current projection.</p>
             <div id="careerMacroContext" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Evidence Log</h2>
+            <h2 class="page-section-title">Where these figures come from</h2>
             <p class="page-section-copy mb-3">Source-backed records used to adjust growth and confidence.</p>
             <div id="careerEvidenceList" class="data-stack"></div>
         </div>
@@ -42,14 +52,14 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Career Risk Timing</h2>
+            <h2 class="page-section-title">Job risk timing</h2>
             <p class="page-section-copy mb-3">When Alfred believes you can take a larger career risk, and what should happen first.</p>
             <div id="careerTimingPanel" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Collection and Processing</h2>
+            <h2 class="page-section-title">Data used</h2>
             <p class="page-section-copy mb-3">How career data is collected, verified, processed, and turned into the current guidance.</p>
             <div id="careerDataPipeline" class="data-stack"></div>
         </div>
@@ -59,7 +69,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Career Profile</h2>
+            <h2 class="page-section-title" id="careerProfileTitle">Your job details</h2>
             <p class="page-section-copy mb-3">Keep the profile fresh so projected income and recommendations stay relevant.</p>
             <form id="careerProfileForm" class="soft-grid">
                 <div class="row g-3">
@@ -99,7 +109,7 @@
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Resume Intelligence</h2>
+            <h2 class="page-section-title" id="careerCvTitle">Your CV</h2>
             <p class="page-section-copy mb-3">Upload one or more resumes so ALFRED can extract skills, strengths, weaknesses, and improve job-fit analysis. PDF, DOCX, TXT, HTML, RTF, ODT, and image-based CV files are accepted; scanned files move to review if OCR is not available on the server.</p>
             <form id="careerResumeForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
@@ -132,14 +142,14 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Profile Snapshot</h2>
+            <h2 class="page-section-title">Summary</h2>
             <p class="page-section-copy mb-3">The fields ALFRED is currently using to model growth.</p>
             <div id="careerProfileSnapshot" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Projected Path</h2>
+            <h2 class="page-section-title" id="careerPathTitle">Where your pay could go</h2>
             <p class="page-section-copy mb-3">Year-by-year view of the current projection.</p>
             <div id="careerProjectionTable" class="data-stack"></div>
         </div>
@@ -149,7 +159,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">What-If Simulation</h2>
+            <h2 class="page-section-title" id="careerWhatIfTitle">What-If Simulation</h2>
             <p class="page-section-copy mb-3">Change one or more career inputs and compare the current projection against the simulated path.</p>
             <form id="careerSimulationForm" class="soft-grid">
                 <div class="row g-3">
@@ -185,7 +195,7 @@
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Before / After Comparison</h2>
+            <h2 class="page-section-title">Before and after</h2>
             <p class="page-section-copy mb-3">Baseline projection vs the simulated scenario, with explicit assumptions and deltas.</p>
             <div id="careerSimulationPanel" class="data-stack">
                 <div class="empty-state">Run a simulation to compare baseline and scenario outcomes.</div>
@@ -197,18 +207,18 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Five-Year Projection</h2>
+            <h2 class="page-section-title">Next five years</h2>
             <p class="page-section-copy mb-3">Projected income curve using the current profile, resume signals, and current macro context.</p>
             <canvas id="salaryChart" height="150"></canvas>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Career Insights</h3>
+                <h3 class="h6 fw-bold mb-3">Tips</h3>
                 <ul class="insight-list" id="careerInsightList"></ul>
             </div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Job Match</h2>
+            <h2 class="page-section-title" id="careerJobTitle">Check a job against your CV</h2>
             <p class="page-section-copy mb-3">Paste a job link from a career portal or drop recruiter mail / JD text so ALFRED can compare the role against your resume and compensation baseline.</p>
             <form id="careerJobMatchForm" class="soft-grid">
                 <div class="row g-3">
@@ -279,14 +289,14 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">What To Study Next</h2>
+            <h2 class="page-section-title" id="careerLearnTitle">What to learn next</h2>
             <p class="page-section-copy mb-3">Study suggestions grounded in your experience stage, latest skill gaps, and current opening signals.</p>
             <div id="careerStudyPlan" class="data-stack"></div>
         </div>
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Layoff and Risk News</h2>
+            <h2 class="page-section-title" id="careerNewsTitle">Layoff and job news</h2>
             <p class="page-section-copy mb-3">Recent layoff and market-risk signals relevant to your role or the matched job.</p>
             <div id="careerLayoffNews" class="data-stack"></div>
         </div>
@@ -295,7 +305,7 @@
         <div class="surface-card h-100">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                 <div>
-                    <h2 class="page-section-title mb-1">Suggested Openings</h2>
+                    <h2 class="page-section-title mb-1">Suggested jobs</h2>
                     <p class="page-section-copy mb-0">Source-backed job leads matched to your role and skills. Check feed freshness; opening availability is unverified.</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
