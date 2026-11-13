@@ -21,7 +21,7 @@ GATES = {
     'AI-10': 'BLOCKED_EVIDENCE: chats kept until deleted and on by default since 2026-11-14 (owner decision); owner check of the chat list remains',
     'AI-14': 'BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes',
     'AI-15': 'BLOCKED_EVIDENCE: genuine per-model held-out outcomes',
-    'RUNTIME-03': 'BLOCKED_EVIDENCE: sustained sign-in/scheduler observation',
+    'RUNTIME-03': 'BLOCKED_EVIDENCE: startup never registered on the owner PC (source checkout had no packaged exe); script now falls back to the checkout pythonw 2026-11-14; real sign-in observation remains',
     'RUNTIME-05': 'BLOCKED_EXTERNAL: independent Windows PC acceptance',
     'RUNTIME-06': 'BLOCKED_EXTERNAL: offline independent-host kit on a separate PC; same-host packaged checks 35/35',
     'RUNTIME-11':'BLOCKED_EXTERNAL: separate-user and clean-PC installs; owner accepted the diskcache residual risk 2026-11-05',

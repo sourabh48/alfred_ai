@@ -31,18 +31,29 @@ if ($Action -eq 'Status') {
 }
 
 $projectDirectory = Split-Path -Parent $PSScriptRoot
-if (-not $Executable) { $Executable = Join-Path $projectDirectory 'dist\ALFRED\ALFRED.exe' }
+$sourcePython = Join-Path $projectDirectory '.venv\Scripts\pythonw.exe'
+$sourceScript = Join-Path $projectDirectory 'alfred_native.py'
+if (-not $Executable) {
+    $Executable = Join-Path $projectDirectory 'dist\ALFRED\ALFRED.exe'
+    # A source checkout has no packaged executable: start it with the checkout's own windowless Python.
+    if (-not (Test-Path -LiteralPath $Executable -PathType Leaf) -and (Test-Path -LiteralPath $sourcePython -PathType Leaf)) { $Executable = $sourcePython }
+}
 if (-not $DataDirectory) { $DataDirectory = $projectDirectory }
 $Executable = [System.IO.Path]::GetFullPath($Executable)
 $DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
 $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
-# Single-quoted PowerShell literals preserve spaces and special characters.
-# The packaged executable uses a console, so its parent starts hidden too.
-$literalExe = $Executable.Replace("'", "''")
-$literalData = $DataDirectory.Replace("'", "''")
-$launch = "& '$literalExe' start --data-dir '$literalData' --no-browser; exit `$LASTEXITCODE"
-$command = '"{0}" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -Command "{1}"' -f $shell, $launch
+if ($Executable -eq [System.IO.Path]::GetFullPath($sourcePython)) {
+    # pythonw has no console window, so no hidden PowerShell parent is needed; its children log to the data folder.
+    $command = '"{0}" "{1}" start --data-dir "{2}" --no-browser' -f $Executable, $sourceScript, $DataDirectory.TrimEnd('\')
+} else {
+    # Single-quoted PowerShell literals preserve spaces and special characters.
+    # The packaged executable uses a console, so its parent starts hidden too.
+    $literalExe = $Executable.Replace("'", "''")
+    $literalData = $DataDirectory.Replace("'", "''")
+    $launch = "& '$literalExe' start --data-dir '$literalData' --no-browser; exit `$LASTEXITCODE"
+    $command = '"{0}" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -Command "{1}"' -f $shell, $launch
+}
 
 if ($existing -and $existing -ne $command) {
     throw 'A different ALFRED startup command already exists. Inspect it with -Action Status before changing it.'

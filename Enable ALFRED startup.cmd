@@ -5,7 +5,7 @@ if not exist "%~dp0scripts\set_windows_autostart.ps1" (
   pause
   exit /b 1
 )
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\set_windows_autostart.ps1" -Action Enable
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\set_windows_autostart.ps1" -Action Enable %*
 if errorlevel 1 (
   echo.
   echo Automatic startup could not be enabled. See the message above.

@@ -66,6 +66,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\set_windows_au
 
 This registers a current-user Windows Run entry named `ALFRED`. It starts the
 packaged executable quietly with the existing checkout data and no browser.
+A source checkout without `dist\ALFRED` starts with the checkout's own
+`.venv\Scripts\pythonw.exe`, which opens no window. If your data lives in
+another folder, add it: `"Enable ALFRED startup.cmd" -DataDirectory F:\ALFRED\restored-runtime`.
 Windows sign-in is required; this is not a service that runs before login.
 The execution-policy option applies only to this script process.
 Keep the complete `dist\ALFRED` folder in place. For another installation, pass
