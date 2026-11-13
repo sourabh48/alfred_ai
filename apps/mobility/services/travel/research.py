@@ -1,7 +1,6 @@
 """Provider orchestration inside the existing durable travel research worker."""
 from copy import deepcopy
 from datetime import date, timedelta
-from math import ceil
 
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -24,9 +23,8 @@ def geocoders():
 def has_locations(result):
     return bool(result.payload.get("locations"))
 from .providers.weather import OpenMeteoWeather, replan_proposals
-from .providers.places import OverpassPlaces
+from .providers.places import GoogleLodging, GooglePlacesNearby
 from .providers.permits import PermitProvider
-from .providers.accommodation import DuffelAccommodation
 from .providers.transport import DuffelFlights, IndianRailProvider
 from .providers.web import WikivoyageDestinations, WikivoyageSearch, WikivoyageStays, BraveSearch, SearXNGSearch
 from .links import external_links
@@ -206,7 +204,8 @@ def enrich_candidate(user, state, destination):
     categories = ["attraction","camping","fuel","hospital","service"]
     if value(state,"find_restaurants"):
         categories.append("restaurant")
-    places = fetch(OverpassPlaces(),{"latitude":d["lat"],"longitude":d["lon"],"categories":categories}) if coords else ProviderResult("overpass","places",error="destination_coordinates_required")
+    # Owner decision 2026-11-13: places and hotels come from Google Places only, with no other provider as a fallback.
+    places = fetch(GooglePlacesNearby(),{"latitude":d["lat"],"longitude":d["lon"],"categories":categories}) if coords else ProviderResult("google_places_nearby","places",error="destination_coordinates_required")
     routes = d.get("route_result",{}).get("payload",{}).get("routes",[])
     route_points = (next((r for r in routes if r.get("route_id") == d.get("selected_route_id")),
         routes[0] if routes and not d.get("route_choice_required") else {}).get("geometry") or {}).get("coordinates",[])
@@ -219,8 +218,7 @@ def enrich_candidate(user, state, destination):
     attach("permit_result",PermitProvider().lookup(value(state,"permit_place",d["name"]),start_date=value(state,"available_start_date")))
     start,end = value(state,"available_start_date"),value(state,"available_end_date")
     people = value(state,"number_of_travelers",1)
-    hotel = fetch(DuffelAccommodation(),{"latitude":d["lat"],"longitude":d["lon"],"check_in":start,"check_out":end,"adults":people,"rooms":ceil(people/2)}) if coords and start and end and start < end else ProviderResult("duffel","hotels",error="overnight_dates_and_destination_required")
-    attach("hotels_result",hotel)
+    attach("hotels_result",fetch(GoogleLodging(),{"latitude":d["lat"],"longitude":d["lon"]}) if coords else ProviderResult("google_lodging","hotels",error="destination_coordinates_required"))
     # Free guide listings: names, contact and contributor price text; never live rates or availability.
     attach("stays_guide_result",fetch(WikivoyageStays(),{"destination":d["name"]}) if d.get("name") else ProviderResult("wikivoyage","stays_guide",error="destination_required"))
     flight = ProviderResult("duffel","flights",error="origin_and_destination_airport_codes_and_dates_required")

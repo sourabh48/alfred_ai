@@ -1,5 +1,22 @@
 # ALFRED execution state
 
+## Travel map, places and hotels from Google only - 2026-11-13
+
+- Owner reports: OpenStreetMap tiles showed "Access blocked" (403). Cause: ALFRED's same-origin referrer policy sends
+  no Referer, which OSM now refuses. Owner decision: "use google map and google places only dont use mutiple api as
+  fallback" (replaces the free-first rule for these three only).
+- Map: Google Map Tiles only, through `/mobility/map-tiles/z/x/y.png` (signed in only). ALFRED fetches the tiles
+  with the key in a header, so the key never reaches the browser; one Google session cached 12 h; a fixed cap of
+  3000 tiles a day for the whole app. No key: no background map, with a message pointing to Settings > Online services.
+  The owner may need to enable the Map Tiles API for the key in Google Cloud.
+- Places: Google Places Nearby only (Overpass no longer called). Hotels: Google Places lodging only (Duffel hotel
+  search no longer called): names, address and a Google Maps link, never a price or free room. Only basic (Pro)
+  fields are asked for; results kept 1 day; app budget 40 calls a day each.
+- Unchanged: flights stay on Duffel (Google has no public flights API); routes and place-name lookup keep their
+  free-first chain; Wikivoyage guide listings stay as their own panel.
+- Evidence: tests.test_travel_google_maps 6 PASS; travel/mobility suites listed in the commit. Not checked live with a
+  real Google key (the owner adds it in Settings).
+
 ## Online services in Settings - 2026-11-13
 
 - Owner request: "give alfred full online access... all required api key addition in settings... dont give user any

@@ -17,13 +17,13 @@ from alfred_private_storage import private_directory
 
 # name: (label, what ALFRED uses it for, where to get one)
 KEYS = {
-    "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps", "Travel: place search, routes and travel times when the free services have no answer.",
+    "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps", "Travel: the map, places and hotels (Google only), plus routes and travel times when the free services have no answer.",
                                    "https://console.cloud.google.com/google/maps-apis/credentials"),
     "TRAVEL_ORS_API_KEY": ("OpenRouteService", "Travel: driving, cycling and walking routes (it has a free plan).",
                            "https://openrouteservice.org/dev/#/signup"),
     "TRAVEL_BRAVE_API_KEY": ("Brave Search", "Travel: web search for places, with your OK for paid searches below.",
                              "https://brave.com/search/api/"),
-    "TRAVEL_DUFFEL_API_KEY": ("Duffel", "Travel: hotel prices, with your OK for paid searches below.", "https://app.duffel.com/join"),
+    "TRAVEL_DUFFEL_API_KEY": ("Duffel", "Travel: flight prices, with your OK for paid searches below.", "https://app.duffel.com/join"),
     "TRAVEL_OPEN_METEO_API_KEY": ("Open-Meteo (commercial)", "Travel: weather and place names. Not needed for personal use.",
                                   "https://open-meteo.com/en/pricing"),
 }
@@ -34,7 +34,7 @@ SWITCHES = {
     "TRAVEL_VALHALLA_URL": ("https://valhalla1.openstreetmap.de",
                             "Free car and motorcycle routes from the FOSSGIS server. Each route sends only the trip's start and end points."),
     "TRAVEL_BRAVE_ALLOW_PAID_SEARCH": ("true", "Brave Search may run searches that count against your Brave plan."),
-    "TRAVEL_DUFFEL_ALLOW_PAID_SEARCH": ("true", "Duffel may run hotel searches that Duffel may charge for. Check its fees first."),
+    "TRAVEL_DUFFEL_ALLOW_PAID_SEARCH": ("true", "Duffel may run flight searches that Duffel may charge for. Check its fees first."),
 }
 # Mail for Career emails you approve one at a time: an address and an app password; the server is filled in for known providers.
 MAIL_PROVIDERS = {"gmail.com": ("smtp.gmail.com", 587, False), "googlemail.com": ("smtp.gmail.com", 587, False),

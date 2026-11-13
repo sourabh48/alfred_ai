@@ -175,6 +175,7 @@
  "tests.test_research_journal": 13.0,
  "tests.test_research_packet": 12.0,
  "tests.test_online_services": 8.0,
+ "tests.test_travel_google_maps": 5.0,
  "tests.test_exchange_rates": 3.0,
  "tests.test_loan_prepayment": 2.0,
  "tests.test_travel_valhalla": 1.0,

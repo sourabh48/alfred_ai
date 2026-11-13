@@ -13,7 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.cache import cache
 from django.db import connection
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.serializers.json import DjangoJSONEncoder
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -659,6 +659,17 @@ def reports_view(request):
 @login_required
 def mobility_view(request):
     return render(request, "mobility/dashboard.html")
+
+
+@login_required
+def map_tile_view(request, z, x, y):
+    from apps.mobility.services.travel.google_tiles import tile
+    found = tile(z, x, y)
+    if not found:
+        return HttpResponse(status=404)
+    response = HttpResponse(found[1], content_type=found[0])
+    response["Cache-Control"] = "private, max-age=86400"
+    return response
 
 
 @login_required

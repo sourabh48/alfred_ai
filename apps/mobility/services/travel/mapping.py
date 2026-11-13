@@ -1,6 +1,5 @@
 """GeoJSON map contract shared by any browser renderer; no map API keys here."""
 import os
-from alfred_ai.services.public_http import normalized_link
 
 
 def map_features(destination):
@@ -29,11 +28,8 @@ def map_features(destination):
 
 
 def map_configuration():
-    # Only public browser settings. Never use a server API credential here.
-    tiles = os.getenv("TRAVEL_MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png")
-    # Public browser URL only, with no credential query. Browser key integrations
-    # need a separately reviewed provider implementation.
-    if not normalized_link(tiles) or "?" in tiles or "#" in tiles:
-        tiles = ""
-    return {"provider": "openstreetmap", "tile_url":tiles,
-        "attribution": "© OpenStreetMap contributors", "attribution_url": "https://www.openstreetmap.org/copyright"}
+    # Google map tiles only (owner decision 2026-11-13). ALFRED fetches them itself, so the key never reaches the browser.
+    if not os.getenv("TRAVEL_GOOGLE_MAPS_API_KEY"):
+        return {"provider": "google", "tile_url": "", "attribution": "", "attribution_url": ""}
+    return {"provider": "google", "tile_url": "/mobility/map-tiles/{z}/{x}/{y}.png", "attribution": "Map data © Google",
+            "attribution_url": "https://www.google.com/intl/en_in/help/terms_maps/"}

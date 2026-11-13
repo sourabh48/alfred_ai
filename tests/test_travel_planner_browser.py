@@ -374,7 +374,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script("return [...document.querySelectorAll('#plannerEvidence a[target=\"_blank\"]')].every(a=>a.rel.includes('noopener')&&a.rel.includes('noreferrer')&&a.protocol==='https:')"))
         self.click("#plannerLoadMap")
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerMap .leaflet-overlay-pane path[fill="none"]'))
-        self.assertIn("Map tiles are disabled",self.text("plannerMapStatus"))
+        self.assertIn("No background map: add a Google Maps key",self.text("plannerMapStatus"))
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,"#plannerMap img.leaflet-tile"))
         self.assertTrue(self.browser.execute_script("return [...document.querySelectorAll('#plannerMap path:not([fill=\"none\"])')].every(p=>p.getBoundingClientRect().width<=20)"))
         self.browser.save_screenshot(str(self.artifacts/"research-map-desktop.png"))

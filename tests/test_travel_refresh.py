@@ -54,8 +54,8 @@ class TravelSelectiveRefreshTests(TestCase):
             "places": {"places": []}, "hotels": {"options": []}, "flights": {"options": []},
             "trains": {"options": []}, "web": {"findings": []},
         }.items()}
-        factories = {"OpenRouteService": "routing", "OpenMeteoWeather": "weather", "OverpassPlaces": "places",
-                     "DuffelAccommodation": "hotels", "DuffelFlights": "flights", "IndianRailProvider": "trains",
+        factories = {"OpenRouteService": "routing", "OpenMeteoWeather": "weather", "GooglePlacesNearby": "places",
+                     "GoogleLodging": "hotels", "DuffelFlights": "flights", "IndianRailProvider": "trains",
                      "BraveSearch": "web", "SearXNGSearch": "web", "WikivoyageSearch": "web"}
         for factory, category in factories.items():
             p = patch("apps.mobility.services.travel.research." + factory, return_value=self.providers[category])
@@ -141,8 +141,9 @@ class TravelSelectiveRefreshTests(TestCase):
         self.providers["weather"].fetch.assert_called_once()
         self.providers["routing"].fetch.assert_not_called()
         self.providers["hotels"].fetch.assert_not_called()
-        self.assertEqual(refreshed["hotels_result"]["error"], "refresh_not_requested")
-        self.assertFalse(refreshed["hotels_result"]["success"])
+        # Google hotel listings carry no dates or prices, so the saved listing is reused and holds no old dates.
+        self.assertTrue(refreshed["hotels_result"]["success"])
+        self.assertEqual(set(refreshed["hotels_result"]["request_parameters"]), {"latitude", "longitude"})
         self.assertEqual(refreshed["weather_result"]["request_parameters"]["start_date"], str(new_start))
 
     def test_whole_trip_force_refresh_still_rechecks_all_categories(self):

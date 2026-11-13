@@ -69,3 +69,75 @@ class OverpassPlaces(Provider):
                 "availability": "UNKNOWN", "permit_status": "unverified",
                 "season": tags.get("seasonal", "unknown"), "review_density": None})
         return {"places": places, "coverage": "OSM mapping coverage varies; absence is not evidence that no place exists."}
+
+
+# Google place types for each ALFRED place category; permit offices have no Google type.
+GOOGLE_TYPES = {"attraction": ["tourist_attraction", "museum"], "camping": ["campground"], "fuel": ["gas_station"],
+                "hospital": ["hospital"], "restaurant": ["restaurant"], "service": ["car_repair"]}
+
+
+class GooglePlacesNearby(Provider):
+    """Places near the destination (the only places source). Key in a header; only basic (Pro) fields, to stay in Google's cheaper tier."""
+    name = "google_places_nearby"
+    category = "places"
+    source_url = "https://www.google.com/maps"
+    attribution = "Powered by Google; opening hours and access not checked"
+    ttl = timedelta(days=1)  # Google limits keeping its place content; a day spares repeat calls while you plan
+    limits = {"minute": 5, "hour": 20, "day": 40, "month": 400}
+    allowed_parameters = {"latitude", "longitude", "radius_m", "categories"}
+
+    def unavailable_reason(self):
+        return "" if os.getenv("TRAVEL_GOOGLE_MAPS_API_KEY") else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
+
+    def types(self, p):
+        categories = sorted(set(p.get("categories") or ["attraction", "camping", "fuel", "hospital", "service"]))
+        if any(c not in OverpassPlaces.filters for c in categories):
+            raise ProviderError("unsupported_poi_category")
+        return [t for c in categories for t in GOOGLE_TYPES.get(c, [])]
+
+    def fetch(self, p):
+        center = {"latitude": number(p["latitude"], low=-90, high=90), "longitude": number(p["longitude"], low=-180, high=180)}
+        body = {"includedTypes": self.types(p), "maxResultCount": 20,
+                "locationRestriction": {"circle": {"center": center, "radius": float(number(p.get("radius_m", 15000), low=100, high=25000))}}}
+        return request_json("POST", "https://places.googleapis.com/v1/places:searchNearby", json=body,
+            headers={"X-Goog-Api-Key": os.environ["TRAVEL_GOOGLE_MAPS_API_KEY"], "Content-Type": "application/json",
+                     "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,places.types,places.googleMapsUri"})
+
+    @staticmethod
+    def listings(raw):
+        for item in (raw.get("places") or [])[:20]:
+            name = str((item.get("displayName") or {}).get("text") or "")[:200]
+            if name:
+                place_id = str(item["id"])[:200]
+                yield {"id": f"google:{place_id}", "name": name, "address": str(item.get("formattedAddress") or "")[:200],
+                       "lat": number(item["location"]["latitude"], low=-90, high=90), "lon": number(item["location"]["longitude"], low=-180, high=180),
+                       "source_url": normalized_link(str(item.get("googleMapsUri") or "")) or f"https://www.google.com/maps/place/?q=place_id:{place_id}",
+                       "types": [item.get("primaryType"), *(item.get("types") or [])]}
+
+    def normalize(self, raw, p):
+        category_of = {t: c for c, types in GOOGLE_TYPES.items() for t in types}
+        places = []
+        for place in self.listings(raw):
+            category = next((category_of[t] for t in place.pop("types") if t in category_of), None)
+            if category:
+                places.append({**place, "category": category, "opening_hours": None, "access": "unknown", "wheelchair": "unknown",
+                               "fee": "unknown", "wikidata": None, "wikipedia": None, "availability": "UNKNOWN",
+                               "permit_status": "unverified", "season": "unknown", "review_density": None})
+        return {"places": places, "coverage": "Google Maps listings near the destination. Open each place on Google Maps for hours and access."}
+
+
+class GoogleLodging(GooglePlacesNearby):
+    """Hotels near the destination (the only hotels source): names and Google Maps links, never a price or a free room."""
+    name = "google_lodging"
+    category = "hotels"
+    attribution = "Powered by Google; prices and free rooms not checked"
+    allowed_parameters = {"latitude", "longitude"}
+
+    def types(self, p):
+        return ["lodging"]
+
+    def normalize(self, raw, p):
+        return {"options": [{"name": place["name"], "provider": "Google Maps", "address": place["address"], "lat": place["lat"],
+                             "lon": place["lon"], "category": "hotel", "source_url": place["source_url"], "booking_url": place["source_url"],
+                             "total_price": None, "nightly_rate": None, "currency": None, "availability": "UNKNOWN"}
+                            for place in self.listings(raw)]}

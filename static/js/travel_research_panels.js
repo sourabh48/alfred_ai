@@ -41,8 +41,9 @@ window.TravelResearchPanels = (() => {
     function stays(d) {
         const r = d.hotels_result || {};
         const options = (r.payload?.options || []).slice().sort((a,b)=>Number(a.total_price)-Number(b.total_price));
-        const picks = options.length <= 3 ? options : [options[0],options[Math.floor(options.length/2)],options.at(-1)];
-        return `<h3 class="h5">Stays · compare and open externally</h3>${provenance(r)}<p class="small">Search results require a fresh availability check on the provider. No room is reserved. Prices may exclude property charges.</p><div class="travel-research-cards">${picks.map((o,i)=>`<article><h4 class="h6">${esc(o.name)}</h4><p>${picks.length === 3 ? ["Lower listed price","Middle listed price","Higher listed price"][i] : "Search result"} · ${money(o.total_price,o.currency)} total</p><p>${money(o.nightly_rate,o.currency)} per night · ${esc(o.check_in)} to ${esc(o.check_out)}</p><p>${esc(o.availability)} · rating ${esc(o.review_score ?? o.rating ?? "unknown")}</p><p>Parking: ${esc(o.parking)} · Cancellation: ${esc(o.cancellation_policy)}</p><p>${link(o.booking_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.name+" "+(d.name || d.destination))}`,"Open stay search")}</p></article>`).join("")}</div>${!picks.length ? '<p>Live stay pricing/availability could not be retrieved. These links open searches for you to check.</p>' : ""}${guideStays(d)}${bookingSites(["hotels"])}${searchLinks(d,["hotels"])}`;
+        const priced = options.some(o=>o.total_price != null);
+        const picks = !priced ? options.slice(0,6) : options.length <= 3 ? options : [options[0],options[Math.floor(options.length/2)],options.at(-1)];
+        return `<h3 class="h5">Stays · compare and open externally</h3>${provenance(r)}<p class="small">Search results require a fresh availability check on the provider. No room is reserved. Prices may exclude property charges.</p><div class="travel-research-cards">${picks.map((o,i)=>`<article><h4 class="h6">${esc(o.name)}</h4>${o.total_price == null ? `${o.address ? `<p class="small">${esc(o.address)}</p>` : ""}<p>Price and free rooms not checked: open it to see them.</p>` : `<p>${picks.length === 3 ? ["Lower listed price","Middle listed price","Higher listed price"][i] : "Search result"} · ${money(o.total_price,o.currency)} total</p><p>${money(o.nightly_rate,o.currency)} per night · ${esc(o.check_in)} to ${esc(o.check_out)}</p><p>${esc(o.availability)} · rating ${esc(o.review_score ?? o.rating ?? "unknown")}</p><p>Parking: ${esc(o.parking)} · Cancellation: ${esc(o.cancellation_policy)}</p>`}<p>${link(o.booking_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.name+" "+(d.name || d.destination))}`,"Open stay search")}</p></article>`).join("")}</div>${!picks.length ? '<p>Live stay pricing/availability could not be retrieved. These links open searches for you to check.</p>' : ""}${guideStays(d)}${bookingSites(["hotels"])}${searchLinks(d,["hotels"])}`;
     }
     function guideStays(d) {
         const r = d.stays_guide_result || {};
@@ -110,9 +111,9 @@ window.TravelResearchPanels = (() => {
         if (!map) {
             map = L.map("plannerMap").setView([20,78],5);
             const tile = session.map_config?.tile_url;
-            if (tile && tile.startsWith("https://")) {
+            if (tile && tile.startsWith("/mobility/map-tiles/")) {  // Google tiles through ALFRED; the key stays on this PC
                 L.tileLayer(tile,{maxZoom:18,attribution:link(session.map_config.attribution_url,session.map_config.attribution)}).addTo(map)
-                  .on("tileerror",()=>{$("plannerMapStatus").textContent="Map tiles unavailable. Saved route/place geometry is still shown where available.";});
+                  .on("tileerror",()=>{$("plannerMapStatus").textContent="Google map tiles unavailable (today's limit reached, or the Map Tiles API is not enabled for your key). Saved route/place geometry is still shown.";});
             }
         }
         const geometry = JSON.stringify(d.map || {type:"FeatureCollection",features:[]});
@@ -131,7 +132,7 @@ window.TravelResearchPanels = (() => {
             $("plannerMapStatus").textContent = !layers.getBounds().isValid()
                 ? "No saved coordinates or route geometry are available. Use the external map links."
                 : session.map_config?.tile_url ? "Available routes and places shown. Check each source and its freshness."
-                : "Map tiles are disabled. Available route and place geometry is shown without a background map.";
+                : "No background map: add a Google Maps key in Settings > Online services. Route and place geometry is shown without it.";
         } catch (_) { $("plannerMapStatus").textContent="Some map geometry could not be displayed. Use the external route links."; }
     }
     document.addEventListener("DOMContentLoaded",()=>{
