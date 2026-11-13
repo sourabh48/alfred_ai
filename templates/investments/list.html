@@ -221,8 +221,8 @@
         <h3 class="h6 mb-0">Step 1 · Look up a stock</h3>
         <div class="row g-3 align-items-end">
             <div class="col-md-4"><label class="form-label" for="researchPacketSymbol">Stock symbol</label>
-                <input class="form-control" id="researchPacketSymbol" name="symbol" maxlength="20" placeholder="e.g. INFY.NS" required aria-describedby="researchPacketSymbolHelp">
-                <div class="form-text" id="researchPacketSymbolHelp">As on Yahoo Finance. NSE stocks end in .NS, BSE stocks in .BO.</div></div>
+                <input class="form-control" id="researchPacketSymbol" name="symbol" maxlength="60" placeholder="e.g. Infosys or INFY.NS" required aria-describedby="researchPacketSymbolHelp">
+                <div class="form-text" id="researchPacketSymbolHelp">Type the company's name or its symbol. New to shares? Look one up and ALFRED explains it in plain words.</div></div>
             <div class="col-md-5"><label class="form-label" for="researchPacketHolding">Do you already own it? (optional)</label>
                 <select class="form-select" id="researchPacketHolding" name="holding" aria-describedby="researchPacketHoldingHelp"><option value="">No / not listed</option></select>
                 <div class="form-text" id="researchPacketHoldingHelp">Pick it to see how much of your money is in it.</div></div>
@@ -315,5 +315,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.17.0"></script>
+<script src="/static/js/investments.js?v=2.18.0"></script>
 {% endblock %}

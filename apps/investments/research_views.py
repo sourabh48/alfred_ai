@@ -154,6 +154,14 @@ def _packet(user, params):
     try:
         return research_packet(str(params.get("symbol") or ""), holding=holding, portfolio_total=total), None
     except ValueError as exc:
+        from .services.research_packet import find_symbols
+        try:
+            matches = find_symbols(params.get("symbol"))  # a newcomer may type "Infosys" rather than INFY.NS
+        except (public_http.PublicHTTPError, ValueError, KeyError, TypeError, AttributeError):
+            matches = []
+        if matches:
+            return None, Response({"detail": "Which company did you mean? Choose one below.", "code": "choose_symbol", "matches": matches},
+                                  status=status.HTTP_400_BAD_REQUEST)
         return None, Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     except public_http.PublicHTTPError as exc:
         return None, Response({"detail": f"Yahoo data is unavailable right now ({exc.code}). Try again later."}, status=status.HTTP_502_BAD_GATEWAY)

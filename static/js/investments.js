@@ -532,10 +532,17 @@ async function loadResearchPacket(event) {
         target.innerHTML = researchPacketHtml(packet);
         prefillResearchView(packet);
         document.getElementById("researchChallengeButton").addEventListener("click", () =>
-            loadResearchChallenge({ ...Object.fromEntries(query), role: document.getElementById("researchChallengeRole").value }));
+            loadResearchChallenge(Object.fromEntries(query), document.getElementById("researchChallengeRole").value));
         document.getElementById("researchPersonalButton").addEventListener("click", () => loadResearchPersonalChallenge(Object.fromEntries(query)));
     } catch (error) {
-        target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${Alfred.escapeHtml(error.message || "The packet could not be built.")}</div>`;
+        const e = Alfred.escapeHtml, matches = error.code === "choose_symbol" ? error.payload?.matches || [] : [];
+        target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${e(error.message || "The packet could not be built.")}
+            ${matches.length ? `<div class="d-flex flex-wrap gap-2 mt-2" id="researchSymbolMatches">${matches.map(m =>
+                `<button type="button" class="btn btn-outline-secondary btn-sm" data-symbol="${e(m.symbol)}">${e(m.name || m.symbol)} · ${e(m.exchange)} (${e(m.symbol)})</button>`).join("")}</div>` : ""}</div>`;
+        target.querySelectorAll("[data-symbol]").forEach(button => button.addEventListener("click", () => {
+            form.elements.symbol.value = button.dataset.symbol;
+            form.requestSubmit();
+        }));
     }
 }
 
@@ -549,7 +556,12 @@ function researchPacketHtml(p) {
     const valuation = v.status === "estimated"
         ? `Price-to-earnings ${e(String(v.price_to_earnings))} (earnings yield ${e(String(v.earnings_yield_pct))}%) as of ${e(v.as_of)}. ${e(v.basis)} ${e(v.uncertainty)}`
         : `Unavailable: ${e(v.reason || "")}`;
+    const b = p.beginner || {};
     return `<div class="mini-card" id="researchPacketResult">
+        ${b.label ? `<div class="border-bottom pb-2 mb-2" id="researchBeginner">
+            <p class="fw-semibold mb-1">In plain words: <span class="badge text-bg-${{ positive: "success", caution: "danger", mixed: "warning" }[b.lean] || "secondary"}">${e(b.label)}</span></p>
+            <p class="mb-1">${e(b.headline)} (${e(String(b.good_signs))} good, ${e(String(b.warning_signs))} warning)</p>
+            ${list(b.steps || [])}<p class="muted small mt-1 mb-0">${e(b.note)}</p></div>` : ""}
         <p class="metric-kicker mb-1">${e(p.symbol)} · statements to ${e(p.latest_period_end || "unknown")} · retrieved ${e((p.retrieved_at || "").slice(0, 10))}
             · <a href="${Alfred.safeHref(p.source_url)}" target="_blank" rel="noopener">Source</a></p>
         <div class="row g-3">${points("Good signs", p.bullish || [], "researchPacketBull")}${points("Warning signs", p.bearish || [], "researchPacketBear")}</div>
@@ -562,11 +574,12 @@ function researchPacketHtml(p) {
         <div class="d-flex flex-wrap gap-2 align-items-end mt-3">
             <div><label for="researchChallengeRole" class="form-label small mb-1">Second opinion from</label>
             <select id="researchChallengeRole" class="form-select form-select-sm">
-                <option value="sceptic" selected>Sceptic: reasons to doubt</option>
+                <option value="team" selected>The whole research team: for, against and risks</option>
+                <option value="sceptic">Sceptic: reasons to doubt</option>
                 <option value="advocate">Advocate: the case for</option>
                 <option value="risk_manager">Risk manager: what could go wrong</option>
             </select></div>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="researchChallengeButton">Get a second opinion (local AI)</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="researchChallengeButton">Ask the research team (local AI)</button>
         </div>
         <div id="researchChallenge" class="mt-2" aria-live="polite"></div>
         <div class="border-top mt-3 pt-2" id="researchPersonal">
@@ -610,20 +623,28 @@ function prefillResearchView(packet) {
     loadResearchLessons(packet.symbol);
 }
 
-async function loadResearchChallenge(params) {
+// TradingAgents-style team: the advocate (bull), the sceptic (bear) and the risk manager each review the public packet in turn.
+async function loadResearchChallenge(params, choice) {
     const target = document.getElementById("researchChallenge"), button = document.getElementById("researchChallengeButton");
-    const e = Alfred.escapeHtml;
+    const e = Alfred.escapeHtml, roles = choice === "team" ? ["advocate", "sceptic", "risk_manager"] : [choice];
+    const done = [];
+    const render = waiting => `<div id="researchChallengeResult">${done.join("")}</div>${waiting
+        ? `<p class="muted small mb-0">Your local AI is reviewing this packet (${done.length + 1} of ${roles.length}); on this PC each view can take a few minutes…</p>` : ""}`;
     button.disabled = true;
-    target.innerHTML = `<p class="muted small mb-0">Your local AI is reviewing this packet; on this PC it can take a few minutes…</p>`;
+    target.innerHTML = render(true);
     try {
-        const c = await Alfred.fetchJSON("/api/investments/research/packet/challenge/", { method: "POST", body: JSON.stringify(params) });
-        if (c.status !== "challenged") { target.innerHTML = `<p class="muted small mb-0">${e(c.detail || "")}</p>`; return; }
-        target.innerHTML = `<div id="researchChallengeResult"><p class="fw-semibold mb-1">Second opinion: ${e(c.role_label)} (${e(c.model)})</p>
-            ${c.objections.length ? `<ul class="mb-2">${c.objections.map(o => `<li><span class="muted">${e(o.point)}</span> — ${e(o.objection)}</li>`).join("")}</ul>` : ""}
-            ${c.overlooked.length ? `<p class="fw-semibold mb-1">Not covered by the packet</p><ul class="mb-2">${c.overlooked.map(item => `<li>${e(item)}</li>`).join("")}</ul>` : ""}
-            <p class="muted small mb-0">${c.dropped ? `${e(String(c.dropped))} reply item(s) were dropped for citing no packet point or stating a number. ` : ""}${c.limits.map(e).join(" ")}</p></div>`;
+        for (const role of roles) {
+            const c = await Alfred.fetchJSON("/api/investments/research/packet/challenge/", { method: "POST", body: JSON.stringify({ ...params, role }) });
+            done.push(c.status !== "challenged" ? `<p class="muted small mb-2">${e(c.detail || "")}</p>` : `<div class="mb-2" data-research-role="${e(role)}">
+                <p class="fw-semibold mb-1">${e(c.role_label)} (${e(c.model)})</p>
+                ${c.objections.length ? `<ul class="mb-1">${c.objections.map(o => `<li><span class="muted">${e(o.point)}</span> — ${e(o.objection)}</li>`).join("")}</ul>` : ""}
+                ${c.overlooked.length ? `<p class="small fw-semibold mb-1">Not covered by the packet</p><ul class="mb-1">${c.overlooked.map(item => `<li>${e(item)}</li>`).join("")}</ul>` : ""}
+                <p class="muted small mb-0">${c.dropped ? `${e(String(c.dropped))} reply item(s) were dropped for citing no packet point or stating a number. ` : ""}${c.limits.map(e).join(" ")}</p></div>`);
+            target.innerHTML = render(done.length < roles.length);
+            if (c.status !== "challenged") break;
+        }
     } catch (error) {
-        target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${e(error.message || "The challenge failed.")}</div>`;
+        target.innerHTML = `${render(false)}<div class="alert alert-warning mb-0" role="alert">${e(error.message || "The challenge failed.")}</div>`;
     } finally {
         button.disabled = false;
     }

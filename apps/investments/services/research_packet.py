@@ -89,6 +89,60 @@ def _common_period(series, *names, back=0):
     return dates[back] if len(dates) > back else None
 
 
+INDIAN_FIRST = {"NSE": 0, "Bombay": 1, "BSE": 1}
+NAME = re.compile(r"^[A-Za-z][A-Za-z0-9 &.'-]{1,59}$")
+
+
+def find_symbols(name: str) -> list[dict]:
+    """A company name to up to five listed symbols (Indian exchanges first), so a newcomer need not know the ticker.
+
+    Only the typed company name goes to Yahoo's public search; anything that looks private is not sent.
+    """
+    from apps.ml_engine.services.web_lookup import PRIVATE_IN_QUESTION
+
+    name = " ".join(str(name or "").split())
+    if not NAME.fullmatch(name) or PRIVATE_IN_QUESTION.search(name):
+        return []
+    response = public_http.request("GET", "https://query2.finance.yahoo.com/v1/finance/search",
+        params={"q": name, "quotesCount": 8, "newsCount": 0}, headers={"User-Agent": USER_AGENT})
+    found = [{"symbol": str(q["symbol"]), "name": str(q.get("longname") or q.get("shortname") or "")[:120],
+              "exchange": str(q.get("exchDisp") or "")[:40]}
+             for q in response.json().get("quotes") or []
+             if q.get("quoteType") in ("EQUITY", "ETF", "MUTUALFUND") and SYMBOL.fullmatch(str(q.get("symbol") or ""))]
+    return sorted(found, key=lambda item: INDIAN_FIRST.get(item["exchange"], 2))[:5]
+
+
+BEGINNER = {
+    "not_enough": ("Not enough data", "ALFRED found too little dated data to judge this one.",
+                   ["Try the company's NSE symbol (ending .NS) or look it up again later.",
+                    "If you are new, a broad index fund needs far less research than one company."]),
+    "positive": ("Looks healthy", "More good signs than warning signs in the company's numbers.",
+                 ["Healthy numbers do not make a share cheap or safe; prices can still fall.",
+                  "If you buy, start small, with money you will not need for at least five years.",
+                  "Do not put a big part of your savings in one company; a broad index fund spreads the risk.",
+                  "Write down your view in step 2 so ALFRED reminds you to check it."]),
+    "mixed": ("Mixed", "The good signs and warning signs are about even.",
+              ["A beginner would usually wait and learn more before buying.",
+               "Ask the research team below for the case for, the case against and the risks.",
+               "A broad index fund is a simpler way to own many companies at once."]),
+    "caution": ("Be careful", "More warning signs than good signs in the company's numbers.",
+                ["A beginner would usually stay away from this one for now.",
+                 "Read the warning signs below; check again after the next annual results.",
+                 "A broad index fund carries less single-company risk."]),
+}
+
+
+def beginner_view(bullish: list, bearish: list, portfolio: dict) -> dict:
+    """Plain-language lean for someone new to markets, counted from the packet's own screens (a rule of thumb, not a forecast)."""
+    good, bad = len(bullish), len(bearish)
+    lean = "not_enough" if good + bad < 2 else "caution" if bad >= good + 2 else "positive" if good >= bad + 2 else "mixed"
+    label, headline, steps = BEGINNER[lean]
+    if portfolio.get("status") == "held" and any(p["metric"] == "portfolio_weight_pct" for p in bearish):
+        steps = ["You already have a lot of your money in this one; adding more raises your risk."] + steps
+    return {"lean": lean, "label": label, "headline": headline, "steps": steps, "good_signs": good, "warning_signs": bad,
+            "note": "Counted from the signs below by fixed rules. Not a forecast or financial advice; nothing is bought or sold."}
+
+
 def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None, portfolio_total=None) -> dict:
     point = lambda text, metric, value, as_of: {"point": text, "metric": metric, "value": value, "as_of": as_of}
     bullish, bearish, changes, missing, metrics = [], [], [], [], {}
@@ -204,7 +258,7 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
             "statement_currency": statement_currency, "price_currency": price_currency,
             "latest_period_end": latest_period.isoformat() if latest_period else None,
             "metrics": metrics, "bullish": bullish, "bearish": bearish, "valuation": valuation, "portfolio": portfolio,
-            "thesis_changes": changes, "missing_evidence": missing,
+            "thesis_changes": changes, "missing_evidence": missing, "beginner": beginner_view(bullish, bearish, portfolio),
             "options": ["Do nothing for now.", "Write down your view in step 2 and check it later.",
                         f"Look again after the next annual results{f', around {review}' if review else ''}."],
             "limits": ["Screens are rules of thumb, not forecasts; there is no rating or price target.",

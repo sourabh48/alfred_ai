@@ -1,5 +1,22 @@
 # ALFRED execution state
 
+## Beginner investment research - 2026-11-13
+
+- Owner request: "for investment assume user dont know about market give suggestions like tradingagents".
+- Research journal step 1 now takes a company name: when it is not a symbol, only the typed name goes to Yahoo's
+  public search and the page offers the listed symbols (NSE and BSE first). Private-looking text is not sent.
+- Every look-up starts with "In plain words": Looks healthy / Mixed / Be careful / Not enough data, counted from
+  the packet's own dated signs by fixed rules, with beginner steps (start small, prefer a broad index fund, write
+  the view down). It warns when the stock is already a large share of the owner's holdings. Labelled not a
+  forecast or financial advice; nothing is bought or sold.
+- "Ask the research team" (default) runs the existing local-model advocate (bull), sceptic (bear) and risk
+  manager in turn, as TradingAgents' researchers and risk manager do. Public packet only; holdings stay local.
+- Evidence: tests.test_research_packet (incl. new BeginnerTests) and journal/abuse suites 42 PASS; 5 research
+  browser tests PASS; live: "Tata Motors" found its NSE symbols, INFY.NS lean "Looks healthy" (5 good, 2
+  warning), qwen3.5:4b risk manager returned three number-free points.
+- Known local-only: test_financial_document_questions_stale_outage_retry_and_no_history and
+  test_settings_sync_consent_budgets_and_explicit_public_mock_fallback fail on this PC at f2c1227 too (CI passed).
+
 ## Ask ALFRED online lookup - 2026-11-13
 
 - Owner request: "the local ai is useless... allow the ollama and open ai to get data from online".

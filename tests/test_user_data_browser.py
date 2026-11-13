@@ -9026,15 +9026,25 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         owner = self.scenario['user']
         holdings, calls = list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()
         self.login()
+        reasoner = FakeReasoner(GOOD)
+        matches = [{'symbol': 'SYNTH.NS', 'name': 'Synthetic Co', 'exchange': 'NSE'}]
         with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund(currency='USD')),                 patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)), \
-                patch('apps.investments.services.research_challenge.local_reasoner', return_value=FakeReasoner(GOOD)):
+                patch('apps.investments.services.research_packet.find_symbols', return_value=matches) as find, \
+                patch('apps.investments.services.research_challenge.local_reasoner', return_value=reasoner):
             self.browser.get(self.live_server_url + '/investments/')
             self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketSymbol'))
-            self.browser.find_element(self.By.ID, 'researchPacketSymbol').send_keys('synth.ns')
+            self.browser.find_element(self.By.ID, 'researchPacketSymbol').send_keys('Synthetic Co')  # a newcomer types the name
             self.memory_click('#researchPacketForm button[type=submit]')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#researchSymbolMatches [data-symbol="SYNTH.NS"]'))
+            self.memory_click('#researchSymbolMatches [data-symbol="SYNTH.NS"]')
             self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketResult'))
-            self.memory_click('#researchChallengeButton')
-            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchChallengeResult'))
+            self.memory_click('#researchChallengeButton')  # default: the whole team, one role after another
+            self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#researchChallengeResult [data-research-role]')) == 3)
+        self.assertEqual(find.call_args.args[0], 'Synthetic Co')
+        self.assertIn('Looks healthy', self.text('researchBeginner'))
+        self.assertIn('financial advice', self.text('researchBeginner'))
+        self.assertEqual([p['task'].split(' reviewing')[0] for p in reasoner.payloads],
+                         ['Act as an independent advocate', 'Act as an independent sceptic', 'Act as an independent risk manager'])
         self.assertIn('Revenue grew 20.0%', self.text('researchPacketBull'))
         self.assertIn('does not convert', self.text('researchPacketValuation'))
         self.assertIn('acquisition rather than demand', self.text('researchChallenge'))
@@ -9062,7 +9072,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund()), \
                 patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)), \
-                patch('apps.investments.services.research_challenge.local_reasoner', side_effect=[analyst, personal]):
+                patch('apps.investments.services.research_challenge.local_reasoner', side_effect=[analyst] * 3 + [personal]):
             self.browser.get(self.live_server_url + '/investments/')
             self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPacketSymbol'))
             self.browser.find_element(self.By.ID, 'researchPacketSymbol').send_keys('synth.ns')
@@ -9071,7 +9081,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.memory_click('#researchPersonalButton')
             self.wait.until(lambda _: 'Tick that ALFRED may use' in self.text('researchPersonalResult'))
             self.memory_click('#researchChallengeButton')
-            self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchChallengeResult'))
+            self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, '#researchChallengeResult [data-research-role]')) == 3)
             self.memory_click('#researchPersonalConsent')
             self.memory_click('#researchPersonalButton')
             self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'researchPersonalChallenge'))

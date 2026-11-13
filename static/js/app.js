@@ -306,6 +306,7 @@ function fetchJSON(url, options = {}) {
                 const error = new Error(payload.detail || payload.error || payload.message || (response.status === 413 ? "This file exceeds the upload limit." : "Request failed. Please retry."));
                 error.status = response.status;
                 error.code = payload.code;
+                error.payload = payload;
                 error.reference = payload.error_id;
                 throw error;
             }

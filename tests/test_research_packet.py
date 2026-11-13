@@ -277,3 +277,37 @@ class PrivateChallengerTests(TestCase):
                                      content_type="application/json").status_code, 403)
         self.client.logout()
         self.assertIn(self._post(GOOD, symbol="SYNTH.NS", include_personal=True).status_code, (401, 403))
+
+
+class BeginnerTests(TestCase):
+    """A newcomer can type a company name and gets a plain lean counted from the packet's own screens."""
+    setUp = PacketApiTests.setUp
+
+    def test_plain_lean_follows_the_counted_signs(self):
+        from apps.investments.services.research_packet import beginner_view
+        good = [{"metric": "m"}] * 3
+        self.assertEqual(build_packet("SYNTH.NS", _fund(), _prices(RISING))["beginner"]["lean"], "positive")
+        self.assertEqual(beginner_view([], [], {})["lean"], "not_enough")
+        self.assertEqual(beginner_view(good, [], {})["label"], "Looks healthy")
+        self.assertEqual(beginner_view(good[:1], good, {})["lean"], "caution")
+        self.assertEqual(beginner_view(good[:2], good[:1], {})["lean"], "mixed")
+        held = beginner_view(good, [{"metric": "portfolio_weight_pct"}], {"status": "held"})
+        self.assertIn("already have a lot of your money", held["steps"][0])
+        self.assertIn("Not a forecast or financial advice", held["note"])
+
+    def test_a_company_name_offers_listed_symbols_indian_first_and_private_text_is_not_sent(self):
+        from alfred_ai.services.public_http import PublicResponse
+        quotes = (b'{"quotes":[{"symbol":"INFY","quoteType":"EQUITY","exchDisp":"NYSE","longname":"Synthetic Infosys"},'
+                  b'{"symbol":"INFY.NS","quoteType":"EQUITY","exchDisp":"NSE","longname":"Synthetic Infosys"},'
+                  b'{"symbol":"X","quoteType":"OPTION","exchDisp":"NSE"},{"symbol":"../bad","quoteType":"EQUITY"}]}')
+        with patch("apps.investments.services.research_packet.fetch_fundamentals", return_value={}), \
+                patch("apps.investments.services.research_packet.fetch_prices", return_value={}), \
+                patch("apps.investments.services.research_packet.public_http.request", return_value=PublicResponse(quotes, "application/json")) as search:
+            response = self.client.get("/api/investments/research/packet/", {"symbol": "Infosys"})
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.json()["code"], "choose_symbol")
+            self.assertEqual([m["symbol"] for m in response.json()["matches"]], ["INFY.NS", "INFY"])
+            self.assertEqual(search.call_args.kwargs["params"]["q"], "Infosys")
+            search.reset_mock()
+            self.assertEqual(self.client.get("/api/investments/research/packet/", {"symbol": "acct 123456789"}).status_code, 400)
+            search.assert_not_called()
