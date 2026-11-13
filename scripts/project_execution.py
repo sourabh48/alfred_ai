@@ -15,8 +15,8 @@ PHASE = {STATES[0]: 'A', STATES[1]: 'B', STATES[2]: 'C', STATES[3]: 'C', STATES[
 OWNER_DEFERRED_MODULES = ('COUNCIL',)
 MODULE_ORDER = ('FIN', 'LOAN', 'INV', 'DOC', 'AI', 'CAREER', 'TRAVEL', 'FAMILY', 'BIKE', 'COUNCIL', 'OPENAI', 'SYNC', 'RUNTIME')
 GATES = {
-    'LOAN-08': 'BLOCKED_EVIDENCE: independent lender/document acceptance corpus',
-    'INV-02': 'BLOCKED_EVIDENCE: broader broker/layout/OCR and authorized real-account corpus; bounded receipts in EXECUTION_STATE',
+    'LOAN-08': 'BLOCKED_EVIDENCE: six dummy lender layouts read field by field after label fixes 2026-11-14 (synthetic); real lender documents remain',
+    'INV-02': 'BLOCKED_EVIDENCE: dummy Groww, CAMS and Kite tables with lakh grouping read and reconciled 2026-11-14 (synthetic); OCR and real-account corpus remain',
     'INV-05': 'BLOCKED_EVIDENCE: fund holdings with an AMFI code and units revalue twice daily from AMFI NAV and Home reports the change (2026-11-14, synthetic tests); owner check with a real fund remains',
     'AI-10': 'BLOCKED_EVIDENCE: chats kept until deleted and on by default since 2026-11-14 (owner decision); owner check of the chat list remains',
     'AI-14': 'BLOCKED_EVIDENCE: eligible consented training and reviewed outcomes',
@@ -30,7 +30,7 @@ GATES = {
     'FIN-07': 'BLOCKED_EVIDENCE: on the owner\'s data the prior range held in 6 of 9 walk-forward months and income evidence is missing; no accuracy claim',
     'FIN-13': 'BLOCKED_EVIDENCE: owner account check PASS 2026-11-06; CI PASS at e8ef8f4 (run 42185812614); a fresh-package check remains',
     'DOC-07': 'BLOCKED_EVIDENCE: bounded whole-extraction Q&A accepted; 111 document tests re-run PASS 2026-11-06; OCR, longer originals and an independent quality corpus remain',
-    'DOC-09': 'BLOCKED_EVIDENCE: delete now removes orphaned stored files 2026-11-06 (118 tests PASS); owner check with a synthetic document remains',
+    'DOC-09': 'BLOCKED_EVIDENCE: delete removes orphaned stored files 2026-11-06 and now confirms Deleted 2026-11-14; owner check with a synthetic document remains',
     'CAREER-04': 'BLOCKED_APPROVAL: manual recruiter intake accepted; automatic mailbox access needs approved provider access and a reviewed integration',
     'CAREER-07': 'BLOCKED_EVIDENCE: interview preparation panel 2026-11-06; one-question-at-a-time mock interview with offline voice and local-AI comments 2026-11-14 (Chrome PASS); owner check remains',
     'TRAVEL-04': 'BLOCKED_APPROVAL: Google Routes is the only router since 2026-11-14 (two-wheeler, distance and time, no line drawn); verified inter-stop routing needs the owner Google key and a real-trip check; manual itineraries accepted',

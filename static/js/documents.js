@@ -1021,7 +1021,9 @@ function deleteDocumentCenterItem(scope, id) {
     }
     setDocumentCenterBusy(true);
     Alfred.fetchJSON(`/api/documents/items/${scope}/${id}/`, { method: "DELETE" })
+        // The reload clears page alerts, so the confirmation is shown after it.
         .then(() => loadDocumentCenter())
+        .then(() => Alfred.upsertPageAlert("documentCenterRoot", "Deleted. Backups made before now keep their own copy.", "success"))
         .catch(error => {
             Alfred.logClientIssue({
                 module: "documents",

@@ -974,10 +974,11 @@ class PortfolioIntelligenceService:
         """Read labelled money columns; an unsafe table must not fall back to positional guesses."""
         # shortcut: labelled text tables only; expand positional layouts after representative corpus review.
         aliases = {
-            "asset_name": {"symbol", "security", "fund name", "scheme name", "asset name"},
-            "invested_amount": {"invested amount", "invested value", "cost value", "investment amount"},
-            "current_value": {"current value", "market value", "current amount"},
-            "account_number": {"account", "account number", "folio", "folio number", "demat account"},
+            # Labels used by common Indian brokers and registrars (Kite/Console, Groww, CAMS/KFintech statements).
+            "asset_name": {"symbol", "security", "fund name", "scheme name", "asset name", "instrument", "stock name", "scheme"},
+            "invested_amount": {"invested amount", "invested value", "cost value", "investment amount", "invested", "buy value"},
+            "current_value": {"current value", "market value", "current amount", "cur. val", "closing value", "present value"},
+            "account_number": {"account", "account number", "folio", "folio number", "folio no", "folio no.", "demat account"},
         }
         columns = None
         header_labels = None
@@ -993,7 +994,8 @@ class PortfolioIntelligenceService:
 
         def amount(value):
             # Currency/units/OCR substitutions are never inferred from a numeric-looking cell.
-            if not re.fullmatch(r"(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?", value):
+            # Plain, international (1,234,567) or Indian lakh grouping (12,34,567); anything else is uncertain.
+            if not re.fullmatch(r"(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3})(?:\.\d+)?", value):
                 raise ValueError("Uncertain monetary cell")
             return investment_money(value.replace(",", ""))
 
@@ -1038,7 +1040,7 @@ class PortfolioIntelligenceService:
                 total = (invested, current)
                 continue
             row_account = cells[columns["account_number"]] if "account_number" in columns else account
-            if not re.fullmatch(r"[A-Za-z0-9-]{6,24}", row_account) or not name or len(name) > 120:
+            if not re.fullmatch(r"[A-Za-z0-9/-]{6,24}", row_account) or not name or len(name) > 120:  # CAMS folios: 12345678/90
                 return review("Missing or unsupported holding/account identity requires source review.")
             item = {"asset_name": name, "asset_type": "mutual_fund" if fund_table else self._guess_asset_type(name),
                     "institution": "" if broker == "Generic" else broker, "account_number": row_account,
@@ -1122,7 +1124,8 @@ class PortfolioIntelligenceService:
         return "equity"
 
     def _extract_account_hint(self, text: str) -> str:
-        match = re.search(r"\b(?:folio|account|demat)\b[ \t]*(?:no\.?|number|id)?[ \t]*[:#-]?[ \t]*([A-Z0-9-]{6,24})\b", text, re.IGNORECASE)
+        # A label word is never the identifier, so "Demat Account: 1208..." does not stop at the word "Account".
+        match = re.search(r"\b(?:folio|account|demat|client)\b[ \t]*(?:no\.?|number|id)?[ \t]*[:#-]?[ \t]*((?!(?:account|folio|demat|client|statement|number|holdings?)\b)[A-Z0-9/-]{6,24})\b", text, re.IGNORECASE)
         return (match.group(1) if match else "").strip()
 
     def _calculate_portfolio_risk_score(self, asset_breakdown: Dict, total_value: float) -> float:

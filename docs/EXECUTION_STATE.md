@@ -1,5 +1,34 @@
 # ALFRED execution state
 
+## Owner checks fixed one by one - 2026-11-14
+
+- Same branch and worktree as below; local commits only, not pushed. New migration: investments 0009 (fund code,
+  units, NAV) besides users 0007; both need the owner's migration approval before the push.
+- NEW-1 map: when Google tiles fail, the map now says why (for example "Map Tiles API is not enabled for this key")
+  and stops asking Google for 10 minutes. Not checked live with the owner's key.
+- NEW-3 Ask ALFRED: questions about you stay in memory; current or general questions memory cannot answer are looked
+  up online by itself (never questions with amounts, long numbers, emails or keys).
+- AI-10 chat history: on by default on this PC, kept until deleted, listed like a chat app with delete.
+- INV-05 fund prices: pick a fund by name and enter units; the value follows AMFI's NAV twice a day and Home says
+  what changed.
+- NEW-2 beginners: Investments > "Start here" shows three plain fund picks from the AMFI watchlist, an "I bought this"
+  button that sets up tracking, and Hold / Review / Sell for owned funds (8% and 15% below the recent high). Not
+  financial advice; nothing is bought or sold.
+- RUNTIME-03: nothing was ever registered at sign-in on the owner's PC: the script needed `dist\ALFRED\ALFRED.exe`,
+  which a source checkout lacks. It now falls back to the checkout's `.venv\Scripts\pythonw.exe` and takes
+  `-DataDirectory`. Registering it on the owner's PC is still the owner's choice; no real sign-in observed.
+- AI-18 voice: listening stops on a pause; long answers are read whole; Ask ALFRED has a hands-free conversation mode
+  (asks when you pause, reads the answer, listens again; changes still need Confirm). Shared `static/js/voice.js`.
+- CAREER-07: a mock interview asks one question at a time (aloud when the voice is installed), takes a spoken or
+  typed answer and shows local-AI comments, then saves the round.
+- LOAN-08 and INV-02 with dummy documents: six invented lender layouts and Groww, CAMS and Kite tables found parser
+  gaps ("Loan A/c No.", one-L "Instalment", "Rate of Interest (p.a.)", "Tenure (months)", title-case bank names, lakh
+  grouping, CAMS folios with "/", "Demat Account:" hint). Fixed and kept as tests. Real documents are still unchecked.
+- FIN-06, AI-17, DOC-09, LOAN-07 and AI-14: their 278 backend tests and six browser tests pass; document delete now
+  says "Deleted". AI-14 already learns by itself nightly with a catch-up after the PC was off; nothing to change.
+- Not done: RUNTIME-15 (home Wi-Fi access) and RUNTIME-14 (cloud sync) are not started; the open question on removing
+  the offline OpenStreetMap country maps is unanswered.
+
 ## Email sign-in and Google-only travel data - 2026-11-14
 
 - Branch `work/email-signin-2026-11-14` (worktree F:/ALFRED_DEV/owner-decisions-1112, base fec7404). Local commits

@@ -20,10 +20,11 @@ class LoanPDFParser:
     LENDER_PATTERNS = [
         (r"BAJAJ\s+(?:HOUSING|FINANCE)", "Bajaj Finance"),
         (r"POONAWALLA\s+FINCORP", "Poonawalla Fincorp"),
-        (r"HDFC\s+(?:HOME|PERSONAL)", "HDFC Bank"),
-        (r"ICICI\s+(?:HOME|PERSONAL)", "ICICI Bank"),
-        (r"SBI\s+(?:HOME|PERSONAL)", "State Bank of India"),
-        (r"AXIS\s+(?:HOME|PERSONAL)", "Axis Bank"),
+        (r"HDFC\s+(?:HOME|PERSONAL|BANK)", "HDFC Bank"),
+        (r"ICICI\s+(?:HOME|PERSONAL|BANK)", "ICICI Bank"),
+        (r"\bSBI\s+(?:HOME|PERSONAL)|STATE\s+BANK\s+OF\s+INDIA", "State Bank of India"),
+        (r"AXIS\s+(?:HOME|PERSONAL|BANK)", "Axis Bank"),
+        (r"KOTAK\s+MAHINDRA", "Kotak Mahindra Bank"),
         (r"TATA\s+CAPITAL", "Tata Capital"),
         (r"FULLERTON", "Fullerton India"),
         (r"MUTHOOT", "Muthoot Finance"),
@@ -181,8 +182,9 @@ class LoanPDFParser:
             if re.search(pattern, text, re.IGNORECASE):
                 return lender
 
-        # Fallback: Look for bank name
-        bank_match = re.search(r"([A-Z\s]+(?:BANK|FINANCE|FINCORP))", text)
+        # Fallback: a name ending in Bank, Finance or Fincorp, in capitals or title case
+        bank_match = re.search(r"([A-Z\s]+(?:BANK|FINANCE|FINCORP))", text) or \
+            re.search(r"\b((?:[A-Z][a-z]+\s+){1,3}(?:Bank|Finance|Fincorp))\b", text)
         if bank_match:
             return bank_match.group(1).strip().title()
 
@@ -199,8 +201,8 @@ class LoanPDFParser:
     def _extract_account_number(self, text: str) -> str:
         """Extract loan account number."""
         patterns = [
-            r"(?:LOAN|ACCOUNT)\s+(?:NO|NUMBER|ID)\s*[:.]?\s*([A-Z0-9-]{6,40})",
-            r"(?:AGREEMENT|CONTRACT)\s+(?:NO|NUMBER)\s*[:.]?\s*([A-Z0-9]{6,20})",
+            r"(?:LOAN|ACCOUNT|A/C)\s+(?:NO|NUMBER|ID)\b[\s:.]*([A-Z0-9-]{6,40})",
+            r"(?:AGREEMENT|CONTRACT)\s+(?:NO|NUMBER)\b[\s:.]*([A-Z0-9]{6,20})",
         ]
 
         for pattern in patterns:
@@ -229,6 +231,7 @@ class LoanPDFParser:
         """Extract interest rate."""
         patterns = [
             r"(?:INTEREST|RATE)\s+(?:RATE|%)\s*[:.]?\s*([0-9.]+)\s*%",
+            r"RATE\s+OF\s+INTEREST\s*(?:\(P\.?\s?A\.?\))?\s*[:.]?\s*([0-9.]+)\s*%",
             r"ROI\s*[:.]?\s*([0-9.]+)\s*%",
             r"([0-9.]+)\s*%\s+(?:P\.A|PER\s+ANNUM)",
         ]
@@ -244,7 +247,7 @@ class LoanPDFParser:
         """Extract EMI amount."""
         patterns = [
             rf"EMI\s*(?:AMOUNT|AMT)?\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
-            rf"(?:MONTHLY|INSTALLMENT)\s+(?:AMOUNT|AMT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
+            rf"(?:MONTHLY|INSTALL?MENT)\s+(?:AMOUNT|AMT|INSTALL?MENT)\s*[:.]?\s*{INR_LABEL_TOKEN}?\s*([0-9,]+(?:\.\d+)?)",
         ]
 
         for pattern in patterns:
@@ -261,8 +264,8 @@ class LoanPDFParser:
             r"(?:TENURE|PERIOD)\s*[:.]?\s*([0-9]+)\s+(?:YEARS|YRS)",  # Convert to months
         ]
 
-        # Months pattern
-        match = re.search(patterns[0], text, re.IGNORECASE)
+        # Months pattern, including a "Tenure (months): 60" label
+        match = re.search(patterns[0], text, re.IGNORECASE) or re.search(r"(?:TENURE|PERIOD)\s*\(\s*MONTHS\s*\)\s*[:.]?\s*([0-9]+)", text, re.IGNORECASE)
         if match:
             return int(match.group(1))
 

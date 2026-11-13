@@ -180,6 +180,8 @@
   "tests.test_social_login": 3.0,
   "tests.test_fund_prices": 3.0,
   "tests.test_beginner_guide": 2.0,
+  "tests.test_loan_dummy_lenders": 3.0,
+  "tests.test_investment_dummy_brokers": 3.0,
  "tests.test_exchange_rates": 3.0,
  "tests.test_loan_prepayment": 2.0,
  "tests.test_advisory_evidence_freshness": 2.4,
