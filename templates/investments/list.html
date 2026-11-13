@@ -19,6 +19,15 @@
 
 <section class="soft-grid four-up mb-4" id="investmentSummaryCards"></section>
 
+<section class="surface-card mb-4" id="beginnerGuideSection" aria-labelledby="beginnerGuideTitle">
+    <h2 id="beginnerGuideTitle" class="page-section-title mb-1">Start here: which fund to buy, hold or sell</h2>
+    <p class="page-section-copy">New to investing? ALFRED checks official AMFI fund prices every day. Pick a fund below, buy it on your broker's or the fund house's site, then press "I bought this" so ALFRED tracks it and tells you when to hold or sell.</p>
+    <div class="soft-grid three-up mb-3" id="beginnerPicks"><div class="empty-state">Loading today's picks…</div></div>
+    <h3 class="h6 mb-2">Funds you own</h3>
+    <ul class="insight-list mb-2" id="beginnerHoldings"></ul>
+    <p class="metric-caption mb-0" id="beginnerNote"></p>
+</section>
+
 <section class="surface-card mb-4" aria-labelledby="investmentReviewTitle">
     <h2 id="investmentReviewTitle" class="page-section-title">Local record-review reminders</h2>
     <p class="page-section-copy">Remind me when a holding's record has not been edited recently. An edit date does not verify its price, statement or market freshness.</p>
@@ -326,5 +335,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.19.0"></script>
+<script src="/static/js/investments.js?v=2.20.0"></script>
 {% endblock %}

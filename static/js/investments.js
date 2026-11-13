@@ -83,6 +83,7 @@ function loadInvestmentDashboard() {
             renderInvestmentRecommendations(summaryData.analysis?.recommendations || [], summaryData.market_context?.suggestions || []);
             renderInvestmentGrounding(summaryData.grounding || {});
             renderInvestmentWatchlist(summaryData.watchlist || {});
+            renderBeginnerGuide(summaryData.beginner || {});
             renderInvestmentPositions(summaryData.positions || []);
             fillPacketHoldings(summaryData.positions || []);
             fillLookThroughHoldings(summaryData.positions || []);
@@ -240,6 +241,43 @@ function renderInvestmentGrounding(grounding) {
         return `<li class="insight-item"><strong>${Alfred.escapeHtml(proof.source_name || proof.title || "Evidence")}</strong>: ${Alfred.escapeHtml(proof.summary || "")}${proof.source_url ? ` <a href="${Alfred.safeHref(proof.source_url)}" target="_blank" rel="noopener">Proof</a>` : ""}</li>`;
     }).join(""));
 }
+
+const BEGINNER_ACTION = {hold: ["Hold", "badge text-bg-success"], review: ["Review", "badge text-bg-warning"], sell: ["Sell or switch", "badge text-bg-danger"], unknown: ["Not sure yet", "badge text-bg-secondary"]};
+
+function renderBeginnerGuide(guide) {
+    const picks = Array.isArray(guide.picks) ? guide.picks : [], holdings = Array.isArray(guide.holdings) ? guide.holdings : [];
+    Alfred.setHTML(document.getElementById("beginnerPicks"), picks.length ? picks.map(pick => `
+        <article class="metric-card">
+            <p class="metric-kicker mb-1">${Alfred.escapeHtml(pick.kind || "Fund")} · ${Alfred.escapeHtml(pick.risk)} risk</p>
+            <h3 class="investment-watch-title mb-1">${Alfred.escapeHtml(pick.name)}</h3>
+            <p class="metric-caption mb-2">${Alfred.escapeHtml(pick.fund_house || "")} · price ₹${Alfred.escapeHtml(pick.nav)} on ${Alfred.escapeHtml(pick.nav_date)}</p>
+            <p class="mb-1">${Alfred.escapeHtml(pick.why)}</p>
+            <p class="metric-caption mb-2">${Alfred.escapeHtml(pick.how)}</p>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-bought-code="${Alfred.escapeHtml(pick.scheme_code)}" data-bought-name="${Alfred.escapeHtml(pick.name)}">I bought this</button>
+        </article>`).join("")
+        : `<div class="empty-state">No picks right now: today's official fund prices could not be checked. Try again later.</div>`);
+    Alfred.setHTML(document.getElementById("beginnerHoldings"), holdings.length ? holdings.map(item => {
+        const [label, chip] = BEGINNER_ACTION[item.action] || BEGINNER_ACTION.unknown;
+        return `<li class="insight-item"><span class="${chip}">${label}</span> <strong>${Alfred.escapeHtml(item.name)}</strong>: ${Alfred.escapeHtml(item.text)}</li>`;
+    }).join("") : `<li class="insight-item">None tracked yet. Add a fund with its name and units, or press "I bought this" on a pick.</li>`);
+    document.getElementById("beginnerNote").textContent = guide.note || "";
+}
+
+// "I bought this" fills the Add Position form so the new holding gets its AMFI code and daily tracking.
+document.addEventListener("click", event => {
+    const button = event.target.closest("[data-bought-code]");
+    if (!button) return;
+    const name = button.dataset.boughtName;
+    document.getElementById("investmentType").value = "mutual_fund";
+    document.getElementById("investmentName").value = name.slice(0, 120);
+    document.getElementById("investmentFund").value = name;
+    document.getElementById("investmentFundCode").value = button.dataset.boughtCode;
+    fundMatches = [{scheme_code: button.dataset.boughtCode, name}];
+    const units = document.getElementById("investmentUnits");
+    units.scrollIntoView({behavior: "smooth", block: "center"});
+    units.focus();
+    showInvestmentFeedback("Fund filled in. Enter the units you bought and the amount you paid, then save.", "info");
+});
 
 function renderInvestmentWatchlist(watchlist) {
     const modeTarget = document.getElementById("investmentWatchlistMode");
