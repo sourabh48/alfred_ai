@@ -5207,7 +5207,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.find_element(self.By.ID, 'onlineMailPassword').send_keys('abcd efgh ijkl mnop')
         self.memory_click('#onlineServicesForm button[type=submit]')
         self.wait.until(lambda _: 'using these settings now' in self.text('onlineServicesFeedback'))
-        self.assertIn('1 of 4 free services on · 1 of 5 keys saved · Career email ready', self.text('onlineServicesStatus'))
+        self.assertIn('1 of 4 free services on · 1 of 6 keys saved · Career email ready', self.text('onlineServicesStatus'))
         self.assertIn('Saved …9876', self.text('onlineServicesKeys'))
         self.assertEqual(self.browser.find_element(self.By.ID, 'online-TRAVEL_ORS_API_KEY').get_attribute('value'), '')
         self.assertEqual((os.environ['TRAVEL_USE_MODE'], settings.ALFRED_SMTP_HOST), ('personal_noncommercial', 'smtp.gmail.com'))

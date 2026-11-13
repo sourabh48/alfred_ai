@@ -11,7 +11,7 @@ def invalidate_trip_dates(destination):
     """Keep date-independent evidence; historical research rows remain unchanged."""
     result = deepcopy(destination)
     volatile = {"weather", "hotels", "flights", "trains", "buses", "permits", "web", "budget"}
-    for key, category in (("weather", "weather"), ("hotels", "hotels"), ("flights", "flights"),
+    for key, category in (("weather", "weather"), ("hotels", "hotels"), ("flights", "flights"), ("flight_prices", "flights"),
                           ("trains", "trains"), ("buses", "buses"), ("permit", "permits")):
         old = result.get(key + "_result", {})
         result[key + "_result"] = ProviderResult(old.get("provider", "unknown"), category,

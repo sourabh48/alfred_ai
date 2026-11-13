@@ -25,7 +25,7 @@ def has_locations(result):
 from .providers.weather import OpenMeteoWeather, replan_proposals
 from .providers.places import GoogleLodging, GooglePlacesNearby
 from .providers.permits import PermitProvider
-from .providers.transport import DuffelFlights, IndianRailProvider
+from .providers.transport import DuffelFlights, IndianRailProvider, TravelpayoutsFlights
 from .providers.web import WikivoyageDestinations, WikivoyageSearch, WikivoyageStays, BraveSearch, SearXNGSearch
 from .links import external_links, hotel_price_links
 from .presentation import age_saved_facts
@@ -225,10 +225,14 @@ def enrich_candidate(user, state, destination):
     # Free guide listings: names, contact and contributor price text; never live rates or availability.
     attach("stays_guide_result",fetch(WikivoyageStays(),{"destination":d["name"]}) if d.get("name") else ProviderResult("wikivoyage","stays_guide",error="destination_required"))
     flight = ProviderResult("duffel","flights",error="origin_and_destination_airport_codes_and_dates_required")
+    flight_prices = ProviderResult("travelpayouts","flights",error="origin_and_destination_airport_codes_and_dates_required")
     if value(state,"origin_airport") and value(state,"destination_airport") and start:
-        flight = fetch(DuffelFlights(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
-            "departure_date":start,"return_date":end,"adults":people})
+        route = {"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),"departure_date":start,"return_date":end}
+        flight = fetch(DuffelFlights(),{**route,"adults":people})
+        # Its own section, not a fallback: free recent fares beside Duffel's live ones.
+        flight_prices = fetch(TravelpayoutsFlights(),route)
     attach("flights_result",flight)
+    attach("flight_prices_result",flight_prices)
     attach("trains_result",fetch(IndianRailProvider(),{"origin":value(state,"origin"),"destination":d["name"],"date":start}))
     attach("buses_result",ProviderResult("operator_links","buses",error="live_bus_inventory_not_configured",payload={"options":[],"availability":"UNKNOWN"}))
     # Search bounded, contextual topics; raw messages, budgets and history never leave.

@@ -261,6 +261,14 @@ No page contents or booking inventory are scraped. Kerala Tourism's
 the forest booking site's terms do not establish an open inventory API.
 Verify opening, quota, fees, ID and restrictions directly with the authority.
 
+Travelpayouts (Aviasales Data API, `aviasales/v3/prices_for_dates`) needs a free
+partner token in `TRAVEL_TRAVELPAYOUTS_TOKEN` (Settings > Online services). It
+returns the cheapest fares Aviasales users found in the last 48 hours, from a
+cache, per one adult: never live prices or seat availability. ALFRED sends only
+the airport codes and dates, with the token in the `X-Access-Token` header, and
+caps it at 5/minute, 30/hour, 100/day and 1500/month. Shown beside Duffel, not as
+a fallback. See [Aviasales Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163).
+
 Duffel requires `TRAVEL_DUFFEL_API_KEY` and
 `TRAVEL_DUFFEL_ALLOW_PAID_SEARCH=true`; test tokens are rejected by the live
 planner. The current search-to-order allowance is 1500:1, with USD 0.005 per

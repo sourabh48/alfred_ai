@@ -15,7 +15,13 @@
 - Each Google hotel card links to its prices: Google Hotels (dates are set there, because Google's date code in links
   is not public and dates in the search words break the search, checked 2026-11-13) and Booking.com with the trip's
   people, rooms and dates. The Google Travel Partner API is for hotels sending prices, not for reading them.
-- Unchanged: flights stay on Duffel (Google has no public flights API); routes and place-name lookup keep their
+- Flights (owner OK 2026-11-13): Travelpayouts / Aviasales Data API adds free recent fares (cheapest found by other
+  travellers in the last 48 h, one adult, not live) beside Duffel, as its own section, not a fallback. Free partner token
+  in Settings > Online services. Only airport codes and dates are sent; token in a header. fli (Google Flights page
+  reader) was reviewed and not adopted: it works around Google's August 2026 lock. Amadeus Self-Service closed 2026-07-17.
+- CI on 75a067e failed only at the privacy preflight: a 25-character fake key in the new test looked like a real key.
+  Fixed by a shorter fake key; the scan rule is unchanged.
+- Unchanged: Duffel live flights (Google has no public flights API); routes and place-name lookup keep their
   free-first chain; Wikivoyage guide listings stay as their own panel.
 - Evidence: tests.test_travel_google_maps 6 PASS; travel/mobility suites listed in the commit. Not checked live with a
   real Google key (the owner adds it in Settings).

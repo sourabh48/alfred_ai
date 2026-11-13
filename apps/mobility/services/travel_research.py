@@ -215,7 +215,7 @@ def run_research(run_id):
                     if selected:
                         current.itinerary["weather"] = selected["weather"]
                         current.itinerary["sources"] = selected["sources"]
-                        for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "flights_result", "trains_result", "buses_result", "discovery_result", "weather_proposals", "map", "quality", "mode_comparison", "web_research", "external_links"):
+                        for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "stays_guide_result", "flights_result", "flight_prices_result", "trains_result", "buses_result", "discovery_result", "weather_proposals", "map", "quality", "mode_comparison", "web_research", "external_links"):
                             current.itinerary[key] = selected.get(key, {})
                         current.itinerary["route"].update(distance_km_one_way=selected.get("distance_km"),hours_one_way=selected.get("travel_hours"),note=selected["distance_basis"],selected_route_id=selected.get("selected_route_id"))
                         if current.itinerary.get("edits"):

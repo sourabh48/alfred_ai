@@ -73,7 +73,7 @@ def build_multi_stop_itinerary(state, stops):
         "hours_one_way": None, "confidence": "ESTIMATED", "legs": legs, "options": [],
         "note": "User-chosen stop order; road routing is not optimized or verified. Leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km), not road routing. Travel times, road legality, closures and motorcycle access are unverified."}
     # Single-destination evidence and quotes cannot establish a multi-stop route or booking.
-    for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "stays_guide_result", "flights_result", "trains_result", "buses_result", "discovery_result", "map", "quality"):
+    for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "stays_guide_result", "flights_result", "flight_prices_result", "trains_result", "buses_result", "discovery_result", "map", "quality"):
         result[key] = {}
     for key in ("sources", "weather_proposals", "mode_comparison", "web_research", "external_links"):
         result[key] = []
@@ -167,7 +167,7 @@ def build_itinerary(state, destination):
                 "notes": "Allow more breaks with pillion/luggage. Avoid unverified shortcuts and unpaved routes; do not ride through flooded roads."}
     return {"destination": destination["name"], "origin": origin, "summary": f"{days} days in {destination['name']} with flexible activity blocks.",
         **{key:deepcopy(destination.get(key, [] if key in {"weather_proposals","mode_comparison","web_research","external_links"} else {})) for key in
-           ("route_result","weather_result","places_result","permit_result","hotels_result","stays_guide_result","flights_result","trains_result","buses_result","discovery_result","weather_proposals","map","quality","mode_comparison","web_research","external_links")},
+           ("route_result","weather_result","places_result","permit_result","hotels_result","stays_guide_result","flights_result","flight_prices_result","trains_result","buses_result","discovery_result","weather_proposals","map","quality","mode_comparison","web_research","external_links")},
         "status": "preliminary", "days": itinerary_days, "budget": budget, "weather": destination["weather"],
         "route": {"summary": f"{origin} → {destination['name']} → {origin}", "distance_km_one_way": destination.get("distance_km"),
                   "selected_route_id": destination.get("selected_route_id"),

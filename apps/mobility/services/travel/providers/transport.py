@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, timedelta
+import os
 import re
 
 from django.utils import timezone
@@ -7,6 +8,52 @@ from django.utils.dateparse import parse_datetime
 from .accommodation import DuffelProvider
 from .base import Provider, ProviderError, number, request_json
 from ..money import quoted_amount
+
+
+class TravelpayoutsFlights(Provider):
+    """Free recent fares from Aviasales' cache: the cheapest that other travellers found in the last 48 hours. Not live."""
+    name = "travelpayouts"
+    category = "flights"
+    source_url = "https://www.aviasales.com"
+    attribution = "Aviasales via Travelpayouts: fares other travellers found recently, not live; check before you book"
+    ttl = timedelta(hours=6)
+    limits = {"minute": 5, "hour": 30, "day": 100, "month": 1500}  # shortcut: ALFRED's own budget, not Travelpayouts' published limit
+    allowed_parameters = {"origin", "destination", "departure_date", "return_date"}
+
+    def unavailable_reason(self):
+        return "" if os.getenv("TRAVEL_TRAVELPAYOUTS_TOKEN") else "missing_TRAVEL_TRAVELPAYOUTS_TOKEN"
+
+    def fetch(self, p):
+        origin, destination = str(p["origin"]).upper(), str(p["destination"]).upper()
+        if not re.fullmatch(r"[A-Z]{3}", origin) or not re.fullmatch(r"[A-Z]{3}", destination) or origin == destination:
+            raise ProviderError("airport_codes_required")
+        departure = date.fromisoformat(p["departure_date"])
+        if departure < timezone.localdate():
+            raise ProviderError("invalid_departure_date")
+        # Only the route and dates are sent; the token goes in a header, never the address.
+        params = {"origin": origin, "destination": destination, "departure_at": departure.isoformat(), "currency": "inr",
+                  "sorting": "price", "direct": "false", "limit": 10, "one_way": "true"}
+        if p.get("return_date"):
+            params |= {"return_at": date.fromisoformat(p["return_date"]).isoformat(), "one_way": "false"}
+        return request_json("GET", "https://api.travelpayouts.com/aviasales/v3/prices_for_dates", params=params,
+                            headers={"X-Access-Token": os.environ["TRAVEL_TRAVELPAYOUTS_TOKEN"]})
+
+    def normalize(self, raw, p):
+        if not raw.get("success"):
+            raise ProviderError("api_error")
+        currency = str(raw.get("currency") or "inr").upper()
+        options = []
+        for item in (raw.get("data") or [])[:10]:
+            link = str(item.get("link") or "")
+            options.append({"provider": "Aviasales", "carrier": str(item.get("airline") or "")[:3],
+                "flight_number": f"{item.get('airline') or ''}{item.get('flight_number') or ''}"[:12],
+                "origin": str(item.get("origin_airport") or item.get("origin") or "")[:3],
+                "destination": str(item.get("destination_airport") or item.get("destination") or "")[:3],
+                "departure": item.get("departure_at"), "return": item.get("return_at"), "transfers": item.get("transfers"),
+                "duration": item.get("duration_to") or item.get("duration"), "fare": quoted_amount(item["price"]), "currency": currency,
+                "fare_scope": "one adult; found by other travellers in the last 48 hours and may have changed",
+                "availability": "UNKNOWN", "booking_url": f"https://www.aviasales.com{link}" if link.startswith("/search/") else None})
+        return {"options": options}
 
 
 class DuffelFlights(DuffelProvider):

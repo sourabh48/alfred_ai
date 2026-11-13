@@ -405,12 +405,11 @@ class TravelProviderUsage(APIView):
         from .services.travel.providers.geocoding import GooglePlaceSearch, OpenMeteoGeocoding
         from .services.travel.providers.weather import OpenMeteoWeather
         from .services.travel.providers.routing import GoogleRoutes, OpenRouteService, ValhallaRouting
-        from .services.travel.providers.places import OverpassPlaces
-        from .services.travel.providers.accommodation import DuffelAccommodation
-        from .services.travel.providers.transport import DuffelFlights, IndianRailProvider
+        from .services.travel.providers.places import GoogleLodging, GooglePlacesNearby
+        from .services.travel.providers.transport import DuffelFlights, IndianRailProvider, TravelpayoutsFlights
         from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations, WikivoyageStays, HotelWebsite
-        providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),ValhallaRouting(),GoogleRoutes(),GooglePlaceSearch(),OverpassPlaces(),
-                     DuffelAccommodation(),DuffelFlights(),IndianRailProvider(),BraveSearch(),
+        providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),ValhallaRouting(),GoogleRoutes(),GooglePlaceSearch(),GooglePlacesNearby(),
+                     GoogleLodging(),DuffelFlights(),TravelpayoutsFlights(),IndianRailProvider(),BraveSearch(),
                      SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations(),WikivoyageStays(),HotelWebsite()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})

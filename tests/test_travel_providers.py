@@ -24,7 +24,7 @@ from apps.mobility.services.travel.bike import bike_context
 from apps.mobility.services.travel_discovery import fact
 from apps.mobility.models import BikeProfile, BikeDocument, BikeIssueReport, BikeServiceRecord, FuelRefillLog
 from apps.mobility.services.travel.providers.accommodation import DuffelAccommodation
-from apps.mobility.services.travel.providers.transport import DuffelFlights, IndianRailProvider
+from apps.mobility.services.travel.providers.transport import DuffelFlights, IndianRailProvider, TravelpayoutsFlights
 
 
 class FakeProvider(Provider):
@@ -588,3 +588,45 @@ class TravelProviderPolicyBoundaryTests(TestCase):
         TravelProviderRequest.objects.filter(pk=event.pk).update(created_at=datetime(2026, 11, 3, 23, 30, tzinfo=zone))
         with timezone.override(zone):
             self.assertEqual(budget_status(OpenMeteoGeocoding(), now=now)["day"]["used"], 0)
+
+
+class TravelpayoutsFlightTests(TestCase):
+    """Free recent fares: off without a token, the token only in a header, and never presented as live or for the whole party."""
+    def setUp(self):
+        self.day = (timezone.localdate() + timedelta(days=20)).isoformat()
+        self.back = (timezone.localdate() + timedelta(days=24)).isoformat()
+
+    def test_off_without_a_token_and_nothing_is_sent(self):
+        with patch("apps.mobility.services.travel.providers.base.request") as sent, patch.dict("os.environ", {"TRAVEL_TRAVELPAYOUTS_TOKEN": ""}):
+            result = query(TravelpayoutsFlights(), {"origin": "BLR", "destination": "GOI", "departure_date": self.day})
+        self.assertEqual(result.error, "missing_TRAVEL_TRAVELPAYOUTS_TOKEN")
+        sent.assert_not_called()
+
+    @patch.dict("os.environ", {"TRAVEL_TRAVELPAYOUTS_TOKEN": "synthetic-tp-0000"})
+    def test_route_and_dates_only_are_sent_and_fares_stay_one_adult_and_not_live(self):
+        raw = {"success": True, "currency": "inr", "data": [{"origin": "BLR", "destination": "GOI", "origin_airport": "BLR",
+               "destination_airport": "GOI", "price": 3499, "airline": "6E", "flight_number": "123", "departure_at": self.day + "T06:00:00+05:30",
+               "return_at": self.back + "T20:00:00+05:30", "transfers": 0, "duration_to": 75, "link": "/search/BLR0112GOI1?t=x"}]}
+        response = Mock(response_hash="h"); response.json.return_value = raw
+        with patch("apps.mobility.services.travel.providers.base.request", return_value=response) as sent:
+            result = query(TravelpayoutsFlights(), {"origin": "blr", "destination": "GOI", "departure_date": self.day, "return_date": self.back, "adults": 4})
+        self.assertTrue(result.success, result.error)
+        option = result.payload["options"][0]
+        self.assertEqual((option["fare"], option["currency"], option["flight_number"], option["availability"]), ("3499", "INR", "6E123", "UNKNOWN"))
+        self.assertIn("one adult", option["fare_scope"])
+        self.assertEqual(option["booking_url"], "https://www.aviasales.com/search/BLR0112GOI1?t=x")
+        args, kwargs = sent.call_args
+        self.assertEqual(kwargs["headers"], {"X-Access-Token": "synthetic-tp-0000"})
+        self.assertNotIn("synthetic-tp", args[1] + str(kwargs["params"]))
+        self.assertEqual(set(kwargs["params"]), {"origin", "destination", "departure_at", "return_at", "currency", "sorting", "direct", "limit", "one_way"})
+        self.assertEqual((kwargs["params"]["origin"], kwargs["params"]["one_way"]), ("BLR", "false"))
+
+    @patch.dict("os.environ", {"TRAVEL_TRAVELPAYOUTS_TOKEN": "synthetic-tp-0000"})
+    def test_bad_input_or_a_refused_answer_gives_no_fares(self):
+        with patch("apps.mobility.services.travel.providers.base.request", side_effect=AssertionError("no call")):
+            for p in ({"origin": "Bangalore", "destination": "GOI", "departure_date": self.day},
+                      {"origin": "BLR", "destination": "GOI", "departure_date": "2020-01-01"}):
+                self.assertFalse(query(TravelpayoutsFlights(), p).success)
+        with self.assertRaises(ProviderError):
+            TravelpayoutsFlights().normalize({"success": False, "data": {}, "error": "token"}, {})
+        self.assertIsNone(TravelpayoutsFlights().normalize({"success": True, "data": [{"price": 1, "link": "https://evil.example"}]}, {})["options"][0]["booking_url"])

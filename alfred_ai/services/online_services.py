@@ -23,6 +23,8 @@ KEYS = {
                            "https://openrouteservice.org/dev/#/signup"),
     "TRAVEL_BRAVE_API_KEY": ("Brave Search", "Travel: web search for places, with your OK for paid searches below.",
                              "https://brave.com/search/api/"),
+    "TRAVEL_TRAVELPAYOUTS_TOKEN": ("Travelpayouts (Aviasales)", "Travel: free flight prices other travellers found recently (not live). Free partner sign-up; the token is under Profile > API token.",
+                                   "https://www.travelpayouts.com/"),
     "TRAVEL_DUFFEL_API_KEY": ("Duffel", "Travel: flight prices, with your OK for paid searches below.", "https://app.duffel.com/join"),
     "TRAVEL_OPEN_METEO_API_KEY": ("Open-Meteo (commercial)", "Travel: weather and place names. Not needed for personal use.",
                                   "https://open-meteo.com/en/pricing"),
