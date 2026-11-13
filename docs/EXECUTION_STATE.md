@@ -19,7 +19,10 @@
   and page index, and every upload place points to Documents.
 - Not done: net worth still lives on Spending and accounts (Home links to it); the Expenses statement upload stays
   as a shortcut beside the Documents hub; long pages are indexed, not split.
-- Next: owner OK to push the local commits; then read the exact-HEAD CI run.
+- Pushed with the owner's OK as master f2c1227 (fast-forward from 52c6f7a). CI run 43391069605 on that exact
+  commit: every job PASS (four backend shards, native, three Selenium shards, Linux). CI_PASSED is not owner
+  acceptance of the UI.
+- Next: owner review of the UI in the app; legal pages, installer signing and the 58 open IDs stay owner gates.
 
 ## Final-development audit and "fix all" follow-ups - 2026-11-13
 
