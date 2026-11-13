@@ -1,5 +1,18 @@
 # ALFRED execution state
 
+## Ask ALFRED online lookup - 2026-11-13
+
+- Owner request: "the local ai is useless... allow the ollama and open ai to get data from online".
+- 8f08f44 (local, not pushed): an opt-in "Look this up online" tick box for general questions. Only the question
+  text goes to Wikipedia's search API and the Google News RSS feed (free, uncached); questions with amounts, long
+  digit runs, emails, keys or ID words are refused before any request. Results go to the local model, or to
+  OpenAI when the owner ticks it (now answers first instead of only after a local failure). Answers cite [web-N]
+  with links; a figure stays visible only when a cited result shows it. Confidentiality unchanged: no records,
+  memories or history are sent; OpenAI still gets only the public-query payload plus the web results.
+- OpenAI limits: 1024 output tokens (was 512), 20 s (was 5 s), server ceiling 65536 tokens and US$1 a day to
+  match the Settings form (was 4096 tokens and US$0.01); the owner's own Settings budget still applies.
+- Evidence: tests.test_assistant_web_lookup 8 PASS; live Wikipedia and Google News lookups returned results.
+
 ## Newcomer UI pass - 2026-11-13
 
 - Owner request: make the UI simple for a newcomer, fix data shown in the wrong place, redesign where needed.
