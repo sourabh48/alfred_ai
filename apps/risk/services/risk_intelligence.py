@@ -105,10 +105,8 @@ class RiskIntelligenceService:
         if role:
             # Only the generic role goes to the news search; the company of a job you analyzed stays on this PC (owner decision).
             career_market = job_intelligence.market_outlook(role, "")
-        else:  # No role recorded: news for a guessed role would score someone else's job market.
-            macro_context = verified_intelligence.macro_context()
-            career_market = {"risk_score": 0.0, "layoff_news": [], "job_market_news": [], "insights": [],
-                             "macro_context": macro_context["payload"], "evidence": macro_context["evidence"]}
+        else:
+            career_market = job_intelligence.market_without_role(verified_intelligence.macro_context())
         macro = career_market["macro_context"]
 
         unemployment = macro["unemployment"].get("latest_value") or 0

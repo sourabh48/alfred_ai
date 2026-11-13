@@ -484,6 +484,12 @@ class JobIntelligenceService:
             "gaps": gaps[:4],
         }
 
+    def market_without_role(self, macro: dict | None = None) -> dict:
+        """No job role recorded: news for a guessed role would describe someone else's market, so search and score nothing."""
+        macro = macro or verified_intelligence.macro_context()
+        return {"risk_score": 0.0, "layoff_news": [], "job_market_news": [], "macro_context": macro["payload"],
+                "insights": ["Add your job role in Career to see job-market news for it."], "evidence": list(macro["evidence"])}
+
     def market_outlook(self, role: str, company: str = "", macro: dict | None = None) -> dict:
         macro = macro or verified_intelligence.macro_context()
         layoff_news = self._news_search(f'("{role}" OR technology) layoffs India OR "job cuts"')

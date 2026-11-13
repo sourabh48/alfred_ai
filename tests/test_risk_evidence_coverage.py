@@ -97,6 +97,17 @@ class RiskEvidenceCoverageTests(TestCase):
         self.assertEqual(result["summary"]["highest_label"], "No data")
         self.assertEqual(result["related_news"], [])
 
+    def test_career_page_without_a_role_searches_no_news_and_no_guessed_role(self):
+        self.client.force_login(self.user)
+        macro = {"payload": market_payload()["macro_context"], "evidence": []}
+        empty = {"openings": [], "evidence": {}, "source_evidence": [], "source_coverage": {}}
+        with patch("apps.career.views.verified_intelligence.macro_context", return_value=macro),                 patch("apps.career.views.job_intelligence.market_outlook") as outlook,                 patch("apps.career.views.job_intelligence.suggest_openings", return_value=empty) as openings:
+            response = self.client.get("/api/career/dashboard/")
+        self.assertEqual(response.status_code, 200, response.content[:300])
+        outlook.assert_not_called()
+        self.assertEqual(openings.call_args.args[0], "")
+        self.assertEqual(response.json()["market"]["risk_score"], 0.0)
+
     def test_all_insufficient_summary_abstains(self):
         with patch("apps.risk.services.risk_intelligence._category_coverage",
                    return_value={"status": "insufficient_data", "available_inputs": [], "missing_inputs": ["x"]}):

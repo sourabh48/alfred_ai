@@ -77,7 +77,7 @@ def _study_recommendations_payload(profile, latest_resume=None, latest_analysis=
 
 
 def _compensation_benchmark_payload(user, profile, *, openings=None, openings_evidence=None, latest_analysis=None, latest_resume=None, income_signals: dict | None = None, country: str = "", state: str = "") -> dict:
-    role = profile.role if profile.role and profile.role != "Profile pending" else ((latest_resume.extracted_payload.get("role", "") if latest_resume else "") or "analyst")
+    role = profile.role if profile.role and profile.role != "Profile pending" else (latest_resume.extracted_payload.get("role", "") if latest_resume else "")
     filter_location = ", ".join(part for part in [state, country] if part)
     location = filter_location or getattr(user, "city", "") or getattr(latest_analysis, "location", "")
     resolved_income_signals = income_signals or build_employment_income_signals(user=user, latest_resume=latest_resume, profile=profile)
@@ -917,8 +917,8 @@ def career_projection(request):
         income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
         projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume, income_signals=income_signals)
         latest_analysis = CareerJobAnalysis.objects.filter(user=request.user).order_by("-created_at", "-id").first()
-        role = profile.role if profile.role and profile.role != "Profile pending" else "analyst"
-        market = job_intelligence.market_outlook(role, macro=macro)
+        role = profile.role if profile.role and profile.role != "Profile pending" else ""
+        market = job_intelligence.market_outlook(role, macro=macro) if role else job_intelligence.market_without_role(macro)
         return Response(
             {
                 **projection,
@@ -960,11 +960,11 @@ def _career_dashboard_payload(request) -> dict:
     income_signals = build_employment_income_signals(user=request.user, latest_resume=latest_resume, profile=profile)
     country, state = _opening_filter_params(request)
     projection = _career_projection_payload(request.user, profile, macro=macro, latest_resume=latest_resume, income_signals=income_signals)
-    role = profile.role if profile.role and profile.role != "Profile pending" else ((latest_resume.extracted_payload.get("role", "") if latest_resume else "") or "analyst")
+    role = profile.role if profile.role and profile.role != "Profile pending" else (latest_resume.extracted_payload.get("role", "") if latest_resume else "")
     # Uploads merge resume skills into the profile, so the owner's saved list is the configured search.
     skills = _resume_payload_from_profile(profile)["skills"] or (latest_resume.extracted_payload.get("skills", []) if latest_resume else [])
-    market = job_intelligence.market_outlook(role, macro=macro)
-    openings = job_intelligence.suggest_openings(role, skills, country=country, state=state)
+    market = job_intelligence.market_outlook(role, macro=macro) if role else job_intelligence.market_without_role(macro)
+    openings = job_intelligence.suggest_openings(role, skills, country=country, state=state)  # with no role, your skills alone
     career_timing = _career_timing_payload(request.user, profile, market, latest_analysis, latest_resume=latest_resume, income_signals=income_signals)
     study_recommendations = _study_recommendations_payload(profile, latest_resume, latest_analysis, openings["openings"])
     data_pipeline = _career_data_pipeline_payload(profile, latest_resume, latest_analysis, projection, market, career_timing)
