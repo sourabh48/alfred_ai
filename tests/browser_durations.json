@@ -46,6 +46,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_data_sources_owned_counts_and_navigation": 4.265,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_research_journal_saves_settles_and_recalls_a_lesson_without_touching_holdings":  8.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_research_packet_shows_dated_case_for_and_against_without_writing":  6.0,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_online_services_are_switched_on_from_settings_without_editing_files": 14.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_personal_challenger_needs_consent_and_keeps_the_owners_view_out_of_the_public_analyst": 11.48,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_fund_look_through_reads_uploaded_portfolio_files_without_saving": 10.41,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_fund_look_through_saves_reuses_and_removes_parsed_portfolios": 12.0,

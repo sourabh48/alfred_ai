@@ -2687,7 +2687,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#memorySyncNow')
         self.wait.until(lambda _: 'Revision 1;' in self.text('memorySyncStatus'))
         self.memory_click('#memoryReasoningEnabled')
-        tokens=self.browser.find_element(self.By.ID,'memoryReasoningTokens'); tokens.clear(); tokens.send_keys('2000')
+        tokens=self.browser.find_element(self.By.ID,'memoryReasoningTokens'); tokens.clear(); tokens.send_keys('4000')  # two answers, each reserving up to 1024 output tokens
         dollars=self.browser.find_element(self.By.ID,'memoryReasoningDollars'); dollars.clear(); dollars.send_keys('0.005')
         self.memory_click('#memoryReasoningForm button')
         self.wait.until(lambda _: 'Reasoning policy saved.' in self.text('memoryCloudFeedback'))

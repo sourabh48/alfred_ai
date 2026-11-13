@@ -28,8 +28,12 @@
 - Evidence: tests.test_research_packet (incl. new BeginnerTests) and journal/abuse suites 42 PASS; 5 research
   browser tests PASS; live: "Tata Motors" found its NSE symbols, INFY.NS lean "Looks healthy" (5 good, 2
   warning), qwen3.5:4b risk manager returned three number-free points.
-- Known local-only: test_financial_document_questions_stale_outage_retry_and_no_history and
-  test_settings_sync_consent_budgets_and_explicit_public_mock_fallback fail on this PC at f2c1227 too (CI passed).
+- Known local-only: test_financial_document_questions_stale_outage_retry_and_no_history fails on this PC at
+  f2c1227 too (CI passed it there).
+- CI on 4d8e11f (run 43406188240): selenium shard 1 failed. Cause found locally:
+  test_settings_sync_consent_budgets_and_explicit_public_mock_fallback set a 2000-token OpenAI day budget and asks
+  twice; each answer now reserves up to 1024 output tokens (was 512), so the second was refused as over budget.
+  The test now sets 4000; the budget behaviour itself is intended.
 
 ## Ask ALFRED online lookup - 2026-11-13
 
