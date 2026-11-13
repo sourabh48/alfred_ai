@@ -5,10 +5,16 @@
 <section class="alfred-hero fade-in" id="accountSettingsRoot">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
-            <div class="alfred-chip mb-3">Account and family context</div>
             <h1 class="alfred-hero-title">Settings</h1>
-            <a href="{% url 'diagnostics' %}" class="btn btn-outline-secondary">Application diagnostics</a>
-            <p class="alfred-hero-copy">Update your profile and connect family members using a link code.</p>
+            <p class="alfred-hero-copy">Your details, family sharing, travel style, AI memory and your data.</p>
+            <nav aria-label="On this page" class="settings-index">
+                <a href="#settingsProfile">Your details and income</a>
+                <a href="#settingsFamily">Family sharing</a>
+                <a href="#travelPreferences">Travel style</a>
+                <a href="#privateMemoryPanel">AI memory</a>
+                <a href="#settingsAccountData">Delete my data</a>
+                <a href="{% url 'diagnostics' %}">App health</a>
+            </nav>
         </div>
         <div class="surface-card" style="min-width: 260px;">
             <p class="metric-kicker">Connected Members</p>
@@ -18,12 +24,12 @@
     </div>
 </section>
 
-<section class="row g-4 mb-4">
+<section class="row g-4 mb-4" id="settingsProfile">
     <div class="col-xl-7">
         <div class="surface-card h-100">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                 <div>
-                    <h2 class="page-section-title mb-1">User Information</h2>
+                    <h2 class="page-section-title mb-1">Your details and income</h2>
                     <p class="page-section-copy mb-0">Signed in as <strong id="settingsUsername">{{ request.user.username }}</strong></p>
                 </div>
                 <span class="status-pill status-stable" id="settingsProfileStatus">Ready</span>
@@ -117,11 +123,11 @@
         </div>
     </div>
 
-    <div class="col-xl-5">
+    <div class="col-xl-5" id="settingsFamily">
         <div class="surface-card h-100">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                 <div>
-                    <h2 class="page-section-title mb-1">Connect an Account</h2>
+                    <h2 class="page-section-title mb-1">Family sharing</h2>
                     <p class="page-section-copy mb-0">Share a link code with a family member, or enter their code below. Codes expire in 24 hours.</p>
                 </div>
                 <span class="status-pill status-guarded" id="settingsLinkStatus">Private</span>
@@ -154,7 +160,7 @@
 </section>
 
 <section class="surface-card mb-4">
-    <h2 class="page-section-title mb-1">Connected Members</h2>
+    <h2 class="page-section-title mb-1">Connected family members</h2>
     <p class="page-section-copy mb-3">Members appear here once a link code has been accepted.</p>
     <p class="page-section-copy">Connecting an account does not share finances. Each person must choose to share their own financial summary with each member. Existing financial sharing is turned off until you choose again; your connections remain. You can stop sharing at any time.</p>
     <div class="data-stack" id="settingsLinkedAccountsList" aria-live="polite"></div>
@@ -162,8 +168,8 @@
 
 {% include "mobility/preferences.html" %}
 {% include "settings/memory.html" %}
-<section class="surface-card">
-    <h2 class="page-section-title mb-1">Account Data</h2>
+<section class="surface-card" id="settingsAccountData">
+    <h2 class="page-section-title mb-1">Delete my data</h2>
     <p class="page-section-copy mb-3">Remove your saved Alfred data and uploaded documents to start fresh. Your account stays active. This cannot be undone.</p>
     <button id="settingsClearDataBtn" type="button" class="btn btn-outline-danger">{{ ui_config.navigation.remove_data_label }}</button>
 </section>
