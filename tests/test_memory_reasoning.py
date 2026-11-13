@@ -10,7 +10,7 @@ from django.core.management import call_command, CommandError
 from django.test import TestCase, override_settings, Client
 
 from alfred_ai.services.public_http import PublicResponse
-from apps.ml_engine.services.memory_reasoning import OpenAIReasoner, MODEL, ReasoningBudgetExceeded, configure_reasoning, reason_with_memory, reasoning_provider, remove_key
+from apps.ml_engine.services.memory_reasoning import CLOUD_OUTPUT_TOKENS, OpenAIReasoner, MODEL, ReasoningBudgetExceeded, configure_reasoning, reason_with_memory, reasoning_provider, remove_key
 from apps.ml_engine.services.memory_sync import SyncUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
 from tests.test_persistent_memory import SyntheticEmbeddings
@@ -76,7 +76,7 @@ class MemoryReasoningTests(TestCase):
         self.assertEqual((method,url),('POST','https://api.openai.com/v1/responses'))
         self.assertFalse(body['store']); self.assertFalse(body['background']); self.assertEqual(body['tools'],[]); self.assertEqual(body['tool_choice'],'none')
         self.assertEqual(body['service_tier'],'default')
-        self.assertEqual(body['max_output_tokens'],512); self.assertEqual(options['max_bytes'],65536)
+        self.assertEqual(body['max_output_tokens'],CLOUD_OUTPUT_TOKENS); self.assertEqual(options['max_bytes'],65536)
         self.assertNotIn('PROVENANCE',str(body)); self.assertNotIn(self.owner,str(body)); self.assertNotIn(KEY,str(body))
         self.assertEqual(result['classification'],'ai_generated_hypothesis'); self.assertFalse(result['financial_authority'])
         self.assertGreater(result['reserved_microusd'],0)
@@ -96,7 +96,7 @@ class MemoryReasoningTests(TestCase):
         self.http.assert_not_called()
 
     def test_spending_cap_reserved_before_call_and_survives_failure_reset_restart(self):
-        cost=self.provider.budget({'query':'mountain','memories':[]},512)[1]
+        cost=self.provider.budget({'query':'mountain','memories':[]},CLOUD_OUTPUT_TOKENS)[1]
         configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=4096,daily_microusd=cost)
         self.http.side_effect=OSError('SYNTHETIC-SECRET-PATH-F:/private')
         with self.assertRaises(SyncUnavailable) as failure: self.reason()
@@ -116,19 +116,19 @@ class MemoryReasoningTests(TestCase):
 
     def test_corrupt_usage_models_tools_and_oversized_answers_fail_safely(self):
         with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=65536):
-            configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=65536,daily_microusd=10000)
+            configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=65536,daily_microusd=100000)
         original=self.response().json()
-        changes=({'model':'different-model'},{'service_tier':'priority'},{'status':'incomplete'},{'usage':{'input_tokens':1,'output_tokens':513,'total_tokens':514}},
+        changes=({'model':'different-model'},{'service_tier':'priority'},{'status':'incomplete'},{'usage':{'input_tokens':1,'output_tokens':CLOUD_OUTPUT_TOKENS+1,'total_tokens':CLOUD_OUTPUT_TOKENS+2}},
             {'usage':{'input_tokens':True,'output_tokens':1,'total_tokens':2}}, {'output':[{'type':'function_call'}]},
-            {'output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':'x'*8193}]}]})
+            {'output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':'x'*16385}]}]})
         for change in changes:
             with self.subTest(change=list(change)):
                 self.http.side_effect=None; self.http.return_value=PublicResponse(json.dumps(original|change).encode(),'application/json')
-                with self.assertRaises(SyncUnavailable): self.reason(daily_tokens=65536)
+                with self.assertRaises(SyncUnavailable): self.reason(daily_tokens=65536,daily_microusd=1000000)
 
     def test_concurrent_requests_share_atomic_spending_reservations(self):
         from concurrent.futures import ThreadPoolExecutor
-        cost=self.provider.budget({'query':'mountain','memories':[]},512)[1]
+        cost=self.provider.budget({'query':'mountain','memories':[]},CLOUD_OUTPUT_TOKENS)[1]
         configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=4096,daily_microusd=cost)
         def attempt():
             try: self.reason(); return 'success'

@@ -66,6 +66,11 @@ class MemoryAPI(APIView):
             now=datetime.now(timezone.utc)
             response['Retry-After']=str(86400-now.hour*3600-now.minute*60-now.second)
             return response
+        from apps.ml_engine.services.web_lookup import PrivateQuestion, PRIVATE_MESSAGE
+        if isinstance(exc, PrivateQuestion):
+            response = safe_error_response(exc, PRIVATE_MESSAGE, logger_name=__name__)
+            response.data['code'] = 'private_question'
+            return response
         if isinstance(exc, (ValueError, PermissionError)):
             return safe_error_response(exc, 'Memory request is invalid or not permitted.', logger_name=__name__)
         # DRF authentication/CSRF/HTTP errors retain their status and handling.

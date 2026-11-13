@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const statementChoice = document.getElementById("intelligenceStatement");
     const financialChoice = document.getElementById("intelligenceFinancial");
     const consent = document.getElementById("intelligenceCloudConsent");
+    const webSearch = document.getElementById("intelligenceWebSearch");
     const feedback = document.getElementById("intelligenceFeedback");
     const answers = document.getElementById("intelligenceAnswers");
     const memoryText = document.getElementById("intelligenceMemoryText");
@@ -404,6 +405,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ensureSources();
         if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
         consent.disabled = scope.value !== "general" || !cloudAvailable || !historyPolicy || historyEnabled();
+        if (scope.value !== "general") webSearch.checked = false;
+        webSearch.disabled = scope.value !== "general";
     }
     async function refreshControls() {
         const ticket = generation;
@@ -502,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
         const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
         const label = document.createElement("span"); label.className = "conversation-label";
-        label.textContent = result.grounding === "canonical_record_overview" ? "Recorded sources · AI unavailable" : result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : "Approved cloud"}`;
+        label.textContent = result.grounding === "canonical_record_overview" ? "Recorded sources · AI unavailable" : result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : result.provider === "openai" ? "OpenAI (your key)" : "Approved cloud"}`;
         const answer = result.provider !== 'local_evidence' && !result.narrative_withheld
             ? Alfred.renderAnswerMarkdown(result.answer) : document.createElement('p');
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
@@ -515,13 +518,16 @@ document.addEventListener("DOMContentLoaded", () => {
         (result.sources || []).forEach(source => {
             const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
             evidence.append(reference);
-            const types = {owner_reviewed_document_record:"Owner-reviewed document fields · not independent authentication", owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records (currency-limited)", canonical_record:"Canonical stored record · not independent authentication", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required"};
+            const types = {owner_reviewed_document_record:"Owner-reviewed document fields · not independent authentication", owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records (currency-limited)", canonical_record:"Canonical stored record · not independent authentication", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required", public_web_result:"Public web result · not checked by ALFRED"};
             const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
             if (historical) description.textContent = "Saved reference only; current existence and verification have not been checked.";
             if (!historical && source.source_file_status === "not_retained") {
                 const note = document.createElement("p"); note.textContent = "Verified metadata record only; original source file is not retained. This does not prove independent bank authenticity."; evidence.append(note);
             }
-            if (safeCitation(source.url)) {
+            if (source.classification === "public_web_result" && /^https:\/\//.test(source.url || "")) {
+                const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer nofollow";
+                link.textContent = `${source.data?.title || "Open result"} (${source.data?.source || "web"})`; evidence.append(link);
+            } else if (safeCitation(source.url)) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
             if (!historical) (source.data?.document_sources || []).forEach(item => {
@@ -766,6 +772,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
         button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
+        if (consent.checked) payload.provider = "openai";
+        if (webSearch.checked && scope.value === "general") payload.web_search = true;
         if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && pageDialogue.length) payload.page_context = pageDialogue;
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);
@@ -798,6 +806,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const fingerprint = JSON.stringify(payload);
                 if (requestToken?.fingerprint !== fingerprint) requestToken = {fingerprint, id:crypto.randomUUID().replaceAll("-", "")};
                 Object.assign(payload, {cloud_consent:false, conversation_id:conversation.id, conversation_revision:conversation.revision, request_id:requestToken.id});
+                delete payload.provider;
             }
             const result = ['general','finance','financial_records','bank_statements','documents','travel'].includes(payload.scope) && !payload.cloud_consent && window.ReadableStream && window.AbortController
                 ? await streamAnswer(payload,ticket)

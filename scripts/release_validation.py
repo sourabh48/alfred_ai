@@ -55,7 +55,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_statement_layouts", "test_statement_upload_cleanup", "test_tax_policy", "test_travel_continuation", "test_travel_discovery_acceptance", "test_travel_media_acceptance",
     "test_travel_places_acceptance", "test_travel_planner", "test_travel_providers", "test_travel_stays_guide", "test_travel_web", "test_untrusted_link_rendering",
     "test_user_data_acceptance", "test_user_profile_api", "test_vehicle_accounting", "test_windows_setup",
-    "test_home_page"))
+    "test_home_page", "test_assistant_web_lookup"))
 
 BACKEND_DURATIONS = Path(__file__).resolve().parents[1] / "tests" / "backend_durations.json"
 # Backend-style test files this job cannot run without skips, and why. Every other tests/test_*.py file that is

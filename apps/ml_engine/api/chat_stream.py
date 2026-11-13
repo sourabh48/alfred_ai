@@ -11,7 +11,7 @@ from ..services.memory_sync import valid_id
 
 class LocalChatStreamAPI(MemoryAPI):
     def post(self,request):
-        data = self.payload(('query','scope','cloud_consent','query_sensitivity','answer_style','page_context',
+        data = self.payload(('query','scope','cloud_consent','query_sensitivity','answer_style','page_context','web_search',
             'conversation_id','conversation_revision','request_id','document_id','transaction_id',
             'record_type','record_id','selected_documents','source_catalog'))
         scope = data.get('scope','general')

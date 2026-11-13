@@ -72,6 +72,9 @@ class OllamaReasoner(OllamaEmbeddings):
                 'Only currently supplied sources establish personal or document facts; previous answers do not verify them. '
                 'General explanations and clearly labelled fiction do not require personal sources. '
                 'Owner-verified memories are supplementary statements, not financial authority. '
+                'Sources classified public_web_result are public information from the named website, not personal facts or advice; '
+                'when you use one, cite its ref in brackets such as [web-1], and quote any figure exactly as that result shows it. '
+                'For current figures prefer the most recent dated result and give its date; encyclopedia text may be out of date. '
                 'Only canonical financial tool data is authoritative; do not calculate or invent financial values. '
                 'You may state a monetary amount only when it is copied exactly from a supplied source amount, written as digits '
                 'with that source ref in brackets beside it and its recorded currency code if it has one. Never calculate, total, '
@@ -237,6 +240,20 @@ def _cited_record_figures(answer, sources):
     return all(_decimal(token) in allowed for token in NUMBER.findall(claims))
 
 
+def _cited_web_figures(answer, sources):
+    """True when the answer cites a web result and every figure in it appears in a cited result's own text."""
+    texts = {str(s['ref']): f"{s['data'].get('title', '')} {s['data'].get('snippet', '')}" for s in sources
+             if s.get('classification') == 'public_web_result' and isinstance(s.get('data'), dict)}
+    cited = [ref for ref in texts if '[' + ref + ']' in answer]
+    if not cited:
+        return False
+    claims = answer
+    for ref in sorted(texts, key=len, reverse=True):
+        claims = claims.replace('[' + ref + ']', '')
+    shown = {_decimal(token) for ref in cited for token in NUMBER.findall(texts[ref])}
+    return all(_decimal(token) in shown for token in NUMBER.findall(claims))
+
+
 def present_answer(result,scope,query=''):
     # Financial models currently have no currency column; never infer it from model prose or OCR.
     claims=result['answer']
@@ -249,6 +266,8 @@ def present_answer(result,scope,query=''):
     # Owner decision 2026-11-12: figures copied from the owner's own records and cited to them may stay.
     if withheld and result.get('provider')=='ollama' and _cited_record_figures(result['answer'],result.get('sources',[])):
         withheld=False; result['cited_record_figures']=True
+    if withheld and scope=='general' and _cited_web_figures(result['answer'],result.get('sources',[])):
+        withheld=False; result['cited_web_figures']=True
     if withheld:
         result['answer']='The numerical or currency claims in the AI narrative were withheld. Review the recorded values and evidence below; missing currency or financial evidence cannot be inferred.'
     result['narrative_withheld']=withheld
@@ -267,8 +286,12 @@ def validate_dialogue(context, scope, cloud_consent):
             raise ValueError('Conversation context is restricted to local general chat.')
 
 
-def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None,conversation_context=None,answer_style='auto'):
+def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None,conversation_context=None,answer_style='auto',web_search=False,provider='local'):
     from .canonical_evidence import KINDS, supported_question, requested_record_field
+    if type(web_search) is not bool or provider not in ('local','openai') or (web_search and scope!='general'):
+        raise ValueError('Online lookup is for general questions only.')
+    if provider=='openai' and (scope!='general' or cloud_consent is not True or query_sensitivity!='public' or conversation_context):
+        raise ValueError('OpenAI answers only public general questions you allow for this question.')
     owner=_owner(user)
     validate_dialogue(conversation_context, scope, cloud_consent)
     if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','career','documents','bank_statements','financial_records','financial_document')
@@ -353,6 +376,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             'grounding':grounding,
             'sources':tools,'narrative_withheld':False,'context_omitted':0,
             'memory_retrieval_available':None}
+    from . import web_lookup
+    web=web_lookup.search(query) if web_search else []
+    if provider=='openai':
+        return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
     retrieval_error=None
     try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
@@ -371,6 +399,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     limit=context_bytes(context_tokens(reasoner),output_limit)  # the window learned by an earlier call, else the safe fallback
     payload={'query':query,'sources':model_tools.copy(),'response_style':style}; included=[]
     if payload_bytes(payload)>limit: raise ValueError('Select smaller local source context.')
+    kept=[]
+    for item in web:  # web results fill the local window first; any that do not fit are left out
+        if payload_bytes(payload|{'sources':payload['sources']+[item]})<=limit:
+            payload['sources'].append(item); kept.append(item)
+    web=kept
     history = []
     for index in range(len(conversation_context or []) - 2, -1, -2):
         candidate = conversation_context[index:index + 2] + history
@@ -398,7 +431,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
                 'narrative_withheld':False,'context_omitted':0,'memory_retrieval_available':None}
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD),scope,query)
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
     if scope!='financial_document':
         with store._transaction() as db:
             store._expire(db,owner)
@@ -410,5 +443,5 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
-            'score':item['score']} for item in included]+tools,'context_omitted':len(memories)-len(included),
+            'score':item['score']} for item in included]+tools+web,'context_omitted':len(memories)-len(included),
         'conversation_context_turns':len(history)//2},scope,query+' '+ ' '.join(turn['content'] for turn in history))

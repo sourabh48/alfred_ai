@@ -78,7 +78,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
 
     def post(self,request):
         data=self.payload(('query','scope','document_id','transaction_id','record_type','record_id','selected_documents','source_catalog','selected_records','cloud_consent','query_sensitivity',
-                           'conversation_id','conversation_revision','request_id','answer_style','page_context'))
+                           'conversation_id','conversation_revision','request_id','answer_style','page_context','web_search','provider'))
         return self.answer(request, data)
 
     def answer(self, request, data, *, stream=None):
@@ -109,6 +109,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
             history = ConversationHistory(store)
             question = dict(query=data.get('query'), scope=data.get('scope','general'), document_id=data.get('document_id'))
             if data.get('answer_style', 'auto') != 'auto': question['answer_style'] = data['answer_style']
+            if data.get('web_search', False) is not False: question['web_search'] = data['web_search']
             if 'transaction_id' in data: question['transaction_id']=data['transaction_id']
             for key in ('record_type','record_id','selected_documents','source_catalog'):
                 if key in data: question[key]=data[key]
@@ -128,7 +129,7 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 document_id=data.get('document_id'),transaction_id=data.get('transaction_id'),record_type=data.get('record_type'),record_id=data.get('record_id'),
                 selected_documents=data.get('selected_documents'),source_catalog=data.get('source_catalog'),selected_records=data.get('selected_records'),cloud_consent=data.get('cloud_consent',False),
                 query_sensitivity=data.get('query_sensitivity','sensitive'), conversation_context=conversation_context,
-                answer_style=data.get('answer_style','auto'), **local)
+                answer_style=data.get('answer_style','auto'), web_search=data.get('web_search',False), provider=data.get('provider','local'), **local)
         finally:
             if page_only_question: current_session(request)
         if identity is not None:
