@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LogoutView
 from django.views.generic import RedirectView
 from .native_views import private_media
 from .diagnostics_views import diagnostics_view
@@ -40,6 +40,9 @@ from .views import (
     project_details_view,
     project_details_api_view,
     signup_view,
+    social_start_view,
+    social_callback_view,
+    AlfredLoginView,
 )
 
 from apps.career.views import career_tailored_cv_print
@@ -53,16 +56,9 @@ urlpatterns = [
     path("favicon.ico", RedirectView.as_view(url="/static/favicon.svg", permanent=True)),
     path("", index_view, name="index"),
     path("signup/", signup_view, name="signup"),
-    path(
-        "login/",
-        LoginView.as_view(
-            extra_context={
-                "hide_sidebar": True,
-                "hide_nav_auth_actions": True,
-            }
-        ),
-        name="login",
-    ),
+    path("login/", AlfredLoginView.as_view(), name="login"),
+    path("auth/<str:provider>/start/", social_start_view, name="social_start"),
+    path("auth/<str:provider>/callback/", social_callback_view, name="social_callback"),
     path("signin/", RedirectView.as_view(pattern_name="login", permanent=False), name="signin"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("accounts/login/", RedirectView.as_view(pattern_name="login", permanent=False)),

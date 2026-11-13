@@ -85,3 +85,16 @@ class UserMoneySnapshot(models.Model):
     policy = models.CharField(max_length=30, default="user-money-v1")
     applied_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class EmailIdentity(models.Model):
+    """An email address that Google, GitHub or Microsoft confirmed belongs to this person at sign-in."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_identities")
+    provider = models.CharField(max_length=16)
+    subject = models.CharField(max_length=255)  # the provider's own id for the account; an email can change, this cannot
+    email = models.EmailField()
+    verified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "users"
+        constraints = [models.UniqueConstraint(fields=["provider", "subject"], name="users_email_identity_provider_subject")]

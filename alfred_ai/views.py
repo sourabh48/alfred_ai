@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.views import LoginView
 from django.shortcuts import render
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
@@ -262,11 +263,13 @@ def data_version_api_view(request):
 
 
 def signup_view(request):
+    from .services import social_login
     if request.user.is_authenticated:
         return redirect("index")
 
+    password_open = social_login.password_signup_open()  # once a provider is set up, new accounts need a verified email
     form = AlfredSignUpForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
+    if request.method == "POST" and password_open and form.is_valid():
         user = form.save()
         login(request, user)
         return redirect("index")
@@ -278,8 +281,59 @@ def signup_view(request):
             "form": form,
             "hide_sidebar": True,
             "hide_nav_auth_actions": True,
+            "password_signup_open": password_open,
+            **_sign_in_context(request),
         },
+        status=403 if request.method == "POST" and not password_open else 200,
     )
+
+
+def _sign_in_context(request, next_url=""):
+    from .services import social_login
+    return {"sign_in_providers": social_login.configured(), "sign_in_error": request.session.pop("alfred_sign_in_error", ""),
+            "next": next_url}
+
+
+def _safe_next(request, value):
+    from django.utils.http import url_has_allowed_host_and_scheme
+    return value if value and url_has_allowed_host_and_scheme(value, {request.get_host()}, request.is_secure()) else "/"
+
+
+@require_http_methods(["GET"])
+def social_start_view(request, provider):
+    from .services import social_login
+    connect = request.user.is_authenticated and request.GET.get("connect") == "1"
+    back = "/settings/#settingsSignIn" if connect else "/login/"
+    try:
+        url = social_login.start(request.session, provider, request.build_absolute_uri(social_login.callback_path(provider)),
+                                 _safe_next(request, request.GET.get("next")), connect)
+    except social_login.SignInError as exc:
+        request.session["alfred_sign_in_error"] = str(exc)
+        return redirect(back)
+    return redirect(url)
+
+
+@require_http_methods(["GET"])
+def social_callback_view(request, provider):
+    from .services import social_login
+    connect = bool((request.session.get(social_login.SESSION_KEY) or {}).get("connect")) and request.user.is_authenticated
+    try:
+        identity, pending = social_login.finish(request.session, provider, request.GET)
+        user = social_login.user_for(identity, request.user if connect else None)
+    except social_login.SignInError as exc:
+        request.session["alfred_sign_in_error"] = str(exc)
+        return redirect("/settings/#settingsSignIn" if connect else "/login/")
+    if connect:
+        return redirect("/settings/#settingsSignIn")
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    return redirect(pending.get("next") or "/")
+
+
+class AlfredLoginView(LoginView):
+    extra_context = {"hide_sidebar": True, "hide_nav_auth_actions": True}
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs) | _sign_in_context(self.request, self.get_redirect_url())
 
 
 def not_found_view(request, exception):
@@ -314,8 +368,12 @@ def dashboard_view(request):
 
 @login_required
 def account_settings_view(request):
+    from .services import social_login
     profile = CareerProfile.objects.filter(user=request.user).first()
     return render(request, "settings/account.html", {
+        **_sign_in_context(request),
+        "email_verified": social_login.is_verified(request.user),
+        "email_identities": request.user.email_identities.order_by("provider"),
         "income_conflict": build_employment_income_signals(user=request.user, profile=profile)["income_conflict"],
         "career_income": profile.rupee_last_salary if profile and not request.user.monthly_income else None,
         "display_currencies": DISPLAY_CURRENCIES,

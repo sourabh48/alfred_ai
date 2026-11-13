@@ -1,0 +1,11 @@
+{% if sign_in_error %}
+<div class="alert alert-danger" role="alert">{{ sign_in_error }}</div>
+{% endif %}
+{% if sign_in_providers %}
+<div class="d-grid gap-2 mb-3" id="signInProviders">
+    {% for provider in sign_in_providers %}
+    <a class="btn btn-outline-dark btn-lg rounded-pill" href="/auth/{{ provider.id }}/start/{% if next %}?next={{ next|urlencode }}{% endif %}">Continue with {{ provider.label }}</a>
+    {% endfor %}
+</div>
+<p class="text-muted small text-center mb-3">Signing in this way confirms your email address.</p>
+{% endif %}

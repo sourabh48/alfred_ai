@@ -1,0 +1,27 @@
+<section class="surface-card mb-4" id="settingsSignIn">
+    <h2 class="page-section-title mb-1">Email and sign-in</h2>
+    {% if sign_in_error %}
+    <div class="alert alert-danger" role="alert">{{ sign_in_error }}</div>
+    {% endif %}
+    {% if email_verified %}
+    <p class="page-section-copy mb-3" id="settingsEmailStatus">Your email <strong>{{ request.user.email }}</strong> is verified.</p>
+    {% else %}
+    <p class="page-section-copy mb-3" id="settingsEmailStatus">Your email is not verified yet. Connect Google, GitHub or Microsoft once to confirm it; you can then sign in with it as well as your password.</p>
+    {% endif %}
+    {% if email_identities %}
+    <ul class="list-unstyled small mb-3">
+        {% for identity in email_identities %}
+        <li>{{ identity.provider|capfirst }}: {{ identity.email }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% if sign_in_providers %}
+    <div class="d-flex flex-wrap gap-2">
+        {% for provider in sign_in_providers %}
+        <a class="btn btn-outline-dark btn-sm rounded-pill" href="/auth/{{ provider.id }}/start/?connect=1">Connect {{ provider.label }}</a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="page-section-copy mb-0">No sign-in provider is set up yet. The person who manages ALFRED adds them under Online services below.</p>
+    {% endif %}
+</section>

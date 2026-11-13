@@ -10,6 +10,7 @@
             <nav aria-label="On this page" class="page-index">
                 <a href="#settingsProfile">Your details and income</a>
                 <a href="#settingsFamily">Family sharing</a>
+                <a href="#settingsSignIn">Email and sign-in</a>
                 <a href="#travelPreferences">Travel style</a>
                 <a href="#privateMemoryPanel">AI memory</a>
                 <a href="#settingsAccountData">Delete my data</a>
@@ -166,6 +167,7 @@
     <div class="data-stack" id="settingsLinkedAccountsList" aria-live="polite"></div>
 </section>
 
+{% include "settings/sign_in.html" %}
 {% include "mobility/preferences.html" %}
 {% include "settings/online.html" %}
 {% include "settings/offline_maps.html" %}

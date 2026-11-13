@@ -59,6 +59,8 @@
             {% if protection_message %}
             <div class="alert alert-warning" role="alert">{{ protection_message }}</div>
             {% endif %}
+            {% include "registration/providers.html" %}
+            {% if password_signup_open %}
             <form method="post" class="row g-3">
                 {% csrf_token %}
                 <div class="col-12">
@@ -131,6 +133,9 @@
                     <div class="text-muted small">You will be signed in immediately after the account is created.</div>
                 </div>
             </form>
+            {% else %}
+            <p class="text-muted" id="signupVerifiedOnly">New accounts sign up with Google, GitHub or Microsoft, which confirms the email address.</p>
+            {% endif %}
         </div>
     </div>
 </section>
