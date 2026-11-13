@@ -741,6 +741,12 @@ def map_tile_view(request, z, x, y):
 
 
 @login_required
+def map_tile_status_view(request):
+    from apps.mobility.services.travel.google_tiles import problem
+    return JsonResponse({"problem": problem()})
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def offline_maps_api_view(request):
     """Settings > Offline maps: check a country's size, download it only after the owner confirms, or remove it."""

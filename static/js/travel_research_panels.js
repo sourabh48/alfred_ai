@@ -97,7 +97,12 @@ window.TravelResearchPanels = (() => {
             };
             if (tile && tile.startsWith("/mobility/map-tiles/") && navigator.onLine !== false) {  // Google tiles through ALFRED; the key stays on this PC
                 google = L.tileLayer(tile,{maxZoom:18,attribution:link(session.map_config.attribution_url,session.map_config.attribution)}).addTo(map)
-                  .on("tileerror",()=>{$("plannerMapStatus").textContent=useOffline() ? "Google map tiles unavailable, so your offline country map is shown." : "Google map tiles unavailable (offline, today's limit reached, or the Map Tiles API is not enabled for your key). Saved route/place geometry is still shown.";});
+                  .once("tileerror",async()=>{  // ask ALFRED why once, instead of guessing per tile
+                    const shown = useOffline() ? " Your offline country map is shown." : " Saved places are still shown.";
+                    let why = "Google map tiles unavailable.";
+                    try { why = (await (await fetch("/mobility/map-tiles/status/",{credentials:"same-origin"})).json()).problem || why; } catch (e) {}
+                    $("plannerMapStatus").textContent = why + shown;
+                  });
             } else useOffline();
         }
         const geometry = JSON.stringify(d.map || {type:"FeatureCollection",features:[]});

@@ -74,7 +74,7 @@ class GooglePlacesTests(TestCase):
 @patch.dict(os.environ, KEY)
 class GoogleMapTileTests(TestCase):
     def setUp(self):
-        for key in (google_tiles.SESSION, f"travel-google-tiles-{timezone.localdate()}"):
+        for key in (google_tiles.SESSION, google_tiles.PROBLEM, f"travel-google-tiles-{timezone.localdate()}"):
             cache.delete(key)
         self.user = get_user_model().objects.create_user("synthetic-map-owner", password="pw-synthetic-1")
 
@@ -108,3 +108,18 @@ class GoogleMapTileTests(TestCase):
         self.assertIsNone(cache.get(google_tiles.SESSION))  # an expired session is dropped and renewed next time
         with patch.object(google_tiles, "DAILY_TILES", 1), patch.object(google_tiles, "request", side_effect=AssertionError("no call")):
             self.assertIsNone(google_tiles.tile(0, 0, 0))
+
+    def test_a_refused_key_is_explained_once_and_not_retried_for_every_tile(self):
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get("/mobility/map-tiles/status/").json(), {"problem": ""})
+        with patch.object(google_tiles, "request", side_effect=PublicHTTPError("authorization_failed")) as sent:
+            for x in range(4):
+                self.assertEqual(self.client.get(f"/mobility/map-tiles/2/{x}/0.png").status_code, 404)
+        self.assertEqual(sent.call_count, 1)
+        self.assertIn("enable the Map Tiles API", self.client.get("/mobility/map-tiles/status/").json()["problem"])
+        cache.delete(google_tiles.PROBLEM)
+        with patch.object(google_tiles, "request", side_effect=[reply({"session": "s2"}), reply(b"PNG-synthetic", "image/png")]):
+            self.assertIsNotNone(google_tiles.tile(0, 0, 0))
+        self.assertEqual(google_tiles.problem(), "")
+        os.environ.pop("TRAVEL_GOOGLE_MAPS_API_KEY")
+        self.assertIn("Settings > Online services", google_tiles.problem())
