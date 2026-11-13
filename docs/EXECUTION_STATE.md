@@ -12,6 +12,9 @@
 - Places: Google Places Nearby only (Overpass no longer called). Hotels: Google Places lodging only (Duffel hotel
   search no longer called): names, address and a Google Maps link, never a price or free room. Only basic (Pro)
   fields are asked for; results kept 1 day; app budget 40 calls a day each.
+- Each Google hotel card links to its prices: Google Hotels (dates are set there, because Google's date code in links
+  is not public and dates in the search words break the search, checked 2026-11-13) and Booking.com with the trip's
+  people, rooms and dates. The Google Travel Partner API is for hotels sending prices, not for reading them.
 - Unchanged: flights stay on Duffel (Google has no public flights API); routes and place-name lookup keep their
   free-first chain; Wikivoyage guide listings stay as their own panel.
 - Evidence: tests.test_travel_google_maps 6 PASS; travel/mobility suites listed in the commit. Not checked live with a

@@ -27,7 +27,7 @@ from .providers.places import GoogleLodging, GooglePlacesNearby
 from .providers.permits import PermitProvider
 from .providers.transport import DuffelFlights, IndianRailProvider
 from .providers.web import WikivoyageDestinations, WikivoyageSearch, WikivoyageStays, BraveSearch, SearXNGSearch
-from .links import external_links
+from .links import external_links, hotel_price_links
 from .presentation import age_saved_facts
 
 
@@ -218,7 +218,10 @@ def enrich_candidate(user, state, destination):
     attach("permit_result",PermitProvider().lookup(value(state,"permit_place",d["name"]),start_date=value(state,"available_start_date")))
     start,end = value(state,"available_start_date"),value(state,"available_end_date")
     people = value(state,"number_of_travelers",1)
-    attach("hotels_result",fetch(GoogleLodging(),{"latitude":d["lat"],"longitude":d["lon"]}) if coords else ProviderResult("google_lodging","hotels",error="destination_coordinates_required"))
+    hotels = fetch(GoogleLodging(),{"latitude":d["lat"],"longitude":d["lon"]}) if coords else ProviderResult("google_lodging","hotels",error="destination_coordinates_required")
+    for option in hotels.payload.get("options",[]):  # this trip's dates, never stored in the shared Google cache
+        option.update(hotel_price_links(state,option.get("name",""),d.get("name","")))
+    attach("hotels_result",hotels)
     # Free guide listings: names, contact and contributor price text; never live rates or availability.
     attach("stays_guide_result",fetch(WikivoyageStays(),{"destination":d["name"]}) if d.get("name") else ProviderResult("wikivoyage","stays_guide",error="destination_required"))
     flight = ProviderResult("duffel","flights",error="origin_and_destination_airport_codes_and_dates_required")

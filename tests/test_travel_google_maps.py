@@ -12,10 +12,11 @@ from django.utils import timezone
 from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.mobility.services.travel import google_tiles
 from apps.mobility.services.travel.cache import query
+from apps.mobility.services.travel.links import hotel_price_links
 from apps.mobility.services.travel.mapping import map_configuration
 from apps.mobility.services.travel.providers.places import GoogleLodging, GooglePlacesNearby
 
-KEY = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google-key-0000"}
+KEY = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-gkey-0000"}
 RAW = {"places": [
     {"id": "p1", "displayName": {"text": "Synthetic Fort"}, "formattedAddress": "Synthetic Road", "location": {"latitude": 12.1, "longitude": 77.1},
      "primaryType": "tourist_attraction", "types": ["tourist_attraction"], "googleMapsUri": "https://maps.google.com/?cid=1"},
@@ -46,7 +47,7 @@ class GooglePlacesTests(TestCase):
         self.assertIn("place_id:p2", places[1]["source_url"])
         args, kwargs = sent.call_args
         self.assertEqual(kwargs["headers"]["X-Goog-Api-Key"], KEY["TRAVEL_GOOGLE_MAPS_API_KEY"])
-        self.assertNotIn("synthetic-google-key", args[1])
+        self.assertNotIn("synthetic-gkey", args[1])
         self.assertEqual(kwargs["json_body"]["includedTypes"], ["tourist_attraction", "museum", "gas_station"])
         self.assertEqual(set(kwargs["json_body"]), {"includedTypes", "maxResultCount", "locationRestriction"})
 
@@ -59,6 +60,16 @@ class GooglePlacesTests(TestCase):
         self.assertTrue(all(o["total_price"] is None and o["nightly_rate"] is None and o["availability"] == "UNKNOWN" for o in options))
         self.assertEqual(options[0]["booking_url"], "https://maps.google.com/?cid=1")
 
+    def test_each_hotel_links_to_its_prices_with_the_trip_dates_where_the_site_accepts_them(self):
+        fact = lambda v: {"value": v}
+        state = {"available_start_date": fact("2026-12-01"), "available_end_date": fact("2026-12-03"), "number_of_travelers": fact(3)}
+        links = hotel_price_links(state, "Synthetic Fort Inn", "Goa")
+        self.assertEqual(links["google_hotels_url"], "https://www.google.com/travel/search?q=Synthetic+Fort+Inn+Goa")
+        self.assertEqual(links["dated_booking_url"], "https://www.booking.com/searchresults.html?ss=Synthetic+Fort+Inn+Goa"
+                         "&group_adults=3&no_rooms=2&checkin=2026-12-01&checkout=2026-12-03")
+        backwards = {**state, "available_end_date": fact("2026-11-30")}
+        self.assertNotIn("checkin", hotel_price_links(backwards, "Synthetic Fort Inn", "Goa")["dated_booking_url"])
+
 
 @patch.dict(os.environ, KEY)
 class GoogleMapTileTests(TestCase):
@@ -70,7 +81,7 @@ class GoogleMapTileTests(TestCase):
     def test_map_is_google_only_through_alfred_and_never_carries_the_key(self):
         config = map_configuration()
         self.assertEqual((config["provider"], config["tile_url"]), ("google", "/mobility/map-tiles/{z}/{x}/{y}.png"))
-        self.assertNotIn("synthetic-google-key", json.dumps(config))
+        self.assertNotIn("synthetic-gkey", json.dumps(config))
         self.assertNotIn("openstreetmap", json.dumps(config))
         os.environ.pop("TRAVEL_GOOGLE_MAPS_API_KEY")
         self.assertEqual(map_configuration()["tile_url"], "")
@@ -85,7 +96,7 @@ class GoogleMapTileTests(TestCase):
         tile_call = sent.call_args_list[1]
         self.assertEqual(tile_call.kwargs["params"], {"session": "s1"})
         self.assertEqual(tile_call.kwargs["headers"], {"X-Goog-Api-Key": KEY["TRAVEL_GOOGLE_MAPS_API_KEY"]})
-        self.assertNotIn("synthetic-google-key", tile_call.args[1])
+        self.assertNotIn("synthetic-gkey", tile_call.args[1])
 
     def test_out_of_range_over_the_cap_or_refused_is_no_tile(self):
         with patch.object(google_tiles, "request", side_effect=AssertionError("no call")):

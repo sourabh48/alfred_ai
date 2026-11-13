@@ -29,6 +29,27 @@ def booking_sites():
             if normalized_link(url) == url and not urlsplit(url).query and not urlsplit(url).fragment]
 
 
+def stay_details(state):
+    """Booking.com search fields: people, rooms and, when valid, the trip's dates."""
+    people = max(1,min(int(value(state,"number_of_travelers",1)),50))
+    details = {"group_adults":people,"no_rooms":(people+1)//2}
+    start, end = value(state,"available_start_date"),value(state,"available_end_date")
+    try:
+        if start and end and date.fromisoformat(start) < date.fromisoformat(end):
+            details.update(checkin=start,checkout=end)
+    except (TypeError, ValueError):
+        pass
+    return details
+
+
+def hotel_price_links(state, hotel, place):
+    """Price pages for one hotel from Google. Google Hotels keeps no dates from a link (its date code is not public),
+    so dates are set there; the Booking.com page carries the trip's people, rooms and dates."""
+    query = f"{hotel} {place}".strip()[:150]
+    return {"google_hotels_url":"https://www.google.com/travel/search?"+urlencode({"q":query}),
+            "dated_booking_url":"https://www.booking.com/searchresults.html?"+urlencode({"ss":query,**stay_details(state)})}
+
+
 def external_links(state, destination):
     name = public_place(destination.get("name"))
     origin = public_place(value(state,"origin"))
@@ -42,15 +63,9 @@ def external_links(state, destination):
     if name:
         add("map","Open destination on Google Maps","https://www.google.com/maps/search/?"+urlencode({"api":1,"query":name}))
         add("hotels","Search stays on Google Maps","https://www.google.com/maps/search/?"+urlencode({"api":1,"query":"hotels in "+name}))
-        params = {"ss":name, "group_adults":max(1,min(int(value(state,"number_of_travelers",1)),50)),"no_rooms":max(1,(int(value(state,"number_of_travelers",1))+1)//2)}
+        params = {"ss":name, **stay_details(state)}
         start, end = value(state,"available_start_date"),value(state,"available_end_date")
-        details = "traveller and room counts"
-        try:
-            if start and end and date.fromisoformat(start) < date.fromisoformat(end):
-                params.update(checkin=start,checkout=end)
-                details += " and dates"
-        except (TypeError, ValueError):
-            pass
+        details = "traveller and room counts" + (" and dates" if "checkin" in params else "")
         # A search link's label names the trip details it sends; clicking it is the owner's choice.
         add("hotels",f"Search Booking.com with your {details}","https://www.booking.com/searchresults.html?"+urlencode(params))
         sent = [text for text, present in (("start city",origin),("dates",start or end)) if present]
