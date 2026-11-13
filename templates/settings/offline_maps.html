@@ -1,0 +1,13 @@
+<section class="surface-card mb-4" id="settingsOfflineMaps" aria-labelledby="settingsOfflineMapsTitle">
+    <h2 id="settingsOfflineMapsTitle" class="page-section-title mb-1">Offline maps</h2>
+    <p class="muted mb-3">Keep a country's map on this PC so Travel still shows a map without internet. ALFRED tells you the size first and downloads nothing until you say so.
+        Maps come from OpenStreetMap through Protomaps; only map tiles are requested, nothing about you or your trips.</p>
+    <p id="offlineMapsStatus" class="small" role="status" aria-live="polite">Loading…</p>
+    <div id="offlineMapsList" class="data-stack mb-3"></div>
+    <form id="offlineMapsForm" class="row g-2 align-items-end" hidden>
+        <div class="col-md-5"><label for="offlineMapsCountry" class="form-label small mb-1">Add a country</label>
+            <select id="offlineMapsCountry" class="form-select"></select></div>
+        <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Check size</button></div>
+    </form>
+    <p id="offlineMapsFeedback" class="small mt-2 mb-0" role="status" aria-live="polite"></p>
+</section>

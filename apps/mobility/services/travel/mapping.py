@@ -29,7 +29,10 @@ def map_features(destination):
 
 def map_configuration():
     # Google map tiles only (owner decision 2026-11-13). ALFRED fetches them itself, so the key never reaches the browser.
+    # Country maps the owner downloaded in Settings show when Google tiles are missing or fail (offline).
+    from .offline_maps import ATTRIBUTION, installed
+    offline = {"offline_url": "/mobility/offline-tiles/{z}/{x}/{y}.mvt" if installed() else "", "offline_attribution": ATTRIBUTION}
     if not os.getenv("TRAVEL_GOOGLE_MAPS_API_KEY"):
-        return {"provider": "google", "tile_url": "", "attribution": "", "attribution_url": ""}
+        return {"provider": "google", "tile_url": "", "attribution": "", "attribution_url": "", **offline}
     return {"provider": "google", "tile_url": "/mobility/map-tiles/{z}/{x}/{y}.png", "attribution": "Map data © Google",
-            "attribution_url": "https://www.google.com/intl/en_in/help/terms_maps/"}
+            "attribution_url": "https://www.google.com/intl/en_in/help/terms_maps/", **offline}

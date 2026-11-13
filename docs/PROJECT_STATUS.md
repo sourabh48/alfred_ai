@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 21 | PARTIALLY_IMPLEMENTED: 26 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 22 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -820,7 +820,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
-| TRAVEL | 12 | 23 | 52.2 | 1 | 6 | 1 | 0 | 3 |
+| TRAVEL | 12 | 23 | 52.2 | 2 | 5 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
@@ -2733,16 +2733,18 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-18 — Google Maps API integration and offline map packages
 
-**PARTIALLY_IMPLEMENTED** · Travel · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
 
-- 2026-11-13 (owner decision "use google map and google places only", commits 75a067e, 7e3cc1b, 2a1f90a; CI passed on e13138b and 2a1f90a): Google Map Tiles through a signed-in, same-origin proxy (key in a header, never sent to the browser, 3000 tiles a day), Google Places Nearby for places and Google Places lodging for hotels (Pro fields only, no prices). Evidence: tests/test_travel_google_maps.py with mocked Google; header use and field tiers checked against Google on 2026-11-13. Not accepted: no live run with the owner's key yet. Offline map packages: NOT_IMPLEMENTED; Google's terms do not allow storing its tiles for offline use, so this needs a separate owner decision on another map source.
+- 2026-11-13 (owner request: store the map of the country in use, ask before downloading, add or remove countries in Settings): offline country maps from the free Protomaps OpenStreetMap build, sized from its index before any download, stored per country under ALFRED_DATA_DIR/maps, resumable, removable, drawn by vendored protomaps-leaflet 5.1.0 when Google tiles are missing or fail. Evidence: tests/test_offline_maps.py (synthetic PMTiles), Settings browser test with axe; live Singapore download and Chrome render on a scratch server 2026-11-13. Not accepted: no owner download in the real app yet.
+
+- 2026-11-13 (owner decision "use google map and google places only", commits 75a067e, 7e3cc1b, 2a1f90a; CI passed on e13138b and 2a1f90a): Google Map Tiles through a signed-in, same-origin proxy (key in a header, never sent to the browser, 3000 tiles a day), Google Places Nearby for places and Google Places lodging for hotels (Pro fields only, no prices). Evidence: tests/test_travel_google_maps.py with mocked Google; header use and field tiers checked against Google on 2026-11-13. Not accepted: no live run with the owner's key yet. Google's terms do not allow storing its tiles, so offline maps use OpenStreetMap data (entry above).
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Map link-outs/Leaflet are not authenticated Google Maps integration or offline tile bundles. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Confirm product/provider choice and storage rights before implementation.
+- Next: owner adds the Google key and downloads their country's map in Settings, then checks the Travel map online and offline.
 
 ### TRAVEL-19 — Photos, GPS/date inference and trip galleries
 

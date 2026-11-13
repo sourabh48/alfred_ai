@@ -1,5 +1,17 @@
 # Travel provider policy and architecture
 
+## Offline country maps
+
+Settings > Offline maps keeps chosen countries' maps on this PC. Source: the free daily
+[Protomaps](https://docs.protomaps.com/basemaps/downloads) OpenStreetMap build (ODbL; shown as
+"© OpenStreetMap contributors, Protomaps"), read with HTTP range requests from `build.protomaps.com`.
+ALFRED first reads only the build's tile index and shows the exact size; it downloads only after the
+person who manages ALFRED confirms that size. Zoom 0-14 inside the country's boxes (from Natural Earth,
+including areas any side claims) is stored in `ALFRED_DATA_DIR/maps/<country>.sqlite`; the map overzooms
+for street level. Downloads resume after an interruption. Removing a country deletes only its file.
+No account, key or personal data is involved. Google tiles cannot be stored offline under Google's terms,
+so the Travel map uses these files only when Google tiles are missing or fail.
+
 ## Request telemetry retention
 
 Post-audit development only; this policy has not been deployed. It deletes only

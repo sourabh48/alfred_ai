@@ -1,5 +1,30 @@
 # ALFRED execution state
 
+## Offline country maps - 2026-11-13
+
+- Owner request: "dont cache ...store the map of the country user is using ask the user before downloading... user
+  can add or remove country map in settings". Built as Settings > Offline maps (manager only; others can view).
+- Source: the free daily Protomaps OpenStreetMap build (ODbL, "© OpenStreetMap contributors, Protomaps"), read with
+  HTTP range requests. ALFRED reads the PMTiles v3 index itself (no new Python dependency), keeps zoom 0-14 inside the
+  country's boxes, and stores one SQLite file per country in `ALFRED_DATA_DIR/maps/`. Nothing about the owner is sent.
+- Steps: "Check size" reads only the index and shows the exact download size; nothing downloads until the owner
+  presses "Download <size>". A broken download keeps what arrived and resumes after checking the size again; a newer
+  build starts over. Remove deletes only that country's file (or stops a download first). The country of the PC's time
+  zone is preselected (Asia/Calcutta and other old names are followed to their country).
+- Country boxes: `apps/mobility/services/travel/country_boxes.json`, 237 countries from Natural Earth 50m (public
+  domain, pinned commit), rebuilt by `scripts/build_country_boxes.py`. Each country also covers every disputed area any
+  side claims for it (India includes all of Jammu and Kashmir, Ladakh and Aksai Chin). Boxes, not borders, so
+  neighbouring land near the border is included.
+- Travel map: Google tiles first while online; when there is no Google key, the PC is offline or Google tiles fail,
+  the downloaded country maps are drawn by vendored protomaps-leaflet 5.1.0 (BSD-3-Clause, sha512 checked) from
+  `/mobility/offline-tiles/z/x/y.mvt` (signed in only, gzip tiles served as stored).
+- Measured 2026-11-13 on build 20261113: India 2.53 GB to download (50 s to size); Singapore 14.6 MB, downloaded in
+  43 s, drawn correctly at zoom 12 and 17 in Chrome against a scratch server.
+- Evidence: tests.test_offline_maps 6 PASS (synthetic PMTiles archive, no network); Settings browser test with axe in
+  light and dark PASS; travel planner, Google maps and online services suites PASS. Not done: an owner download in the
+  real app. Note: the test live server's in-memory SQLite can drop sessions under parallel tile requests (same flake
+  as unchanged master); the renderer then gets the login page, so visual checks use a file database.
+
 ## Travel map, places and hotels from Google only - 2026-11-13
 
 - Owner reports: OpenStreetMap tiles showed "Access blocked" (403). Cause: ALFRED's same-origin referrer policy sends

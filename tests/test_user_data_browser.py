@@ -5212,6 +5212,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID, 'online-TRAVEL_ORS_API_KEY').get_attribute('value'), '')
         self.assertEqual((os.environ['TRAVEL_USE_MODE'], settings.ALFRED_SMTP_HOST), ('personal_noncommercial', 'smtp.gmail.com'))
         self.assertIn("TRAVEL_ORS_API_KEY='synthetic-ors-key-9876'", (root / 'config' / 'local.env').read_text(encoding='utf-8'))
+        self.wait.until(lambda _: 'No offline maps yet.' in self.text('offlineMapsStatus'))
+        self.assertTrue(self.browser.find_element(self.By.ID, 'offlineMapsCountry').is_displayed())
         self.run_axe_light_dark('settings-online-services')
 
     def run_axe_light_dark(self, name):

@@ -11,5 +11,13 @@ These assets allow the interface, dialogs and charts to work without a CDN.
   Travel maps use circle markers; no remote marker-image dependency. Tile loading
   is opt-in and follows the configured tile provider policy.
 
+- protomaps-leaflet 5.1.0: https://github.com/protomaps/protomaps-leaflet (BSD-3-Clause;
+  protomaps-leaflet/LICENSE). `dist/protomaps-leaflet.js` from the npm tarball
+  https://registry.npmjs.org/protomaps-leaflet/-/protomaps-leaflet-5.1.0.tgz, checked against the
+  registry's sha512 integrity. SHA256 JS: 26af014f7b1af308ec120b791cff76657bb9c3383633b52033e6edf9e5e4cdb5.
+  The bundle includes pmtiles, @protomaps/basemaps, pbf and @mapbox/vector-tile (BSD-3-Clause),
+  @mapbox/point-geometry and potpack (ISC), rbush and color2k (MIT). It draws the offline country
+  maps from ALFRED's own tile route and loads nothing remote.
+
 Downloaded from the corresponding pinned npm package URLs at cdn.jsdelivr.net.
 Optional Google web fonts fall back to system fonts when offline.

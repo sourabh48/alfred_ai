@@ -116,11 +116,18 @@ window.TravelResearchPanels = (() => {
         $("plannerMap").hidden = false;
         if (!map) {
             map = L.map("plannerMap").setView([20,78],5);
-            const tile = session.map_config?.tile_url;
-            if (tile && tile.startsWith("/mobility/map-tiles/")) {  // Google tiles through ALFRED; the key stays on this PC
-                L.tileLayer(tile,{maxZoom:18,attribution:link(session.map_config.attribution_url,session.map_config.attribution)}).addTo(map)
-                  .on("tileerror",()=>{$("plannerMapStatus").textContent="Google map tiles unavailable (today's limit reached, or the Map Tiles API is not enabled for your key). Saved route/place geometry is still shown.";});
-            }
+            const tile = session.map_config?.tile_url, offline = session.map_config?.offline_url;
+            let google = null, local = null;
+            const useOffline = () => {  // country maps downloaded in Settings, served from this PC
+                if (local || !offline?.startsWith("/mobility/offline-tiles/") || !window.protomapsL) return Boolean(local);
+                if (google) map.removeLayer(google);
+                local = protomapsL.leafletLayer({url:offline,flavor:"light",lang:"en",maxDataZoom:14,attribution:esc(session.map_config.offline_attribution)}).addTo(map);
+                return true;
+            };
+            if (tile && tile.startsWith("/mobility/map-tiles/") && navigator.onLine !== false) {  // Google tiles through ALFRED; the key stays on this PC
+                google = L.tileLayer(tile,{maxZoom:18,attribution:link(session.map_config.attribution_url,session.map_config.attribution)}).addTo(map)
+                  .on("tileerror",()=>{$("plannerMapStatus").textContent=useOffline() ? "Google map tiles unavailable, so your offline country map is shown." : "Google map tiles unavailable (offline, today's limit reached, or the Map Tiles API is not enabled for your key). Saved route/place geometry is still shown.";});
+            } else useOffline();
         }
         const geometry = JSON.stringify(d.map || {type:"FeatureCollection",features:[]});
         // Polling and itinerary edits should preserve the user's map position.
@@ -137,8 +144,8 @@ window.TravelResearchPanels = (() => {
             mapGeometry = geometry;
             $("plannerMapStatus").textContent = !layers.getBounds().isValid()
                 ? "No saved coordinates or route geometry are available. Use the external map links."
-                : session.map_config?.tile_url ? "Available routes and places shown. Check each source and its freshness."
-                : "No background map: add a Google Maps key in Settings > Online services. Route and place geometry is shown without it.";
+                : session.map_config?.tile_url || session.map_config?.offline_url ? "Available routes and places shown. Check each source and its freshness."
+                : "No background map: add a Google Maps key in Settings > Online services, or download your country's map in Settings > Offline maps. Route and place geometry is shown without it.";
         } catch (_) { $("plannerMapStatus").textContent="Some map geometry could not be displayed. Use the external route links."; }
     }
     document.addEventListener("DOMContentLoaded",()=>{

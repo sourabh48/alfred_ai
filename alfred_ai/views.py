@@ -673,5 +673,47 @@ def map_tile_view(request, z, x, y):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
+def offline_maps_api_view(request):
+    """Settings > Offline maps: check a country's size, download it only after the owner confirms, or remove it."""
+    from apps.mobility.services.travel import offline_maps
+    from .services.online_services import can_manage
+    if request.method == "POST":
+        if not can_manage(request.user):
+            return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can add or remove maps."}, status=403)
+        result = ""
+        try:
+            data = json.loads(request.body or b"{}")
+            code, action = str(data.get("country", "")), data.get("action")
+            if action == "size":
+                offline_maps.check_size(code)
+            elif action == "download":
+                offline_maps.download(code, str(data.get("build", "")), data.get("bytes"))
+            elif action == "remove":
+                result = offline_maps.remove(code)
+            else:
+                raise ValueError("Choose to check the size, download or remove a map.")
+        except (ValueError, AttributeError) as exc:
+            detail = str(exc) if type(exc) is ValueError else "Send the choice as JSON."
+            return JsonResponse({"detail": detail}, status=400)
+    response = JsonResponse({**offline_maps.status(), "can_manage": can_manage(request.user),
+                             "result": result if request.method == "POST" else ""})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+@login_required
+def offline_tile_view(request, z, x, y):
+    from apps.mobility.services.travel.offline_maps import tile
+    found = tile(z, x, y)
+    if found is None:
+        return HttpResponse(status=404)
+    response = HttpResponse(found, content_type="application/vnd.mapbox-vector-tile")
+    response["Content-Encoding"] = "gzip"  # stored exactly as the build compressed it; the browser unpacks it
+    response["Cache-Control"] = "private, max-age=86400"
+    return response
+
+
+@login_required
 def bike_service_view(request):
     return render(request, "mobility/bike_service_dashboard.html")

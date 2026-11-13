@@ -54,7 +54,7 @@ GATES = {
     'INV-04': 'BLOCKED_EVIDENCE: assumed-age advice removed and guidance labelled 2026-11-06; reviewed risk-evidence definition and owner check remain',
     'FIN-17': 'OWNER_DESCOPED (2026-11-12): credit score, credit reports and their tables removed; drop migration integrations 0007 applied to the owner runtime 2026-11-13 after a backup; reopening needs a new owner decision',
     'FIN-16': 'BLOCKED_EVIDENCE: tax year 2026-27 rules and the notice-only Budget check implemented; page check on the owner app PASS 2026-11-06; CI PASS at e8ef8f4; reviewed actual tax cases (income unverified) remain',
-    'TRAVEL-18': 'BLOCKED_APPROVAL: Google maps and places built 2026-11-13 (live run with the owner key pending); offline map packages need an owner decision on a map source, as Google tiles cannot be stored offline',
+    'TRAVEL-18': 'BLOCKED_EVIDENCE: Google maps and places and offline country maps (OpenStreetMap via Protomaps, size shown before download) built 2026-11-13; owner live check with the Google key and a country download remain',
 }
 
 
