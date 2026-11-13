@@ -59,7 +59,7 @@ class DataSourcesTests(TestCase):
         self.client.force_login(self.owner)
         StatementUpload.objects.create(user=self.owner, file_name='SYNTHETIC-PRIVATE-FILENAME.pdf')
         response = self.client.get('/data-sources/')
-        self.assertContains(response, 'Data Sources')
+        self.assertContains(response, 'Add your data')
         self.assertNotContains(response, 'SYNTHETIC-PRIVATE-FILENAME')
         self.assertIn('no-store', response['Cache-Control'])
         self.assertEqual(self.client.post('/data-sources/').status_code, 400)

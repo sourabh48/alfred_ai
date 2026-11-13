@@ -46,7 +46,7 @@ class DocumentCenterAndStatementImportTests(TestCase):
     def test_documents_page_renders_for_authenticated_user(self):
         response = self.client.get("/documents/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Central upload hub")
+        self.assertContains(response, "Your documents")
         self.assertContains(response, "Statements")
         self.assertContains(response, "Loan Documents")
 

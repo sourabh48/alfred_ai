@@ -45,12 +45,12 @@
   },
   "expenses": {
     "page": {
-      "title": "Expense Timeline",
-      "description": "Upload statements, classify outflows, and review only the transactions you need instead of scrolling through the full history."
+      "title": "Spending and accounts",
+      "description": "Add your statements, see where your money went, and check what you own and owe."
     },
     "timeline": {
-      "title": "Timeline",
-      "description": "Use filters to find a transaction by merchant, reference, fingerprint, or internal Alfred ID.",
+      "title": "All transactions",
+      "description": "Search by shop name, reference or note, or filter the list.",
       "search_placeholder": "Search merchant, reference, fingerprint, or note",
       "id_placeholder": "Transaction ID",
       "limit_label": "Rows",
