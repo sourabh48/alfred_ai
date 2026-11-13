@@ -2791,11 +2791,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local = Mock(); local.reason.return_value = 'Synthetic historical hypothesis <img src=x onerror="window.historyLeak=true">'
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
         self.enterContext(patch('apps.ml_engine.api.views.OllamaReasoner', return_value=local))
+        history = ConversationHistory(MemoryStore(root/'vault'))
+        if authorized:  # history is on by default since 2026-11-14; these tests start from a person who switched it off
+            history.configure(self.scenario['user'], enabled=False)
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
-        expected_policy = 'On · local only' if authorized else 'Switched off on this PC'  # on by default since 2026-11-14
+        expected_policy = 'Off' if authorized else 'Switched off on this PC'
         self.wait.until(lambda _: self.text('conversationHistoryStatus') == expected_policy)
         self.memory_click('#conversationHistoryPanel > summary')
-        return ConversationHistory(MemoryStore(root/'vault')), local
+        return history, local
 
     def enable_private_history_ui(self):
         self.memory_click('#conversationHistoryConsent')
