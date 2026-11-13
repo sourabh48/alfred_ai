@@ -557,8 +557,8 @@ ALFRED_SMTP_FROM = env('ALFRED_SMTP_FROM', default='')
 ALFRED_SMTP_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
 ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)
-# Current-profile recovery/retention approval is separate from an owner's opt-in.
-ALFRED_CONVERSATION_HISTORY_AUTHORIZED = env.bool('ALFRED_CONVERSATION_HISTORY_AUTHORIZED', default=False)
+# Owner decision 2026-11-14: keep chats like a chat app, each person can delete them; set false to switch history off for everyone.
+ALFRED_CONVERSATION_HISTORY_AUTHORIZED = env.bool('ALFRED_CONVERSATION_HISTORY_AUTHORIZED', default=True)
 
 
 # ---------------------------------------------------------

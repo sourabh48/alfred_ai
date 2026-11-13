@@ -243,8 +243,8 @@ document.addEventListener("DOMContentLoaded", () => {
             historyFeedback.textContent = "Conversation no longer available. Its displayed turns were cleared; your unsent draft is preserved.";
         }
         document.getElementById("conversationHistoryStatus").textContent = !historyPolicy.available
-            ? "Unavailable · operator retention/recovery approval required" : historyEnabled() ? "On · local only" : "Off";
-        if (historyPolicy.retention_days) historyDays.value = historyPolicy.retention_days;
+            ? "switched off on this PC" : historyEnabled() ? `${(data.conversations || []).length} saved on this PC` : "history is off";
+        historyDays.value = historyPolicy.retention_days || "";
         historyList.replaceChildren();
         (data.conversations || []).forEach(record => {
             const item = document.createElement("li"); item.className = "d-flex flex-wrap gap-2 align-items-center mb-2";
@@ -267,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, true);
             });
             const age = document.createElement("span"); age.className = "small text-muted";
-            age.textContent = `Expires ${new Date(record.expires_at).toLocaleString()}`;
+            age.textContent = new Date(record.updated_at).toLocaleString([], {dateStyle:"medium", timeStyle:"short"});
             item.append(open, remove, age); historyList.append(item);
         });
         filterHistory();
@@ -294,6 +294,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (active && !historySearchMessages.disabled) historySearchMessages.focus();
     });
+    function chatTitle(text) {  // named after its first question, like a chat app; 30 characters stay inside the 128-byte limit
+        const letters = Array.from(text.replace(/\s+/g, " ").trim());
+        return letters.length ? letters.slice(0, 30).join("") + (letters.length > 30 ? "…" : "") : "Chat";
+    }
     function dialogueSnippet(text) {
         const encoder = new TextEncoder(); let snippet = "", size = 0;
         for (const character of text) {
@@ -357,7 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     historyForm.addEventListener("submit", event => {
         event.preventDefault();
-        historyRequest("/api/ai/conversations/policy/", {method:"PUT", body:JSON.stringify({enabled:true, consent:historyConsent.checked, days:Number(historyDays.value)})}, () => {
+        historyRequest("/api/ai/conversations/policy/", {method:"PUT", body:JSON.stringify({enabled:true, consent:historyConsent.checked, days:historyDays.value ? Number(historyDays.value) : null})}, () => {
             historyConsent.checked = false;
             historyFeedback.textContent = "Local history choice saved. Earlier page-only messages are not imported.";
             clearConversation();
@@ -801,7 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             if (historyEnabled() && !["financial_document","career"].includes(payload.scope)) {
-                if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || "Private conversation"})});
+                if (!conversation) conversation = await Alfred.fetchJSON("/api/ai/conversations/", {method:"POST", body:JSON.stringify({title:historyTitle.value.trim() || chatTitle(query.value)})});
                 if (!active || ticket !== generation) return;
                 const fingerprint = JSON.stringify(payload);
                 if (requestToken?.fingerprint !== fingerprint) requestToken = {fingerprint, id:crypto.randomUUID().replaceAll("-", "")};

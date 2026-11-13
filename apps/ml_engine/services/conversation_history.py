@@ -10,8 +10,10 @@ from django.conf import settings
 from .persistent_memory import _owner, _json, MemoryConflict
 from .memory_sync import valid_id
 
-MAX_CONVERSATIONS = 50
-MAX_TURNS = 20
+MAX_CONVERSATIONS = 200
+MAX_TURNS = 50
+MAX_DAYS = 365
+KEEP_UNTIL_DELETED = 3650  # days; a chat with no age limit still needs an expiry date in its record
 MAX_RECORD = 262144
 
 
@@ -43,14 +45,14 @@ class ConversationHistory:
     def _policy(self, db, owner):
         row = db.execute('SELECT encrypted FROM conversation_policies WHERE owner=?', (owner,)).fetchone()
         if not row:
-            return dict(owner=owner, enabled=False, days=None, generation=0)
+            # On until the person turns it off; no age limit until they choose one (owner decision 2026-11-14).
+            return dict(owner=owner, enabled=settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED, days=None, generation=0)
         try:
             policy = json.loads(self.store._cipher(db).decrypt(row[0]))
             if (policy['owner'] != owner or type(policy['enabled']) is not bool or type(policy['generation']) is not int
                     or policy['generation'] < 0 or (policy['days'] is not None and
-                    (type(policy['days']) is not int or not 1 <= policy['days'] <= 30))):
+                    (type(policy['days']) is not int or not 1 <= policy['days'] <= MAX_DAYS))):
                 raise ValueError()
-            if policy['enabled'] and policy['days'] is None: raise ValueError()
             return policy
         except (InvalidToken, ValueError, KeyError, TypeError):
             raise RuntimeError('Private conversation policy verification failed.') from None
@@ -120,7 +122,7 @@ class ConversationHistory:
             policy = self._policy(db, owner)
             count = db.execute('SELECT COUNT(*) FROM conversations WHERE owner=?', (owner,)).fetchone()[0]
         return dict(available=settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED, enabled=policy['enabled'],
-                    retention_days=policy['days'], conversations=count, maximum_days=30,
+                    retention_days=policy['days'], conversations=count, maximum_days=MAX_DAYS,
                     rollback_requires_clear=policy['enabled'] or count > 0)
 
     def configure(self, user, *, enabled, consent=False, days=None):
@@ -128,8 +130,8 @@ class ConversationHistory:
             raise ValueError('Choose an explicit private history policy.')
         if enabled and (not settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED or consent is not True):
             raise ConversationPermission('Private history requires explicit local-only consent.')
-        if enabled and (type(days) is not int or not 1 <= days <= 30):
-            raise ValueError('Choose between one and thirty retention days.')
+        if enabled and days is not None and (type(days) is not int or not 1 <= days <= MAX_DAYS):
+            raise ValueError('Keep chats until you delete them, or choose 1 to 365 days.')
         owner = _owner(user)
         with self.store._transaction() as db:
             if not enabled: self._clear(db, owner, disable=True)
@@ -175,7 +177,7 @@ class ConversationHistory:
             now = datetime.now(timezone.utc)
             record = dict(kind='assistant_conversation', schema=1, owner=owner, id=uuid4().hex, title=title,
                 revision=0, turns=[], created_at=now.isoformat(), updated_at=now.isoformat(),
-                expires_at=(now+timedelta(days=policy['days'])).isoformat())
+                expires_at=(now+timedelta(days=policy['days'] or KEEP_UNTIL_DELETED)).isoformat())
             key = Fernet.generate_key()
             db.execute('INSERT INTO conversations VALUES(?,?,?,?)', (record['id'], owner,
                 self.store._cipher(db).encrypt(key), Fernet(key).encrypt(_encoded(record))))

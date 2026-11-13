@@ -97,6 +97,7 @@ class ConversationHistoryTests(TestCase):
         url = '/api/ai/conversations/search/'
         payload = {'query':'private'}
         self.assertEqual(Client().post(url, payload, content_type='application/json').status_code, 403)
+        self.history.configure(self.alice, enabled=False)  # a person who turned history off cannot search it
         self.assertEqual(self.client.post(url, payload, content_type='application/json').status_code, 403)
         self.create()
         with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False):
@@ -210,16 +211,23 @@ print('SEARCH_CAPACITY_RESTART_PASS count=50 turns_each=20 elapsed_ms='+str(roun
         self.assertEqual(response.status_code, 403)
         self.assertNotIn('conversations', response.json())
 
-    def test_default_off_operator_gate_explicit_consent_and_strict_retention(self):
-        self.assertFalse(self.history.policy(self.alice)['enabled'])
+    def test_on_by_default_until_deleted_operator_gate_explicit_consent_and_bounded_retention(self):
+        # Owner decision 2026-11-14: chats are kept like a chat app until the person deletes them or turns history off.
+        self.assertTrue(self.history.policy(self.alice)['enabled'])
         self.assertIsNone(self.history.policy(self.alice)['retention_days'])
+        kept = self.history.create(self.alice, 'Kept')
+        self.assertGreater(datetime.fromisoformat(kept['expires_at']), datetime.now(timezone.utc)+timedelta(days=3000))
+        self.history.configure(self.alice, enabled=False)
+        self.assertEqual(self.history.policy(self.alice)['conversations'], 0)
         with self.assertRaises(ConversationPermission): self.history.create(self.alice, 'Unsaved')
         with self.assertRaises(ConversationPermission): self.history.configure(self.alice, enabled=True, days=7)
         with override_settings(ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False):
+            self.assertFalse(self.history.policy(self.bob)['enabled'])
             with self.assertRaises(ConversationPermission): self.enable()
-        for days in (None, True, 0, 31, '7', 1.5):
+        for days in (True, 0, 366, '7', 1.5):
             with self.subTest(days=days), self.assertRaises(ValueError): self.enable(days=days)
-        self.assertTrue(self.enable()['enabled'])
+        self.assertIsNone(self.enable(days=None)['retention_days'])
+        self.assertEqual(self.enable(days=365)['retention_days'], 365)
 
     def test_followup_context_is_owned_bounded_revision_bound_and_survives_reopen(self):
         record = self.create()
@@ -254,7 +262,7 @@ print('SEARCH_CAPACITY_RESTART_PASS count=50 turns_each=20 elapsed_ms='+str(roun
         self.assertEqual(payload['history'][0]['content'], 'Suggest a quiet hobby')
         self.assertEqual(second.json()['conversation_context_turns'], 1)
         self.assertEqual(self.store.list_memories(self.alice), [])
-        self.assertFalse(self.history.policy(self.bob)['enabled'])
+        self.assertEqual(self.history.policy(self.bob)['conversations'], 0)  # Alice's chat is not Bob's
 
     def test_atomic_local_answer_numeric_guard_and_replay_idempotence(self):
         record = self.create(); payload = self.turn(record)
