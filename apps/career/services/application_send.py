@@ -109,8 +109,7 @@ def review(user, analysis, resume, *, to, subject, body, attach_cv) -> dict:
     if attach_cv and resume is not None and resume.parser_status != "parsed":
         warnings.append("Your CV extraction still needs review; check the file you are attaching.")
     if not mail_configured():
-        blockers.append("Sending is off: add your mailbox (ALFRED_SMTP_HOST, ALFRED_SMTP_USER, ALFRED_SMTP_PASSWORD) "
-                        "to config/local.env and restart ALFRED.")
+        blockers.append("Sending is off: add your email address and app password in Settings > Online services > Career email.")
     triage = _payload(analysis).get("triage")
     if isinstance(triage, dict) and isinstance(triage.get("score"), (int, float)) and triage["score"] < 4.0:
         warnings.append(f"Triage score {triage['score']}/5 is below 4.0, where Career Ops advises against applying.")

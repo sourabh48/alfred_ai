@@ -1,0 +1,35 @@
+<section class="surface-card mb-4" id="settingsOnline" aria-labelledby="settingsOnlineTitle">
+    <h2 id="settingsOnlineTitle" class="page-section-title mb-1">Online services</h2>
+    <p class="muted mb-3">Switch on what ALFRED may look up online and add your own keys. Changes work straight away; no files or restarts.
+        Your bank, loan and investment records never go to these services.</p>
+    <p id="onlineServicesStatus" class="small" role="status" aria-live="polite">Loading…</p>
+    <form id="onlineServicesForm" data-live-refresh-hold="true" autocomplete="off" hidden>
+        <h3 class="h6">Free services</h3>
+        <div id="onlineServicesSwitches" class="mb-3"></div>
+        <h3 class="h6">Your own API keys</h3>
+        <p class="small muted mb-2">Optional. Paste a key to use that service; leave a box empty to keep what is saved. Keys are kept in ALFRED's private settings file on this PC and never shown again.</p>
+        <div id="onlineServicesKeys" class="soft-grid mb-3"></div>
+        <h3 class="h6">Career email</h3>
+        <p class="small muted mb-2">To send job applications you approve one at a time from your own mailbox. Use an app password from your email provider, not your normal password. Gmail, Yahoo and Zoho servers are filled in for you.</p>
+        <div class="row g-2 mb-2">
+            <div class="col-md-5"><label for="onlineMailAddress" class="form-label small mb-1">Email address</label>
+                <input id="onlineMailAddress" class="form-control" type="email" maxlength="254" autocomplete="off"></div>
+            <div class="col-md-4"><label for="onlineMailPassword" class="form-label small mb-1">App password</label>
+                <input id="onlineMailPassword" class="form-control" type="password" maxlength="520" autocomplete="new-password" spellcheck="false"></div>
+        </div>
+        <details class="small mb-3"><summary>Another email provider</summary>
+            <div class="row g-2 mt-1">
+                <div class="col-md-5"><label for="onlineMailHost" class="form-label small mb-1">SMTP server</label>
+                    <input id="onlineMailHost" class="form-control form-control-sm" maxlength="253" placeholder="e.g. smtp.example.com"></div>
+                <div class="col-md-2"><label for="onlineMailPort" class="form-label small mb-1">Port</label>
+                    <input id="onlineMailPort" class="form-control form-control-sm" inputmode="numeric" maxlength="4" placeholder="587"></div>
+            </div>
+        </details>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" type="submit">Save online services</button>
+            <button class="btn btn-outline-danger" type="button" id="onlineMailRemove" hidden>Turn off Career email</button>
+        </div>
+        <p class="small muted mt-2 mb-0">OpenAI: each person adds their own key under Memory and AI below.</p>
+    </form>
+    <p id="onlineServicesFeedback" class="small mt-2 mb-0" role="status" aria-live="polite"></p>
+</section>

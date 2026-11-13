@@ -1,5 +1,19 @@
 # ALFRED execution state
 
+## Online services in Settings - 2026-11-13
+
+- Owner request: "give alfred full online access... all required api key addition in settings... dont give user any
+  manual work... keep the sensitive banking data confediencial always".
+- Settings > Online services (new): the PC's owner (the superuser, or the first account when there is none) can
+  switch on free services (Open-Meteo personal use, FOSSGIS Valhalla routes, Brave and Duffel paid-search consent),
+  paste keys for Google Maps, OpenRouteService, Brave, Duffel and Open-Meteo, and set Career email with only an
+  address and app password (Gmail, Yahoo and Zoho servers filled in). Values go to the private config/local.env,
+  quoted, and apply at once to the running app; other lines are kept. Keys are never sent back (last 4 shown).
+  Only listed names can be written. OpenAI stays per person under Memory and AI. No banking data is involved.
+- Evidence: tests.test_online_services 4 PASS; 304 related backend tests PASS; browser
+  test_online_services_are_switched_on_from_settings_without_editing_files PASS with axe light/dark.
+- Not added: Cloudflare R2 cloud backup keys and the developer-only Gemini key.
+
 ## Beginner investment research - 2026-11-13
 
 - Owner request: "for investment assume user dont know about market give suggestions like tradingagents".

@@ -5191,6 +5191,29 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('travelPlanList').scrollIntoView({block:'start',behavior:'instant'})")
         self.run_axe_light_dark('travel-plan-board-cards')
 
+    def test_online_services_are_switched_on_from_settings_without_editing_files(self):
+        from alfred_ai.services import online_services
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-online-browser-synthetic-')))
+        self.enterContext(patch.dict(os.environ, {'ALFRED_DATA_DIR': str(root)}))
+        for name in [*online_services.KEYS, *online_services.SWITCHES, *online_services.MAIL]:
+            os.environ.pop(name, None)
+        self.enterContext(override_settings(ALFRED_SMTP_HOST='', ALFRED_SMTP_USER='', ALFRED_SMTP_PASSWORD=''))
+        owner = self.scenario['user']; owner.is_superuser = True; owner.save(update_fields=['is_superuser'])
+        self.login(); self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: '0 of 4 free services on' in self.text('onlineServicesStatus'))
+        self.memory_click('#online-TRAVEL_USE_MODE')
+        self.browser.find_element(self.By.ID, 'online-TRAVEL_ORS_API_KEY').send_keys('synthetic-ors-key-9876')
+        self.browser.find_element(self.By.ID, 'onlineMailAddress').send_keys('synthetic.owner@gmail.com')
+        self.browser.find_element(self.By.ID, 'onlineMailPassword').send_keys('abcd efgh ijkl mnop')
+        self.memory_click('#onlineServicesForm button[type=submit]')
+        self.wait.until(lambda _: 'using these settings now' in self.text('onlineServicesFeedback'))
+        self.assertIn('1 of 4 free services on · 1 of 5 keys saved · Career email ready', self.text('onlineServicesStatus'))
+        self.assertIn('Saved …9876', self.text('onlineServicesKeys'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'online-TRAVEL_ORS_API_KEY').get_attribute('value'), '')
+        self.assertEqual((os.environ['TRAVEL_USE_MODE'], settings.ALFRED_SMTP_HOST), ('personal_noncommercial', 'smtp.gmail.com'))
+        self.assertIn("TRAVEL_ORS_API_KEY='synthetic-ors-key-9876'", (root / 'config' / 'local.env').read_text(encoding='utf-8'))
+        self.run_axe_light_dark('settings-online-services')
+
     def run_axe_light_dark(self, name):
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
         for theme in ('light', 'dark'):

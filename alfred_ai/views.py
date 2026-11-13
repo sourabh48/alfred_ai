@@ -214,6 +214,29 @@ def index_view(request):
 
 
 @login_required
+@require_http_methods(["GET", "POST"])
+def online_services_api_view(request):
+    """Settings > Online services: the owner adds service keys and switches free services on, without editing files."""
+    from alfred_private_storage import PrivateStorageUnavailable
+    from .services import online_services
+    if request.method == "POST":
+        if not online_services.can_manage(request.user):
+            return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can change online services."}, status=403)
+        try:
+            data = json.loads(request.body or b"{}")
+            if not isinstance(data, dict):
+                raise AttributeError
+            online_services.save(online_services.changes_from(data))
+        except (ValueError, AttributeError) as exc:
+            detail = str(exc) if isinstance(exc, ValueError) and not isinstance(exc, json.JSONDecodeError) else "Send the settings as JSON."
+            return JsonResponse({"detail": detail}, status=400)
+        except (OSError, PrivateStorageUnavailable):
+            logging.getLogger(__name__).exception("Online services could not be saved")
+            return JsonResponse({"detail": "ALFRED could not save its settings file. Nothing was changed."}, status=500)
+    return JsonResponse(online_services.status(request.user))
+
+
+@login_required
 @require_http_methods(["POST"])
 def session_ping_api_view(request):
     request.session.modified = True
