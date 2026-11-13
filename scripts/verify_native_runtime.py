@@ -174,7 +174,7 @@ def main():
                 wait.until(lambda driver: "80,000" in driver.find_element(By.ID, "dashboardSummaryCards").text)
                 text = browser.find_element(By.ID, "dashboardSummaryCards").text
                 browser.save_screenshot(str(data / "dashboard.png"))
-                assert all(value in text.lower() for value in ("30,000", "47,000", "confirmed outflow")), text
+                assert all(value in text.lower() for value in ("30,000", "47,000", "money out")), text
                 notice = browser.find_element(By.ID, "dashboardReviewNotice").text
                 assert "60,000" in notice and "excluded" in notice
                 charts = browser.execute_script("return Chart.getChart(document.getElementById('dashboardMonthlyChart')).data.datasets.map(d => ({label:d.label, last:d.data.at(-1)}));")
