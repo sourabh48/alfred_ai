@@ -7,13 +7,18 @@
 - Pushed with the owner's OK: 106f678 (no career risk from a guessed role), 52c6f7a (grouped menu with "More
   insights", Home with At a glance, Needs your attention and a Get started checklist). CI run 43376348267 on
   52c6f7a FAILED: the native check still read the old "Confirmed Outflow" label (fixed 0d12575; local native
-  --browser --extended PASS). Backend shard 0 and Selenium shard 0 also failed; their logs need a GitHub sign-in,
-  so they are being reproduced locally.
+  --browser --extended PASS after also fixing the new Home link's contrast). Backend shard 0 and Selenium shard 0
+  also failed; their logs need a GitHub sign-in. Reproduced locally: Selenium shard 0 hit a real dark-mode menu
+  hover contrast bug (1.2:1, exposed when the new menu put a link under the test's cursor), fixed edb3378.
+  Backend shard 0 passes locally (706 tests); its CI cause is unconfirmed.
+- Local three-shard browser run at edb3378: shards 0 and 1 PASS; shard 2 one failure in
+  test_travel_d2_keyboard_focus_consent_and_error_states that passes 3 of 3 alone (load-timing flake on this PC).
 - Local, not pushed: f92d0d9 Settings index; 3daf056 Career searches no news for a guessed role; 9fb19e5 Vehicles
   index; f3a5143 plain page titles on 11 pages, Expenses index and section names, Family links to family sharing;
-  0d12575 native label and link contrast.
-- Not done: net worth still lives on Spending and accounts (Home links to it); three upload places not merged;
-  Documents, Risk and Career pages are still long.
+  0d12575 native label and link contrast; edb3378 dark hover; 184d52f Documents, Risk and Career section names
+  and page index, and every upload place points to Documents.
+- Not done: net worth still lives on Spending and accounts (Home links to it); the Expenses statement upload stays
+  as a shortcut beside the Documents hub; long pages are indexed, not split.
 - Next: owner OK to push the local commits; then read the exact-HEAD CI run.
 
 ## Final-development audit and "fix all" follow-ups - 2026-11-13
