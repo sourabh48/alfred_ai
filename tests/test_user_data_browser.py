@@ -2129,6 +2129,25 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.execute_script('return window.__played') == 1)
         self.assertAlmostEqual(self.browser.execute_script('return window.__seconds'), 0.2, places=2)
         self.assertIn('Synthetic trip', spoken.call_args.args[0])
+        # Hands-free: a pause ends listening by itself, the question is asked, the reply is read aloud, and ALFRED listens again
+        self.browser.execute_script("""
+            window.__calls = 0;
+            navigator.mediaDevices.getUserMedia = async () => {
+                window.__calls += 1;
+                const context = new AudioContext(), tone = context.createOscillator(), out = context.createMediaStreamDestination();
+                tone.connect(out); tone.start(); if (window.__calls === 1) tone.stop(context.currentTime + 0.6);
+                return out.stream;
+            };""")
+        self.memory_click('#intelligenceHandsFree')
+        self.memory_click('#intelligenceMic')
+        self.wait.until(lambda _: self.browser.execute_script('return window.__played') == 2)
+        self.assertEqual(len(heard), 2)
+        mic = lambda: self.browser.find_element(self.By.ID, 'intelligenceMic')
+        self.wait.until(lambda _: self.browser.execute_script('return window.__calls') == 2 and mic().get_attribute('aria-pressed') == 'true')
+        self.memory_click('#intelligenceHandsFree')  # off again: the next words wait for the owner to press Ask
+        self.memory_click('#intelligenceMic')
+        self.wait.until(lambda _: 'Nothing has been asked yet' in self.text('intelligenceFeedback') and not mic().get_attribute('disabled'))
+        self.assertEqual(len(heard), 3)
         local.reason.assert_not_called()
         self.capture('assistant-speech')
 
@@ -5411,6 +5430,26 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script(open_notes)
         self.memory_click('#careerPracticeStart')
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-practice-feedback="0"]'))  # local-AI comments: API-tested
+        # Mock interview: one question at a time, local-AI comments after each answer, then the round is saved
+        self.enterContext(patch('apps.career.services.bullet_rewrite.AnswerCoach.__init__', return_value=None))
+        self.enterContext(patch('apps.career.services.bullet_rewrite.AnswerCoach.feedback', return_value={'works': 'Clear opening.', 'improve': 'Say what you learned.'}))
+        self.browser.execute_script(open_notes)
+        self.memory_click('#careerMockStart')
+        self.wait.until(lambda _: 'Question 1 of' in self.text('careerPracticeForm'))
+        self.assertIn('How would you size a Kafka cluster?', self.text('careerMockQuestion'))
+        self.memory_click('#careerMockNext')
+        self.assertIn('Answer first', self.text('careerMockFeedback'))
+        self.browser.find_element(self.By.ID, 'careerMockAnswer').send_keys('I planned partitions from peak throughput.')
+        self.memory_click('#careerMockNext')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'careerMockNext').text == 'Next question')
+        self.assertIn('Say what you learned.', self.text('careerMockFeedback'))
+        self.memory_click('#careerMockNext')
+        self.wait.until(lambda _: 'Question 2 of' in self.text('careerPracticeForm'))
+        self.memory_click('#careerMockEnd')
+        self.assertIn('you answered 1 of', self.text('careerPracticeForm'))
+        self.memory_click('#careerMockSave')
+        answers = lambda: [turn['answer'] for session in item.extracted_payload['interview_notes']['sessions'] for turn in session['turns']]
+        self.wait.until(lambda _: item.refresh_from_db() or 'I planned partitions from peak throughput.' in answers())
         # Transcript import from a real round, with a marked signal
         self.browser.execute_script(open_notes)
         self.browser.find_element(self.By.ID, 'careerTranscriptText').send_keys(

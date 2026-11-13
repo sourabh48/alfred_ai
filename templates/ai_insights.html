@@ -112,7 +112,8 @@
             This question is public. Answer it with OpenAI using your own key from Settings.</label>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
         <p class="small" id="intelligenceStreamHelp">Local general chat can show an unverified preview with history on or off. Finance, saved records, statement evidence, verified closures and Travel answers stay buffered until source checks finish; Stop generation keeps your draft. A completed turn may already be saved if its final response is lost; reopen history or retry the same draft.</p>
-        <p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone only until you press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Check the text before you ask.</p>
+        <p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone until you pause or press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Without hands-free, check the text before you ask.</p>
+        <label class="d-block mb-2" hidden><input id="intelligenceHandsFree" type="checkbox"> Hands-free conversation: ask when I pause, read the answer aloud, then listen again. Changes still wait for Confirm.</label>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
             <button id="intelligenceStop" class="btn btn-outline-danger" type="button" hidden aria-describedby="intelligenceStreamHelp">Stop generation</button>
             <button id="intelligenceMic" class="btn btn-outline-primary" type="button" aria-pressed="false" aria-describedby="intelligenceSpeechHint" hidden>Speak</button>
@@ -223,5 +224,6 @@
 {% block extra_js %}
 <script src="/static/js/ai_insights.js?v=2.1.1"></script>
 <script src="/static/js/answer_markdown.js?v=1"></script>
-<script src="/static/js/intelligence.js?v=37"></script>
+<script src="/static/js/voice.js?v=1"></script>
+<script src="/static/js/intelligence.js?v=38"></script>
 {% endblock %}

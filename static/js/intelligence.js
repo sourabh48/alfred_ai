@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const modelStatus=document.getElementById('modelReadinessStatus'), modelRefresh=document.getElementById('modelReadinessRefresh');
     let modelPending=false, modelLoaded=false;
     const mic = document.getElementById("intelligenceMic"), speechHint = document.getElementById("intelligenceSpeechHint");
-    let speech = {listen:false, speak:false}, recording = null, player = null;
+    let speech = {listen:false, speak:false};
     async function refreshModelReadiness() {
         if (!active || modelPending) return;
         const ticket=generation;
@@ -619,72 +619,52 @@ document.addEventListener("DOMContentLoaded", () => {
         answers.append(row);
         while (answers.children.length > 20) answers.firstElementChild.remove();
     }
-    // AI-18: offline speech. The microphone is on only between Speak and Stop listening.
+    // AI-18: offline speech (static/js/voice.js). Listening stops by itself when you pause. Hands-free asks the question,
+    // reads the answer aloud and listens again, like a smart speaker, until nothing is said. Changes still need Confirm.
+    const handsFree = document.getElementById("intelligenceHandsFree");
+    let speakNext = false;
+    try { handsFree.checked = localStorage.getItem("alfred.handsFree") === "on"; } catch {}
+    handsFree.addEventListener("change", () => { try { localStorage.setItem("alfred.handsFree", handsFree.checked ? "on" : "off"); } catch {} });
     function readAloudButton(text) {
         const button = document.createElement("button"); button.type = "button"; button.className = "btn btn-outline-secondary btn-sm mt-3 ms-2";
         button.textContent = "Read aloud"; button.dataset.readAloud = "true"; button.hidden = !speech.speak;
         button.addEventListener("click", async () => {
             button.disabled = true;
-            try {
-                const response = await fetch("/api/ai/speech/speak/", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json", "X-CSRFToken":getCookie("csrftoken")}, body:JSON.stringify({text})});
-                if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || "The offline voice could not read this.");
-                // Web Audio plays the WAV without a blob: URL, which the page's Content Security Policy blocks.
-                const audio = await response.arrayBuffer();
-                if (player) player.close();
-                player = new AudioContext();
-                const sound = player.createBufferSource(); sound.buffer = await player.decodeAudioData(audio);
-                sound.connect(player.destination); sound.start();
-            } catch (error) { feedback.textContent = error.message; }
+            try { await AlfredVoice.speak(text); } catch (error) { feedback.textContent = error.message; }
             finally { button.disabled = false; }
         });
+        if (speakNext) { speakNext = false; converse(text); }
         return button;
     }
-    function wav16k(chunks, rate) {
-        const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0), input = new Float32Array(total);
-        let at = 0; chunks.forEach(chunk => { input.set(chunk, at); at += chunk.length; });
-        const length = Math.floor(total * 16000 / rate), view = new DataView(new ArrayBuffer(44 + length * 2));
-        const tag = (offset, value) => [...value].forEach((char, index) => view.setUint8(offset + index, char.charCodeAt(0)));
-        tag(0, "RIFF"); view.setUint32(4, 36 + length * 2, true); tag(8, "WAVE"); tag(12, "fmt "); view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 16000, true); view.setUint32(28, 32000, true);
-        view.setUint16(32, 2, true); view.setUint16(34, 16, true); tag(36, "data"); view.setUint32(40, length * 2, true);
-        // Fallback only when the browser refuses a 16 kHz context: nearest-sample downsampling.
-        for (let i = 0; i < length; i++) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, input[Math.floor(i * rate / 16000)] || 0)) * 0x7fff, true);
-        return new Blob([view], {type:"audio/wav"});
+    async function converse(text) {
+        try { if (speech.speak) await AlfredVoice.speak(text); } catch (error) { feedback.textContent = error.message; return; }
+        while (pending) await new Promise(resolve => setTimeout(resolve, 100));
+        if (handsFree.checked && speech.listen && active) listenOnce();
     }
-    async function startRecording() {
-        // The browser's own free noise suppression and echo cancellation clean the voice before Whisper hears it.
-        const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1, noiseSuppression:true, echoCancellation:true, autoGainControl:true}});
-        // A 16 kHz context lets the browser resample with filtering; naive downsampling garbled words.
-        let context; try { context = new AudioContext({sampleRate:16000}); } catch { context = new AudioContext(); }
-        const source = context.createMediaStreamSource(stream), processor = context.createScriptProcessor(4096, 1, 1), chunks = [];
-        processor.onaudioprocess = event => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
-        source.connect(processor); processor.connect(context.destination); await context.resume();
-        recording = {stream, context, chunks, timer:setTimeout(stopRecording, 30000)};
+    async function listenOnce() {
+        if (AlfredVoice.listening) { AlfredVoice.stop(); return; }
+        const idle = () => { mic.textContent = "Speak"; mic.setAttribute("aria-pressed", "false"); };
         mic.textContent = "Stop listening"; mic.setAttribute("aria-pressed", "true");
-        feedback.textContent = "Listening. Press Stop listening when you finish.";
-    }
-    async function stopRecording() {
-        const current = recording; if (!current) return;
-        recording = null; clearTimeout(current.timer);
-        current.stream.getTracks().forEach(track => track.stop());
-        const rate = current.context.sampleRate; await current.context.close();
-        mic.textContent = "Speak"; mic.setAttribute("aria-pressed", "false"); mic.disabled = true;
-        feedback.textContent = "Turning your speech into text on this PC.";
         try {
-            const result = await Alfred.fetchJSON("/api/ai/speech/transcribe/", {method:"POST", headers:{"Content-Type":"audio/wav"}, body:wav16k(current.chunks, rate)});
-            if (result.text && !query.readOnly) query.value = [query.value.trim(), result.text].filter(Boolean).join(" ");
-            feedback.textContent = result.text ? "Check the text, then press Ask ALFRED. Nothing has been asked yet." : "No speech was heard.";
+            const text = await AlfredVoice.listen(stage => {
+                if (stage === "listening") feedback.textContent = handsFree.checked ? "Listening. Ask your question; ALFRED asks it when you pause." : "Listening. Pause or press Stop listening when you finish.";
+                else { idle(); mic.disabled = true; feedback.textContent = "Turning your speech into text on this PC."; }
+            });
+            if (text && !query.readOnly) query.value = [query.value.trim(), text].filter(Boolean).join(" ");
+            if (text && handsFree.checked) form.requestSubmit();
+            else feedback.textContent = text ? "Check the text, then press Ask ALFRED. Nothing has been asked yet."
+                : handsFree.checked ? "Nothing was heard, so hands-free is waiting. Press Speak to go on." : "No speech was heard.";
             query.focus();
-        } catch (error) { feedback.textContent = error.message; }
-        finally { mic.disabled = false; }
+        } catch (error) {
+            feedback.textContent = error.name === "NotAllowedError" ? "Microphone access was not allowed."
+                : error instanceof DOMException ? "The microphone could not start." : error.message;
+        } finally { idle(); mic.disabled = false; }
     }
-    mic.addEventListener("click", () => recording ? stopRecording() : startRecording().catch(error => {
-        feedback.textContent = error.name === "NotAllowedError" ? "Microphone access was not allowed." : "The microphone could not start.";
-    }));
-    Alfred.fetchJSON("/api/ai/speech/status/").then(state => {
-        speech = state; mic.hidden = speechHint.hidden = !state.listen || !navigator.mediaDevices?.getUserMedia;
+    mic.addEventListener("click", () => { AlfredVoice.stopSpeaking(); listenOnce(); });
+    AlfredVoice.status().then(state => {
+        speech = state; mic.hidden = speechHint.hidden = handsFree.parentElement.hidden = !state.listen || !navigator.mediaDevices?.getUserMedia;
         document.querySelectorAll("[data-read-aloud]").forEach(button => { button.hidden = !state.speak; });
-    }).catch(() => {});
+    });
     async function streamAnswer(payload, ticket) {
         const controller = new AbortController(); streamRequest = controller;
         stopGeneration.hidden = false;
@@ -769,6 +749,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const ticket = generation, button = event.target.querySelector('button[type="submit"]');
         pending = true; button.disabled = true; newConversation.disabled = true; query.readOnly = true; retry.hidden = true;
+        speakNext = handsFree.checked;  // hands-free reads this answer aloud, then listens again
         updateHistoryControls();
         answers.setAttribute("aria-busy", "true");
         setLocalStatus("Local model processing", "processing");
