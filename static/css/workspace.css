@@ -92,6 +92,8 @@ html[data-theme="dark"] a { color: #a8caff; }
 html[data-theme="dark"] .alert a { color: inherit; }
 html[data-theme="dark"] .alfred-nav-list .nav-link { color: #ceddf2; }
 html[data-theme="dark"] .alfred-nav-list .nav-link.active { background: #294977; color: #fff; }
+/* The light theme's white hover wash left #ceddf2 text at 1.2:1 in dark mode. */
+html[data-theme="dark"] .alfred-nav-list .nav-link:hover, html[data-theme="dark"] .alfred-nav-list .nav-link:focus { background: #294977; color: #fff; }
 html[data-theme="dark"] .btn-primary, html[data-theme="dark"] .btn-secondary { color: #fff; }
 html[data-theme="dark"] .btn-soft-primary { color: #a8caff; }
 html[data-theme="dark"] .btn-outline-primary, html[data-theme="dark"] .btn-outline-secondary { color: #a8caff; border-color: #789cc8; }
