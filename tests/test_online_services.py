@@ -37,12 +37,12 @@ class OnlineServicesTests(TestCase):
         self.assertFalse(online.can_manage(self.family))
         admin = get_user_model().objects.create_superuser(username="synthetic-online-admin", password="pw-synthetic-3")
         self.assertEqual((online.can_manage(admin), online.can_manage(self.owner)), (True, False))
-        self.assertEqual(self.post(self.family, {"switches": {"TRAVEL_USE_MODE": True}}).status_code, 403)
+        self.assertEqual(self.post(self.family, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "synthetic-sky-key"}}).status_code, 403)
         self.assertFalse((self.root / "config" / "local.env").exists())
 
     def test_input_is_checked_before_anything_is_written(self):
-        for bad in ({"keys": {"DJANGO_SECRET_KEY": "x" * 20}}, {"keys": {"TRAVEL_ORS_API_KEY": "has space inside"}},
-                    {"keys": {"TRAVEL_ORS_API_KEY": "quote'injected\nDJANGO_SECRET_KEY=x"}}, {"switches": {"TRAVEL_VALHALLA_URL": "https://evil.example"}},
+        for bad in ({"keys": {"DJANGO_SECRET_KEY": "x" * 20}}, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "has space inside"}},
+                    {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "quote'injected\nDJANGO_SECRET_KEY=x"}}, {"switches": {"TRAVEL_VALHALLA_URL": True}},
                     {"switches": {"ALFRED_MEMORY_CLOUD_AUTHORIZED": True}}, {"mail": {"address": "me@unknown-provider.example", "password": "abcdefghij"}},
                     {"mail": {"address": "me@gmail.com", "password": "abcdefghij", "port": "99999"}}, {"mail": {"address": "not-an-email", "password": "abcdefghij"}}):
             with self.subTest(bad=bad):
@@ -53,9 +53,9 @@ class OnlineServicesTests(TestCase):
     def test_saved_values_work_at_once_survive_a_restart_and_are_never_sent_back(self):
         path = self.root / "config" / "local.env"
         private_directory(path.parent)
-        path.write_text("DJANGO_SECRET_KEY=keep-this-synthetic\nTRAVEL_ORS_API_KEY=old-synthetic-key\n# a comment\n", encoding="utf-8")
-        key = "synthetic-ors-key-1234"
-        response = self.post(self.owner, {"keys": {"TRAVEL_ORS_API_KEY": key}, "switches": {"TRAVEL_USE_MODE": True, "TRAVEL_VALHALLA_URL": True},
+        path.write_text("DJANGO_SECRET_KEY=keep-this-synthetic\nTRAVEL_SKYSCANNER_API_KEY=old-synthetic-key\n# a comment\n", encoding="utf-8")
+        key = "synthetic-sky-key-1234"
+        response = self.post(self.owner, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": key},
                                           "mail": {"address": "synthetic.owner@gmail.com", "password": "abcd efgh ijkl mnop"}})
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(key, response.content.decode())
@@ -64,7 +64,7 @@ class OnlineServicesTests(TestCase):
         self.assertEqual([k["hint"] for k in body["keys"] if k["saved"]], ["…1234"])
         self.assertTrue(body["mail"]["ready"])
         # in use straight away
-        self.assertEqual((os.environ["TRAVEL_ORS_API_KEY"], os.environ["TRAVEL_USE_MODE"]), (key, "personal_noncommercial"))
+        self.assertEqual(os.environ["TRAVEL_SKYSCANNER_API_KEY"], key)
         self.assertEqual((settings.ALFRED_SMTP_HOST, settings.ALFRED_SMTP_PORT, settings.ALFRED_SMTP_SSL, settings.ALFRED_SMTP_PASSWORD),
                          ("smtp.gmail.com", 587, False, "abcdefghijklmnop"))
         from apps.career.services.application_send import mail_configured
@@ -77,18 +77,17 @@ class OnlineServicesTests(TestCase):
         for name in NAMES:
             os.environ.pop(name, None)
         load_local_environment(self.root)
-        self.assertEqual((os.environ["TRAVEL_ORS_API_KEY"], os.environ["TRAVEL_VALHALLA_URL"], os.environ["ALFRED_SMTP_USER"]),
-                         (key, "https://valhalla1.openstreetmap.de", "synthetic.owner@gmail.com"))
+        self.assertEqual((os.environ["TRAVEL_SKYSCANNER_API_KEY"], os.environ["ALFRED_SMTP_USER"]), (key, "synthetic.owner@gmail.com"))
         # family members see the state but not the address
         self.client.force_login(self.family)
         family_view = self.client.get("/api/settings/online-services/").json()
         self.assertEqual((family_view["can_manage"], family_view["mail"]["address"]), (False, ""))
 
     def test_switching_off_and_removing_clears_the_line_and_the_running_value(self):
-        self.post(self.owner, {"keys": {"TRAVEL_BRAVE_API_KEY": "synthetic-brave-key"}, "switches": {"TRAVEL_BRAVE_ALLOW_PAID_SEARCH": True},
+        self.post(self.owner, {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google-key"},
                                "mail": {"address": "synthetic@yahoo.com", "password": "abcdefghij"}})
         self.assertEqual((settings.ALFRED_SMTP_PORT, settings.ALFRED_SMTP_SSL), (465, True))
-        self.post(self.owner, {"keys": {"TRAVEL_BRAVE_API_KEY": ""}, "switches": {"TRAVEL_BRAVE_ALLOW_PAID_SEARCH": False}, "mail": {}})
-        self.assertNotIn("TRAVEL_BRAVE", (self.root / "config" / "local.env").read_text(encoding="utf-8"))
-        self.assertNotIn("TRAVEL_BRAVE_API_KEY", os.environ)
+        self.post(self.owner, {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": ""}, "mail": {}})
+        self.assertNotIn("TRAVEL_GOOGLE", (self.root / "config" / "local.env").read_text(encoding="utf-8"))
+        self.assertNotIn("TRAVEL_GOOGLE_MAPS_API_KEY", os.environ)
         self.assertEqual((settings.ALFRED_SMTP_HOST, settings.ALFRED_SMTP_PORT), ("", 587))

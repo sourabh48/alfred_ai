@@ -281,7 +281,7 @@ ADVISORY_PROOF_SURFACE_CONTRACTS = (
         "label": "Travel advisor preview",
         "surface_type": "recommendation",
         "payload_path": "apps.mobility.services.travel_advisor.TravelAdvisorService.build_advice",
-        "required_sources": ["Open-Meteo / GeoNames, CC BY 4.0"],
+        "required_sources": ["Powered by Google"],
         "contract_features": list(ADVISORY_PROOF_REQUIRED_FEATURES),
     },
     {
@@ -554,7 +554,7 @@ class VerifiedIntelligenceService:
         return InsightResult(payload, evidence, result.cached)
 
     def geocode_destination(self, destination: str, stale_days: int = 30, *, force: bool = False) -> InsightResult:
-        from apps.mobility.services.travel.providers.geocoding import OpenMeteoGeocoding
+        from apps.mobility.services.travel.providers.geocoding import GooglePlaceSearch
 
         def shape(payload):
             items = payload.get("locations", [])
@@ -563,7 +563,7 @@ class VerifiedIntelligenceService:
             item = items[0]
             return {"display_name": ", ".join(filter(None, [item["name"], item.get("region"), item.get("country")])),
                     "latitude": float(item["lat"]), "longitude": float(item["lon"])}
-        return self._travel_insight(OpenMeteoGeocoding(), {"name": destination}, f"Destination match for {destination}",
+        return self._travel_insight(GooglePlaceSearch(), {"name": destination}, f"Destination match for {destination}",
                                     destination, shape, force)
 
     def offbeat_suggestions(self, destination: str, stale_days: int = 14, *, force: bool = False) -> InsightResult:
@@ -574,11 +574,11 @@ class VerifiedIntelligenceService:
             "Nearby suggestions come from the Travel planner, which applies provider budgets and terms."), False)
 
     def weather_snapshot(self, latitude: float, longitude: float, start_date: date, end_date: date, stale_hours: int = 8, *, force: bool = False) -> InsightResult:
-        from apps.mobility.services.travel.providers.weather import OpenMeteoWeather
+        from apps.mobility.services.travel.providers.weather import GoogleWeather
 
         def shape(payload):
             return {key: payload.get(key) for key in ("average_max_temp", "average_min_temp", "precipitation_total", "wind_max")}
-        return self._travel_insight(OpenMeteoWeather(), {"latitude": latitude, "longitude": longitude,
+        return self._travel_insight(GoogleWeather(), {"latitude": latitude, "longitude": longitude,
             "start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
             f"Weather forecast {start_date.isoformat()} to {end_date.isoformat()}", "", shape, force)
 

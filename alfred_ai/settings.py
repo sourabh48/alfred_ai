@@ -4,11 +4,9 @@ Django settings for alfred_ai project.
 
 import environ
 import os
-import re
 import sys
 from pathlib import Path
 from datetime import timedelta
-from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
@@ -224,24 +222,14 @@ SECURE_PROXY_SSL_HEADER = (
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST", default=not LOCAL_RUNTIME)
 X_FRAME_OPTIONS = env("X_FRAME_OPTIONS", default="DENY")
 
-def _csp_tile_host(url):
-    """Return a tile host safe to place in a policy; a bad URL only disables map tiles."""
-    try:
-        parts = urlsplit(url)
-    except ValueError:
-        return ""
-    return parts.hostname if parts.scheme == "https" and re.fullmatch(r"[a-z0-9.-]+", parts.hostname or "") else ""
-
-
 # Blocks external scripts, plugins, framing and fetch or image exfiltration. It is not
 # an XSS defence yet: inline handlers are used across the UI, so script-src allows them,
 # and an injected handler could still call same-origin APIs or navigate away with data.
 # The report-only policy shows the inline use in the browser console; it reports nowhere.
-_map_tile_host = _csp_tile_host(os.environ.get("TRAVEL_MAP_TILE_URL", "https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
 _CSP_BASE = {
     "default-src": [CSP.SELF],
     "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
-    "img-src": [CSP.SELF, "data:", "blob:", *([f"https://{_map_tile_host}"] if _map_tile_host else [])],
+    "img-src": [CSP.SELF, "data:", "blob:"],  # map tiles come through ALFRED itself
     "font-src": [CSP.SELF, "data:"],
     "connect-src": [CSP.SELF],
     "object-src": [CSP.NONE],

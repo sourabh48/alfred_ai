@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.mobility.models import TravelResearchEvidence
 from apps.mobility.services.travel.providers.base import ProviderError, ProviderResult
-from apps.mobility.services.travel.providers.routing import OpenRouteService
+from apps.mobility.services.travel.providers.routing import GoogleRoutes
 from apps.mobility.services.travel.research import enrich_candidate
 from apps.mobility.services.travel.mapping import map_features
 from apps.mobility.services.travel_conversation import new_session, save_plan
@@ -20,12 +20,10 @@ from apps.mobility.services.travel_itinerary import build_itinerary
 def route_fixture(*, distance=80):
     now = timezone.now()
     parameters = {"start": [77.59, 12.97], "end": [77.03, 12.18], "mode": "ride"}
-    payload = OpenRouteService().normalize({"features": [{"geometry": {"type": "LineString", "coordinates": points},
-        "properties": {"summary": {"distance": km*1000, "duration": hours*3600}}}
-        for points, km, hours in [([parameters["start"], parameters["end"]], distance, 2),
-            ([parameters["start"], [77.3, 12.5], parameters["end"]], distance+10, 3)]]}, parameters)
-    return ProviderResult("openrouteservice", "routing", success=True, status="ok", freshness="LIVE", confidence="LIKELY",
-        source_url="https://openrouteservice.org/", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(), payload=payload)
+    payload = GoogleRoutes().normalize({"routes": [{"distanceMeters": km*1000, "duration": f"{hours*3600}s", "description": via}
+        for km, hours, via in [(distance, 2, "NH275"), (distance+10, 3, "SH17")]]}, parameters)
+    return ProviderResult("google_routes", "routing", success=True, status="ok", freshness="LIVE", confidence="LIKELY",
+        source_url="https://www.google.com/maps", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(), payload=payload)
 
 
 def _alternative_requests(query):
@@ -59,23 +57,22 @@ class TravelRouteChoiceTests(TestCase):
         return self.client.post(self.url, {"action": "route_choice", "revision": self.session.revision,
             "candidate_index": 0, "route_id": self.result.payload["routes"][1]["route_id"], **overrides}, content_type="application/json")
 
-    @patch.dict("os.environ", {"TRAVEL_ORS_API_KEY": "synthetic-key"})
+    @patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-key"})
     @patch("apps.mobility.services.travel.providers.routing.request_json")
-    def test_alternative_request_is_bounded_and_distinct_geometry_is_not_fabricated(self, request):
-        provider = OpenRouteService()
+    def test_alternative_request_is_bounded_and_identical_routes_are_not_doubled(self, request):
+        provider = GoogleRoutes()
         p = {"start": [77, 12], "end": [77.1, 12.1], "mode": "ride"}
         provider.fetch(p)
-        self.assertNotIn("alternative_routes", request.call_args.kwargs["json"])
+        self.assertFalse(request.call_args.kwargs["json"]["computeAlternativeRoutes"])
         provider.fetch(p | {"alternatives": True, "avoid_tolls": True})
-        self.assertEqual(request.call_args.kwargs["json"]["alternative_routes"], {"target_count": 3, "share_factor": 0.6, "weight_factor": 1.4})
-        self.assertEqual(request.call_args.kwargs["json"]["options"]["avoid_features"], ["tollways"])
+        self.assertTrue(request.call_args.kwargs["json"]["computeAlternativeRoutes"])
+        self.assertEqual(request.call_args.kwargs["json"]["routeModifiers"], {"avoidHighways": False, "avoidTolls": True})
         before = request.call_count
         for bad in (1, "true", None, {}):
             with self.assertRaises(ProviderError): provider.fetch(p | {"alternatives": bad})
         self.assertEqual(request.call_count, before)
-        feature = {"geometry": {"type": "LineString", "coordinates": [[77, 12], [77.1, 12.1]]},
-            "properties": {"summary": {"distance": 1000, "duration": 60}}}
-        normalized = provider.normalize({"features": [feature, feature]}, p)
+        route = {"distanceMeters": 1000, "duration": "60s"}
+        normalized = provider.normalize({"routes": [route, route]}, p)
         self.assertEqual(len(normalized["routes"]), 1)
         self.assertEqual(normalized["routes"][0]["motorcycle_legal"], "UNKNOWN")
 
@@ -92,7 +89,7 @@ class TravelRouteChoiceTests(TestCase):
             return candidate
         accepted = run(self.result)
         self.assertEqual(len(accepted["route_result"]["payload"]["routes"]), 2)
-        failed = run(ProviderResult("openrouteservice", "routing", error="quota_exhausted"))
+        failed = run(ProviderResult("google_routes", "routing", error="quota_exhausted"))
         self.assertEqual(failed["route_result"]["payload"], self.result.payload)
         self.assertIn("retaining the single-route", failed["route_alternatives_note"])
 
@@ -119,7 +116,7 @@ class TravelRouteChoiceTests(TestCase):
         self.assertEqual(sum(budget["categories"].values()), budget["expected"])
         self.assertEqual(sum(day["estimated_cost"] for day in self.session.itinerary["days"]), budget["expected"])
         routes = [f for f in selected["map"]["features"] if f["properties"]["kind"] == "route"]
-        self.assertEqual([f["properties"]["selected"] for f in routes], [False, True])
+        self.assertEqual(routes, [])  # Google routes carry distance and time only, so no line is drawn
         self.assertEqual(self.session.state["_destination_pool"]["value"][0]["selected_route_id"], selected["selected_route_id"])
         self.assertEqual(TravelResearchEvidence.objects.count(), before_evidence)
         self.session.plan.refresh_from_db()

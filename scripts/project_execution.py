@@ -33,7 +33,7 @@ GATES = {
     'DOC-09': 'BLOCKED_EVIDENCE: delete now removes orphaned stored files 2026-11-06 (118 tests PASS); owner check with a synthetic document remains',
     'CAREER-04': 'BLOCKED_APPROVAL: manual recruiter intake accepted; automatic mailbox access needs approved provider access and a reviewed integration',
     'CAREER-07': 'BLOCKED_EVIDENCE: interview preparation panel from the saved job match 2026-11-06 (73 backend + Chrome PASS); owner check remains',
-    'TRAVEL-04': 'BLOCKED_APPROVAL: routing key added to the owner runtime 2026-11-07 and opt-in Valhalla motorcycle routing built; verified inter-stop routing needs the owner real-trip check after restart; manual itineraries accepted',
+    'TRAVEL-04': 'BLOCKED_APPROVAL: Google Routes is the only router since 2026-11-14 (two-wheeler, distance and time, no line drawn); verified inter-stop routing needs the owner Google key and a real-trip check; manual itineraries accepted',
     'TRAVEL-07': 'BLOCKED_EVIDENCE: bounded alternative-route choice accepted; independently reviewed scenic/legal route evidence absent',
     'TRAVEL-08': 'BLOCKED_EVIDENCE: owner-reviewed restriction references accepted; independently authenticated route-applicable restrictions absent',
     'TRAVEL-09': 'BLOCKED_APPROVAL: straight-line stop distance labelled 2026-11-06; road-network detours need an approved routing key',

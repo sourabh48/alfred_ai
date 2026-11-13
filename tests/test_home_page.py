@@ -1,4 +1,7 @@
 """Home: plain figures from the canonical baseline, first-run steps and a read-only attention list."""
+import os
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
@@ -24,7 +27,15 @@ class HomePageTests(TestCase):
         self.assertEqual([tile["amount"] for tile in response.context["glance"]], [None, None, None, None])
         self.assertContains(response, "Not added yet", count=4)
         self.assertContains(response, "Get started: 0 of 6 done")
-        self.assertNotContains(response, "Needs your attention")
+        self.assertEqual([item["action"] for item in response.context["attention"]], ["Add key", "Add sign-in"])  # this account manages ALFRED
+
+    def test_missing_keys_are_asked_for_only_from_the_manager_and_only_while_missing(self):
+        keys = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google", "ALFRED_GOOGLE_CLIENT_ID": "synthetic-id", "ALFRED_GOOGLE_CLIENT_SECRET": "synthetic-secret"}
+        with patch.dict(os.environ, keys):
+            self.assertNotContains(self.home(), "Needs your attention")
+        other = get_user_model().objects.create_user("synthetic-home-2", password="synthetic-pass-123")
+        self.client.force_login(other)
+        self.assertNotContains(self.home(), "Add your Google Maps Platform key")
 
     def test_figures_are_the_canonical_ones_and_reading_home_writes_nothing(self):
         self.user.monthly_income, self.user.monthly_income_basis = 100000, "monthly"

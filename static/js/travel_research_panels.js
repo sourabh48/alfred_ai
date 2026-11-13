@@ -43,40 +43,12 @@ window.TravelResearchPanels = (() => {
         const options = (r.payload?.options || []).slice().sort((a,b)=>Number(a.total_price)-Number(b.total_price));
         const priced = options.some(o=>o.total_price != null);
         const picks = !priced ? options.slice(0,6) : options.length <= 3 ? options : [options[0],options[Math.floor(options.length/2)],options.at(-1)];
-        return `<h3 class="h5">Stays · compare and open externally</h3>${provenance(r)}<p class="small">Search results require a fresh availability check on the provider. No room is reserved. Prices may exclude property charges.</p><div class="travel-research-cards">${picks.map((o,i)=>`<article><h4 class="h6">${esc(o.name)}</h4>${o.total_price == null ? `${o.address ? `<p class="small">${esc(o.address)}</p>` : ""}<p>Prices and free rooms: ${o.google_hotels_url ? `${link(o.google_hotels_url,"Google Hotels (set your dates there)")} · ${link(o.dated_booking_url,"Booking.com with your trip details")}` : "open the link below to check them."}</p>` : `<p>${picks.length === 3 ? ["Lower listed price","Middle listed price","Higher listed price"][i] : "Search result"} · ${money(o.total_price,o.currency)} total</p><p>${money(o.nightly_rate,o.currency)} per night · ${esc(o.check_in)} to ${esc(o.check_out)}</p><p>${esc(o.availability)} · rating ${esc(o.review_score ?? o.rating ?? "unknown")}</p><p>Parking: ${esc(o.parking)} · Cancellation: ${esc(o.cancellation_policy)}</p>`}<p>${link(o.booking_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.name+" "+(d.name || d.destination))}`,"Open stay search")}</p></article>`).join("")}</div>${!picks.length ? '<p>Live stay pricing/availability could not be retrieved. These links open searches for you to check.</p>' : ""}${guideStays(d)}${bookingSites(["hotels"])}${searchLinks(d,["hotels"])}`;
-    }
-    function guideStays(d) {
-        const r = d.stays_guide_result || {};
-        const rows = (r.payload?.options || []).slice(0,12);
-        if (!rows.length) return "";
-        return `<div data-stays-guide><h4 class="h6 mt-3">Guide listings · ${esc(r.payload?.article)}</h4>${provenance(r)}<p class="small">From the Wikivoyage travel guide. Prices are as written by contributors, not current rates. Availability, parking and condition are unverified: contact the property before you rely on a listing.</p><div class="travel-research-cards">${rows.map(o=>`<article><h5 class="h6">${esc(o.name)}</h5>${o.tier ? `<p class="small">${esc(o.tier)}</p>` : ""}${o.price_text ? `<p>Guide price: ${esc(o.price_text)}</p>` : ""}${o.description ? `<p class="small">${esc(o.description)}</p>` : ""}${o.address ? `<p class="small">${esc(o.address)}</p>` : ""}${o.check_in || o.check_out ? `<p class="small">Check-in ${esc(o.check_in || "unknown")} · check-out ${esc(o.check_out || "unknown")}</p>` : ""}${o.phone ? `<p class="small">Phone ${esc(o.phone)}</p>` : ""}${o.website ? `<p>${link(o.website,"Property website")}</p><div aria-live="polite">${stayDetailsHtml.get(o.website) || `<button class="btn btn-sm btn-outline-secondary" data-stay-details="${esc(o.website)}">Get details from this website</button>`}</div>` : o.website_host ? `<p class="small">Website (not a secure link): ${esc(o.website_host)}</p>` : ""}<p class="small">${link(o.source_url,"Guide entry")}${o.listing_updated ? ` · listing updated ${esc(o.listing_updated)}` : ""}</p></article>`).join("")}</div><p class="small">${esc(r.payload?.coverage)}</p></div>`;
-    }
-    const stayDetailsHtml = new Map();
-    const STAY_ERRORS = {robots_disallowed:"This website asks automated tools not to read it. Open it yourself.",
-        robots_unreadable:"ALFRED could not confirm that this website allows automated reading, so it did not read it.",
-        redirect_blocked:"This website sends visitors to another address. Open it yourself.",
-        authorization_failed:"This website refuses automated readers. Open it yourself.",
-        network_error:"The website did not respond.", timeout:"The website did not respond in time.",
-        response_too_large:"This page is too large to read safely. Open it yourself.",
-        api_error:"The website returned an error page.", unexpected_content_type:"This link is not a web page."};
-    function stayDetails(r) {
-        if (!r.success) return `<p class="small travel-unknown">${esc(STAY_ERRORS[r.error] || `Could not read this website: ${(r.error || "unavailable").replaceAll("_"," ")}.`)}</p>`;
-        const x = r.payload?.details || {};
-        const rows = [["Name",x.name],["Address",x.address],["Phone",x.phone],["Check-in",x.check_in],["Check-out",x.check_out],
-            ["Price range (property's own)",x.price_range],["Stars",x.star_rating],["Rating",x.rating && `${x.rating}${x.review_count ? ` from ${x.review_count} reviews` : ""}`],
-            ["Pets",x.pets_allowed],["Amenities",(x.amenities || []).join(", ")],["About",x.description],["Page summary",x.page_summary]].filter(([,v])=>v);
-        return `${rows.length ? `<dl class="small" data-stay-website-details>${rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}<p class="small">${esc(r.payload?.coverage)} ${r.cached ? "Saved copy" : "Checked"} ${esc(stamp(r.retrieved_at))}.</p>`;
-    }
-    function recentFares(d) {
-        const r = d.flight_prices_result || {};
-        const rows = (r.payload?.options || []).slice(0,5);
-        if (!rows.length) return r.error && !r.error.startsWith("missing_") ? `<p class="small">Recent fares unavailable: ${esc(r.error.replaceAll("_"," "))}.</p>` : "";
-        return `<div data-recent-fares><h4 class="h6 mt-3">Recent fares other travellers found</h4>${provenance(r)}<p class="small">Cheapest prices seen on Aviasales in the last 48 hours, for one adult. Not live: open a fare to see today's price.</p><ul>${rows.map(o=>`<li>${money(o.fare,o.currency)} · ${esc(o.flight_number || o.carrier)} · ${esc(o.origin)} → ${esc(o.destination)} · ${esc(o.departure || "time unknown")} · ${esc(o.transfers ?? "unknown")} stops ${link(o.booking_url,"Open fare")}</li>`).join("")}</ul></div>`;
+        return `<h3 class="h5">Stays · compare and open externally</h3>${provenance(r)}<p class="small">Search results require a fresh availability check on the provider. No room is reserved. Prices may exclude property charges.</p><div class="travel-research-cards">${picks.map((o,i)=>`<article><h4 class="h6">${esc(o.name)}</h4>${o.total_price == null ? `${o.address ? `<p class="small">${esc(o.address)}</p>` : ""}<p>Prices and free rooms: ${o.google_hotels_url ? `${link(o.google_hotels_url,"Google Hotels (set your dates there)")} · ${link(o.dated_booking_url,"Booking.com with your trip details")}` : "open the link below to check them."}</p>` : `<p>${picks.length === 3 ? ["Lower listed price","Middle listed price","Higher listed price"][i] : "Search result"} · ${money(o.total_price,o.currency)} total</p><p>${money(o.nightly_rate,o.currency)} per night · ${esc(o.check_in)} to ${esc(o.check_out)}</p><p>${esc(o.availability)} · rating ${esc(o.review_score ?? o.rating ?? "unknown")}</p><p>Parking: ${esc(o.parking)} · Cancellation: ${esc(o.cancellation_policy)}</p>`}<p>${link(o.booking_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.name+" "+(d.name || d.destination))}`,"Open stay search")}</p></article>`).join("")}</div>${!picks.length ? '<p>Live stay pricing/availability could not be retrieved. These links open searches for you to check.</p>' : ""}${bookingSites(["hotels"])}${searchLinks(d,["hotels"])}`;
     }
     function transport(d) {
         return `<h3 class="h5">Train, bus and flight research</h3>${["trains","buses","flights"].map(kind=>{
             const r = d[kind+"_result"] || {};
-            return `<details><summary>${esc(kind[0].toUpperCase()+kind.slice(1))} · ${esc(label(r))}</summary>${provenance(r)}${(r.payload?.options || []).slice(0,4).map(o=>`<article><strong>${esc(o.carrier || o.provider)} · ${esc(o.origin)} → ${esc(o.destination)}</strong><p>${esc(o.departure || "Time unknown")} – ${esc(o.arrival || "Time unknown")} · ${esc(o.duration || "Duration unknown")} · ${esc(o.transfers ?? "Unknown")} transfers</p><p>${money(o.fare,o.currency)} · ${esc(o.availability)}</p>${o.fare_scope ? `<p>${esc(o.fare_scope)}</p>` : ""}${link(o.booking_url,"Open operator")}</article>`).join("") || '<p>Current availability could not be verified. Check the operator externally.</p>'}${kind === "flights" ? recentFares(d) : ""}${bookingSites([kind])}${kind === "buses" ? '<p class="small">State operators only; other states and private operators are not listed.</p>' : ""}${searchLinks(d,[kind])}</details>`;
+            return `<details><summary>${esc(kind[0].toUpperCase()+kind.slice(1))} · ${esc(label(r))}</summary>${provenance(r)}${(r.payload?.options || []).slice(0,4).map(o=>`<article><strong>${esc(o.carrier || o.provider)} · ${esc(o.origin)} → ${esc(o.destination)}</strong><p>${esc(o.departure || "Time unknown")} – ${esc(o.arrival || "Time unknown")} · ${esc(o.duration || "Duration unknown")} · ${esc(o.transfers ?? "Unknown")} transfers</p><p>${money(o.fare,o.currency)} · ${esc(o.availability)}</p>${o.fare_scope ? `<p>${esc(o.fare_scope)}</p>` : ""}${link(o.booking_url,"Open operator")}</article>`).join("") || '<p>Current availability could not be verified. Check the operator externally.</p>'}${bookingSites([kind])}${kind === "buses" ? '<p class="small">State operators only; other states and private operators are not listed.</p>' : ""}${searchLinks(d,[kind])}</details>`;
         }).join("")}${(d.mode_comparison || []).length ? `<h4 class="h6 mt-3">Mode comparison · ESTIMATED budgets</h4><ul>${d.mode_comparison.map(m=>`<li>${esc(m.mode)}: ${money(m.budget.expected)} expected · ${esc(m.availability)}</li>`).join("")}</ul>` : ""}`;
     }
     function discovery(d) {
@@ -85,8 +57,7 @@ window.TravelResearchPanels = (() => {
     }
     function sources(d) {
         const r = d.permit_result || {}, p = r.payload || {};
-        const research = d.web_research || [];
-        return `<h3 class="h5">Permits, access and source evidence</h3>${provenance(r)}<p><strong>${esc(p.place || d.name || d.destination)}</strong>: ${esc(p.requirement || "Requirement unverified")}</p><p>Authority: ${esc(p.authority || "Unknown")} · Current access: ${esc(p.opening_status || "UNKNOWN")}</p><p>${esc(p.recheck || "Recheck entry rules, quotas and closures directly with the authority before departure.")}</p>${searchLinks(d,["permits","closures"])}${research.map(result=>`<details><summary>Research leads: ${esc(result.payload?.query || "Search unavailable")}</summary>${provenance(result)}<p>${esc(result.payload?.coverage)}</p>${(result.payload?.findings || []).map(f=>`<article class="travel-source">${link(f.source_url,f.title)}<br><small>${esc(f.source_type)} · UNVERIFIED LEAD</small><p>${esc(f.snippet)}</p></article>`).join("")}</details>`).join("")}<p class="small">Finding an official page in search does not verify a rule. Snippets are leads; current fees, restrictions and opening may still be unknown.</p>`;
+        return `<h3 class="h5">Permits, access and source evidence</h3>${provenance(r)}<p><strong>${esc(p.place || d.name || d.destination)}</strong>: ${esc(p.requirement || "Requirement unverified")}</p><p>Authority: ${esc(p.authority || "Unknown")} · Current access: ${esc(p.opening_status || "UNKNOWN")}</p><p>${esc(p.recheck || "Recheck entry rules, quotas and closures directly with the authority before departure.")}</p>${searchLinks(d,["permits","closures"])}`;
     }
     function quality(d) {
         const q = d.quality || {};
@@ -152,17 +123,6 @@ window.TravelResearchPanels = (() => {
         $("plannerEvidence")?.addEventListener("click",async e=>{
             const choice = e.target.closest("[data-research-destination]");
             if (choice) { selectedName=choice.dataset.researchDestination; render(session); }
-            const detailsButton = e.target.closest("[data-stay-details]");
-            if (detailsButton) {
-                const url = detailsButton.dataset.stayDetails;
-                detailsButton.disabled = true;
-                detailsButton.textContent = "Reading the property's website…";
-                try {
-                    stayDetailsHtml.set(url, stayDetails(await Alfred.fetchJSON(`/api/mobility/planner/sessions/${session.id}/stay-details/`,
-                        {method:"POST", body:JSON.stringify({url})})));
-                    render(session);
-                } catch (err) { detailsButton.disabled = false; detailsButton.textContent = `Try again · ${err.message}`; }
-            }
             if (e.target.id === "plannerLoadMap") { mapEnabled=true; renderMap(selected()); e.target.hidden=true; }
             if (e.target.id === "plannerLoadQuota") {
                 try {

@@ -57,7 +57,7 @@ class TravelAdvisorService:
             "proof_contract": proof_contract_payload(
                 evidence_items=evidence,
                 freshness=evidence_freshness,
-                required_sources=["Open-Meteo / GeoNames, CC BY 4.0"] if destination else [],
+                required_sources=["Powered by Google"] if destination else [],
                 advisory_surface="travel_advisor_preview",
             ),
         }

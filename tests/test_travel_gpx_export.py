@@ -9,7 +9,22 @@ from alfred_private_storage import private_directory
 from apps.mobility.models import TravelPlan
 from apps.mobility.services.travel_discovery import fact
 from tests import test_travel_pdf_export as fixtures
-from tests.test_travel_route_choices import route_fixture
+from apps.mobility.services.travel.providers.base import ProviderResult
+
+
+def route_fixture():
+    """A route line saved from openrouteservice before 2026-11-14; Google routes draw none, but old plans still export it."""
+    from datetime import timedelta
+    from hashlib import sha256
+    import json
+    from django.utils import timezone
+    now = timezone.now()
+    route = {"distance_km": 80, "duration_hours": 2, "profile": "driving-car",
+             "geometry": {"type": "LineString", "coordinates": [[77.59, 12.97], [77.03, 12.18]]}}
+    route["route_id"] = sha256(json.dumps(route, sort_keys=True).encode()).hexdigest()
+    return ProviderResult("openrouteservice", "routing", success=True, status="ok", freshness="LIVE", confidence="LIKELY",
+        source_url="https://openrouteservice.org/", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(),
+        payload={"routes": [route]})
 
 
 class TravelGPXExportTests(TestCase):

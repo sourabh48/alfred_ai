@@ -60,7 +60,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
                 return query(provider, parameters, **kwargs)
             now = timezone.now()
             return ProviderResult(provider.name, provider.category, success=True, status="ok", freshness="LIVE",
-                confidence="LIKELY", source_url="https://openrouteservice.org/", retrieved_at=now.isoformat(),
+                confidence="LIKELY", source_url="https://www.google.com/maps", retrieved_at=now.isoformat(),
                 expires_at=(now+timedelta(days=1)).isoformat(), payload={"routes":[{
                     "distance_km":250, "duration_hours":5,
                     "geometry":{"type":"LineString", "coordinates":[parameters["start"],parameters["end"]]}}]})
@@ -71,10 +71,11 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             ("apps.mobility.services.travel.cache.query", {"side_effect":route_fixture}),  # routing goes through the free-first fallback chain
             ("apps.mobility.services.travel.providers.base.request", {"side_effect":AssertionError("Browser tests must mock providers")}),
             ("apps.mobility.planner_views.map_configuration", {"return_value":{"provider":"openstreetmap","tile_url":"","attribution":"Fixture map","attribution_url":"https://www.openstreetmap.org/copyright"}}),
-            ("apps.mobility.services.travel.providers.web.WikivoyageDestinations.fetch", {"return_value":({"query":{"pages":[
-                {"pageid":42,"ns":0,"title":"Talakadu","coordinates":[{"lat":12.18,"lon":77.03}]},
-                {"pageid":43,"ns":0,"title":"Chikmagalur","coordinates":[{"lat":13.32,"lon":75.77}]},
-                {"pageid":44,"ns":0,"title":"Belur","coordinates":[{"lat":13.16,"lon":75.87}]}]}},"fixture-hash")})]:
+            ("apps.mobility.services.travel.providers.places.GoogleDestinations.unavailable_reason", {"return_value":""}),
+            ("apps.mobility.services.travel.providers.places.GoogleDestinations.fetch", {"return_value":({"places":[
+                {"id":"t42","displayName":{"text":"Talakadu"},"location":{"latitude":12.18,"longitude":77.03}},
+                {"id":"t43","displayName":{"text":"Chikmagalur"},"location":{"latitude":13.32,"longitude":75.77}},
+                {"id":"t44","displayName":{"text":"Belur"},"location":{"latitude":13.16,"longitude":75.87}}]},"fixture-hash")})]:
             p=patch(target,**kw);p.start();self.addCleanup(p.stop)
         self.browser.get(self.live_server_url+"/login/")
         self.browser.add_cookie({"name":"sessionid","value":self.client.cookies["sessionid"].value,"path":"/"})
@@ -217,7 +218,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def test_route_comparison_choice_rebuild_retry_expiry_and_reopen(self):
         from apps.mobility.models import TravelPlanningSession
-        from apps.mobility.services.travel.providers.routing import OpenRouteService
+        from apps.mobility.services.travel.providers.routing import GoogleRoutes
         from apps.expenses.models import BankAccount, Expense
         from apps.investments.models import Investment
         from apps.loans.models import Loan
@@ -227,17 +228,13 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         financial_before = [list(model.objects.values()) for model in (BankAccount, Expense, Investment, Loan)]
         def compared(provider, params, **kwargs):
             if provider.category != "routing": return query(provider, params, **kwargs)
-            points = [params["start"], params["end"]]
-            middle = [(points[0][0]+points[1][0])/2+0.05, (points[0][1]+points[1][1])/2]
-            features = [{"geometry": {"type": "LineString", "coordinates": points},
-                "properties": {"summary": {"distance": 80000, "duration": 7200}}}]
+            routes = [{"distanceMeters": 80000, "duration": "7200s", "description": "NH 275"}]
             if params.get("alternatives"):
-                features.append({"geometry": {"type": "LineString", "coordinates": [points[0], middle, points[1]]},
-                    "properties": {"summary": {"distance": 90000, "duration": 10800}}})
+                routes.append({"distanceMeters": 90000, "duration": "10800s", "description": "SH 17"})
             now = timezone.now()
             return ProviderResult(provider.name, provider.category, success=True, status="ok", freshness="LIVE", confidence="LIKELY",
-                source_url="https://openrouteservice.org/", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(),
-                payload=OpenRouteService().normalize({"features": features}, params))
+                source_url="https://www.google.com/maps", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(),
+                payload=GoogleRoutes().normalize({"routes": routes}, params))
 
         with patch("apps.mobility.services.travel.research.query", side_effect=compared), patch("apps.mobility.services.travel.cache.query", side_effect=compared):
             self.browser.get(self.live_server_url+"/mobility/")
@@ -409,33 +406,11 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.text("plannerResearch").startswith("Ready"))
         self.click("#plannerQuota summary")
         self.click("#plannerLoadQuota")
-        self.wait.until(lambda _: "brave · web" in self.text("plannerQuotaBody"))
-        self.assertIn("wikivoyage · destinations",self.text("plannerQuotaBody"))
-        self.assertIn("duffel · flights",self.text("plannerQuotaBody"))
+        self.wait.until(lambda _: "google_routes · routing" in self.text("plannerQuotaBody"))
+        self.assertIn("google_destinations · destinations",self.text("plannerQuotaBody"))
+        self.assertIn("skyscanner · flights",self.text("plannerQuotaBody"))
         self.assertIn("local budget left",self.text("plannerQuotaBody"))
         self.assertIn("per month",self.text("plannerQuotaBody"))
-
-    def test_guide_stay_reads_the_property_website_on_request(self):
-        from tests.test_travel_stays_guide import HOTEL_PAGE
-        article = "==Sleep==\n* {{sleep | name=Synthetic Lodge | url=https://stay.example.org/ | price=₹2000 }}\n==Connect==\n"
-        stays = patch("apps.mobility.services.travel.providers.web.WikivoyageStays.fetch", return_value=({"query":{"pages":[
-            {"pageid":7,"title":"Coorg","revisions":[{"timestamp":"2026-01-01T00:00:00Z","slots":{"main":{"content":article}}}]}]}},"stays-hash"))
-        site = patch("apps.mobility.services.travel.providers.web.HotelWebsite.fetch", return_value=(HOTEL_PAGE,"site-hash"))
-        stays.start(); self.addCleanup(stays.stop)
-        fetch = site.start(); self.addCleanup(site.stop)
-        self.browser.get(self.live_server_url+"/mobility/")
-        self.wait.until(lambda _: "destination is optional" in self.text("plannerMessages"))
-        self.send("Plan a 3-day bike trip from Bengaluru to Coorg. Budget 15000.")
-        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,"[data-stay-details]"))
-        self.assertIn("Guide price: ₹2000", self.text("plannerEvidence"))
-        fetch.assert_not_called()  # Nothing is read from the property's site until the owner asks.
-        self.click("[data-stay-details]")
-        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,"[data-stay-website-details]"))
-        details = self.browser.find_element(self.By.CSS_SELECTOR,"[data-stay-website-details]").text
-        self.assertIn("1 Hill Road, Manali, IN", details)
-        self.assertIn("Parking, Wifi", details)
-        self.assertNotIn("Pool", details)
-        fetch.assert_called_once()
 
     def test_date_change_keeps_edited_days_and_does_not_resurrect_old_forecast(self):
         self.browser.get(self.live_server_url + "/mobility/")

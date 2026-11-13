@@ -70,16 +70,16 @@ ranking. It does **not** send chats to a hosted language model. It supports the
 documented requests and edits, and asks for clarification for unsupported edits.
 It is not a general-purpose conversational language model.
 
-No-key Wikivoyage discovery can find geotagged destinations beyond the 13-place
-offline seed catalogue. Coverage is incomplete and community maintained. Failed
+Google Places can find destinations around the start city beyond the 13-place
+offline seed catalogue. They are map listings, not an official list. Failed
 or unsuitable discovery falls back to the seed catalogue with a visible reason.
 Arbitrary named destinations can use configured geocoding; ambiguous results
 require selection. Unknown origin distances remain unknown.
 
 The research panels show weather, stays, transport, permit/source leads, places,
-estimated cost formulas and provider freshness. Configured adapters support
-Open-Meteo, openrouteservice, authorized Overpass and opt-in Duffel stay/flight
-search. See [provider configuration and limits](TRAVEL_PROVIDERS.md). Their
+estimated cost formulas and provider freshness. One Google Maps Platform key
+covers place names, places, hotels, destinations, routes and weather; live flight
+prices wait for a Skyscanner key (a Google Flights link until then). See [provider configuration and limits](TRAVEL_PROVIDERS.md). Their
 implementation and fixture tests do not establish live-account acceptance.
 Missing credentials leave the affected category unavailable and retain the plan.
 
@@ -94,9 +94,7 @@ window stay **UNKNOWN**. Saved API reads age forecasts and offers, remove expire
 weather proposals, and label expired availability as unknown. Cached results are
 never presented as a new live fetch. Rechecks retain edited days and allowances.
 
-Broad web research needs configured Brave storage rights/paid-use opt-in or an
-authorized SearXNG endpoint. Wikivoyage is the limited community fallback. Search
-snippets and tourism links are leads; they do not verify current permits, opening,
+Tourism links are leads; they do not verify current permits, opening,
 fees or inventory. Rail and bus availability remain unavailable without authorized
 integrations. External stay, transport and map links are unchecked searches.
 ALFRED makes no bookings, reservations or payments.

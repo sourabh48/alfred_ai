@@ -4,61 +4,64 @@ from statistics import mean
 
 from django.utils import timezone
 
-from .base import ProviderError, number, request_json
-from .geocoding import OpenMeteoGeocoding
+from .base import Provider, ProviderError, number, request_json
+from .geocoding import GOOGLE_KEY, google_unavailable
+
+FORECAST_DAYS = 10  # Google's daily forecast covers today and the next nine days
 
 
-class OpenMeteoWeather(OpenMeteoGeocoding):
+class GoogleWeather(Provider):
+    """Daily forecast from the Google Maps Platform Weather API (owner decision 2026-11-14: Google only)."""
+    name = "google_weather"
     category = "weather"
-    source_url = "https://open-meteo.com/en/docs"
-    attribution = "Weather data by Open-Meteo, CC BY 4.0; ALFRED summarizes forecasts"
+    source_url = "https://developers.google.com/maps/documentation/weather"
+    attribution = "Weather by Google; ALFRED summarizes the forecast"
     ttl = timedelta(hours=2)
     allowed_parameters = {"latitude", "longitude", "start_date", "end_date"}
-    variables = ("temperature_2m_max", "temperature_2m_min", "precipitation_sum", "wind_speed_10m_max",
-                 "weather_code", "sunrise", "sunset")
+    limits = {"minute": 10, "hour": 60, "day": 200, "month": 3000}
+
+    def unavailable_reason(self):
+        return google_unavailable()
 
     def parameters(self, parameters):
-        # Checked before query() logs a network call: an unforecastable window must not use budget or back off geocoding.
+        # Checked before query() logs a network call: an unforecastable window must not use budget.
         clean = super().parameters(parameters)
         start, end = date.fromisoformat(clean["start_date"]), date.fromisoformat(clean["end_date"])
         today = timezone.localdate()
-        if not today <= start <= end <= today+timedelta(days=15):
+        if not today <= start <= end < today+timedelta(days=FORECAST_DAYS):
             raise ProviderError("outside_forecast_window")
         return clean
 
     def fetch(self, p):
-        start, end = date.fromisoformat(p["start_date"]), date.fromisoformat(p["end_date"])
-        today = timezone.localdate()
-        if not today <= start <= end <= today+timedelta(days=15):
-            raise ProviderError("outside_forecast_window")
-        params = {"latitude": number(p["latitude"], low=-90, high=90),
-                  "longitude": number(p["longitude"], low=-180, high=180),
-                  "start_date": start.isoformat(), "end_date": end.isoformat(),
-                  "daily": ",".join(self.variables), "timezone": "auto", "wind_speed_unit": "kmh"}
-        key = os.getenv("TRAVEL_OPEN_METEO_API_KEY")
-        if key:
-            params["apikey"] = key
-        host = "customer-api" if key else "api"
-        return request_json("GET", f"https://{host}.open-meteo.com/v1/forecast", params=params)
+        days = (date.fromisoformat(p["end_date"])-timezone.localdate()).days+1
+        params = {"location.latitude": number(p["latitude"], low=-90, high=90),
+                  "location.longitude": number(p["longitude"], low=-180, high=180), "days": days, "pageSize": days}
+        return request_json("GET", "https://weather.googleapis.com/v1/forecast/days:lookup", params=params,
+                            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY]})
 
     def normalize(self, raw, p):
-        daily = raw["daily"]
-        days = []
-        expected = (date.fromisoformat(p["end_date"])-date.fromisoformat(p["start_date"])).days+1
-        if len(daily["time"]) != expected or expected < 1:
-            raise ProviderError("incomplete_forecast")
-        for i, day in enumerate(daily["time"]):
-            if day != (date.fromisoformat(p["start_date"])+timedelta(days=i)).isoformat():
-                raise ProviderError("incomplete_forecast")
-            row = {"date": day, "max_temp_c": number(daily["temperature_2m_max"][i], low=-90, high=65),
-                   "min_temp_c": number(daily["temperature_2m_min"][i], low=-100, high=65),
-                   "rain_mm": number(daily["precipitation_sum"][i], low=0, high=3000),
-                   "wind_kmh": number(daily["wind_speed_10m_max"][i], low=0, high=500),
-                   "weather_code": int(daily["weather_code"][i]),
-                   "sunrise": daily["sunrise"][i], "sunset": daily["sunset"][i]}
+        start, end = date.fromisoformat(p["start_date"]), date.fromisoformat(p["end_date"])
+        rows = {}
+        for item in raw.get("forecastDays") or []:
+            shown = item.get("displayDate") or {}
+            day = date(int(shown["year"]), int(shown["month"]), int(shown["day"]))
+            if not start <= day <= end:
+                continue
+            parts = [item.get("daytimeForecast") or {}, item.get("nighttimeForecast") or {}]
+            rain = sum(number(((part.get("precipitation") or {}).get("qpf") or {}).get("quantity", 0), low=0, high=3000) for part in parts)
+            wind = max(number((((part.get("wind") or {}).get("speed") or {}).get("value", 0)), low=0, high=500) for part in parts)
+            condition = str(((parts[0].get("weatherCondition") or {}).get("type")) or "")
+            sun = item.get("sunEvents") or {}
+            row = {"date": day.isoformat(), "max_temp_c": number(item["maxTemperature"]["degrees"], low=-90, high=65),
+                   "min_temp_c": number(item["minTemperature"]["degrees"], low=-100, high=65),
+                   "rain_mm": round(rain, 1), "wind_kmh": wind, "condition": condition,
+                   "sunrise": str(sun.get("sunriseTime") or "")[11:16], "sunset": str(sun.get("sunsetTime") or "")[11:16]}
             row["risks"] = weather_risks(row)
-            days.append(row)
-        return {"days": days, "timezone": raw.get("timezone", ""),
+            rows[row["date"]] = row
+        days = [rows.get((start+timedelta(days=i)).isoformat()) for i in range((end-start).days+1)]
+        if not days or None in days:
+            raise ProviderError("incomplete_forecast")
+        return {"days": days, "timezone": str((raw.get("timeZone") or {}).get("id") or ""),
                 "average_min_temp": round(mean(d["min_temp_c"] for d in days), 1),
                 "average_max_temp": round(mean(d["max_temp_c"] for d in days), 1),
                 "precipitation_total": round(sum(d["rain_mm"] for d in days), 1),
@@ -73,9 +76,9 @@ def weather_risks(day):
         risks.append("rain")
     if day["max_temp_c"] >= 35:
         risks.append("heat")
-    if day["weather_code"] in {95, 96, 99}:
+    if "THUNDER" in day.get("condition", ""):
         risks.append("thunderstorm")
-    if day["weather_code"] in {45, 48}:
+    if "FOG" in day.get("condition", "") or "HAZE" in day.get("condition", ""):
         risks.append("fog")
     if day["wind_kmh"] >= 40:
         risks.append("wind")

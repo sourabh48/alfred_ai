@@ -1,5 +1,26 @@
 # ALFRED execution state
 
+## Email sign-in and Google-only travel data - 2026-11-14
+
+- Branch `work/email-signin-2026-11-14` (worktree F:/ALFRED_DEV/owner-decisions-1112, base fec7404). Local commits
+  only; not pushed. Users migration 0007 (`EmailIdentity`) needs the owner's migration approval and a new
+  `--reviewed-source` SHA in the browser-regression preflight before CI can pass.
+- Sign-in (owner: "then use only email"): Continue with Google, GitHub or Microsoft (OAuth code flow with PKCE and
+  state). Only a provider-confirmed email is accepted; an existing account with that confirmed email is reused, and
+  Settings > Account connects more providers. Password sign-up closes once any provider is configured. No phone check.
+- Travel data (owner: "main api key must be google... use minimum apis"): Google Places (place names, places, hotels,
+  destination ideas), Routes and Weather (10 days) plus Map Tiles; one key. Removed and no longer called:
+  openrouteservice, Valhalla, Open-Meteo, Overpass, Wikivoyage/Wikipedia stays and destinations, Brave, SearXNG,
+  Duffel and Travelpayouts. Flights: Skyscanner Flights Live Prices v3 adapter ready for its key (fixture-tested,
+  UNVERIFIED live); a Google Flights link until then. Asking an AI model for hotel or flight prices was rejected: it
+  would invent prices, and Ollama Cloud would send data off the PC.
+- Kept (no key, nothing Google offers): Yahoo Finance, AMFI, World Bank, Frankfurter, job boards, Google News RSS and
+  Protomaps offline maps.
+- Settings > Online services now lists 8 keys and no free switches; Home > Needs your attention asks the manager for
+  the Google key and a Google sign-in client while they are missing.
+- Not checked: any live Google, Skyscanner or OAuth call (no keys in the test runtime); the owner's Google Cloud API list
+  (the browser pane is not signed in to Google).
+
 ## Offline country maps - 2026-11-13
 
 - Owner request: "dont cache ...store the map of the country user is using ask the user before downloading... user

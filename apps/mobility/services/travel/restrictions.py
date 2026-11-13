@@ -55,7 +55,8 @@ def _current(candidate, route, now):
     result = candidate.get("route_result", {})
     checked, expiry = (_timestamp(result.get(k)) for k in ("retrieved_at", "expires_at"))
     return bool(result.get("success") and not result.get("stale") and normalized_link(result.get("source_url", ""))
-        and checked and expiry and checked <= now < expiry and route.get("profile") == "driving-car")
+        # driving-car: plans saved from openrouteservice before 2026-11-14; Google routes since.
+        and checked and expiry and checked <= now < expiry and route.get("profile") in ("driving-car", "google-drive", "google-two_wheeler"))
 
 
 def record_restriction(session, data):

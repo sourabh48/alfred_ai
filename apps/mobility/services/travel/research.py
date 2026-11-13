@@ -11,23 +11,22 @@ from .cache import query, query_with_fallback
 from .discovery import rank_places
 from .mapping import map_features
 from .providers.base import ProviderResult
-from .providers.geocoding import GooglePlaceSearch, OpenMeteoGeocoding
-from .providers.routing import OpenRouteService, routing_chain
+from .providers.geocoding import GooglePlaceSearch
+from .providers.routing import routing_chain
+from .providers.weather import FORECAST_DAYS, GoogleWeather, replan_proposals
+from .providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
+from .providers.permits import PermitProvider
+from .providers.transport import IndianRailProvider, SkyscannerFlights
+from .links import external_links, hotel_price_links
 
 
 def geocoders():
-    """Free Open-Meteo first; Google only when it finds nothing or is unavailable."""
-    return [OpenMeteoGeocoding(), GooglePlaceSearch()]
+    """Google only (owner decision 2026-11-14)."""
+    return [GooglePlaceSearch()]
 
 
 def has_locations(result):
     return bool(result.payload.get("locations"))
-from .providers.weather import OpenMeteoWeather, replan_proposals
-from .providers.places import GoogleLodging, GooglePlacesNearby
-from .providers.permits import PermitProvider
-from .providers.transport import DuffelFlights, IndianRailProvider, TravelpayoutsFlights
-from .providers.web import WikivoyageDestinations, WikivoyageSearch, WikivoyageStays, BraveSearch, SearXNGSearch
-from .links import external_links, hotel_price_links
 from .presentation import age_saved_facts
 
 
@@ -38,15 +37,15 @@ def discover_destinations(user, state, preliminary):
         matches = located.payload.get("locations",[])
         if len(matches) == 1:
             origin = (matches[0]["lat"],matches[0]["lon"])
-    result = ProviderResult("wikivoyage","destinations",error="unambiguous_origin_required")
+    result = ProviderResult("google_destinations","destinations",error="unambiguous_origin_required")
     if origin:
         radius = min(600,max(50,int(value(state,"maximum_daily_driving",300))))
         styles = value(state,"preferred_trip_style",[])
         interest = next((word for style,word in [("camping","camping"),("trekking","hiking"),("beaches","beach"),("waterfalls","waterfall"),("historical places","heritage")] if style in styles),"")
         params = {"latitude":origin[0],"longitude":origin[1],"radius_km":radius,"interest":interest}
-        result = query(WikivoyageDestinations(),params,force=value(state,"force_refresh",False))
+        result = query(GoogleDestinations(),params,force=value(state,"force_refresh",False))
         if result.success and not result.payload.get("destinations") and interest:
-            result = query(WikivoyageDestinations(),{**params,"interest":""},force=value(state,"force_refresh",False))
+            result = query(GoogleDestinations(),{**params,"interest":""},force=value(state,"force_refresh",False))
     seeds = result.payload.get("destinations",[]) if result.success else []
     # Apply the existing transparent budget/time/preference/history ranking.
     options = candidates_for(user,state,limit=20,destinations=seeds,origin_coordinates=origin) if seeds else []
@@ -54,7 +53,7 @@ def discover_destinations(user, state, preliminary):
         for d in options:
             d["discovery_result"] = result.as_dict()
             d["source_freshness"] = result.freshness
-            d["why"].append("Dynamically discovered in a community travel guide; current access remains unverified.")
+            d["why"].append("Found on Google Maps near your start city; current access remains unverified.")
         return options
     fallback = deepcopy(preliminary)
     for d in fallback:
@@ -104,10 +103,10 @@ def research_candidates(user, state, preliminary):
 def weather_result(destination, state, *, force=False, cache_only=False):
     start, end = value(state,"available_start_date"), value(state,"available_end_date")
     if not start or not end:
-        return ProviderResult("open_meteo","weather",error="dates_required")
-    if not timezone.localdate() <= date.fromisoformat(start) <= date.fromisoformat(end) <= timezone.localdate()+timedelta(days=15):
-        return ProviderResult("open_meteo","weather",error="outside_forecast_window")
-    return query(OpenMeteoWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force,cache_only=cache_only)
+        return ProviderResult("google_weather","weather",error="dates_required")
+    if not timezone.localdate() <= date.fromisoformat(start) <= date.fromisoformat(end) < timezone.localdate()+timedelta(days=FORECAST_DAYS):
+        return ProviderResult("google_weather","weather",error="outside_forecast_window")
+    return query(GoogleWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force,cache_only=cache_only)
 
 
 def enrich_candidate(user, state, destination):
@@ -158,7 +157,7 @@ def enrich_candidate(user, state, destination):
         route = fetch_any(chain, route_parameters)
         router = next((provider for provider in chain if provider.name == route.provider), chain[0])
         d["route_alternatives_note"] = "Alternative comparison unavailable; no additional route is established."
-        if route.success and not route.stale and route.payload["routes"][0]["distance_km"] <= 100 and router.name != "google_routes":
+        if route.success and not route.stale and route.payload["routes"][0]["distance_km"] <= 100:
             alternatives = fetch(router, {**route_parameters, "alternatives": True})
             if alternatives.success and not alternatives.stale:
                 route = alternatives
@@ -187,12 +186,12 @@ def enrich_candidate(user, state, destination):
     else:
         d.pop("origin_location", None)
         d.update(distance_km=None, travel_hours=None, distance_basis="No verified route or distance for the current trip settings.")
-        attach("route_result",ProviderResult("openrouteservice","routing",error="unambiguous_origin_and_destination_coordinates_required"))
+        attach("route_result",ProviderResult("google_routes","routing",error="unambiguous_origin_and_destination_coordinates_required"))
     try:
-        weather = weather_result(d,state,force=force and not cached_only("weather"),cache_only=cached_only("weather")) if coords else ProviderResult("open_meteo","weather",error="destination_coordinates_required")
+        weather = weather_result(d,state,force=force and not cached_only("weather"),cache_only=cached_only("weather")) if coords else ProviderResult("google_weather","weather",error="destination_coordinates_required")
     except Exception:
         # An adapter fault must not discard the saved plan or other research.
-        weather = ProviderResult("open_meteo","weather",error="weather_unavailable")
+        weather = ProviderResult("google_weather","weather",error="weather_unavailable")
     attach("weather_result",weather)
     d["weather"] = {**weather.payload,"summary":weather.payload.get("summary","Current weather for these dates is unverified. Recheck nearer departure."),
                     "confidence":weather.confidence,"freshness":weather.freshness}
@@ -222,37 +221,13 @@ def enrich_candidate(user, state, destination):
     for option in hotels.payload.get("options",[]):  # this trip's dates, never stored in the shared Google cache
         option.update(hotel_price_links(state,option.get("name",""),d.get("name","")))
     attach("hotels_result",hotels)
-    # Free guide listings: names, contact and contributor price text; never live rates or availability.
-    attach("stays_guide_result",fetch(WikivoyageStays(),{"destination":d["name"]}) if d.get("name") else ProviderResult("wikivoyage","stays_guide",error="destination_required"))
-    flight = ProviderResult("duffel","flights",error="origin_and_destination_airport_codes_and_dates_required")
-    flight_prices = ProviderResult("travelpayouts","flights",error="origin_and_destination_airport_codes_and_dates_required")
+    flight = ProviderResult("skyscanner","flights",error="origin_and_destination_airport_codes_and_dates_required")
     if value(state,"origin_airport") and value(state,"destination_airport") and start:
-        route = {"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),"departure_date":start,"return_date":end}
-        flight = fetch(DuffelFlights(),{**route,"adults":people})
-        # Its own section, not a fallback: free recent fares beside Duffel's live ones.
-        flight_prices = fetch(TravelpayoutsFlights(),route)
-    attach("flights_result",flight)
-    attach("flight_prices_result",flight_prices)
+        flight = fetch(SkyscannerFlights(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
+                                            "departure_date":start,"return_date":end,"adults":people})
+    attach("flights_result",flight)  # without a Skyscanner key, the Google Flights link carries the live prices
     attach("trains_result",fetch(IndianRailProvider(),{"origin":value(state,"origin"),"destination":d["name"],"date":start}))
     attach("buses_result",ProviderResult("operator_links","buses",error="live_bus_inventory_not_configured",payload={"options":[],"availability":"UNKNOWN"}))
-    # Search bounded, contextual topics; raw messages, budgets and history never leave.
-    topics = ["closures"]
-    requested_topics = value(state,"research_categories",[])
-    for topic in ("permits","hotels","trains","flights","buses","camping","attractions","fuel","tolls"):
-        if topic in requested_topics and topic not in topics:
-            topics.append(topic)
-    if refresh_categories:
-        topics.sort(key=lambda topic: topic not in refresh_categories)
-    d["web_research"] = []
-    for topic in topics[:3]:
-        searched = query_with_fallback([BraveSearch(),SearXNGSearch(),WikivoyageSearch()],
-            {"destination":value(state,"permit_place",d["name"]) if topic == "permits" else d["name"],
-             "origin":value(state,"origin") if topic in {"closures","routing","trains","flights","buses"} else "",
-             "topic":topic,"date":start,"mode":value(state,"transport_mode","mixed")},
-            force=force and (not refresh_categories or topic in refresh_categories or (topic == "closures" and "routing" in refresh_categories)),
-            cache_only=bool(refresh_categories) and topic not in refresh_categories and not (topic == "closures" and "routing" in refresh_categories))
-        d["web_research"].append(searched.as_dict())
-        results.append(searched)
     d["external_links"] = external_links(state,d)
     d["budget"] = budget_for(state,d)
     d["mode_comparison"] = [{"mode":mode,"budget":budget_for({**state,"transport_mode":{"value":mode}},d),

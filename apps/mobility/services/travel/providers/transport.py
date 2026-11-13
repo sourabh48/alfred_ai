@@ -1,27 +1,40 @@
 from datetime import date, timedelta
+from decimal import Decimal
 import os
 import re
 
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 
-from .accommodation import DuffelProvider
 from .base import Provider, ProviderError, number, request_json
 from ..money import quoted_amount
 
+SKYSCANNER = "https://partners.api.skyscanner.net/apiservices/v3/flights/live/search"
+PRICE_UNITS = {"PRICE_UNIT_WHOLE": 1, "PRICE_UNIT_CENTI": 100, "PRICE_UNIT_MILLI": 1000, "PRICE_UNIT_MICRO": 1000000}
+CABINS = {"economy": "CABIN_CLASS_ECONOMY", "premium_economy": "CABIN_CLASS_PREMIUM_ECONOMY",
+          "business": "CABIN_CLASS_BUSINESS", "first": "CABIN_CLASS_FIRST"}
 
-class TravelpayoutsFlights(Provider):
-    """Free recent fares from Aviasales' cache: the cheapest that other travellers found in the last 48 hours. Not live."""
-    name = "travelpayouts"
+
+def _when(value):
+    """Skyscanner's {year, month, day, hour, minute} as an ISO date-time."""
+    if not isinstance(value, dict) or not value.get("year"):
+        return None
+    return f"{int(value['year']):04d}-{int(value['month']):02d}-{int(value['day']):02d}T{int(value.get('hour', 0)):02d}:{int(value.get('minute', 0)):02d}"
+
+
+class SkyscannerFlights(Provider):
+    """Live flight prices from the Skyscanner Travel API (partner key, flights only). Until the key is approved the
+    planner shows a Google Flights link instead. Built from Skyscanner's Flights Live Prices v3 documentation;
+    UNVERIFIED against a live key."""
+    name = "skyscanner"
     category = "flights"
-    source_url = "https://www.aviasales.com"
-    attribution = "Aviasales via Travelpayouts: fares other travellers found recently, not live; check before you book"
-    ttl = timedelta(hours=6)
-    limits = {"minute": 5, "hour": 30, "day": 100, "month": 1500}  # ALFRED's own budget; Travelpayouts allows 600/minute with no monthly cap (checked 2026-11-13)
-    allowed_parameters = {"origin", "destination", "departure_date", "return_date"}
+    source_url = "https://www.skyscanner.net/"
+    attribution = "Prices by Skyscanner; check the airline or agent before you book"
+    ttl = timedelta(minutes=15)
+    limits = {"minute": 5, "hour": 30, "day": 100, "month": 2000}
+    allowed_parameters = {"origin", "destination", "departure_date", "return_date", "adults", "cabin_class"}
 
     def unavailable_reason(self):
-        return "" if os.getenv("TRAVEL_TRAVELPAYOUTS_TOKEN") else "missing_TRAVEL_TRAVELPAYOUTS_TOKEN"
+        return "" if os.getenv("TRAVEL_SKYSCANNER_API_KEY") else "missing_TRAVEL_SKYSCANNER_API_KEY"
 
     def fetch(self, p):
         origin, destination = str(p["origin"]).upper(), str(p["destination"]).upper()
@@ -30,92 +43,52 @@ class TravelpayoutsFlights(Provider):
         departure = date.fromisoformat(p["departure_date"])
         if departure < timezone.localdate():
             raise ProviderError("invalid_departure_date")
-        # Only the route and dates are sent; the token goes in a header, never the address.
-        params = {"origin": origin, "destination": destination, "departure_at": departure.isoformat(), "currency": "inr",
-                  "sorting": "price", "direct": "false", "limit": 10, "one_way": "true"}
-        if p.get("return_date"):
-            params |= {"return_at": date.fromisoformat(p["return_date"]).isoformat(), "one_way": "false"}
-        return request_json("GET", "https://api.travelpayouts.com/aviasales/v3/prices_for_dates", params=params,
-                            headers={"X-Access-Token": os.environ["TRAVEL_TRAVELPAYOUTS_TOKEN"]})
-
-    def normalize(self, raw, p):
-        if not raw.get("success"):
-            raise ProviderError("api_error")
-        currency = str(raw.get("currency") or "inr").upper()
-        options = []
-        for item in (raw.get("data") or [])[:10]:
-            link = str(item.get("link") or "")
-            options.append({"provider": "Aviasales", "carrier": str(item.get("airline") or "")[:3],
-                "flight_number": f"{item.get('airline') or ''}{item.get('flight_number') or ''}"[:12],
-                "origin": str(item.get("origin_airport") or item.get("origin") or "")[:3],
-                "destination": str(item.get("destination_airport") or item.get("destination") or "")[:3],
-                "departure": item.get("departure_at"), "return": item.get("return_at"), "transfers": item.get("transfers"),
-                "duration": item.get("duration_to") or item.get("duration"), "fare": quoted_amount(item["price"]), "currency": currency,
-                "fare_scope": "one adult; found by other travellers in the last 48 hours and may have changed",
-                "availability": "UNKNOWN", "booking_url": f"https://www.aviasales.com{link}" if link.startswith("/search/") else None})
-        return {"options": options}
-
-
-class DuffelFlights(DuffelProvider):
-    category = "flights"
-    allowed_parameters = {"origin", "destination", "departure_date", "return_date", "adults", "cabin_class"}
-
-    def fetch(self, p):
-        origin, destination = p["origin"].upper(), p["destination"].upper()
-        if not re.fullmatch(r"[A-Z]{3}", origin) or not re.fullmatch(r"[A-Z]{3}", destination) or origin == destination:
-            raise ProviderError("airport_codes_required")
-        departure = date.fromisoformat(p["departure_date"])
-        if departure < timezone.localdate():
-            raise ProviderError("invalid_departure_date")
-        slices = [{"origin":origin,"destination":destination,"departure_date":departure.isoformat()}]
+        legs = [(origin, destination, departure)]
         if p.get("return_date"):
             returning = date.fromisoformat(p["return_date"])
             if returning < departure:
                 raise ProviderError("invalid_return_date")
-            slices.append({"origin":destination,"destination":origin,"departure_date":returning.isoformat()})
-        cabin = p.get("cabin_class", "economy")
-        if cabin not in {"economy", "premium_economy", "business", "first"}:
+            legs.append((destination, origin, returning))
+        cabin = CABINS.get(p.get("cabin_class", "economy"))
+        if not cabin:
             raise ProviderError("invalid_cabin_class")
-        adults = int(number(p.get("adults",1),low=1,high=9))
-        return request_json("POST", "https://api.duffel.com/air/offer_requests", headers=self.headers(),
-            params={"return_offers":"true","supplier_timeout":10000},
-            json={"data":{"slices":slices,"passengers":[{"type":"adult"} for _ in range(adults)],
-                          "cabin_class":cabin,"max_connections":1}})
+        # Only airports, dates, traveller count and cabin are sent; the key goes in a header.
+        query = {"market": "IN", "locale": "en-GB", "currency": "INR", "adults": int(number(p.get("adults", 1), low=1, high=8)),
+                 "cabinClass": cabin, "queryLegs": [{"originPlaceId": {"iata": a}, "destinationPlaceId": {"iata": b},
+                                                    "date": {"year": d.year, "month": d.month, "day": d.day}} for a, b, d in legs]}
+        headers = {"x-api-key": os.environ["TRAVEL_SKYSCANNER_API_KEY"], "Content-Type": "application/json"}
+        raw, digest = request_json("POST", f"{SKYSCANNER}/create", json={"query": query}, headers=headers)
+        for _ in range(2):  # a search fills in over a few seconds; two polls keep the request short
+            if raw.get("status") != "RESULT_STATUS_INCOMPLETE" or not raw.get("sessionToken"):
+                break
+            raw, digest = request_json("POST", f"{SKYSCANNER}/poll/{raw['sessionToken']}", headers=headers)
+        return raw, digest
 
     def normalize(self, raw, p):
-        if raw["data"].get("live_mode") is not True:
-            raise ProviderError("sandbox_response_not_live_inventory")
+        results = (raw.get("content") or {}).get("results") or {}
+        itineraries, legs = results.get("itineraries") or {}, results.get("legs") or {}
+        places, carriers = results.get("places") or {}, results.get("carriers") or {}
+        cheapest = ((raw.get("content") or {}).get("sortingOptions") or {}).get("cheapest") or []
         options = []
-        for offer in raw["data"]["offers"][:20]:
-            if offer.get("live_mode") is not True or offer.get("partial"):
+        for ranked in cheapest[:10]:
+            itinerary = itineraries.get(ranked.get("itineraryId")) or {}
+            pricing = (itinerary.get("pricingOptions") or [{}])[0]
+            price = pricing.get("price") or {}
+            scale = PRICE_UNITS.get(price.get("unit"))
+            if not scale or price.get("amount") in (None, ""):
                 continue
-            expiry = parse_datetime(offer["expires_at"])
-            if not expiry or timezone.is_naive(expiry):
-                raise ProviderError("missing_offer_expiry")
-            if expiry <= timezone.now():
-                continue
-            slices = []
-            for route in offer["slices"]:
-                segments = route["segments"]
-                slices.append({"origin":segments[0]["origin"]["iata_code"],
-                    "destination":segments[-1]["destination"]["iata_code"],
-                    "departure":segments[0]["departing_at"],"arrival":segments[-1]["arriving_at"],
-                    "duration":route["duration"],"transfers":len(segments)-1,
-                    "stops":sum(len(s.get("stops",[])) for s in segments),
-                    "segments":[{"origin":s["origin"]["iata_code"],"destination":s["destination"]["iata_code"],
-                        "departure":s["departing_at"],"arrival":s["arriving_at"],
-                        "flight_number":str(s.get("marketing_carrier",{}).get("iata_code",""))+str(s.get("marketing_carrier_flight_number",""))} for s in segments]})
-            if not slices:
-                raise ProviderError("malformed_response")
-            options.append({"id":offer["id"],"provider":"Duffel","carrier":offer.get("owner",{}).get("name"),
-                "origin":slices[0]["origin"],"destination":slices[0]["destination"],
-                "date":p.get("departure_date"),"departure":slices[0]["departure"],"arrival":slices[0]["arrival"],
-                "duration":slices[0]["duration"],"transfers":slices[0]["transfers"],"slices":slices,
-                "class":p.get("cabin_class","economy"),"fare":quoted_amount(offer["total_amount"]),
-                "currency":offer["total_currency"],"fare_scope":"all requested passengers and slices; extras may cost more",
-                "availability":"offer_returned_recheck_before_purchase","expires_at":expiry.isoformat(),
-                "booking_url":None,"booking_note":"Provider supplied an API offer, not a public booking link. ALFRED does not issue tickets."})
-        return {"options":options,"coverage":"Participating airlines and completed supplier searches only; not an exhaustive market comparison."}
+            first = legs.get((itinerary.get("legIds") or [""])[0]) or {}
+            link = next((item.get("deepLink") for item in pricing.get("items") or [] if str(item.get("deepLink", "")).startswith("https://")), None)
+            options.append({"provider": "Skyscanner",
+                "carrier": ", ".join(str((carriers.get(c) or {}).get("name") or "") for c in first.get("marketingCarrierIds") or [])[:120],
+                "origin": str((places.get(first.get("originPlaceId")) or {}).get("iata") or p["origin"])[:3],
+                "destination": str((places.get(first.get("destinationPlaceId")) or {}).get("iata") or p["destination"])[:3],
+                "departure": _when(first.get("departureDateTime")), "arrival": _when(first.get("arrivalDateTime")),
+                "duration": first.get("durationInMinutes"), "transfers": first.get("stopCount"),
+                "fare": quoted_amount(Decimal(str(price["amount"])) / scale), "currency": "INR",
+                "fare_scope": "all requested travellers; the agent's page shows the final price",
+                "availability": "price_returned_recheck_before_purchase", "booking_url": link})
+        return {"options": options, "coverage": "Airlines and agents in Skyscanner's search; not every fare on the market."}
 
 
 class IndianRailProvider(Provider):

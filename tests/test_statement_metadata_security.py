@@ -47,12 +47,6 @@ class StatementTextCleaningTests(SimpleTestCase):
         self.assertTrue(cleaned.endswith(".pdf"))
         self.assertEqual(clean_statement_file_name('<>"`'), "statement.pdf")
 
-    def test_bad_tile_url_disables_tiles_instead_of_stopping_startup(self):
-        from alfred_ai.settings import _csp_tile_host
-        self.assertEqual(_csp_tile_host("https://tile.openstreetmap.org/{z}/{x}/{y}.png"), "tile.openstreetmap.org")
-        for bad in ("https://[x/", "http://tile.example.com/{z}.png", "https://bad host'/x.png", ""):
-            self.assertEqual(_csp_tile_host(bad), "")
-
     def parsed_holder(self, line):
         raw = statement_pdf("HDFC BANK", line, "Account Number: 123456789012")
         with patch("apps.expenses.services.statement_import.apply_parser_learning", return_value=(0.5, [])):
@@ -136,7 +130,7 @@ class StatementImportSecurityTests(TestCase):
                                   "form-action 'self'", "frame-ancestors 'none'"):
                     self.assertIn(directive, enforced)
                 self.assertNotIn("img-src *", enforced)
-                self.assertIn("https://tile.openstreetmap.org", enforced)
+                self.assertNotIn("openstreetmap", enforced)  # map tiles come through ALFRED itself
                 report_only = response.headers["Content-Security-Policy-Report-Only"]
                 self.assertRegex(report_only, r"script-src 'self'(;|$)")
 

@@ -17,37 +17,23 @@ from alfred_private_storage import private_directory
 
 # name: (label, what ALFRED uses it for, where to get one)
 KEYS = {
-    "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps", "Travel: the map, places and hotels (Google only), plus routes and travel times when the free services have no answer.",
+    "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps Platform", "Travel: the map, places, hotels, routes, place names and weather. Enable Map Tiles, Places (New), Routes and Weather for this key.",
                                    "https://console.cloud.google.com/google/maps-apis/credentials"),
-    "TRAVEL_ORS_API_KEY": ("OpenRouteService", "Travel: driving, cycling and walking routes (it has a free plan).",
-                           "https://openrouteservice.org/dev/#/signup"),
-    "TRAVEL_BRAVE_API_KEY": ("Brave Search", "Travel: web search for places, with your OK for paid searches below.",
-                             "https://brave.com/search/api/"),
-    "TRAVEL_TRAVELPAYOUTS_TOKEN": ("Travelpayouts (Aviasales)", "Travel: free flight prices other travellers found recently (not live). Free partner sign-up; the token is under Profile > API token.",
-                                   "https://www.travelpayouts.com/"),
-    "TRAVEL_DUFFEL_API_KEY": ("Duffel", "Travel: flight prices, with your OK for paid searches below.", "https://app.duffel.com/join"),
     "ALFRED_GOOGLE_CLIENT_ID": ("Sign in with Google: client ID", "Sign-in that confirms each person's email. Google Cloud > Credentials > OAuth client ID (Web application); add the redirect URI http://localhost:8000/auth/google/callback/.",
                                 "https://console.cloud.google.com/apis/credentials"),
     "ALFRED_GOOGLE_CLIENT_SECRET": ("Sign in with Google: client secret", "Shown with the client ID above.", "https://console.cloud.google.com/apis/credentials"),
-    "ALFRED_GITHUB_CLIENT_ID": ("Sign in with GitHub: client ID", "GitHub > Settings > Developer settings > OAuth Apps; callback URL http://localhost:8000/auth/github/callback/.",
+    "TRAVEL_SKYSCANNER_API_KEY": ("Skyscanner", "Travel: live flight prices, once Skyscanner approves your partner account. Until then each trip has a Google Flights link.",
+                                  "https://www.partners.skyscanner.net/product/travel-api"),
+    "ALFRED_GITHUB_CLIENT_ID": ("Sign in with GitHub (optional): client ID", "GitHub > Settings > Developer settings > OAuth Apps; callback URL http://localhost:8000/auth/github/callback/.",
                                 "https://github.com/settings/developers"),
-    "ALFRED_GITHUB_CLIENT_SECRET": ("Sign in with GitHub: client secret", "Generated on the same OAuth App page.", "https://github.com/settings/developers"),
-    "ALFRED_MICROSOFT_CLIENT_ID": ("Sign in with Microsoft (Outlook): application ID", "Azure portal > App registrations, personal Microsoft accounts only; Web redirect URI http://localhost:8000/auth/microsoft/callback/.",
+    "ALFRED_GITHUB_CLIENT_SECRET": ("Sign in with GitHub (optional): client secret", "Generated on the same OAuth App page.", "https://github.com/settings/developers"),
+    "ALFRED_MICROSOFT_CLIENT_ID": ("Sign in with Microsoft (optional): application ID", "Azure portal > App registrations, personal Microsoft accounts only; Web redirect URI http://localhost:8000/auth/microsoft/callback/.",
                                    "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
-    "ALFRED_MICROSOFT_CLIENT_SECRET": ("Sign in with Microsoft (Outlook): client secret", "Certificates & secrets on the same app registration.",
+    "ALFRED_MICROSOFT_CLIENT_SECRET": ("Sign in with Microsoft (optional): client secret", "Certificates & secrets on the same app registration.",
                                        "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
-    "TRAVEL_OPEN_METEO_API_KEY": ("Open-Meteo (commercial)", "Travel: weather and place names. Not needed for personal use.",
-                                  "https://open-meteo.com/en/pricing"),
 }
-# name: (value written when on, what the switch means)
-SWITCHES = {
-    "TRAVEL_USE_MODE": ("personal_noncommercial",
-                        "I use ALFRED for myself, not for a business. Turns on free weather and place search from Open-Meteo."),
-    "TRAVEL_VALHALLA_URL": ("https://valhalla1.openstreetmap.de",
-                            "Free car and motorcycle routes from the FOSSGIS server. Each route sends only the trip's start and end points."),
-    "TRAVEL_BRAVE_ALLOW_PAID_SEARCH": ("true", "Brave Search may run searches that count against your Brave plan."),
-    "TRAVEL_DUFFEL_ALLOW_PAID_SEARCH": ("true", "Duffel may run flight searches that Duffel may charge for. Check its fees first."),
-}
+# name: (value written when on, what the switch means). None today: Google is the only travel source (owner decision 2026-11-14).
+SWITCHES = {}
 # Mail for Career emails you approve one at a time: an address and an app password; the server is filled in for known providers.
 MAIL_PROVIDERS = {"gmail.com": ("smtp.gmail.com", 587, False), "googlemail.com": ("smtp.gmail.com", 587, False),
                   "yahoo.com": ("smtp.mail.yahoo.com", 465, True), "yahoo.co.in": ("smtp.mail.yahoo.com", 465, True),

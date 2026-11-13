@@ -10,21 +10,22 @@ from apps.integrations.models import VerifiedExternalInsight
 from apps.mobility.models import TravelProviderRequest, TravelProviderState
 from apps.mobility.services.travel.cache import budget_status, query, query_with_fallback, usage_summary
 from apps.mobility.services.travel.providers.base import Provider, ProviderError
-from apps.mobility.services.travel.providers.geocoding import OpenMeteoGeocoding
-from apps.mobility.services.travel.providers.routing import OpenRouteService
+from apps.mobility.services.travel.providers.geocoding import GooglePlaceSearch
+from apps.mobility.services.travel.providers.routing import GoogleRoutes
 from apps.mobility.services.travel.mapping import map_features
-from apps.mobility.services.travel.providers.weather import OpenMeteoWeather, replan_proposals
+from apps.mobility.services.travel.providers.weather import GoogleWeather, replan_proposals
 from apps.mobility.services.travel.providers.base import ProviderResult
 from apps.mobility.services.travel.discovery import rank_places, remember
-from apps.mobility.services.travel.providers.places import OverpassPlaces
+from apps.mobility.services.travel.providers.places import GoogleDestinations, GooglePlacesNearby
 from apps.mobility.services.travel.providers.permits import PermitProvider
 from apps.mobility.services.travel.costs import calculate_budget
 from apps.mobility.services.travel.money import quoted_amount
 from apps.mobility.services.travel.bike import bike_context
 from apps.mobility.services.travel_discovery import fact
 from apps.mobility.models import BikeProfile, BikeDocument, BikeIssueReport, BikeServiceRecord, FuelRefillLog
-from apps.mobility.services.travel.providers.accommodation import DuffelAccommodation
-from apps.mobility.services.travel.providers.transport import DuffelFlights, IndianRailProvider, TravelpayoutsFlights
+from apps.mobility.services.travel.providers.transport import IndianRailProvider, SkyscannerFlights
+
+GOOGLE = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-g-0000"}
 
 
 class FakeProvider(Provider):
@@ -196,112 +197,103 @@ class TravelProviderTests(TestCase):
 
 class TravelRoutingTests(TestCase):
     def test_geocoding_global_ambiguity_and_invalid_coordinates(self):
-        provider = OpenMeteoGeocoding()
-        row = {"id": 1, "name": "Springfield", "latitude": 12, "longitude": 77}
-        self.assertTrue(provider.normalize({"results": [row, {**row, "id": 2}]}, {})["ambiguous"])
+        provider = GooglePlaceSearch()
+        row = {"id": "p1", "displayName": {"text": "Springfield"}, "location": {"latitude": 12, "longitude": 77}}
+        self.assertTrue(provider.normalize({"places": [row, {**row, "id": "p2"}]}, {})["ambiguous"])
         with self.assertRaises(ValueError):
-            provider.normalize({"results": [{**row, "latitude": 999}]}, {})
+            provider.normalize({"places": [{**row, "location": {"latitude": 999, "longitude": 77}}]}, {})
 
-    @patch.dict("os.environ", {"TRAVEL_ORS_API_KEY": "fixture-secret"})
+    @patch.dict("os.environ", GOOGLE)
     @patch("apps.mobility.services.travel.providers.routing.request_json")
     def test_motorcycle_route_constraints_do_not_claim_legality(self, request):
-        provider = OpenRouteService()
+        provider = GoogleRoutes()
         p = {"start": [77, 12], "end": [76, 11], "mode": "ride", "avoid_expressways": True, "avoid_tolls": True}
         provider.fetch(p)
-        self.assertEqual(request.call_args.kwargs["json"]["options"]["avoid_features"], ["highways", "tollways"])
-        self.assertIn("api.heigit.org/openrouteservice", request.call_args.args[1])
-        data = provider.normalize({"features": [{"geometry": {"type": "LineString", "coordinates": [[77,12], [76,11]]},
-            "properties": {"summary": {"distance": 250000, "duration": 18000}}}]}, p)
-        self.assertEqual(data["routes"][0]["motorcycle_legal"], "UNKNOWN")
-        self.assertEqual(data["routes"][0]["distance_km"], 250)
+        body = request.call_args.kwargs["json"]
+        self.assertEqual((body["travelMode"], body["routeModifiers"]), ("TWO_WHEELER", {"avoidHighways": True, "avoidTolls": True}))
+        self.assertEqual(request.call_args.kwargs["headers"]["X-Goog-Api-Key"], "synthetic-g-0000")
+        data = provider.normalize({"routes": [{"distanceMeters": 250000, "duration": "18000s"}]}, p)
+        self.assertEqual((data["routes"][0]["motorcycle_legal"], data["routes"][0]["distance_km"]), ("UNKNOWN", 250))
         features = map_features({"name": "Wayanad", "lat": 11, "lon": 76, "route_result": {"payload": data, "freshness": "LIVE"}})
-        self.assertEqual(features["features"][1]["geometry"]["type"], "LineString")
+        self.assertFalse(any(f["geometry"]["type"] == "LineString" for f in features["features"]))  # Google routes draw no line
         with self.assertRaises(ProviderError):
             provider.fetch({**p, "mode": "train"})
 
-
-    def test_malformed_route_points_do_not_become_valid_looking_coordinates(self):
-        provider=OpenRouteService()
-        p={'start':[77,12],'end':[76,11],'mode':'ride'}
-        for coordinates in (['77','12'],[[77,12],'76'],[[77,12,None],[76,11,10]],
-                [[77,12,0,1],[76,11,0,1]]):
-            with self.subTest(coordinates=coordinates), self.assertRaises((ValueError,TypeError,ProviderError)):
-                provider.normalize({'features':[{'geometry':{'type':'LineString','coordinates':coordinates},
-                    'properties':{'summary':{'distance':250000,'duration':18000}}}]},p)
-
-    @patch.dict('os.environ',{'TRAVEL_ORS_API_KEY':'fixture-secret'})
-    @patch('apps.mobility.services.travel.providers.routing.request_json')
-    def test_invalid_request_point_shapes_never_reach_transport(self,request):
-        for field in ('start','end'):
-            for point in ('77',None,{0:77,1:12},[77],[77,12,0,1]):
-                with self.subTest(field=field,point=point), self.assertRaises((ValueError,ProviderError)):
-                    OpenRouteService().fetch({'start':[77,12],'end':[76,11],field:point})
+    @patch.dict("os.environ", GOOGLE)
+    @patch("apps.mobility.services.travel.providers.routing.request_json")
+    def test_invalid_request_point_shapes_never_reach_transport(self, request):
+        for field in ("start", "end"):
+            for point in ("77", None, {0: 77, 1: 12}, [77], [77, 12, 0, 1]):
+                with self.subTest(field=field, point=point), self.assertRaises((ValueError, TypeError, ProviderError)):
+                    GoogleRoutes().fetch({"start": [77, 12], "end": [76, 11], field: point})
         request.assert_not_called()
 
-    @patch.dict('os.environ',{'TRAVEL_ORS_API_KEY':'fixture-secret'})
-    @patch('apps.mobility.services.travel.providers.routing.request_json')
-    def test_malformed_route_is_unavailable_not_cached_or_mapped_as_live(self,request):
-        request.return_value=({'features':[{'geometry':{'type':'LineString','coordinates':['77','12']},
-            'properties':{'summary':{'distance':250000,'duration':18000}}}]},'synthetic-route-response')
-        result=query(OpenRouteService(),{'start':[77,12],'end':[76,11],'mode':'car'})
-        self.assertFalse(result.success); self.assertEqual(result.error,'malformed_response')
-        self.assertNotEqual(result.freshness,'LIVE')
-        self.assertFalse(VerifiedExternalInsight.objects.filter(scope='travel_provider').exists())
-        self.assertFalse(TravelProviderRequest.objects.filter(provider='openrouteservice',status='ok').exists())
-        features=map_features({'name':'Synthetic destination','route_result':result.as_dict()})
-        self.assertFalse(any(feature['geometry']['type']=='LineString' for feature in features['features']))
+    @patch.dict("os.environ", GOOGLE)
+    @patch("apps.mobility.services.travel.providers.routing.request_json")
+    def test_malformed_route_is_unavailable_not_cached_or_mapped_as_live(self, request):
+        request.return_value = ({"routes": [{"distanceMeters": 250000, "duration": "five hours"}]}, "synthetic-route-response")
+        result = query(GoogleRoutes(), {"start": [77, 12], "end": [76, 11], "mode": "car"})
+        self.assertFalse(result.success); self.assertEqual(result.error, "malformed_response")
+        self.assertNotEqual(result.freshness, "LIVE")
+        self.assertFalse(VerifiedExternalInsight.objects.filter(scope="travel_provider").exists())
+        self.assertFalse(TravelProviderRequest.objects.filter(provider="google_routes", status="ok").exists())
 
-    def test_finite_elevation_coordinates_and_explicit_zero_route_remain_supported(self):
-        result=OpenRouteService().normalize({'features':[{'geometry':{'type':'LineString','coordinates':[[0,0,-2],[0,0,3]]},
-            'properties':{'summary':{'distance':0,'duration':0}}}]},{'mode':'walking'})
-        route=result['routes'][0]
-        self.assertEqual(route['geometry']['coordinates'],[[0,0],[0,0]])
-        self.assertEqual(route['distance_km'],0); self.assertEqual(route['duration_hours'],0)
-        self.assertEqual(route['motorcycle_legal'],'UNKNOWN'); self.assertEqual(route['closures'],'UNKNOWN')
+    def test_explicit_zero_route_remains_supported(self):
+        route = GoogleRoutes().normalize({"routes": [{"distanceMeters": 0, "duration": "0s"}]}, {"mode": "walking"})["routes"][0]
+        self.assertEqual((route["distance_km"], route["duration_hours"], route["closures"]), (0, 0, "UNKNOWN"))
 
-    @patch.dict('os.environ',{'TRAVEL_ORS_API_KEY':'fixture-secret'})
-    @patch('apps.mobility.services.travel.providers.routing.request_json')
-    def test_legacy_route_cache_cannot_bypass_validation_and_is_preserved(self,request):
-        raw={'features':[{'geometry':{'type':'LineString','coordinates':['77','12']},
-            'properties':{'summary':{'distance':250000,'duration':18000}}}]}
-        request.return_value=(raw,'synthetic-legacy-route-response')
-        parameters={'start':[77,12],'end':[76,11],'mode':'car'}
-        legacy=OpenRouteService(); legacy.version=1; legacy.min_interval=0
-        with patch.object(legacy,'normalize',return_value={'routes':[{'geometry':{'type':'LineString','coordinates':[[7,7],[1,2]]}}]}):
-            self.assertTrue(query(legacy,parameters).success)
-        snapshot=VerifiedExternalInsight.objects.get(scope='travel_provider')
-        before=snapshot.payload.copy()
-        result=query(OpenRouteService(),parameters)
-        self.assertFalse(result.success); self.assertEqual(result.error,'malformed_response')
-        self.assertEqual(request.call_count,2)
-        snapshot.refresh_from_db(); self.assertEqual(snapshot.payload,before)
+    @patch.dict("os.environ", GOOGLE)
+    @patch("apps.mobility.services.travel.providers.routing.request_json")
+    def test_legacy_route_cache_cannot_bypass_validation_and_is_preserved(self, request):
+        request.return_value = ({"routes": [{"distanceMeters": 250000, "duration": "bad"}]}, "synthetic-legacy-route-response")
+        parameters = {"start": [77, 12], "end": [76, 11], "mode": "car"}
+        legacy = GoogleRoutes(); legacy.version = 0; legacy.min_interval = 0
+        with patch.object(legacy, "normalize", return_value={"routes": [{"distance_km": 1}]}):
+            self.assertTrue(query(legacy, parameters).success)
+        snapshot = VerifiedExternalInsight.objects.get(scope="travel_provider")
+        before = snapshot.payload.copy()
+        result = query(GoogleRoutes(), parameters)
+        self.assertFalse(result.success); self.assertEqual(result.error, "malformed_response")
+        self.assertEqual(request.call_count, 2)
+        snapshot.refresh_from_db(); self.assertEqual(snapshot.payload, before)
+
+
+def google_day(day, high=30, low=20, rain=0, wind=10, condition="CLEAR"):
+    half = {"precipitation": {"qpf": {"quantity": rain / 2, "unit": "MILLIMETERS"}}, "wind": {"speed": {"value": wind, "unit": "KILOMETERS_PER_HOUR"}},
+            "weatherCondition": {"type": condition}}
+    return {"displayDate": {"year": day.year, "month": day.month, "day": day.day}, "daytimeForecast": half, "nighttimeForecast": half,
+            "maxTemperature": {"degrees": high}, "minTemperature": {"degrees": low},
+            "sunEvents": {"sunriseTime": f"{day.isoformat()}T00:45:00Z", "sunsetTime": f"{day.isoformat()}T12:40:00Z"}}
 
 
 class TravelWeatherTests(TestCase):
     def test_daily_weather_and_replan_does_not_cancel(self):
-        provider = OpenMeteoWeather()
-        today = timezone.localdate().isoformat()
-        payload = provider.normalize({"timezone": "Asia/Kolkata", "daily": {"time": [today],
-            "temperature_2m_max": [36], "temperature_2m_min": [22], "precipitation_sum": [35],
-            "wind_speed_10m_max": [45], "weather_code": [95], "sunrise": [today+"T06:00"], "sunset": [today+"T18:00"]}},
-            {"start_date": today, "end_date": today})
-        result = ProviderResult("open_meteo", "weather", success=True, payload=payload)
+        today = timezone.localdate()
+        payload = GoogleWeather().normalize({"timeZone": {"id": "Asia/Kolkata"}, "forecastDays": [
+            google_day(today, high=36, low=22, rain=35, wind=45, condition="THUNDERSTORM")]},
+            {"start_date": today.isoformat(), "end_date": today.isoformat()})
+        result = ProviderResult("google_weather", "weather", success=True, payload=payload)
         proposals = replan_proposals(result)
         self.assertEqual(proposals[0]["risks"], ["rain", "heat", "thunderstorm", "wind"])
+        self.assertEqual((payload["days"][0]["rain_mm"], payload["timezone"]), (35, "Asia/Kolkata"))
         self.assertTrue(proposals[0]["requires_acceptance"])
         self.assertEqual(payload["official_alerts"], "UNKNOWN")
         result.stale = True
         self.assertEqual(replan_proposals(result), [])
 
+    @patch.dict("os.environ", GOOGLE)
     @patch("apps.mobility.services.travel.providers.weather.request_json")
     def test_outside_forecast_window_makes_no_request(self, request):
-        with self.assertRaises(ProviderError):
-            OpenMeteoWeather().fetch({"start_date": "2099-01-01", "end_date": "2099-01-03"})
+        far = (timezone.localdate() + timedelta(days=10)).isoformat()  # Google forecasts today and the next nine days
+        for window in ({"start_date": "2099-01-01", "end_date": "2099-01-03"}, {"start_date": far, "end_date": far}):
+            self.assertEqual(query(GoogleWeather(), {"latitude": 12, "longitude": 77, **window}).error, "invalid_parameters")
         request.assert_not_called()
 
     def test_incomplete_forecast_is_unknown_not_dry(self):
+        today = timezone.localdate()
         with self.assertRaises(ProviderError):
-            OpenMeteoWeather().normalize({"daily": {"time": []}}, {"start_date": "2026-10-01", "end_date": "2026-10-01"})
+            GoogleWeather().normalize({"forecastDays": [google_day(today)]},
+                                      {"start_date": today.isoformat(), "end_date": (today + timedelta(days=1)).isoformat()})
 
 
 class TravelDiscoveryTests(TestCase):
@@ -326,14 +318,16 @@ class TravelDiscoveryTests(TestCase):
         self.assertEqual(result[0]["popularity"], "UNKNOWN")
         self.assertIn("Matches your interests", result[0]["reasons"])
 
-    def test_places_normalization_and_partial_response(self):
-        raw = {"elements": [{"id": 1, "type": "way", "center": {"lat":12,"lon":77},
-                             "tags": {"name":"Camp", "tourism":"camp_site", "opening_hours":"24/7"}}]}
-        place = OverpassPlaces().normalize(raw, {})["places"][0]
-        self.assertEqual(place["category"], "camping")
-        self.assertEqual(place["availability"], "UNKNOWN")
+    def test_places_normalization_and_destinations_from_google(self):
+        raw = {"places": [{"id": "c1", "displayName": {"text": "Camp"}, "location": {"latitude": 12, "longitude": 77},
+                           "primaryType": "campground", "googleMapsUri": "https://maps.google.com/?cid=1"},
+                          {"id": "x1", "displayName": {"text": "Office"}, "location": {"latitude": 12, "longitude": 77}, "primaryType": "accounting"}]}
+        places = GooglePlacesNearby().normalize(raw, {})["places"]
+        self.assertEqual([(p["name"], p["category"], p["availability"]) for p in places], [("Camp", "camping", "UNKNOWN")])
         with self.assertRaises(ProviderError):
-            OverpassPlaces().normalize({**raw,"remark":"runtime error"}, {})
+            GooglePlacesNearby().types({"categories": ["nightclub"]})
+        found = GoogleDestinations().normalize({"places": raw["places"] * 2}, {})["destinations"]
+        self.assertEqual(([d["name"] for d in found], found[0]["source"]), (["Camp", "Office"], "https://maps.google.com/?cid=1"))
 
 
 class TravelPermitTests(TestCase):
@@ -439,49 +433,7 @@ class TravelCostBikeTests(TestCase):
         self.assertIn("not a mechanical inspection",result["note"])
 
 
-class TravelAccommodationTests(TestCase):
-    def test_search_price_is_not_confirmed_availability_and_expiry_caps_cache(self):
-        expiry = timezone.now()+timedelta(minutes=4)
-        raw = {"data":{"results":[{"id":"srr_1","expires_at":expiry.isoformat(),
-                "check_in_date":"2026-10-01","check_out_date":"2026-10-03", "cheapest_rate_total_amount":"4000",
-                "cheapest_rate_currency":"INR", "cheapest_rate_due_at_accommodation_amount":"200",
-                "cheapest_rate_due_at_accommodation_currency":"INR",
-                "accommodation":{"name":"Fixture hotel","rating":3,"location":{"geographic_coordinates":{"latitude":12,"longitude":77}}}}]}}
-        provider = DuffelAccommodation()
-        payload = provider.normalize(raw,{})
-        option = payload["options"][0]
-        self.assertEqual(option["nightly_rate"],"2000.00")
-        self.assertEqual(option["due_at_property"],"200")
-        self.assertEqual(option["availability"],"search_result_requires_rate_confirmation")
-        self.assertIsNone(option["booking_url"])
-        self.assertEqual(provider.expires_at(payload,{},timezone.now()),expiry)
-        raw["data"]["results"][0]["expires_at"] = (timezone.now()-timedelta(seconds=1)).isoformat()
-        self.assertEqual(provider.normalize(raw,{})["options"],[])
-
-    @patch.dict("os.environ", {"TRAVEL_DUFFEL_API_KEY":"duffel_test_fixture","TRAVEL_DUFFEL_ALLOW_PAID_SEARCH":"true"})
-    def test_sandbox_is_never_live(self):
-        result = query(DuffelAccommodation(),{})
-        self.assertEqual(result.freshness,"UNKNOWN")
-        self.assertEqual(result.error,"sandbox_token_not_live_inventory")
-
-
 class TravelTransportTests(TestCase):
-    def test_flight_normalization_roundtrip_price_and_sandbox_rejection(self):
-        segment = {"origin":{"iata_code":"BLR"},"destination":{"iata_code":"CCJ"},
-                   "departing_at":"2026-10-01T08:00:00","arriving_at":"2026-10-01T09:00:00"}
-        offer = {"id":"off_1","live_mode":True,"expires_at":(timezone.now()+timedelta(minutes=10)).isoformat(),
-                 "total_amount":"6000","total_currency":"INR","slices":[{"duration":"PT1H","segments":[segment]}]}
-        provider = DuffelFlights()
-        raw = {"data":{"live_mode":True,"offers":[offer]}}
-        option = provider.normalize(raw,{"departure_date":"2026-10-01"})["options"][0]
-        self.assertEqual(option["fare"],"6000")
-        self.assertEqual(option["transfers"],0)
-        self.assertEqual(option["availability"],"offer_returned_recheck_before_purchase")
-        self.assertIsNone(option["booking_url"])
-        raw["data"]["live_mode"] = False
-        with self.assertRaises(ProviderError):
-            provider.normalize(raw,{})
-
     def test_train_schedule_never_implies_inventory_or_verified_fare(self):
         provider = IndianRailProvider()
         option = provider.normalize({"options":[{"origin":"SBC","destination":"CLT","departure":"21:00",
@@ -493,40 +445,29 @@ class TravelTransportTests(TestCase):
 
 
 class TravelProviderPolicyBoundaryTests(TestCase):
-    """Withdrawn use mode stops cached data, and the older advisor uses the same budgeted path."""
+    """Google needs its key, and the older advisor uses the same budgeted path."""
 
-    geocoding = {"results": [{"id": 1, "name": "Synthetic Town", "latitude": 12.5, "longitude": 77.5,
-                              "admin1": "Synthetic State", "country": "India", "country_code": "IN"}]}
+    geocoding = {"places": [{"id": "g1", "displayName": {"text": "Synthetic Town"}, "formattedAddress": "Synthetic State, India",
+                             "location": {"latitude": 12.5, "longitude": 77.5}}]}
 
     @patch("apps.mobility.services.travel.providers.geocoding.request_json")
-    def test_withdrawn_use_mode_stops_fresh_cached_results(self, request_json):
-        request_json.return_value = (self.geocoding, "hash")
-        with patch.dict("os.environ", {"TRAVEL_USE_MODE": "personal_noncommercial"}):
-            self.assertTrue(query(OpenMeteoGeocoding(), {"name": "Synthetic Town"}).success)
-        with patch.dict("os.environ", {"TRAVEL_USE_MODE": ""}):
-            result = query(OpenMeteoGeocoding(), {"name": "Synthetic Town"})
-        self.assertFalse(result.success)
-        self.assertEqual(result.payload, {})
-        self.assertEqual(request_json.call_count, 1)
+    def test_without_the_google_key_nothing_is_sent(self, request_json):
+        with patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": ""}):
+            result = query(GooglePlaceSearch(), {"name": "Synthetic Town"})
+        self.assertEqual((result.success, result.error), (False, "missing_TRAVEL_GOOGLE_MAPS_API_KEY"))
+        request_json.assert_not_called()
 
+    @patch.dict("os.environ", GOOGLE)
     @patch("apps.mobility.services.travel.providers.geocoding.request_json")
     def test_advisor_lookups_use_the_budgeted_provider_with_no_second_cache(self, request_json):
         from apps.integrations.services.verified_intelligence import verified_intelligence
         request_json.return_value = (self.geocoding, "hash")
-        with patch.dict("os.environ", {"TRAVEL_USE_MODE": ""}):
-            blocked = verified_intelligence.geocode_destination("Synthetic Town")
-        self.assertEqual((blocked.payload, blocked.evidence["status"]), ({}, "failed"))
-        request_json.assert_not_called()
-        with patch.dict("os.environ", {"TRAVEL_USE_MODE": "personal_noncommercial"}):
-            live = verified_intelligence.geocode_destination("Synthetic Town")
-            cached = verified_intelligence.geocode_destination("Synthetic Town")
+        live = verified_intelligence.geocode_destination("Synthetic Town")
+        cached = verified_intelligence.geocode_destination("Synthetic Town")
         self.assertEqual(live.payload["display_name"], "Synthetic Town, Synthetic State, India")
-        self.assertIn("GeoNames", live.evidence["source_name"])
+        self.assertIn("Google", live.evidence["source_name"])
         self.assertEqual((live.cached, cached.cached), (False, True))
-        self.assertEqual(TravelProviderRequest.objects.filter(provider="open_meteo", network_call=True).count(), 1)
-        # Withdrawing the use mode stops the advisor too: it keeps no copy of its own.
-        with patch.dict("os.environ", {"TRAVEL_USE_MODE": ""}):
-            self.assertEqual(verified_intelligence.geocode_destination("Synthetic Town").payload, {})
+        self.assertEqual(TravelProviderRequest.objects.filter(provider="google_places", network_call=True).count(), 1)
         self.assertFalse(VerifiedExternalInsight.objects.filter(scope="travel").exists())
 
     @patch("alfred_ai.services.public_http.request")
@@ -543,16 +484,15 @@ class TravelProviderPolicyBoundaryTests(TestCase):
         self.assertFalse(old.is_active)
         request.assert_not_called()
 
+    @patch.dict("os.environ", GOOGLE)
     @patch("apps.mobility.services.travel.providers.weather.request_json")
     def test_unforecastable_window_uses_no_budget_or_backoff(self, request_json):
-        with patch.dict("os.environ", {"TRAVEL_USE_MODE": "personal_noncommercial"}):
-            result = query(OpenMeteoWeather(), {"latitude": 12.5, "longitude": 77.5,
-                                                "start_date": "2001-01-01", "end_date": "2001-01-02"})
+        result = query(GoogleWeather(), {"latitude": 12.5, "longitude": 77.5, "start_date": "2001-01-01", "end_date": "2001-01-02"})
         self.assertFalse(result.success)
         request_json.assert_not_called()
         self.assertFalse(TravelProviderRequest.objects.filter(network_call=True).exists())
-        self.assertFalse(TravelProviderState.objects.filter(provider="open_meteo", next_allowed_at__isnull=False).exists())
-        self.assertEqual(query(OpenMeteoWeather(), {"latitude": 1, "longitude": 1}).error, "invalid_parameters")
+        self.assertFalse(TravelProviderState.objects.filter(provider="google_weather", next_allowed_at__isnull=False).exists())
+        self.assertEqual(query(GoogleWeather(), {"latitude": 1, "longitude": 1}).error, "invalid_parameters")
 
     def test_geocoded_origin_keeps_its_source_and_is_not_labelled_static(self):
         from copy import deepcopy
@@ -562,7 +502,7 @@ class TravelProviderPolicyBoundaryTests(TestCase):
 
         def fake_query(provider, parameters, **kwargs):
             if provider.category == "geocoding":
-                return ProviderResult("open_meteo", "geocoding", success=True, status="ok", freshness="LIVE",
+                return ProviderResult("google_places", "geocoding", success=True, status="ok", freshness="LIVE",
                     confidence="LIKELY", source_url=provider.source_url, attribution=provider.attribution,
                     retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(),
                     payload={"locations": [{"name": "Synthetic Origin", "lat": 13.0, "lon": 77.0}]})
@@ -570,9 +510,9 @@ class TravelProviderPolicyBoundaryTests(TestCase):
         from apps.mobility.services.travel_discovery import candidates_for
         owner = get_user_model().objects.create_user("origin-owner", password="x-Unused-12345")
         destination = candidates_for(owner, {"origin": fact("Bengaluru")}, destinations=[deepcopy(DESTINATIONS[0])])[0]
-        with patch("apps.mobility.services.travel.research.query", side_effect=fake_query),                 patch("apps.mobility.services.travel.cache.query", side_effect=fake_query):
+        with patch("apps.mobility.services.travel.research.query", side_effect=fake_query), patch("apps.mobility.services.travel.cache.query", side_effect=fake_query):
             d, _ = enrich_candidate(owner, {"origin": fact("Synthetic Origin")}, destination)
-        self.assertIn("GeoNames", d["origin_geocoding_result"]["attribution"])
+        self.assertIn("Google", d["origin_geocoding_result"]["attribution"])
         origin = next(f for f in map_features(d)["features"] if f["properties"]["kind"] == "origin")
         self.assertEqual(origin["properties"]["freshness"], "LIVE")
 
@@ -580,53 +520,61 @@ class TravelProviderPolicyBoundaryTests(TestCase):
         from zoneinfo import ZoneInfo
         zone = ZoneInfo("Asia/Kolkata")
         now = datetime(2026, 11, 4, 1, 0, tzinfo=zone).astimezone(datetime_timezone.utc)  # timezone.now() is UTC: 3 November.
-        event = TravelProviderRequest.objects.create(provider="open_meteo", category="weather", cache_key="k",
+        event = TravelProviderRequest.objects.create(provider="google_places", category="geocoding", cache_key="k",
                                                      parameters={}, status="ok", network_call=True)
         TravelProviderRequest.objects.filter(pk=event.pk).update(created_at=datetime(2026, 11, 4, 0, 30, tzinfo=zone))
         with timezone.override(zone):
-            self.assertEqual(budget_status(OpenMeteoGeocoding(), now=now)["day"]["used"], 1)
+            self.assertEqual(budget_status(GooglePlaceSearch(), now=now)["day"]["used"], 1)
         TravelProviderRequest.objects.filter(pk=event.pk).update(created_at=datetime(2026, 11, 3, 23, 30, tzinfo=zone))
         with timezone.override(zone):
-            self.assertEqual(budget_status(OpenMeteoGeocoding(), now=now)["day"]["used"], 0)
+            self.assertEqual(budget_status(GooglePlaceSearch(), now=now)["day"]["used"], 0)
 
 
-class TravelpayoutsFlightTests(TestCase):
-    """Free recent fares: off without a token, the token only in a header, and never presented as live or for the whole party."""
+class SkyscannerFlightTests(TestCase):
+    """Live fares once the partner key exists: off without it, only airports, dates and travellers sent, and the
+    cheapest itineraries priced exactly from Skyscanner's scaled whole numbers."""
     def setUp(self):
-        self.day = (timezone.localdate() + timedelta(days=20)).isoformat()
-        self.back = (timezone.localdate() + timedelta(days=24)).isoformat()
+        self.day = timezone.localdate() + timedelta(days=20)
+        self.back = timezone.localdate() + timedelta(days=24)
 
-    def test_off_without_a_token_and_nothing_is_sent(self):
-        with patch("apps.mobility.services.travel.providers.base.request") as sent, patch.dict("os.environ", {"TRAVEL_TRAVELPAYOUTS_TOKEN": ""}):
-            result = query(TravelpayoutsFlights(), {"origin": "BLR", "destination": "GOI", "departure_date": self.day})
-        self.assertEqual(result.error, "missing_TRAVEL_TRAVELPAYOUTS_TOKEN")
+    def test_off_without_a_key_and_nothing_is_sent(self):
+        with patch("apps.mobility.services.travel.providers.base.request") as sent, patch.dict("os.environ", {"TRAVEL_SKYSCANNER_API_KEY": ""}):
+            result = query(SkyscannerFlights(), {"origin": "BLR", "destination": "GOI", "departure_date": self.day.isoformat()})
+        self.assertEqual(result.error, "missing_TRAVEL_SKYSCANNER_API_KEY")
         sent.assert_not_called()
 
-    @patch.dict("os.environ", {"TRAVEL_TRAVELPAYOUTS_TOKEN": "synthetic-tp-0000"})
-    def test_route_and_dates_only_are_sent_and_fares_stay_one_adult_and_not_live(self):
-        raw = {"success": True, "currency": "inr", "data": [{"origin": "BLR", "destination": "GOI", "origin_airport": "BLR",
-               "destination_airport": "GOI", "price": 3499, "airline": "6E", "flight_number": "123", "departure_at": self.day + "T06:00:00+05:30",
-               "return_at": self.back + "T20:00:00+05:30", "transfers": 0, "duration_to": 75, "link": "/search/BLR0112GOI1?t=x"}]}
-        response = Mock(response_hash="h"); response.json.return_value = raw
-        with patch("apps.mobility.services.travel.providers.base.request", return_value=response) as sent:
-            result = query(TravelpayoutsFlights(), {"origin": "blr", "destination": "GOI", "departure_date": self.day, "return_date": self.back, "adults": 4})
+    @patch.dict("os.environ", {"TRAVEL_SKYSCANNER_API_KEY": "synthetic-sky-0000"})
+    def test_search_polls_until_complete_and_prices_the_cheapest_exactly(self):
+        leg = {"originPlaceId": "p1", "destinationPlaceId": "p2", "durationInMinutes": 75, "stopCount": 0, "marketingCarrierIds": ["c1"],
+               "departureDateTime": {"year": self.day.year, "month": self.day.month, "day": self.day.day, "hour": 6, "minute": 5},
+               "arrivalDateTime": {"year": self.day.year, "month": self.day.month, "day": self.day.day, "hour": 7, "minute": 20}}
+        done = {"status": "RESULT_STATUS_COMPLETE", "content": {"results": {
+            "itineraries": {"i1": {"legIds": ["l1"], "pricingOptions": [{"price": {"amount": "3499500", "unit": "PRICE_UNIT_MILLI"},
+                                                                         "items": [{"deepLink": "https://www.skyscanner.net/transport_deeplink/x"}]}]},
+                            "i2": {"legIds": ["l1"], "pricingOptions": [{"price": {"amount": "", "unit": "PRICE_UNIT_MILLI"}}]}},
+            "legs": {"l1": leg}, "places": {"p1": {"iata": "BLR"}, "p2": {"iata": "GOI"}}, "carriers": {"c1": {"name": "Synthetic Air"}}},
+            "sortingOptions": {"cheapest": [{"itineraryId": "i1"}, {"itineraryId": "i2"}]}}}
+        answers = [{"status": "RESULT_STATUS_INCOMPLETE", "sessionToken": "tok"}, done]
+        responses = [Mock(response_hash="h", **{"json.return_value": a}) for a in answers]
+        with patch("apps.mobility.services.travel.providers.base.request", side_effect=responses) as sent:
+            result = query(SkyscannerFlights(), {"origin": "blr", "destination": "GOI", "departure_date": self.day.isoformat(),
+                                                 "return_date": self.back.isoformat(), "adults": 2})
         self.assertTrue(result.success, result.error)
+        self.assertEqual(len(result.payload["options"]), 1)  # an itinerary with no price is left out
         option = result.payload["options"][0]
-        self.assertEqual((option["fare"], option["currency"], option["flight_number"], option["availability"]), ("3499", "INR", "6E123", "UNKNOWN"))
-        self.assertIn("one adult", option["fare_scope"])
-        self.assertEqual(option["booking_url"], "https://www.aviasales.com/search/BLR0112GOI1?t=x")
-        args, kwargs = sent.call_args
-        self.assertEqual(kwargs["headers"], {"X-Access-Token": "synthetic-tp-0000"})
-        self.assertNotIn("synthetic-tp", args[1] + str(kwargs["params"]))
-        self.assertEqual(set(kwargs["params"]), {"origin", "destination", "departure_at", "return_at", "currency", "sorting", "direct", "limit", "one_way"})
-        self.assertEqual((kwargs["params"]["origin"], kwargs["params"]["one_way"]), ("BLR", "false"))
+        self.assertEqual((option["fare"], option["carrier"], option["origin"], option["transfers"]), ("3499.5", "Synthetic Air", "BLR", 0))
+        self.assertEqual(option["booking_url"], "https://www.skyscanner.net/transport_deeplink/x")
+        create, poll = sent.call_args_list
+        self.assertTrue(create.args[1].endswith("/create") and poll.args[1].endswith("/poll/tok"))
+        self.assertEqual(create.kwargs["headers"]["x-api-key"], "synthetic-sky-0000")
+        query_sent = create.kwargs["json_body"]["query"]
+        self.assertEqual((query_sent["adults"], len(query_sent["queryLegs"]), query_sent["queryLegs"][1]["originPlaceId"]), (2, 2, {"iata": "GOI"}))
+        self.assertNotIn("synthetic-sky", str(create.kwargs["json_body"]))
 
-    @patch.dict("os.environ", {"TRAVEL_TRAVELPAYOUTS_TOKEN": "synthetic-tp-0000"})
-    def test_bad_input_or_a_refused_answer_gives_no_fares(self):
+    @patch.dict("os.environ", {"TRAVEL_SKYSCANNER_API_KEY": "synthetic-sky-0000"})
+    def test_bad_input_makes_no_call(self):
         with patch("apps.mobility.services.travel.providers.base.request", side_effect=AssertionError("no call")):
-            for p in ({"origin": "Bangalore", "destination": "GOI", "departure_date": self.day},
-                      {"origin": "BLR", "destination": "GOI", "departure_date": "2020-01-01"}):
-                self.assertFalse(query(TravelpayoutsFlights(), p).success)
-        with self.assertRaises(ProviderError):
-            TravelpayoutsFlights().normalize({"success": False, "data": {}, "error": "token"}, {})
-        self.assertIsNone(TravelpayoutsFlights().normalize({"success": True, "data": [{"price": 1, "link": "https://evil.example"}]}, {})["options"][0]["booking_url"])
+            for p in ({"origin": "Bangalore", "destination": "GOI", "departure_date": self.day.isoformat()},
+                      {"origin": "BLR", "destination": "GOI", "departure_date": "2020-01-01"},
+                      {"origin": "BLR", "destination": "GOI", "departure_date": self.day.isoformat(), "cabin_class": "deluxe"}):
+                self.assertFalse(query(SkyscannerFlights(), p).success)

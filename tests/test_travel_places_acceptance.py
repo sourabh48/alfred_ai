@@ -11,7 +11,7 @@ from django.utils import timezone
 from apps.integrations.models import VerifiedExternalInsight
 from apps.mobility.services.travel.cache import query
 from apps.mobility.services.travel.presentation import age_saved_facts
-from apps.mobility.services.travel.providers.places import OverpassPlaces
+from apps.mobility.services.travel.providers.places import GooglePlacesNearby
 from apps.mobility.services.travel_conversation import new_session
 
 
@@ -77,10 +77,10 @@ class TravelPlacesAcceptanceTests(TestCase):
         self.assertEqual(self.client.get(url).status_code, 404)
 
     def provider(self):
-        provider = OverpassPlaces(); provider.min_interval = 0
+        provider = GooglePlacesNearby(); provider.min_interval = 0
         self.enterContext(patch.object(provider, "unavailable_reason", return_value=""))
-        self.enterContext(patch.object(provider, "fetch", return_value=({"elements": [{"type": "node", "id": 1,
-            "lat": 12, "lon": 77, "tags": {"name": "Synthetic camp", "tourism": "camp_site", "opening_hours": "24/7"}}]}, "synthetic-response")))
+        self.enterContext(patch.object(provider, "fetch", return_value=({"places": [{"id": "c1", "displayName": {"text": "Synthetic camp"},
+            "location": {"latitude": 12, "longitude": 77}, "primaryType": "campground"}]}, "synthetic-response")))
         return provider
 
     def test_cache_reuse_and_offline_fallback_preserve_original_provenance(self):
@@ -100,12 +100,12 @@ class TravelPlacesAcceptanceTests(TestCase):
 
     def test_partial_or_unconfigured_results_cannot_invent_places(self):
         provider = self.provider()
-        provider.fetch.return_value = ({"remark": "Synthetic partial response", "elements": []}, "partial")
+        provider.fetch.return_value = ({"places": [{"id": "x", "displayName": {"text": "Broken"}, "location": {"latitude": 999, "longitude": 77}}]}, "partial")
         result = query(provider, {"latitude": 12, "longitude": 77})
         self.assertFalse(result.success)
-        self.assertEqual(result.error, "incomplete_poi_response")
+        self.assertEqual(result.error, "malformed_response")
         self.assertFalse(VerifiedExternalInsight.objects.exists())
-        with patch.dict("os.environ", {"TRAVEL_OVERPASS_URL": ""}):
-            unavailable = query(OverpassPlaces(), {"latitude": 13, "longitude": 78})
+        with patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": ""}):
+            unavailable = query(GooglePlacesNearby(), {"latitude": 13, "longitude": 78})
         self.assertFalse(unavailable.success)
         self.assertEqual(unavailable.payload, {})

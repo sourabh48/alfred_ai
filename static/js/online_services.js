@@ -8,8 +8,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function render(data) {
         const ready = data.keys.filter(k => k.saved).length, on = data.switches.filter(s => s.on).length;
-        status.textContent = `${on} of ${data.switches.length} free services on · ${ready} of ${data.keys.length} keys saved · Career email ${data.mail.ready ? "ready" : "off"}.`
+        status.textContent = (data.switches.length ? `${on} of ${data.switches.length} free services on · ` : "") + `${ready} of ${data.keys.length} keys saved · Career email ${data.mail.ready ? "ready" : "off"}.`
             + (data.can_manage ? "" : " Only the person who manages ALFRED on this PC can change these.");
+        document.getElementById("onlineServicesSwitchArea").hidden = !data.switches.length;
         document.getElementById("onlineServicesSwitches").innerHTML = data.switches.map(s => `<div class="form-check mb-1">
             <input class="form-check-input" type="checkbox" id="online-${e(s.name)}" data-switch="${e(s.name)}" ${s.on ? "checked" : ""} ${data.can_manage ? "" : "disabled"}>
             <label class="form-check-label small" for="online-${e(s.name)}">${e(s.detail)}</label></div>`).join("");

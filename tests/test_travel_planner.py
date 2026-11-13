@@ -22,9 +22,9 @@ from apps.mobility.services.travel.providers.base import ProviderResult
 
 def weather_fixture(*args, **kwargs):
     now = timezone.now()
-    return ProviderResult("open_meteo","weather",success=True,status="ok",freshness="LIVE",confidence="LIKELY",
+    return ProviderResult("google_weather","weather",success=True,status="ok",freshness="LIVE",confidence="LIKELY",
         payload={"average_min_temp":20,"average_max_temp":26,"precipitation_total":2,"wind_max":12,"days":[]},
-        source_url="https://open-meteo.com/en/docs",retrieved_at=now.isoformat(),verified_at=now.isoformat(),expires_at=(now+timedelta(hours=2)).isoformat())
+        source_url="https://developers.google.com/maps/documentation/weather",retrieved_at=now.isoformat(),verified_at=now.isoformat(),expires_at=(now+timedelta(hours=2)).isoformat())
 
 
 class TravelPlannerTests(TestCase):

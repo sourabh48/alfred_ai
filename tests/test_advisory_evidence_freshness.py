@@ -40,13 +40,13 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
             "apps.mobility.services.travel_advisor.verified_intelligence.geocode_destination",
             return_value=_insight(
                 {"display_name": "Darjeeling", "latitude": 27.03, "longitude": 88.26},
-                "Open-Meteo / GeoNames, CC BY 4.0",
+                "Powered by Google",
             ),
         ), patch(
             "apps.mobility.services.travel_advisor.verified_intelligence.weather_snapshot",
             return_value=_insight(
                 {"average_max_temp": 24, "average_min_temp": 16, "precipitation_total": 8, "wind_max": 18},
-                "Open-Meteo",
+                "Weather by Google; ALFRED summarizes the forecast",
             ),
         ), patch(
             "apps.mobility.services.travel_advisor.verified_intelligence.offbeat_suggestions",
@@ -76,7 +76,7 @@ class AdvisoryEvidenceFreshnessTests(TestCase):
         self.assertEqual(payload["evidence_freshness"]["fresh_records"], 3)
         self.assertTrue(payload["proof_contract"]["complete"])
         self.assertEqual(payload["proof_contract"]["refresh_contract"]["scheduled_refresh"], "refresh_due_records")
-        self.assertIn("Open-Meteo / GeoNames, CC BY 4.0", payload["proof_contract"]["observed_sources"])
+        self.assertIn("Powered by Google", payload["proof_contract"]["observed_sources"])
 
     def test_risk_outlook_exposes_evidence_freshness(self):
         # No job role, so the outlook uses only macro evidence; mock it so the test never reaches World Bank or Yahoo.

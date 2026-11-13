@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from decimal import Decimal
 
@@ -173,8 +174,17 @@ def _attention_items(user, sources):
     """What needs the owner now, read from the services each page already uses. Reading writes nothing."""
     from apps.budgets.services.budget_intelligence import budget_spent, current_budget_plan
     from apps.mobility.services.bike_service_intelligence import bike_service_intelligence
+    from .services import online_services, social_login
 
     items = []
+    if online_services.can_manage(user):
+        # Keys are shared app-wide, so only the person who manages ALFRED is asked; Google first (owner decision 2026-11-14).
+        if not os.environ.get("TRAVEL_GOOGLE_MAPS_API_KEY"):
+            items.append(dict(tone="warning", text="Add your Google Maps Platform key so Travel can show maps, places, hotels, routes and weather.",
+                              action="Add key", url="/settings/#settingsOnline"))
+        if not social_login.configured():
+            items.append(dict(tone="warning", text="Add a Google sign-in client so everyone signs in with a confirmed email.",
+                              action="Add sign-in", url="/settings/#settingsOnline"))
     for source in sources:
         if source["state"] in ("Review needed", "Import needs attention", "Unavailable") and source.get("next_action"):
             items.append(dict(tone="warning", text=f"{source['label']}: {source['state'].lower()}.",

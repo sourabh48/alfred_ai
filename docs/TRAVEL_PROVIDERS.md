@@ -107,7 +107,7 @@ redBus). `www.apsrtconline.in` is left out because it redirected to plain HTTP.
 `online.keralartc.com` refused the connection. Add a site only after the same
 review.
 
-**Provider status — 2026-10-15:** Code/fixture success is separate from configured and real-live-tested. No new provider credentials/calls were used in this audit. Open-Meteo current published free limits and Brave/Duffel/OpenAI pricing/retention are in the [current register](ALFRED_EXTERNAL_INTEGRATIONS.md); ORS account quotas and all contract-specific limits remain unverified. Keep old dated limits below as historical guidance. Never treat wiki/POIs/link-outs as booking or road-legality evidence.
+**Provider status — 2026-10-15:** Code/fixture success is separate from configured and real-live-tested. No new provider credentials/calls were used in this audit. Provider pricing is in the [current register](ALFRED_EXTERNAL_INTEGRATIONS.md); contract-specific limits remain unverified. Keep old dated limits below as historical guidance. Never treat wiki/POIs/link-outs as booking or road-legality evidence.
 
 Policy review: 29 September 2026. ALFRED remains a local/LAN application. The
 planner sends public place/date/route search parameters, not conversations,
@@ -135,66 +135,40 @@ at most 28 fractional digits; excessive exponent expansion is rejected, not roun
 Adapter normalization errors surface as `malformed_response`. Current compatible
 selected quotes remain separate evidence and never replace estimated allowances.
 
+Owner decision 2026-11-14: Google is the one travel data source wherever Google has the data, so one key
+covers the map, place names, places, hotels, destinations, routes and weather. Flights wait for Skyscanner.
+The key goes in Settings > Online services (or `TRAVEL_GOOGLE_MAPS_API_KEY` in `config/local.env`) and is
+sent only in the `X-Goog-Api-Key` header. On that key enable **Map Tiles API, Places API (New), Routes API
+and Weather API**; Geocoding is not needed because Places text search finds place names.
+
 | Category | Adapter / configuration | Cache | Terms and limitations |
 | --- | --- | --- | --- |
-| Geocoding | Open-Meteo / GeoNames | 90 days | Global place search; ambiguous names require selection |
-| Routing | openrouteservice; `TRAVEL_ORS_API_KEY` | 5 days | Car/walking, highway/toll avoidance; car routes do not verify motorcycle legality or closures |
-| Routing (motorcycle first) | Valhalla; `TRAVEL_VALHALLA_URL` (free FOSSGIS server `https://valhalla1.openstreetmap.de`: one request a second, identifying User-Agent) | 5 days | Motorcycle profile follows OpenStreetMap motorcycle access tags; reports whether motorway and toll avoidance was met |
-| Routing (paid fallback) | Google Routes; `TRAVEL_GOOGLE_MAPS_API_KEY` | 1 hour | Only after the free routers fail; two-wheeler mode; distance and time only, no line on the OpenStreetMap map (Google terms); app cap 40 a day, 400 a month |
-| Place lookup (paid fallback) | Google Places text search; same key | 30 days | Only when Open-Meteo finds nothing or is unavailable; app cap 40 a day, 400 a month |
-| Weather | Open-Meteo | 2 hours | Complete daily forecast within 16 days; official warnings unavailable |
-| POIs | Overpass; `TRAVEL_OVERPASS_URL` | 7 days | Authorized/self-hosted instance required; OSM tags do not confirm opening, permits or availability |
+| Map | Google Map Tiles (2D roadmap) | Browser, one day | App cap 3000 tiles a day; offline country maps (Protomaps) are used only when Google tiles are missing or fail |
+| Place names | `google_places`: Places text search | 30 days (Google allows keeping coordinates 30 days) | Ambiguous names ask you to choose |
+| Places and hotels | `google_places_nearby`, `google_lodging`: Places nearby search | 1 day | Listings, ratings and price level only; no room rates or availability |
+| Destination ideas | `google_destinations`: Places text search in a box around the start city | 1 day | Google Maps listings, not an official list; seed catalogue fallback |
+| Routing | `google_routes`: Routes API | 1 hour | Two-wheeler, car or walking; up to three alternatives; distance and time only, no line on a non-Google map (Google terms); motorcycle legality and closures unverified |
+| Weather | `google_weather`: Weather API daily forecast | 2 hours | Today and the next nine days only; trips further out show "not checked"; official warnings unavailable |
+| Flights | `skyscanner`: Flights Live Prices v3; `TRAVEL_SKYSCANNER_API_KEY` | 15 minutes | Waiting for Skyscanner partner approval; until then each trip shows a Google Flights link |
 | Permits | Dated official references | 6 hours near departure, otherwise 24 hours | No authorized live permit inventory API verified; opening remains unverified |
-| Hotels | Duffel Stays | 15 minutes, capped by offer expiry | Live account and Stays access required; search result needs rate confirmation |
-| Flights | Duffel Flights | 15 minutes, capped by offer expiry | Participating airline offers; recheck before purchase |
 | Indian rail | Unavailable boundary | None | Authorized agreement/API required; timetable never implies seats, waitlist or fare |
-| Bus | Reviewed state-operator links and a search link | None | No live inventory integration; availability unknown; other states and private operators not listed |
-| Destination discovery | Wikivoyage | 14 days | Geotagged community guides, incomplete coverage; seed catalogue fallback |
-| Web research | Brave / authorized SearXNG / Wikivoyage fallback | 6 hours; 30 minutes for inventory-related leads | Search snippets are unverified leads, not current rules or availability |
+| Bus | Reviewed state-operator links and a search link | None | No live inventory integration; availability unknown |
 
-No-key wiki discovery/search is enabled by default; set `TRAVEL_WEB_ENABLED=false`
-to disable those wiki requests. Optional broad search requires either
-`TRAVEL_BRAVE_API_KEY`, `TRAVEL_BRAVE_STORAGE_ALLOWED=true` and
-`TRAVEL_BRAVE_ALLOW_PAID_SEARCH=true`, or an authorized public HTTPS
-`TRAVEL_SEARXNG_URL` with `TRAVEL_SEARXNG_TERMS_CONFIRMED=true`. These switches
-record the operator's account/terms decision; they do not grant provider rights.
-Leave paid/keyed providers unconfigured until that decision is made. See the
-dated provider review in `artifacts/audit/TRAVEL_PROVIDER_RESEARCH.md`.
+Every Google provider shares the app caps in code (10 a minute, 60 an hour, 200 a day, 3000 a month each),
+well inside Google's monthly free usage. Removed on 2026-11-14 and no longer called: openrouteservice,
+Valhalla, Open-Meteo, Overpass, Wikivoyage/Wikipedia, Brave, SearXNG, Duffel and Travelpayouts. Their old
+keys in `config/local.env` are ignored and can be deleted.
 
-`TRAVEL_MAP_TILE_URL` selects a public HTTPS browser tile template without
-credential query parameters. An empty value disables tiles while retaining
-saved geometry. Tiles load only after the user chooses **Load map**.
+### Skyscanner, once the key is approved
 
-Open-Meteo hosted free use requires `TRAVEL_USE_MODE=personal_noncommercial`.
-Commercial use requires `TRAVEL_OPEN_METEO_API_KEY` and a subscription, using
-the documented customer endpoint. Free limits: 600/minute, 5,000/hour,
-10,000/day and 300,000/month; weighted requests can cost more than one call.
-ALFRED's limits are lower (60/minute, 500/hour, 2,000/day, 50,000/month shared
-across geocoding/weather). Attribution: Open-Meteo / GeoNames, CC BY 4.0.
-See [pricing](https://open-meteo.com/en/pricing),
-[terms](https://open-meteo.com/en/terms),
-[geocoding](https://open-meteo.com/en/docs/geocoding-api) and
-[forecast documentation](https://open-meteo.com/en/docs).
-
-openrouteservice Standard is free with an individual account/key. Current
-published directions limits are 2,000/day and 40/minute; ALFRED caps requests
-below these. Results require attribution and CC BY-SA 4.0 compliance. Key stays
-server-side. The current API base is `https://api.heigit.org/openrouteservice`.
-See [plans](https://account.heigit.org/info/plans),
-[terms](https://account.heigit.org/info/tos),
-[routing options](https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/routing-options)
-and [FAQ](https://giscience.github.io/openrouteservice/frequently-asked-questions).
-
-For a current single-route result of at most 100 km, ALFRED also makes one
-separately cached, quota-accounted alternative request: at most three results,
-share factor 0.6 and weight factor 1.4. These are provider search parameters,
-not measured route overlap, scenic scores or guaranteed availability. See the
-official [request interface](https://github.com/GIScience/openrouteservice-py/blob/master/openrouteservice/directions.py)
-and [distance/count restrictions](https://openrouteservice.org/restrictions/).
-Longer, stale or unavailable results do not trigger the additional request.
-Failure retains the single-route result with an explicit unavailable comparison.
-Duplicate normalized geometries do not become additional options. Route cache v3
-separates this contract from older snapshots; no old evidence is deleted.
+1. Apply at the [Skyscanner Travel API](https://www.partners.skyscanner.net/product/travel-api) partner page.
+2. When approved, paste the key in Settings > Online services > Skyscanner. Nothing else changes: the
+   planner starts showing live fares on the next trip check.
+3. ALFRED sends only airport codes, dates, traveller count and cabin (`POST .../flights/live/search/create`,
+   then up to two `poll` calls), with the key in the `x-api-key` header. It shows the ten cheapest
+   itineraries in INR with the agent's own link. Prices are quotes to recheck; nothing is booked.
+4. The adapter (`providers/transport.py::SkyscannerFlights`) follows Skyscanner's v3 documentation and is
+   tested against fixtures; it is UNVERIFIED against a live key until the first real search.
 
 Choose a displayed route explicitly before using it in a draft. Selection checks
 the owned session revision, route identity and source timestamps. An expired or
@@ -248,23 +222,8 @@ Route geometry/profile/constraints and trip inputs/dates are bound into the
 receipt scope. Reads and reviews never mutate canonical finance, itinerary days
 or saved-plan allowances. Existing account/session cascades remain unchanged.
 
-Public Nominatim was not enabled: its generated-application policy requires an
-informed operator decision; it also requires identifying requests, attribution,
-caching, no autocomplete and at most one request/second for the entire app.
-See [usage policy](https://operations.osmfoundation.org/policies/nominatim/).
-
-Shared public Overpass instances are not a default ALFRED backend. The operator's
-[commons policy](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html)
-discourages that use. `TRAVEL_OVERPASS_URL` must pass the same public HTTPS check
-as the transport; a plain HTTP or local instance reports invalid rather than
-configured. Published broad guidelines (~10,000 calls and 1 GB/day)
-are not a reserved quota or service guarantee. OSM data is global, unevenly
-mapped, and ODbL licensed. Arrange an authorized endpoint or self-host locally.
-
-Maps use provider-neutral GeoJSON. OSM tiles require visible attribution,
-ordinary browser caching/referer, and no bulk download or offline prefetch.
-See [tile policy](https://operations.osmfoundation.org/policies/tiles/).
-No Google billing or keys are configured automatically.
+Maps use provider-neutral GeoJSON. Google tiles show Google's attribution; offline OpenStreetMap
+files show "© OpenStreetMap contributors, Protomaps".
 
 Permit references are evidence, not access clearance. The dated Chembra
 reference points to [Kerala Tourism](https://www.keralatourism.org/destination/chembra-peak-wayanad/508/).
@@ -276,31 +235,6 @@ Verify opening, quota, fees, ID and restrictions directly with the authority.
 Google (checked 2026-11-13): map tiles read the key from the `X-Goog-Api-Key` header; 2D tiles have
 100,000 free requests a month (700,000 for India-billed accounts), and ALFRED caps them at 3000 a day.
 Places nearby and lodging ask only for Nearby Search Pro fields.
-
-Travelpayouts (Aviasales Data API, `aviasales/v3/prices_for_dates`) needs a free
-partner token in `TRAVEL_TRAVELPAYOUTS_TOKEN` (Settings > Online services). It
-returns the cheapest fares Aviasales users found in the last 48 hours, from a
-cache, per one adult: never live prices or seat availability. ALFRED sends only
-the airport codes and dates, with the token in the `X-Access-Token` header, and
-caps it at 5/minute, 30/hour, 100/day and 1500/month (Travelpayouts allows 600/minute
-with no monthly cap, and lists India as market `in` with INR; the market follows the
-departure airport). Shown beside Duffel, not as a fallback. See [Aviasales Data API](https://support.travelpayouts.com/hc/en-us/articles/203956163).
-
-Duffel requires `TRAVEL_DUFFEL_API_KEY` and
-`TRAVEL_DUFFEL_ALLOW_PAID_SEARCH=true`; test tokens are rejected by the live
-planner. The current search-to-order allowance is 1500:1, with USD 0.005 per
-excess search. This is **not a free inventory feed for a planner with no
-bookings**. Stays access requires an account request; worldwide inventory varies.
-The documented default live search rate is 10/minute; ALFRED caps the shared
-provider at 8/minute, 20/hour, 40/day and 100/month. These are application caps,
-not a guarantee of free usage. No orders, payments or ticket issuance are made.
-No public booking URL is fabricated from an API offer ID. See
-[pricing](https://duffel.com/pricing), [agreement](https://duffel.com/services-agreement),
-[Stays setup](https://duffel.com/docs/guides/getting-started-with-stays),
-[hotel search](https://duffel.com/docs/api/v2/search),
-[flight search](https://duffel.com/docs/api/offer-requests),
-[offer expiry](https://duffel.com/docs/api/offers) and
-[rate limits](https://help.duffel.com/hc/en-gb/articles/10229200096786-What-is-the-API-rate-limit).
 
 Amadeus Self-Service was rejected for a new integration: the current
 [official portal](https://developers.amadeus.com/self-service/category/hotels)

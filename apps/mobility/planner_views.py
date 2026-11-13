@@ -22,7 +22,6 @@ from .services.travel.restrictions import KIND, record_restriction, restriction_
 from .services.travel.links import booking_sites
 from .services.travel.mapping import map_configuration, map_features
 from .services.travel.cache import budget_status, query, usage_summary
-from .services.travel.providers.web import HotelWebsite
 from alfred_ai.services.public_http import normalized_link
 from .services.travel.discovery import remember, place_key
 from .services.travel.intent import PROFILE_KEYS, validate_preference
@@ -373,44 +372,17 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
         return Response(session_payload(session))
 
 
-def _guide_websites(node):
-    if isinstance(node, dict):
-        for key, item in node.items():
-            if key == "stays_guide_result" and isinstance(item, dict):
-                for option in (item.get("payload") or {}).get("options") or []:
-                    if isinstance(option, dict) and option.get("website"):
-                        yield normalized_link(option["website"]).split("#", 1)[0]
-            else:
-                yield from _guide_websites(item)
-    elif isinstance(node, list):
-        for item in node:
-            yield from _guide_websites(item)
-
-
-class TravelStayDetailsView(PrivateTravelSessionAPI):
-    """Reads one guide-listed property's own website on request; never an arbitrary URL."""
-
-    def post(self, request, pk):
-        session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
-        url = normalized_link(request.data.get("url")).split("#", 1)[0]
-        if not url or url not in set(_guide_websites(session.candidates)):
-            raise ValidationError("Choose a property website from this trip's guide listings.")
-        return Response(query(HotelWebsite(url), {"url": url}).as_dict())
-
-
 class TravelProviderUsage(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        from .services.travel.providers.geocoding import GooglePlaceSearch, OpenMeteoGeocoding
-        from .services.travel.providers.weather import OpenMeteoWeather
-        from .services.travel.providers.routing import GoogleRoutes, OpenRouteService, ValhallaRouting
-        from .services.travel.providers.places import GoogleLodging, GooglePlacesNearby
-        from .services.travel.providers.transport import DuffelFlights, IndianRailProvider, TravelpayoutsFlights
-        from .services.travel.providers.web import BraveSearch, SearXNGSearch, WikivoyageSearch, WikivoyageDestinations, WikivoyageStays, HotelWebsite
-        providers = [OpenMeteoGeocoding(),OpenMeteoWeather(),OpenRouteService(),ValhallaRouting(),GoogleRoutes(),GooglePlaceSearch(),GooglePlacesNearby(),
-                     GoogleLodging(),DuffelFlights(),TravelpayoutsFlights(),IndianRailProvider(),BraveSearch(),
-                     SearXNGSearch(),WikivoyageSearch(),WikivoyageDestinations(),WikivoyageStays(),HotelWebsite()]
+        from .services.travel.providers.geocoding import GooglePlaceSearch
+        from .services.travel.providers.weather import GoogleWeather
+        from .services.travel.providers.routing import GoogleRoutes
+        from .services.travel.providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
+        from .services.travel.providers.transport import IndianRailProvider, SkyscannerFlights
+        providers = [GooglePlaceSearch(),GoogleWeather(),GoogleRoutes(),GooglePlacesNearby(),GoogleLodging(),GoogleDestinations(),
+                     SkyscannerFlights(),IndianRailProvider()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 

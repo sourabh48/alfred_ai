@@ -43,7 +43,7 @@ class TravelContinuationTests(TestCase):
 
     @patch("apps.mobility.services.travel.research.query")
     def test_arbitrary_destination_is_retained_when_geocoding_unavailable(self, query):
-        query.return_value = ProviderResult("open_meteo","geocoding",error="missing_configuration")
+        query.return_value = ProviderResult("google_places","geocoding",error="missing_configuration")
         options = research_candidates(self.user,{**self.state,"requested_destination":fact("Ziro")},[])
         self.assertEqual(options[0]["name"],"Ziro")
         self.assertIsNone(options[0]["lat"])
@@ -120,7 +120,8 @@ class TravelContinuationTests(TestCase):
             self.assertEqual(set(row["application_budget"]),set(row["application_limits"]))
             self.assertTrue(all(item["remaining"]==item["limit"]-item["used"] for item in row["application_budget"].values()))
         configured = {(p["provider"], p["category"]) for p in response.json()["configuration"]}
-        self.assertTrue({("open_meteo", "weather"), ("duffel", "flights"), ("brave", "web"),
-                         ("searxng", "web"), ("wikivoyage", "web"), ("wikivoyage", "destinations")} <= configured)
-        with patch.dict("os.environ", {"TRAVEL_BRAVE_API_KEY": "secret-test-sentinel"}):
+        self.assertEqual(configured, {("google_places", "geocoding"), ("google_weather", "weather"), ("google_routes", "routing"),
+                                      ("google_places_nearby", "places"), ("google_lodging", "hotels"), ("google_destinations", "destinations"),
+                                      ("skyscanner", "flights"), ("indian_rail_authorized", "trains")})
+        with patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": "secret-test-sentinel", "TRAVEL_SKYSCANNER_API_KEY": "secret-test-sentinel"}):
             self.assertNotIn("secret-test-sentinel", self.client.get("/api/mobility/planner/providers/").content.decode())

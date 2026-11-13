@@ -52,16 +52,15 @@ class TravelSelectiveRefreshTests(TestCase):
                                      "geometry": {"type": "LineString", "coordinates": [[77, 12], [76, 11]]}}]},
             "weather": {"summary": "Synthetic forecast", "precipitation_total": 0, "days": []},
             "places": {"places": []}, "hotels": {"options": []}, "flights": {"options": []},
-            "trains": {"options": []}, "web": {"findings": []},
+            "trains": {"options": []},
         }.items()}
-        factories = {"OpenRouteService": "routing", "OpenMeteoWeather": "weather", "GooglePlacesNearby": "places",
-                     "GoogleLodging": "hotels", "DuffelFlights": "flights", "IndianRailProvider": "trains",
-                     "BraveSearch": "web", "SearXNGSearch": "web", "WikivoyageSearch": "web"}
+        factories = {"GoogleWeather": "weather", "GooglePlacesNearby": "places", "GoogleLodging": "hotels",
+                     "SkyscannerFlights": "flights", "IndianRailProvider": "trains"}
         for factory, category in factories.items():
             p = patch("apps.mobility.services.travel.research." + factory, return_value=self.providers[category])
             p.start()
             self.addCleanup(p.stop)
-        # Routing goes through the free-first chain; here it is the one fixture router.
+        # Routing goes through the router chain (Google only); here it is the one fixture router.
         p = patch("apps.mobility.services.travel.research.routing_chain", return_value=[self.providers["routing"]])
         p.start()
         self.addCleanup(p.stop)
@@ -115,14 +114,6 @@ class TravelSelectiveRefreshTests(TestCase):
         self.assertEqual(refreshed["route_result"]["retrieved_at"], destination["route_result"]["retrieved_at"])
         self.assertEqual(refreshed["route_result"]["response_hash"], destination["route_result"]["response_hash"])
         self.assertEqual(refreshed["route_result"]["freshness"], "RECENTLY_VERIFIED")
-
-    def test_latest_requested_web_topic_is_not_crowded_out_by_old_interests(self):
-        state = {**self.state, "research_categories": fact(["permits", "hotels", "trains", "flights"]),
-                 "refresh_categories": fact(["flights"]), "force_refresh": fact(True)}
-        refreshed, _ = enrich_candidate(self.user, state, self.seeded())
-        self.assertTrue(any(r["request_parameters"]["topic"] == "flights" and r["freshness"] == "LIVE"
-                            for r in refreshed["web_research"]))
-        self.providers["web"].fetch.assert_called_once()
 
     def test_changed_route_parameters_do_not_reuse_the_old_route(self):
         destination = self.seeded()

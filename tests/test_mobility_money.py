@@ -271,7 +271,7 @@ class MobilityMoneyMigrationTests(TransactionTestCase):
                 executor = MigrationExecutor(db)
                 self.assertEqual(sorted((migration.app_label, migration.name, reverse) for migration, reverse in executor.migration_plan(self.leaves)),
                     [('career', '0005_career_salary_decimal', False), ('career', '0006_salary_currency', False), ('mobility', '0013_mobility_money_decimal', False), ('mobility', '0014_trip_video', False),
-                     ('mobility', '0015_vehicle_and_travel_currency', False), ('users', '0003_user_money_decimal', False), ('users', '0004_user_monthly_income_basis', False), ('users', '0005_income_currency', False), ('users', '0006_user_display_currency', False)])
+                     ('mobility', '0015_vehicle_and_travel_currency', False), ('users', '0003_user_money_decimal', False), ('users', '0004_user_monthly_income_basis', False), ('users', '0005_income_currency', False), ('users', '0006_user_display_currency', False), ('users', '0007_email_identity', False)])
                 executor.migrate(self.leaves); db.close()
                 after, _ = read_database(candidate)
                 profile_fields = {'users_user': ('monthly_income', 'variable_income', 'rent_or_emi'),
