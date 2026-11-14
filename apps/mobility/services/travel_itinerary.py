@@ -1,6 +1,5 @@
 from copy import deepcopy
 from datetime import date, timedelta
-from itertools import permutations
 import re
 from rest_framework.exceptions import ValidationError
 
@@ -9,6 +8,7 @@ from .travel_catalog import ACTIVITY_TAGS, CITIES, approximate_road_km
 from .travel.costs import calculate_budget
 from .travel.money import decimal_amount, rupees
 from .travel.providers.base import number
+from .travel.route_optimiser import optimise_route
 
 
 def packing_suggestions(mode):
@@ -27,15 +27,31 @@ def compare_stop_orders(state, stops):
         coordinates=(points[a]["lat"], points[a]["lon"]))
         for a in range(len(points)) for b in range(len(points)) if a != b}
 
+    hours = lambda km: km/45 + km/180*.3  # ALFRED's riding-time allowance, as in discovery and research
+    ride = {pair: hours(km) for pair, km in distances.items()}
+    for i, stop in enumerate(stops, 1):
+        if stop.get("selected_route_id") and type(stop.get("travel_hours")) in (int, float) and stop["travel_hours"] > 0:
+            ride[0, i] = ride[i, 0] = stop["travel_hours"]  # provider duration from home; stop-to-stop legs stay estimates
+
     def total(order):
         route = (0, *order, 0)
         return sum(distances[a, b] for a, b in zip(route, route[1:]))
 
     original = tuple(range(1, len(points)))
-    best = min(permutations(original), key=total)  # At most 5! orders; ties retain the original order.
-    return {"stops": [points[i]["name"] for i in best], "current_distance_km": current["route"]["distance_km_total"],
-        "suggested_distance_km": total(best), "changed": best != original,
-        "basis": "Shortest town-centre distance allowance among these stop orders, not a verified fastest, cheapest or legal road route. Applying rebuilds days, nights and budget and removes day edits; no booking or financial record is changed."}
+    visits = [{"name": i, "visit_hours": 0, "score": 1} for i in original]  # nights are allotted after ordering
+    days = int(value(state, "trip_duration", 3))
+    rules = {"day_start": 7, "day_end": 18, "max_ride_hours_per_day": hours(value(state, "maximum_daily_driving", 300)),
+             "deadline": (days-1)*24 + 18}
+    best = optimise_route(0, 0, visits, ride, rules, start_at=7)
+    fits = bool(best) and len(best["stops"]) == len(stops)
+    if not fits:
+        best = optimise_route(0, 0, visits, ride)  # Some leg is over the daily limit; still order every stop.
+    order = tuple(best["stops"])  # Ties retain the original order: it is searched first.
+    return {"stops": [points[i]["name"] for i in order], "current_distance_km": current["route"]["distance_km_total"],
+        "suggested_distance_km": total(order), "suggested_ride_hours": round(best["ride_hours"], 1),
+        "fits_daily_riding_limit": fits, "equal_orders": [[points[i]["name"] for i in o] for o in best["equal_orders"]],
+        "changed": order != original,
+        "basis": "Fewest estimated riding hours among every order of these stops, preferring orders where each leg fits your daily riding limit in 07:00–18:00 daylight. Town-centre distance allowances, not a verified fastest, cheapest or legal road route. Applying rebuilds days, nights and budget and removes day edits; no booking or financial record is changed."}
 
 
 def build_multi_stop_itinerary(state, stops):
