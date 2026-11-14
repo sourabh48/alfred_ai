@@ -74,6 +74,7 @@
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_quick_ideas_draft_and_preferences":  4.36,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_route_comparison_choice_rebuild_retry_expiry_and_reopen":  11.11,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_staff_provider_configuration_panel":  6.828,
+                      "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_world_dataset_counts_places_flags_trips_and_suggests_names_offline":  5.189,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_assistant_responsive_keyboard_retry_and_new_conversation":  12.141,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_bank_grounding_outage_and_source_revocation_preserve_draft":  6.985,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_bank_grounding_review_to_answer_correction_and_private_citation":  10.469,
