@@ -10,8 +10,8 @@
   with the owner's OK; the owner app was restarted on it. Confirm at the next 00:00 UTC refresh.
 - TRAVEL-09 (15c4cdd, local): the top three sights get a real road detour from one Google Routes call each
   through the stop; a failed call leaves no figure. Synthetic tests and the places Chrome test PASS; no live call.
-- Owner decisions still open: accept RUNTIME-06 and RUNTIME-11 without a separate PC (as for RUNTIME-05), the
-  OpenAI replacement model (OPENAI-02, pinned model retires 2027-01-14), required CI checks on master (RUNTIME-12),
+- The owner accepted RUNTIME-06 and RUNTIME-11 without a separate PC (as for RUNTIME-05); both COMPLETE_VERIFIED,
+  baseline 89/143. Owner decisions still open: the OpenAI replacement model (OPENAI-02, pinned model retires 2027-01-14), required CI checks on master (RUNTIME-12),
   and the R2 bucket and keys (RUNTIME-14, SYNC-02, SYNC-11).
 
 ## Owner checks fixed one by one - 2026-11-14

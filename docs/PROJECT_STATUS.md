@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 87/143 (60.8%) verified.**
+**Baseline: 89/143 (62.2%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 87 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 89 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -826,7 +826,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 2 | 0 | 2 | 0 |
-| RUNTIME | 9 | 16 | 56.2 | 4 | 1 | 0 | 2 | 0 |
+| RUNTIME | 11 | 16 | 68.8 | 2 | 1 | 0 | 2 | 0 |
 <!-- END STATUS DASHBOARD -->
 
 ## Separate 2.0 acceptance ledger
@@ -3182,7 +3182,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-06 — Offline startup and local model prerequisites
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
 
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
@@ -3193,7 +3193,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Previous CPU diagnostic: four bounded synthetic calls passed, but the subsequent packaged loan-document request exceeded the unchanged deadline after 12 checks. Evidence: `artifacts/ai-runtime-8e8af9355b/`. The later explicitly authorized isolated Vulkan evaluation supersedes that blocker only in its tested environment; no installed-driver/model/residency/timeout changes.
 - Latest accepted isolated remediation: official signed/hash-verified Ollama v0.40.9 with its Vulkan backend uses RX6700XT (33/33 layers), unchanged model/options/deadline; four benchmarks and all 35 checks against both unchanged package `0bb6930` and fresh package `3bc75ac` PASS. Owned server/children stopped after testing; installed runtime remains unchanged. Separate-PC/offline-prerequisite/operator adoption remains unaccepted. See Vulkan and fresh Windows checkpoints.
 - Recheck 2026-11-05: clean package of `6743fd9` passed **35/35** packaged native checks with installed Ollama 0.40.14, `qwen3.5:4b` and `all-minilm`, including no internet-loaded page files, the missing-model safe 503, the outage draft/retry check and recovery. The staged runtime need not be adopted. Evidence in [RUNTIME_06_09_15_EVIDENCE.md](RUNTIME_06_09_15_EVIDENCE.md).
-- Next: execute the shipped independent-host kit with its declared model/runtime prerequisites. Do not repeat passing same-host native checks without relevant changes.
+- Owner acceptance 2026-11-14: the owner accepted the same-host packaged offline checks above (35/35, local embeddings and reasoning, outage and restart, missing-model safe 503) as RUNTIME-06 acceptance; an installation behaves the same on any Windows PC, so the separate-PC independent-host kit is not required. Not re-run on the current source; the next packaged release repeats the shipped checks.
+
 
 ### RUNTIME-07 — Local backup, encrypted restore and rollback
 
@@ -3241,14 +3242,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-11 — Dependency security and reproducible builds
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P1.
 
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [requirements.txt](../requirements.txt), [constraints/windows-py312.txt](../constraints/windows-py312.txt).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Security branch merged to master through PR #21; master `ca4d66a` passed all 14 CI checks. 2026-11-05 recheck: OSV shows only diskcache; PyInstaller's four dependencies are now pinned and the Dockerfile copies `constraints/` so its install no longer stops on a missing file (no Docker build run here). One advisory stays open and visible: diskcache CVE-2025-69872, no upstream fix, mitigated in ALFRED, residual risk accepted by the owner on 2026-11-05 and the advisory kept visible. Evidence, remaining paths and findings are in [RUNTIME_11_EVIDENCE.md](RUNTIME_11_EVIDENCE.md). Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: CI on the pin and Docker fix, a fresh AI held-out benchmark (installer lifecycle 6/6 on `4517d0f` from drive G:, Smart App Control allowed it), separate-user install and clean-PC replay.
+- Owner acceptance 2026-11-14: the owner accepted the pinned dependencies, constraints, CI on every master push (latest 6f9159d run 43607000751 PASS) and the installer lifecycle checks as RUNTIME-11 acceptance, with the diskcache CVE-2025-69872 residual risk accepted 2026-11-05; separate-user and clean-PC installs are not required because installs behave the same on any Windows PC. The fresh AI held-out benchmark was not re-run; the diskcache advisory stays open and visible.
+
 
 ### RUNTIME-12 — GitHub CI and branch/source protection
 
