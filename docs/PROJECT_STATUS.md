@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 85/143 (59.4%) verified.**
+**Baseline: 87/143 (60.8%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 22 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 87 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -826,7 +826,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 2 | 0 | 2 | 0 |
-| RUNTIME | 7 | 16 | 43.8 | 6 | 1 | 0 | 2 | 0 |
+| RUNTIME | 9 | 16 | 56.2 | 4 | 1 | 0 | 2 | 0 |
 <!-- END STATUS DASHBOARD -->
 
 ## Separate 2.0 acceptance ledger
@@ -3168,7 +3168,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-05 — Install/upgrade/uninstall on separate PC
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
 
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [scripts/verify_windows_installer.py](../scripts/verify_windows_installer.py).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
@@ -3176,7 +3176,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Current evidence: fresh exact-source `3bc75ac` installer completed **six same-host synthetic lifecycle checks**: install/startup without system Python, upgrade retaining account/session/totals/file, failed-shutdown uninstall guard, data retention and ownership-aware startup cleanup. Original startup/desktop state restored; test ports released. Receipt: `artifacts/windows-integrated-20261023/installer-report.json`; earlier `0bb6930` receipt remains preserved.
 - Limitations/dependencies: this was a fresh test directory on the development PC, not an independent clean-PC/reboot/normal-account acceptance. Status remains IMPLEMENTED_NOT_ACCEPTED.
-- Next: run the shipped acceptance kit on an independent authorized Windows machine; do not relabel this same-host proof.
+- Owner acceptance 2026-11-14: the owner accepted the six same-host installer lifecycle checks above (install, upgrade, uninstall guard, data retention, startup cleanup) as RUNTIME-05 acceptance; an installation behaves the same on any Windows PC, so no separate-PC run is required. Not re-run on the current source; the next packaged release repeats the shipped checks.
+
 
 ### RUNTIME-06 — Offline startup and local model prerequisites
 
@@ -3288,7 +3289,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-15 — Local/LAN hosting and optional Docker stack
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P2.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P2.
 
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec), [docker-compose.local.yml](../docker-compose.local.yml), [docs/LOCAL_HOSTING.md](../docs/LOCAL_HOSTING.md).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
@@ -3296,7 +3297,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Loopback/local native is current target; Compose/Celery profiles exist but do not prove present sustained Docker acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
 - 2026-11-06 Compose run (Docker Desktop 4.98.0, engine 29.9.2; disposable clone of `49d622e` on drive G:, synthetic settings, port 8090): all five services healthy; only `web` published, on 127.0.0.1; the image held none of the planted `.env`, SQLite, key, `.claude` or memory decoy files and runs as user `alfred`; `local_stack_ops.py verify` accepted (migrations, Django checks, liveness, Redis, worker); backup and isolated restore check accepted with synthetic rows (counts match, live database untouched); data persisted through `down`/`up`; beat sent jobs and the worker completed them. Evidence: `F:\ALFRED\dev-evidence\post-audit\runtime-15-20261106`.
-- Next: a request from a second trusted LAN device (needs a LAN binding and a Windows Firewall private-profile rule), a host restart with the stack, and scheduled job outcomes over their real schedule. Docker was uninstalled after the run at the owner's request. Keep local privacy; no new public cloud hosting wiring.
+- Owner acceptance 2026-11-14: the desktop app's opt-in home Wi-Fi access (`ALFRED_LAN_ACCESS`, 8272c93, CI run 43600203584 PASS) is on in the owner runtime; the owner's phone on the home LAN opened ALFRED at the PC's LAN address. The owner accepted this as RUNTIME-15 completion and waived the host-restart and sustained-schedule checks. The Docker stack stays optional.
+
 
 ### RUNTIME-16 — Real-account and manual accessibility acceptance
 

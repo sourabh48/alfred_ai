@@ -12,9 +12,9 @@ Generated from the [canonical inventory and PR checkpoint](docs/PROJECT_STATUS.m
 Counts describe accepted scopes, not universal accuracy or production readiness.
 
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 85/143 (59.4%) verified.**
+**Baseline: 87/143 (60.8%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 22 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 87 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
