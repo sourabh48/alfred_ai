@@ -28,8 +28,14 @@
   grouping, CAMS folios with "/", "Demat Account:" hint). Fixed and kept as tests. Real documents are still unchecked.
 - FIN-06, AI-17, DOC-09, LOAN-07 and AI-14: their 278 backend tests and six browser tests pass; document delete now
   says "Deleted". AI-14 already learns by itself nightly with a catch-up after the PC was off; nothing to change.
-- Not done: RUNTIME-15 (home Wi-Fi access) and RUNTIME-14 (cloud sync) are not started; the open question on removing
-  the offline OpenStreetMap country maps is unanswered.
+- RUNTIME-03 on the owner's PC: the first Run entry went to the Claude desktop app's virtualized registry and never
+  ran; rewritten through WMI on 2026-11-14 and listed by Windows. Confirm at the next real sign-in.
+- RUNTIME-15: the desktop app gains opt-in home Wi-Fi access (`ALFRED_LAN_ACCESS=true` in config/local.env; binds all
+  interfaces, answers only 10/8, 172.16/12, 192.168/16, fd00::/8 and loopback, prints the address). Not switched on
+  for the owner yet (needs master and a restart); a second real device is still needed for acceptance.
+- RUNTIME-14: the owner chose the encrypted R2 cloud backup (SYNC-11) as the off-device copy; it needs the owner's
+  R2 bucket, keys and a portable key with its own recovery copy before the first upload. RUNTIME-05 still needs a
+  separate Windows PC. The offline OpenStreetMap country maps were kept (NEW-1 only replaced the online map).
 
 ## Email sign-in and Google-only travel data - 2026-11-14
 
