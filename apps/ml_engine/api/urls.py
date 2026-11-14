@@ -1,5 +1,5 @@
 from django.urls import path
-from .assistant_actions import AssistantActionCancelAPI, AssistantActionConfirmAPI, AssistantActionProposeAPI
+from .assistant_actions import AssistantActionCancelAPI, AssistantActionConfirmAPI, AssistantActionProposeAPI, TaskBotsAPI
 from .assistant_tools import AssistantToolCatalogAPI
 from .speech import SpeechSpeakAPI, SpeechStatusAPI, SpeechTranscribeAPI
 from .chat_stream import LocalChatStreamAPI
@@ -51,6 +51,7 @@ urlpatterns = [
     path("actions/propose/", AssistantActionProposeAPI.as_view()),
     path("actions/confirm/", AssistantActionConfirmAPI.as_view()),
     path("actions/cancel/", AssistantActionCancelAPI.as_view()),
+    path("bots/", TaskBotsAPI.as_view()),
     path("speech/status/", SpeechStatusAPI.as_view()),
     path("speech/transcribe/", SpeechTranscribeAPI.as_view()),
     path("speech/speak/", SpeechSpeakAPI.as_view()),

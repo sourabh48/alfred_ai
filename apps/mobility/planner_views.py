@@ -387,6 +387,25 @@ class TravelProviderUsage(APIView):
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 
 
+class TravelSuggestionsView(APIView):
+    """Proactive next steps for saved trips and ideas for the next free weekend; read-only."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .services.travel.proactive import next_steps, trip_ideas, upcoming_steps
+        identity = request.query_params.get("session")
+        if identity is not None:
+            if not identity.isdigit():
+                raise ValidationError("Choose one of your trips.")
+            session = get_object_or_404(TravelPlanningSession.objects.select_related("plan"), pk=int(identity), user=request.user)
+            steps = next_steps(session.plan) if session.plan_id else []
+        else:
+            steps = upcoming_steps(request.user)
+        response = Response({"next_steps": steps, "trip_ideas": trip_ideas(request.user)})
+        response["Cache-Control"] = "no-store, private"
+        return response
+
+
 class TravelPreferencesView(APIView):
     permission_classes = [IsAuthenticated]
 

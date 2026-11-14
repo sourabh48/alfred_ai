@@ -504,3 +504,61 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             self.assertFalse(self.browser.find_element(self.By.ID, 'travelMediaLearning').is_enabled())
             self.assertFalse(self.browser.find_element(self.By.ID, 'travelResetPreferences').is_enabled())
             self.assertEqual(self.browser.find_element(self.By.ID, 'travelPreferences').get_attribute('aria-busy'), 'false')
+
+    def test_proactive_next_step_needs_confirm_and_trip_idea_fills_the_chat(self):
+        from apps.expenses.models import Expense
+        from apps.loans.models import Loan
+        from apps.mobility.services.travel import reminders
+        from apps.mobility.services.travel_conversation import new_session, save_plan
+        session = new_session(self.user)
+        save_plan(session, draft=True)
+        session.refresh_from_db()
+        start = timezone.localdate()+timedelta(days=5)
+        TravelPlan.objects.filter(pk=session.plan_id).update(status="planned", start_date=start, end_date=start+timedelta(days=2), transport_mode="ride")
+        before = [list(model.objects.values()) for model in (Expense, Loan)]
+        self.browser.get(self.live_server_url+f"/mobility/?session={session.pk}")
+        self.wait.until(lambda _: "Add a reminder for the evening before" in self.text("plannerSuggestions"))
+        self.assertIn("Confirm where you stay", self.text("plannerSuggestions"))
+        self.assertTrue(self.browser.execute_script("return [...document.querySelectorAll('#plannerSuggestions a')].every(a=>a.rel.includes('noopener')&&a.protocol==='https:')"))
+        self.click(f'[data-suggestion-review="{session.plan_id}:reminder"]')
+        self.wait.until(lambda _: "turn on reminders for this trip" in self.text("plannerSuggestions"))
+        self.browser.execute_script("document.getElementById('plannerSuggestions').scrollIntoView({behavior:'instant'})")
+        self.browser.save_screenshot(str(self.artifacts/"suggestions-review-desktop.png"))
+        self.assertNotIn(reminders.KEY, TravelPlan.objects.get(pk=session.plan_id).planning_state)  # Review alone changes nothing
+        self.click(f'[data-suggestion-confirm="{session.plan_id}:reminder"]')
+        self.wait.until(lambda _: "Reminder added." in self.text("plannerSuggestionsStatus"))
+        policy = TravelPlan.objects.get(pk=session.plan_id).planning_state[reminders.KEY]
+        self.assertEqual([(r["local_time"], r["status"]) for r in policy["reminders"]], [(f"{start-timedelta(days=1)}T18:00", "scheduled")])
+        self.wait.until(lambda _: "Add a reminder for the evening before" not in self.text("plannerSuggestions"))
+        self.click("[data-suggestion-idea]")
+        self.assertTrue(self.browser.find_element(self.By.ID, "plannerInput").get_attribute("value").startswith("Plan a 2-day trip to "))
+        self.assertIn("not checked yet", self.text("plannerSuggestions"))
+        self.assertEqual(before, [list(model.objects.values()) for model in (Expense, Loan)])
+        self.browser.set_window_size(390, 1000)
+        self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+        errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
+        self.assertEqual(errors, [])
+
+    def test_home_assistant_bot_review_confirm_and_dismiss(self):
+        from apps.expenses.models import Expense
+        from apps.reports.models import OperationalLog
+        Expense.objects.create(user=self.user, description="Synthetic bot spend", amount="250.00", currency="INR", category="food",
+                               transaction_date=timezone.localdate()-timedelta(days=1))
+        before = list(Expense.objects.values())
+        self.browser.get(self.live_server_url+"/dashboard/")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-bot-run="money_review"]'))
+        self.assertIn("No reviews waiting", self.text("taskBotsList"))
+        self.click('[data-bot-run="money_review"]')
+        self.wait.until(lambda _: "Spent ₹250.00 in the last 7 days" in self.text("taskBotsList"))
+        self.click("[data-bot-confirm]")
+        self.wait.until(lambda _: "Marked as reviewed. Nothing else changed." in self.text("taskBotsStatus"))
+        self.wait.until(lambda _: "No reviews waiting" in self.text("taskBotsList"))
+        self.assertEqual(OperationalLog.objects.get(scope="assistant_bot", user=self.user).payload["state"], "confirmed")
+        Expense.objects.create(user=self.user, description="Synthetic second spend", amount="1.00", currency="INR", transaction_date=timezone.localdate())
+        self.click('[data-bot-run="money_review"]')
+        self.wait.until(lambda _: "Spent ₹251.00" in self.text("taskBotsList"))
+        self.click("[data-bot-dismiss]")
+        self.wait.until(lambda _: "Dismissed. Nothing was changed." in self.text("taskBotsStatus"))
+        self.assertEqual(len(Expense.objects.all()), len(before)+1)
+        errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
+        self.assertEqual(errors, [])

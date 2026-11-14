@@ -402,6 +402,8 @@ class OperationalLoggingService:
             "payload": entry.payload or {},
             "created_at": entry.created_at.isoformat(),
         }
+        if entry.module == "assistant" and entry.scope == "assistant_bot":
+            data["payload"] = {key: entry.payload[key] for key in ("bot", "state", "for_date", "confirmed_at") if key in entry.payload}
         if (entry.module == "assistant" and entry.scope == "assistant_action") or entry.scope == "career_history_review":
             data["payload"] = {key: entry.payload[key] for key in ("action", "state", "expires_at", "confirmed_at", "goal_id") if key in entry.payload}
         if entry.module == "loans" or entry.scope in {"loan_document", "loan_closure_document"}:

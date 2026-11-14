@@ -4,7 +4,7 @@
 
 - Scan at 621ede6: no TODO/FIXME markers, stubs or unexplained skips in source. Open: 18 implemented-not-accepted
   and 25 partial rows wait on owner checks, keys, real documents, outcomes over time or approvals; WEALTH2-003 was
-  the only 2.0 extension with no code. feat/proactive-bots (95355ef) waits for the owner's merge decision.
+  the only 2.0 extension with no code. feat/proactive-bots (95355ef) merged with the owner's OK.
 - WEALTH2-003 slice 1 (local): each bank cash account shows its balance rolled forward from the newest statement
   row with a closing balance, adding only entries dated strictly after it (same-day entries are counted, not added).
   Abstains when the balance was edited by hand, a later entry has another or no currency, or the account is a card
@@ -24,6 +24,27 @@
 - The owner accepted RUNTIME-06 and RUNTIME-11 without a separate PC (as for RUNTIME-05); both COMPLETE_VERIFIED,
   baseline 89/143. Owner decisions still open: the OpenAI replacement model (OPENAI-02, pinned model retires 2027-01-14), required CI checks on master (RUNTIME-12),
   and the R2 bucket and keys (RUNTIME-14, SYNC-02, SYNC-11).
+
+## Proactive travel planner and task bots - 2026-11-14
+
+- Owner request: "i need more proactive travel planner..... and complete automation in app... i need bots to do tasks".
+  Branch `feat/proactive-bots` (worktree F:/ALFRED_DEV/proactive-bots), cut from origin/master 23de55f. Local commits
+  only; not pushed. No migration, dependency, provider, model or workflow change.
+- Mapping: AI-17 (task bots, propose-then-confirm) and TRAVEL-04 (saved-trip next steps); statuses unchanged, baseline
+  unchanged. The work also touches two 2.0 extensions, which the queue places after baseline closure; the owner's request
+  above is the reason: WEALTH2-002 (bot proposals carry a keyed fingerprint and Confirm refuses a stale review across
+  money, travel, career and vehicle records) and TRAVEL2-003 (a reminder proposed from the trip, created through the
+  existing opt-in reminder service). Both stay UNACCEPTED.
+- Travel: "Suggested for you" panel in the planner and GET /api/mobility/planner/suggestions/. The recheck now also
+  reports a route-distance change (10 km or 10%). Trip ideas come from the offline guide for the next free weekend.
+- Bots: GET/POST /api/ai/bots/ (run, confirm, dismiss); Home > Your assistants; daily Huey job `task-bots` in
+  DAILY_JOBS. Weekly money review runs every 7 days, the others daily; a proposal with the same fingerprint is reused.
+- Evidence (synthetic, isolated sandbox): tests.test_task_bots 14 PASS; 19 affected backend modules 257 tests PASS after
+  two fixes (test_native_daily_catch_up now counts DAILY_JOBS instead of a fixed 4; the new module is in BACKEND);
+  tests.test_travel_planner_browser 11 PASS in Chrome, including the two new tests (planner Review/Confirm reminder and
+  Plan this; Home run/confirm/dismiss); tracker check clean. Not checked: the owner's app, a live Huey worker run,
+  real records.
+- Next: owner check in the app, then the owner's OK before any push.
 
 ## Owner checks fixed one by one - 2026-11-14
 

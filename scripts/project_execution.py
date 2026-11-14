@@ -43,7 +43,7 @@ GATES = {
     'COUNCIL-01': 'BLOCKED_APPROVAL: owner agreed to local auto-training 2026-11-06; it takes effect when the owner presses Approve Auto-Training in their app, then held-out outcomes follow',
     'TRAVEL-20': 'BLOCKED_EVIDENCE: private trip videos implemented 2026-11-06; owner approved and applied migration mobility 0014; owner check in the app remains',
     'AI-18': 'BLOCKED_EVIDENCE: offline Speak (Whisper) and Read aloud (Piper) 2026-11-06; stops on a pause, reads long answers whole and hands-free conversation 2026-11-14 (Chrome PASS); owner check remains',
-    'AI-17': 'BLOCKED_EVIDENCE: propose-then-confirm savings-goal actions implemented 2026-11-06 (owner decision); owner check remains',
+    'AI-17': 'BLOCKED_EVIDENCE: propose-then-confirm savings-goal actions 2026-11-06; six task bots propose daily on Huey and act only on Confirm 2026-11-14 (synthetic, Chrome PASS); owner check remains',
     'SYNC-02': 'BLOCKED_EXTERNAL: Cloudflare R2 encrypted adapter built 2026-11-06, tested against a synthetic signed server only; owner creates a free R2 bucket and bucket-scoped token in the data folder config/local.env, then a live sync check',
     'SYNC-11': 'BLOCKED_EXTERNAL: encrypted backup copies to R2 built 2026-11-06 (scripts/cloud_backup.py), tested against a synthetic signed server only; needs the owner R2 bucket, a portable backup key with a copy kept off this PC, then a live upload, read-back and restore check',
     'TRAVEL-14': 'BLOCKED_APPROVAL: owner left the choice to Claude 2026-11-06; kept deferred because no free official bus inventory source exists and live booking stays off; links to verified bus websites remain',
