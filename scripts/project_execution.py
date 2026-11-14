@@ -26,7 +26,7 @@ GATES = {
     'RUNTIME-06': 'BLOCKED_EXTERNAL: offline independent-host kit on a separate PC; same-host packaged checks 35/35',
     'RUNTIME-11':'BLOCKED_EXTERNAL: separate-user and clean-PC installs; owner accepted the diskcache residual risk 2026-11-05',
     'RUNTIME-14': 'BLOCKED_EXTERNAL: same-host synthetic M21 rehearsal PASS at 10203a3 on G:; separate PC, normal account and device-loss acceptance open',
-    'RUNTIME-15': 'BLOCKED_EXTERNAL: same-host Compose run PASS at 49d622e; second LAN device, host restart and sustained schedule open',
+    'RUNTIME-15': 'BLOCKED_EXTERNAL: same-host Compose run PASS at 49d622e; desktop app home Wi-Fi opt-in (ALFRED_LAN_ACCESS) added 2026-11-14; second LAN device, host restart and sustained schedule open',
     'FIN-07': 'BLOCKED_EVIDENCE: on the owner\'s data the prior range held in 6 of 9 walk-forward months and income evidence is missing; no accuracy claim',
     'FIN-13': 'BLOCKED_EVIDENCE: owner account check PASS 2026-11-06; CI PASS at e8ef8f4 (run 42185812614); a fresh-package check remains',
     'DOC-07': 'BLOCKED_EVIDENCE: bounded whole-extraction Q&A accepted; 111 document tests re-run PASS 2026-11-06; OCR, longer originals and an independent quality corpus remain',
