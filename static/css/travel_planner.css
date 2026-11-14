@@ -27,6 +27,7 @@ html[data-theme="dark"] .travel-day :is(.travel-fit,.travel-priority) { color:va
 :is(#travelPlanner,#plannerItinerary,#plannerPacking,#plannerReminders,#plannerCalendar,#plannerAffordability) :is(.form-control,.form-select) { border-color:var(--alfred-muted); }
 :is(#travelPlanner,#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders,#plannerExport,#plannerCalendar,#plannerAffordability) :focus-visible { outline:3px solid #1858d6; outline-offset:3px; }
 html[data-theme="dark"] :is(#travelPlanner,#plannerStops,#plannerItinerary,#plannerDocuments,#plannerPacking,#plannerReminders,#plannerExport,#plannerCalendar,#plannerAffordability) :focus-visible { outline-color:#a8caff; }
+@media (min-width: 992px) { #mobilitySummaryCards { grid-template-columns:repeat(5,minmax(0,1fr)); } }
 /* Plan board: one card per trip with a cover, status badge and totals. */
 .trip-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); gap:1rem; }
 .trip-card { display:flex; flex-direction:column; border:1px solid var(--alfred-stroke); border-radius:18px; overflow:hidden; background:var(--alfred-surface-strong); color:var(--alfred-ink); box-shadow:var(--alfred-shadow-soft); transition:transform .2s, box-shadow .2s; }

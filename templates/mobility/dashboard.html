@@ -36,7 +36,8 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="destination">Destination</label>
-                        <input id="destination" name="destination" class="form-control">
+                        <input id="destination" name="destination" class="form-control" list="worldPlaces" autocomplete="off">
+                        <datalist id="worldPlaces"></datalist>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="tripStartDate">Start Date</label>
@@ -137,7 +138,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label" for="logLocation">Location Name</label>
-                        <input id="logLocation" name="location_name" class="form-control">
+                        <input id="logLocation" name="location_name" class="form-control" list="worldPlaces" autocomplete="off">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label" for="logLatitude">Latitude</label>
@@ -297,8 +298,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="/static/css/travel_planner.css?v=cards1">
-<script src="/static/js/mobility.js?v=8"></script>
+<link rel="stylesheet" href="/static/css/travel_planner.css?v=cards2">
+<script src="/static/js/mobility.js?v=9"></script>
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/vendor/protomaps-leaflet/protomaps-leaflet.js?v=5.1.0"></script>

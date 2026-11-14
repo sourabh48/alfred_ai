@@ -1,4 +1,5 @@
 """Search/official links only. Opening a link never means ALFRED checked inventory."""
+import re
 from datetime import date
 from urllib.parse import urlencode, urlsplit
 
@@ -50,6 +51,23 @@ def hotel_price_links(state, hotel, place):
             "dated_booking_url":"https://www.booking.com/searchresults.html?"+urlencode({"ss":query,**stay_details(state)})}
 
 
+def skyscanner_link(state):
+    """Skyscanner searches by airport code, so the link exists only once both airports are known."""
+    origin, destination = (str(value(state,key) or "").upper() for key in ("origin_airport","destination_airport"))
+    if not re.fullmatch(r"[A-Z]{3}",origin) or not re.fullmatch(r"[A-Z]{3}",destination) or origin == destination:
+        return None
+    try:
+        days = [date.fromisoformat(value(state,key)) for key in ("available_start_date","available_end_date") if value(state,key)]
+    except (TypeError, ValueError):
+        days = []
+    if len(days) == 2 and days[1] < days[0]:
+        days = days[:1]
+    people = max(1,min(int(value(state,"number_of_travelers",1)),8))  # Skyscanner's search takes at most 8 adults
+    path = "/".join([origin.lower(),destination.lower(),*(d.strftime("%y%m%d") for d in days)])
+    label = "Search Skyscanner with your " + ("airports, traveller count and dates" if days else "airports and traveller count")
+    return label, f"https://www.skyscanner.co.in/transport/flights/{path}/?"+urlencode({"adultsv2":people})
+
+
 def external_links(state, destination):
     name = public_place(destination.get("name"))
     origin = public_place(value(state,"origin"))
@@ -70,6 +88,8 @@ def external_links(state, destination):
         add("hotels",f"Search Booking.com with your {details}","https://www.booking.com/searchresults.html?"+urlencode(params))
         sent = [text for text, present in (("start city",origin),("dates",start or end)) if present]
         add("flights","Search Google Flights"+(" with your "+" and ".join(sent) if sent else ""),"https://www.google.com/travel/flights?"+urlencode({"q":f"Flights {'from '+origin+' ' if origin else ''}to {name} {start or ''} {end or ''}".strip()}))
+        if skyscanner := skyscanner_link(state):
+            add("flights",*skyscanner)
         if origin:
             add("routing","Check route on Google Maps from your start city","https://www.google.com/maps/dir/?"+urlencode({"api":1,"origin":origin,"destination":name,"travelmode":"driving"}))
         for topic, text in [("permits","official permit entry requirements"),("closures","official road closure traffic advisory"),("buses","bus operator timetable")]:
