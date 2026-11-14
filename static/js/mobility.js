@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("photoPlan").addEventListener("change", syncPhotoLogOptions);
     document.getElementById("tripVideoForm").addEventListener("submit", submitTripVideo);
     loadTripVideos();
+    ["destination", "logLocation"].forEach(id => document.getElementById(id)?.addEventListener("focus", loadWorldPlaces));
 
     setMobilityDefaults();
     loadMobilityDashboard();
@@ -43,6 +44,21 @@ function loadMobilityDashboard() {
         .catch(error => showRootAlert(error.message, "danger"));
 }
 
+function loadWorldPlaces() {
+    // Offline suggestions from the bundled world dataset; fetched once, on first focus.
+    const list = document.getElementById("worldPlaces");
+    if (!list || list.dataset.loaded) return;
+    list.dataset.loaded = "1";
+    fetch("/static/vendor/world/world.json")
+        .then(response => response.ok ? response.json() : Promise.reject(new Error(response.statusText)))
+        .then(data => {
+            const countries = Object.fromEntries(data.countries.map(row => [row[0], row[2]]));
+            const names = [...data.countries.map(row => row[2]), ...data.states.map(row => `${row[2]}, ${countries[row[0]] || row[0]}`)];
+            list.replaceChildren(...names.map(name => new Option(name)));
+        })
+        .catch(() => { delete list.dataset.loaded; });
+}
+
 function renderHero(summary, conditionSnapshot) {
     document.getElementById("mobilityTripHero").textContent = `Upcoming trips: ${Alfred.formatNumber(summary.upcoming_trips || 0, 0)} | mapped points: ${Alfred.formatNumber(summary.mapped_points || 0, 0)}`;
     document.getElementById("mobilityConditionMeta").textContent = conditionSnapshot
@@ -55,6 +71,7 @@ function renderSummaryCards(summary) {
     const cards = [
         ["Upcoming Trips", Alfred.formatNumber(summary.upcoming_trips || 0, 0), `${Alfred.formatNumber(summary.completed_trips || 0, 0)} completed`],
         ["Distance Logged", `${Alfred.formatNumber(summary.total_trip_distance_km || 0, 1)} km`, `${Alfred.formatNumber(summary.trip_logs || 0, 0)} journal entries`],
+        ["Countries Visited", Alfred.formatNumber(summary.countries_visited || 0, 0), `${Alfred.formatNumber(summary.states_visited || 0, 0)} states or regions`],
         ["Photo Trail", Alfred.formatNumber(summary.photo_count || 0, 0), `${Alfred.formatNumber(summary.mapped_points || 0, 0)} mapped points`],
         ["Bike Service Link", summary.condition_score ? `${Alfred.formatNumber(summary.condition_score, 0)}/100` : "No data", `${Alfred.escapeHtml(summary.condition_status || "No status")} | ${Alfred.formatNumber(summary.expiring_documents || 0, 0)} documents due`],
     ];
@@ -145,7 +162,7 @@ function renderTravelPlans(items) {
                 <div class="trip-card-body">
                     <p class="trip-when">${Alfred.escapeHtml(tripTiming(item))}</p>
                     <h3 class="h5 mb-1">${Alfred.escapeHtml(item.title)}</h3>
-                    <div class="muted small">${Alfred.escapeHtml(item.destination || "Destination not set")} · ${Alfred.escapeHtml(item.transport_mode_label)}</div>
+                    <div class="muted small">${item.place?.flag ? `<span role="img" aria-label="${Alfred.escapeHtml(item.place.country)}">${Alfred.escapeHtml(item.place.flag)}</span> ` : ""}${Alfred.escapeHtml(item.destination || "Destination not set")} · ${Alfred.escapeHtml(item.transport_mode_label)}</div>
                     ${item.start_date ? `<div class="muted small">${Alfred.formatDate(item.start_date)} to ${Alfred.formatDate(item.end_date || item.start_date)}</div>` : ""}
                     ${item.vehicle_profile_name ? `<div class="muted small">Vehicle: ${Alfred.escapeHtml(item.vehicle_profile_name)}</div>` : ""}
                     <ul class="trip-card-stats" aria-label="Trip totals">

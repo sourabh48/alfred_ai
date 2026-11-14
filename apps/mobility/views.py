@@ -40,6 +40,7 @@ from .serializers import (
 from .services import bike_document_ai, bike_service_intelligence, build_profile_payload, catalog_coverage_summary, list_catalog_manufacturers, list_catalog_models, travel_advisor
 from .services import build_document_payload, build_service_record_payload, merge_nested_payload, resolve_vehicle_identity
 from .services.payload_contracts import COST_HELD_FOR_REVIEW
+from .services.travel import world
 
 
 PROFILE_MANUAL_OVERRIDE_FIELDS = {
@@ -934,6 +935,10 @@ class MobilityDashboardView(APIView):
         total_trip_budget = sum(rupee_amount(plan.budget or 0, plan.budget_currency) for plan in travel_plans)
         total_trip_spend = sum(rupee_amount(log.spend_amount or 0, log.currency) for log in trip_logs)
         total_trip_distance = sum(log.distance_km or 0 for log in trip_logs)
+        visited = world.visited_regions(travel_plans, trip_logs)
+        plan_payload = TravelPlanSerializer(travel_plans, many=True, context={"request": request}).data
+        for row in plan_payload:
+            row["place"] = world.match_text(row.get("destination"))
 
         heatmap_points = []
         for log in trip_logs:
@@ -976,13 +981,15 @@ class MobilityDashboardView(APIView):
                 "total_trip_spend": round(total_trip_spend, 2),
                 "total_trip_distance_km": round(total_trip_distance, 1),
                 "mapped_points": len(heatmap_points),
+                "countries_visited": visited["countries"],
+                "states_visited": visited["states"],
                 "expiring_documents": len(expiring_documents),
                 "condition_score": condition_snapshot.overall_score if condition_snapshot else 0,
                 "condition_status": condition_snapshot.get_overall_status_display() if condition_snapshot else "No data",
             },
             "condition_snapshot": BikeConditionSnapshotSerializer(condition_snapshot, context={"request": request}).data if condition_snapshot else None,
             "bike_profiles": BikeProfileSerializer(bike_profiles, many=True, context={"request": request}).data,
-            "travel_plans": TravelPlanSerializer(travel_plans, many=True, context={"request": request}).data,
+            "travel_plans": plan_payload,
             "trip_logs": TripLogSerializer(trip_logs[:12], many=True, context={"request": request}).data,
             "trip_photos": TripPhotoSerializer(trip_photos[:12], many=True, context={"request": request}).data,
             "heatmap_points": heatmap_points,
