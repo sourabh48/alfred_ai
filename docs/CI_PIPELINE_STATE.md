@@ -11,7 +11,11 @@ users 0007_email_identity and investments 0009_fund_units_and_nav (both additive
 step's `--reviewed-source` names 81708a2. Left out on purpose: feat/skyscanner-link (replaced by the Skyscanner
 provider), work/fix-all-2026-11-13 (its hotel links and map-test fix reached master in 7e3cc1b),
 work/awie-scrapling-review (Scrapling pilot not before 2026-11-18), the 2026-11-04 WIP manifest and the 2026-11-11
-review branches; all stay as they are. After the push: read the exact-HEAD run.
+review branches; all stay as they are. Pushed a4c8a64: run 43582300103 CI_FAILED (three Selenium shards on chat
+history being on by default and a too-quick speech stop; backend shard 3 failed for a reason not reproduced locally,
+offline or with the calendar parser, and job logs need a GitHub sign-in). CI fixes 1d3a858 and 96cdb64 pushed with
+the state commit c53f652: run 43593128467 at 96cdb64 CI_PASSED (Linux, four Windows backend shards, native, three
+Selenium shards). The owner's app runs master with both migrations applied.
 
 ## Final-development audit and CI coverage - 2026-11-13
 
