@@ -1,5 +1,19 @@
 # ALFRED execution state
 
+## Sprint - 2026-11-14 evening
+
+- The queue had no eligible task: every open row waits on an owner check, a key (Google, R2), real documents or an
+  approval. Two code-doable items were found and done.
+- 05:30 intelligence-refresh error: the Yahoo market snapshot failed every 00:00 UTC refresh on Yahoo's unpriced
+  next-session bar (owner runtime: the record was due at 00:00 UTC on 11-05, 06, 12 and 14 and refreshed only at
+  06:00 UTC). 23de55f drops that trailing bar; future priced bars and all-empty charts are still rejected. Pushed
+  with the owner's OK; the owner app was restarted on it. Confirm at the next 00:00 UTC refresh.
+- TRAVEL-09 (15c4cdd, local): the top three sights get a real road detour from one Google Routes call each
+  through the stop; a failed call leaves no figure. Synthetic tests and the places Chrome test PASS; no live call.
+- Owner decisions still open: accept RUNTIME-06 and RUNTIME-11 without a separate PC (as for RUNTIME-05), the
+  OpenAI replacement model (OPENAI-02, pinned model retires 2027-01-14), required CI checks on master (RUNTIME-12),
+  and the R2 bucket and keys (RUNTIME-14, SYNC-02, SYNC-11).
+
 ## Owner checks fixed one by one - 2026-11-14
 
 - Pushed to master at a4c8a64 on 2026-11-14 at the owner's request, merged with the route optimiser (a1e96ef) and
