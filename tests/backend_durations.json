@@ -155,6 +155,7 @@
  "tests.test_travel_ics_export": 21.05,
  "tests.test_travel_itinerary_editor": 27.92,
  "tests.test_travel_multistop": 24.22,
+ "tests.test_travel_route_optimiser": 0.315,
  "tests.test_travel_packing": 19.27,
  "tests.test_travel_pdf_export": 17.38,
  "tests.test_travel_refresh": 1.95,
