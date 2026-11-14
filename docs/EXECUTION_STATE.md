@@ -2,8 +2,10 @@
 
 ## Owner checks fixed one by one - 2026-11-14
 
-- Same branch and worktree as below; local commits only, not pushed. New migration: investments 0009 (fund code,
-  units, NAV) besides users 0007; both need the owner's migration approval before the push.
+- Pushed to master at a4c8a64 on 2026-11-14 at the owner's request, merged with the route optimiser (a1e96ef) and
+  think-before-answering (cf90877). The owner approved users 0007 and investments 0009; both ran on the owner's app
+  after a database copy in restored-runtimeackupsefore-migrations-users0007-investments0009-20261114. Local full
+  backend run: 3,020 tests OK, 14 calendar-parser skips (tool missing on this PC). Exact-HEAD CI: see CI_PIPELINE_STATE.
 - NEW-1 map: when Google tiles fail, the map now says why (for example "Map Tiles API is not enabled for this key")
   and stops asking Google for 10 minutes. Not checked live with the owner's key.
 - NEW-3 Ask ALFRED: questions about you stay in memory; current or general questions memory cannot answer are looked
