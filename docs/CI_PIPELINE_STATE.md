@@ -4,7 +4,9 @@
 
 Owner asked to merge everything to master (2026-11-14). Branch work/email-signin-2026-11-14 in the
 owner-decisions-1112 worktree, base origin/master fec7404: the owner checks and email sign-in commits, merged with
-feat/travel-route-optimiser (a1e96ef, which sits on cf90877 think-before-answering) at 81708a2. The owner approved
+feat/travel-route-optimiser (a1e96ef) at 81708a2 and feat/auto-thinking (cf90877, think before answering) at 5361717.
+A local full run found a stale Duffel Stays link in PROJECT_STATUS (fixed) and a boundary test that read a model
+window learned from this PC's running Ollama (the test now clears that cache first). The owner approved
 users 0007_email_identity and investments 0009_fund_units_and_nav (both additive) on 2026-11-14, so the backend
 step's `--reviewed-source` names 81708a2. Left out on purpose: feat/skyscanner-link (replaced by the Skyscanner
 provider), work/fix-all-2026-11-13 (its hotel links and map-test fix reached master in 7e3cc1b),

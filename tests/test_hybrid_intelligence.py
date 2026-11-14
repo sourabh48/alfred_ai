@@ -261,6 +261,12 @@ class HybridIntelligenceTests(TestCase):
 
 
 class OllamaReasonerBoundaryTests(SimpleTestCase):
+    def setUp(self):
+        # A window or thinking capability learned from a real local Ollama earlier in the run must not change num_ctx here.
+        from apps.ml_engine.services import local_ai_limits as limits
+        limits._windows.clear(); limits._thinks.clear()
+        self.addCleanup(limits._windows.clear); self.addCleanup(limits._thinks.clear)
+
     def test_task_budgets_are_bounded_and_explicit_style_overrides_query(self):
         for query, style, tokens in (('Briefly explain','concise',192),('Compare options','comparison',768),
                 ('Walk me through this','steps',768),('Explain in detail','detailed',2048),('Hello','concise',384)):
