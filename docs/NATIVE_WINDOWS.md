@@ -81,6 +81,23 @@ disable the entry. Registering it does not prove an actual Windows sign-in;
 check ALFRED after the next normal sign-in. Verification has a separate startup
 control described below.
 
+### Use ALFRED from your phone or another PC on home Wi-Fi
+
+Off by default; ALFRED then answers only this PC. To open it from other devices on
+your home network, add `ALFRED_LAN_ACCESS=true` to `config\local.env` in the data
+folder and restart ALFRED. It prints (and records in `artifacts\native\runtime.json`)
+addresses such as `http://192.168.1.20:8000/` to open on the other device.
+
+- When Windows asks whether to let `pythonw.exe` (or `ALFRED.exe`) communicate,
+  allow **Private networks** only. Never allow public networks.
+- ALFRED refuses any device outside the home ranges 10.x, 172.16-31.x, 192.168.x
+  and fd00::/8, and accepts only this PC's own addresses and name.
+- Other devices sign in with an ALFRED password. Google, GitHub and Microsoft
+  sign-in accept only this PC's `127.0.0.1` address.
+- The connection is plain HTTP inside your home network: use it only on a Wi-Fi
+  network you trust, never on public or shared Wi-Fi.
+- If the router gives this PC a new address, restart ALFRED to pick it up.
+
 ## Data and secrets
 
 All writable state stays in the selected data folder:

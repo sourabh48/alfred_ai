@@ -63,6 +63,28 @@ class NativeRuntimeBoundaryTests(SimpleTestCase):
             create_native_server(lambda *_: [], 8123)
         listener.return_value.bind.assert_called_once_with(('127.0.0.1', 8123))
 
+    def test_home_wifi_access_is_opt_in_and_answers_private_addresses_only(self):
+        from alfred_ai.services.native_web import home_network_client, lan_addresses
+        with override_settings(ALFRED_LAN_ACCESS=True), patch('alfred_ai.services.native_web.socket.socket') as listener, \
+                patch('waitress.create_server') as create:
+            create_native_server(lambda environ, start: [b'synthetic page'], 8123)
+        listener.return_value.bind.assert_called_once_with(('0.0.0.0', 8123))
+        guarded = create.call_args.args[0]
+        for address, allowed in (('192.168.1.20', True), ('10.0.0.5', True), ('172.16.4.2', True), ('127.0.0.1', True),
+                                 ('203.0.113.9', False), ('8.8.8.8', False), ('169.254.1.1', False), ('100.64.0.1', False),
+                                 ('', False), ('not-an-address', False)):
+            status = []
+            body = guarded({'REMOTE_ADDR': address}, lambda code, headers: status.append(code))
+            with self.subTest(address=address):
+                self.assertEqual(body == [b'synthetic page'], allowed)
+                self.assertEqual(status, [] if allowed else ['403 Forbidden'])
+        self.assertFalse(home_network_client('0.0.0.0'))
+        lookup = [(None, None, None, None, (a, 0)) for a in ('192.168.1.20', '127.0.0.1', '203.0.113.9', '169.254.3.3')]
+        with patch('alfred_ai.services.native_web.socket.getaddrinfo', return_value=lookup):
+            self.assertEqual(lan_addresses(), ['192.168.1.20'])
+        with patch('alfred_ai.services.native_web.socket.getaddrinfo', side_effect=OSError('synthetic: no network')):
+            self.assertEqual(lan_addresses(), [])
+
     def test_native_travel_fence_rejects_external_dns_connect_and_local_ollama(self):
         import subprocess
         import sys

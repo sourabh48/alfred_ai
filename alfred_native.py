@@ -263,6 +263,12 @@ def serve(data, port):
         state.update(status="running", worker_pid=child.pid, started_at=time.time())
         write_json(runtime / "runtime.json", state)
         print(f"ALFRED is ready at http://127.0.0.1:{state['port']}/", flush=True)
+        from django.conf import settings
+        if getattr(settings, "ALFRED_LAN_ACCESS", False):
+            from alfred_ai.services.native_web import lan_addresses
+            state["lan_urls"] = [f"http://{address}:{state['port']}/" for address in lan_addresses()]
+            write_json(runtime / "runtime.json", state)
+            print("On your home Wi-Fi: " + (", ".join(state["lan_urls"]) or "no private network address found"), flush=True)
         from alfred_tray import start_tray
         tray = start_tray(
             data, state, ASSETS,

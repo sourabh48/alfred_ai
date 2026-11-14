@@ -1,5 +1,6 @@
 """Settings for the Windows launcher. Writable data lives outside the bundle."""
 import os
+import socket
 from pathlib import Path
 
 from .settings import *  # noqa: F403
@@ -11,6 +12,11 @@ LOCAL_RUNTIME = True
 DEBUG = False
 SECRET_KEY_FALLBACKS = env.json("DJANGO_SECRET_KEY_FALLBACKS", default=[])
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
+# Opt-in home Wi-Fi access: other devices open http://<this PC's address>:<port>/ (see docs/NATIVE_WINDOWS.md).
+ALFRED_LAN_ACCESS = env.bool("ALFRED_LAN_ACCESS", default=False)
+if ALFRED_LAN_ACCESS:
+    from alfred_ai.services.native_web import lan_addresses
+    ALLOWED_HOSTS += [*lan_addresses(), socket.gethostname().lower()]
 CORS_ALLOW_ALL_ORIGINS = False
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
