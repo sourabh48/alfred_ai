@@ -23,6 +23,10 @@ from tests import test_document_review_browser as browser_support
 from tests.user_acceptance_scenario import PASSWORD, month_start, seed_acceptance_user
 
 
+# History switched off on this PC (renamed from 'Unavailable · operator ...' on 2026-11-14) or not loaded ('Unavailable · reload').
+HISTORY_OFF_OR_UNAVAILABLE = ('Switched off on this PC', 'Unavailable')
+
+
 @unittest.skipUnless(browser_support.RUN_BROWSER_TESTS, "Set ALFRED_RUN_BROWSER_TESTS=true to run browser acceptance.")
 class UserDataBrowserTests(StaticLiveServerTestCase):
     @classmethod
@@ -2145,6 +2149,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         mic = lambda: self.browser.find_element(self.By.ID, 'intelligenceMic')
         self.wait.until(lambda _: self.browser.execute_script('return window.__calls') == 2 and mic().get_attribute('aria-pressed') == 'true')
         self.memory_click('#intelligenceHandsFree')  # off again: the next words wait for the owner to press Ask
+        time.sleep(1)  # let the recorder capture audio first (one 4096-sample chunk is 0.26 s at 16 kHz); stopping sooner records nothing
         self.memory_click('#intelligenceMic')
         self.wait.until(lambda _: 'Nothing has been asked yet' in self.text('intelligenceFeedback') and not mic().get_attribute('disabled'))
         self.assertEqual(len(heard), 3)
@@ -2563,7 +2568,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(query.get_property('value'),'')
         self.assertEqual(self.text('intelligenceAnswers'),'')
         self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
-        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith(HISTORY_OFF_OR_UNAVAILABLE))
         self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceStop').is_displayed())
 
     def test_assistant_responsive_keyboard_retry_and_new_conversation(self):
@@ -2699,6 +2704,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         store.save_verified(owner,{'statement':'synthetic public mountain preference'},{'source':'synthetic review'},verified=True,sensitivity='public')
+        from apps.ml_engine.services.conversation_history import ConversationHistory
+        ConversationHistory(store).configure(owner, enabled=False)  # history is on by default; cloud answers need it off
         self.login(); self.browser.get(self.live_server_url+'/settings/')
         self.wait.until(lambda _: 'Provider: mock.' in self.text('memorySyncStatus'))
         self.memory_click('#memorySyncEnabled'); self.memory_click('#memorySyncForm button[type=submit]')
@@ -3182,12 +3189,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
         self.assertNotIn('history',local.reason.call_args.args[0])
         self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));")
-        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith(HISTORY_OFF_OR_UNAVAILABLE))
         self.ask_history_question('Synthetic question after page restore')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
         self.assertNotIn('history',local.reason.call_args.args[0])
         self.browser.refresh()
-        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith(HISTORY_OFF_OR_UNAVAILABLE))
         self.ask_history_question('Synthetic question after reload')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
         self.assertNotIn('history',local.reason.call_args.args[0])
@@ -5824,7 +5831,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.addCleanup(cleanup)
         self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=expense&record_id={row.pk}')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'expense:{row.pk}')
-        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith(HISTORY_OFF_OR_UNAVAILABLE))
         self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR, '#intelligenceForm button[type="submit"]').is_enabled())
         query=self.browser.find_element(self.By.ID,'intelligenceQuery'); query.send_keys('Explain this record',Keys.CONTROL,Keys.ENTER)
         self.wait.until(lambda _: entered.is_set() and self.browser.find_element(self.By.ID,'intelligenceStop').is_displayed())
@@ -5866,7 +5873,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         rows,local=self.canonical_grounding_fixture(); row=rows['expense']
         self.login(); self.browser.get(self.live_server_url+f'/ai/insights/?scope=financial_records&record_type=expense&record_id={row.pk}')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceFinancial').get_property('value') == f'expense:{row.pk}')
-        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith('Unavailable'))
+        self.wait.until(lambda _: self.text('conversationHistoryStatus').startswith(HISTORY_OFF_OR_UNAVAILABLE))
         original=LocalChatStream.offer
         def injected(stream,event):
             if event['type']=='final': original(stream,dict(type='delta',text='SYNTHETIC-PREMATURE-DOMAIN-TEXT'))
