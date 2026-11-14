@@ -2,7 +2,8 @@ from rest_framework import serializers
 
 from alfred_ai.services.currency import CURRENCY_CHOICES, currency_status
 from .models import BankAccount, Expense, StatementUpload
-from .money import NumericMoneySerializerField
+from .money import NumericMoneySerializerField, money_float
+from .services.balance_roll_forward import balance_roll_forward
 from .services.transaction_intelligence import hydrate_expense_data
 
 
@@ -10,6 +11,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     current_balance = NumericMoneySerializerField(allow_null=True, required=False)
     currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
     currency_status = serializers.SerializerMethodField()
+    balance_since_statement = serializers.SerializerMethodField()
     masked_account_number = serializers.CharField(read_only=True)
     display_name = serializers.CharField(read_only=True)
 
@@ -28,6 +30,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
             "current_balance",
             "currency",
             "currency_status",
+            "balance_since_statement",
             "is_primary",
             "is_active",
             "last_synced_at",
@@ -37,6 +40,11 @@ class BankAccountSerializer(serializers.ModelSerializer):
 
     def get_currency_status(self, obj):
         return currency_status(obj.currency)
+
+    def get_balance_since_statement(self, obj):
+        # shortcut: two queries per account on the 25-per-page list; batch them if owners hold many accounts.
+        result = balance_roll_forward(obj)
+        return {k: money_float(v) if k in {"anchor_balance", "credits", "debits", "estimated_balance"} else v for k, v in result.items()}
 
     def validate_currency(self, value):
         value = value or None  # blank means not recorded, never a guessed INR

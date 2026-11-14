@@ -1,5 +1,16 @@
 # ALFRED execution state
 
+## Sprint - 2026-11-15
+
+- Scan at 621ede6: no TODO/FIXME markers, stubs or unexplained skips in source. Open: 18 implemented-not-accepted
+  and 25 partial rows wait on owner checks, keys, real documents, outcomes over time or approvals; WEALTH2-003 was
+  the only 2.0 extension with no code. feat/proactive-bots (95355ef) waits for the owner's merge decision.
+- WEALTH2-003 slice 1 (local): each bank cash account shows its balance rolled forward from the newest statement
+  row with a closing balance, adding only entries dated strictly after it (same-day entries are counted, not added).
+  Abstains when the balance was edited by hand, a later entry has another or no currency, or the account is a card
+  or investment account. Read-only, Decimal, no migration, not in canonical totals. Backend and Chrome tests PASS.
+  Next slices: investment unit anchors with post-anchor purchases, dividends and recurring-plan provenance.
+
 ## Sprint - 2026-11-14 evening
 
 - The queue had no eligible task: every open row waits on an owner check, a key (Google, R2), real documents or an

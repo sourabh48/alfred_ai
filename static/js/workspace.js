@@ -90,7 +90,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     const row = document.createElement('tr');
                     const reference = /^\*{4}\d{4}$/.test(account.masked_account_number) ? account.masked_account_number : 'Reference hidden';
                     const balance = account.current_balance === null || account.current_balance === undefined ? 'Balance unavailable' : Alfred.formatCurrency(account.current_balance, account.currency || 'INR') + (account.currency && account.currency !== 'INR' ? ' · kept out of rupee totals' : '');
-                    [account.nickname || account.bank_name || 'Bank account',reference,account.account_type,balance,account.currency || currencyPicker(account),account.is_active?'Active':'Inactive'].forEach(value=>{const cell=document.createElement('td');cell.append(value);row.append(cell)});
+                    const since = account.balance_since_statement || {};
+                    const rolled = since.status === 'estimated' ? ` · about ${Alfred.formatCurrency(since.estimated_balance, account.currency || 'INR')} now, from the ${since.anchor_date} statement plus ${since.entries} later ${since.entries === 1 ? 'entry' : 'entries'} (estimate, not a bank quote${since.same_day_not_counted ? `; ${since.same_day_not_counted} same-day ${since.same_day_not_counted === 1 ? 'entry' : 'entries'} not counted` : ''})` : '';
+                    [account.nickname || account.bank_name || 'Bank account',reference,account.account_type,balance + rolled,account.currency || currencyPicker(account),account.is_active?'Active':'Inactive'].forEach(value=>{const cell=document.createElement('td');cell.append(value);row.append(cell)});
                     bankBody.append(row);
                 });
                 status.textContent = accounts.length ? `${pagination.count ?? accounts.length} owned accounts · page ${page} · latest recorded balances, not live bank quotes` : 'No bank accounts recorded. Imported statements can create owned accounts.';

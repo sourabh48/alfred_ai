@@ -2219,6 +2219,24 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('loanSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture('loan-other-currency')
 
+    def test_account_balance_rolls_forward_from_the_last_statement(self):
+        from datetime import timedelta
+        from decimal import Decimal
+        from django.utils import timezone
+        from apps.expenses.models import BankAccount, Expense
+        owner = self.scenario['user']; today = timezone.localdate()
+        account = BankAccount.objects.create(user=owner, bank_name='Synthetic Roll Bank', account_number='SYNROLL0001', currency='INR',
+                                             current_balance=Decimal('10000.00'))
+        Expense.objects.create(user=owner, bank_account=account, amount=Decimal('100.00'), direction='debit', currency='INR',
+                               transaction_date=today - timedelta(days=5), closing_balance=Decimal('10000.00'), source='bank_statement')
+        Expense.objects.create(user=owner, bank_account=account, amount=Decimal('250.50'), direction='debit', currency='INR',
+                               transaction_date=today - timedelta(days=2), merchant='Synthetic Later Shop')
+        self.login(); self.browser.get(self.live_server_url + '/expenses/')
+        self.wait.until(lambda _: 'Synthetic Roll Bank' in self.text('bankAccountsBody') and self.active_requests == 0)
+        self.assertIn(f'about ₹9,749.50 now, from the {(today - timedelta(days=5)).isoformat()} statement plus 1 later entry '
+                      '(estimate, not a bank quote)', self.text('bankAccountsBody'))
+        self.capture('account-balance-roll-forward')
+
     def test_account_transaction_and_budget_currencies_stay_in_their_own_totals(self):
         from decimal import Decimal
         from django.utils import timezone
