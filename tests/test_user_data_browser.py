@@ -7547,7 +7547,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 focus_checks.append(dict(width=width,theme=theme,**focus))
                 (self.artifacts/'travel-d2-keyboard.json').write_text(json.dumps(focus_checks,indent=2),encoding='utf-8')
                 self.assertNotEqual(focus['outline'],'none');self.assertGreater(float(focus['outline_width'].replace('px','')),0)
-                self.assertIn('Local reminders',self.text('plannerAlert'))
+                self.wait.until(lambda _:'Local reminders' in self.text('plannerAlert'))  # set just after the save request returns
                 self.capture(f'travel-d2-consent-focus-{width}-{theme}')
         # Add through actual Tab/Enter; the form is retained and focus returns after save.
         item=keyboard_to('[data-packing-add] input')
