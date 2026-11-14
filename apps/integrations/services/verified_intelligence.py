@@ -1428,7 +1428,7 @@ class VerifiedIntelligenceService:
                 raise ValueError("Yahoo observation arrays are invalid.")
             observations = {}
             for stamp, raw in zip(timestamps, prices):
-                if type(stamp) is not int or stamp <= 0 or datetime.fromtimestamp(stamp, datetime_timezone.utc) > timezone.now():
+                if type(stamp) is not int or stamp <= 0:
                     raise ValueError("Yahoo observation timestamp is invalid.")
                 value = None if raw is None else Decimal(str(raw))
                 if value is not None and (isinstance(raw, bool) or not value.is_finite() or value <= 0 or not isfinite(float(value))):
@@ -1437,8 +1437,13 @@ class VerifiedIntelligenceService:
                     raise ValueError("Yahoo observation conflicts with its duplicate.")
                 observations[stamp] = value
             dates = sorted(observations)
-            if observations[dates[-1]] is None:
+            # Yahoo opens the next session's daily bar (no price, often a future start time) around 00:00 UTC.
+            while dates and observations[dates[-1]] is None:
+                dates.pop()
+            if not dates:
                 raise ValueError("Latest Yahoo daily value is missing.")
+            if datetime.fromtimestamp(dates[-1], datetime_timezone.utc) > timezone.now():
+                raise ValueError("Yahoo observation timestamp is invalid.")
             valid = [(stamp, observations[stamp]) for stamp in dates if observations[stamp] is not None]
             return {"close": [value for _, value in valid], "timestamp": [stamp for stamp, _ in valid],
                     "currency": str(result["meta"].get("currency") or "").upper()[:3] or None}

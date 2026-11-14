@@ -82,6 +82,22 @@ class YahooMarketAcceptanceTests(TestCase):
         self.assertEqual(result["close"][10], Decimal(1011))
         self.assertEqual(result["timestamp"][10], self.chart()["timestamp"][11])
 
+    def test_next_session_bar_without_a_price_is_dropped_but_an_all_empty_chart_is_rejected(self):
+        # Seen on the owner runtime: every 00:00 UTC market refresh failed on Yahoo's unpriced next-session bar.
+        last_priced = self.chart()["timestamp"][-1]
+        for offset in (3600, -60):  # future session start, or an already-started bar with no price yet
+            with self.subTest(offset=offset):
+                row = self.chart()
+                row["timestamp"] = row["timestamp"][:40] + [int(timezone.now().timestamp()) + offset]
+                row["indicators"]["quote"][0]["close"] = row["indicators"]["quote"][0]["close"][:40] + [None]
+                result = self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d")
+                self.assertEqual(result["timestamp"][-1], last_priced)
+                self.assertEqual(result["close"][-1], Decimal(1039))
+        row = self.chart()
+        row["indicators"]["quote"][0]["close"] = [None] * len(row["timestamp"])
+        with self.assertRaises(ValueError):
+            self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d")
+
     def test_unsorted_identical_duplicates_are_not_extra_observations(self):
         row = self.chart()
         row["timestamp"] = list(reversed(row["timestamp"])) + row["timestamp"][-1:]
@@ -108,9 +124,9 @@ class YahooMarketAcceptanceTests(TestCase):
                 with self.assertRaises(ValueError):
                     self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d")
 
-    def test_bad_prices_timestamps_latest_missing_and_duplicate_conflicts_are_rejected(self):
+    def test_bad_prices_timestamps_and_duplicate_conflicts_are_rejected(self):
         original = copy.deepcopy(self.chart())
-        for field, value in [("price", v) for v in (True, 0, -1, float("inf"), float("nan"), None)] + [
+        for field, value in [("price", v) for v in (True, 0, -1, float("inf"), float("nan"))] + [
                 ("time", True), ("time", -1), ("time", 1.5), ("time", int(timezone.now().timestamp()) + 3600), ("duplicate", 1)]:
             with self.subTest(field=field, value=value):
                 row = copy.deepcopy(original)
