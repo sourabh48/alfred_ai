@@ -206,6 +206,17 @@ different local reasoning model; cloud-hosted Ollama models are refused. Startup
 does not depend on either model. Without them the rest of ALFRED keeps working
 and the assistant reports that the local model is unavailable.
 
+`ALFRED_LOCAL_AI_THINKING` (default `auto`) lets a model that reports the
+`thinking` capability (for example Qwen 3.5 or Gemma 4) reason privately before
+answering hard general or travel questions: puzzles, optimisation, itineraries,
+schedules, or questions with many figures. Quick lookups and owner-record
+questions never think. `on` thinks for every general or travel question, `off`
+never does. `ALFRED_LOCAL_AI_THINKING_TOKENS` (default 3072) is added to the
+answer budget for that hidden reasoning, which is never shown or saved; it is
+dropped first if the sources would not fit the context window. A thinking answer
+takes longer, so keep `ALFRED_LOCAL_AI_TIMEOUT_SECONDS` above the time your GPU
+needs for about 4,000 tokens.
+
 ## Backup and restore
 
 1. Stop ALFRED and wait for shutdown to finish.

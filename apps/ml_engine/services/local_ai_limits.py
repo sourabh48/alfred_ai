@@ -13,6 +13,7 @@ BYTES_PER_TOKEN = 3
 SYSTEM_PROMPT_TOKENS = 1024
 FALLBACK_CONTEXT_TOKENS = 8192
 _windows = {}
+_thinks = {}  # model -> (digest, reports the 'thinking' capability)
 
 
 def ollama_address():
@@ -42,24 +43,42 @@ def max_output_tokens():
     return max(64, int(settings.ALFRED_LOCAL_AI_MAX_OUTPUT_TOKENS))
 
 
+def thinking_mode():
+    """'auto', 'on' or 'off'; anything else is treated as off."""
+    mode = str(settings.ALFRED_LOCAL_AI_THINKING).strip().lower()
+    return mode if mode in ('auto', 'on', 'off') else 'off'
+
+
+def thinking_tokens():
+    return max(256, int(settings.ALFRED_LOCAL_AI_THINKING_TOKENS))
+
+
+def supports_thinking(client):
+    """True only when Ollama reported the 'thinking' capability for the model's current digest."""
+    return _thinks.get(getattr(client, 'model', None), (None, False))[1]
+
+
 def learn_window(client, digest, *, deadline=None):
-    """Remember the model's own context window, read once per installed model digest from Ollama /api/show.
+    """Remember the model's own context window and thinking capability, read once per installed digest from /api/show.
 
     Called from the reasoner's model check, so a failed lookup costs nothing and is retried next time.
     """
     model = getattr(client, 'model', None)
-    if _windows.get(model, (None,))[0] == digest:
+    if _windows.get(model, (None,))[0] == digest and _thinks.get(model, (None,))[0] == digest:
         return
     try:
         limit = time.monotonic() + 10
-        info = client._request('POST', '/api/show', {'model': model},
-                               deadline=limit if deadline is None else min(deadline, limit)).get('model_info', {})
+        shown = client._request('POST', '/api/show', {'model': model},
+                                deadline=limit if deadline is None else min(deadline, limit))
+        info = shown.get('model_info', {})
         window = next((value for key, value in info.items()
                        if key.endswith('.context_length') and type(value) is int and value > 0), None)
+        capabilities = shown.get('capabilities')
     except Exception:
         return  # unknown window: callers use the safe fallback, never a guess above it
     if window:
         _windows[model] = (digest, window)
+    _thinks[model] = (digest, isinstance(capabilities, list) and 'thinking' in capabilities)
 
 
 def context_tokens(client):

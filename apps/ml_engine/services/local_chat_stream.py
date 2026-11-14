@@ -125,7 +125,7 @@ class LocalChatStream:
         self.check()
         deadline = min(deadline,self.deadline)
         connection = HTTPConnection(*ollama_address(),timeout=max(.001,deadline-time.monotonic()))
-        answer, pending, received, frames, final = '', b'', 0, 0, None
+        answer, pending, received, frames, final, thinking = '', b'', 0, 0, None, False
         tokens = int(body.get('options', {}).get('num_predict') or 1024)
         answer_cap, frame_cap = max(8192, 8 * tokens), max(2048, 2 * tokens + 64)
         context = json.loads(body['messages'][1]['content'])
@@ -160,8 +160,12 @@ class LocalChatStream:
                     item = json.loads(raw); message = item.get('message',{}) if isinstance(item,dict) else {}
                     if (not isinstance(item,dict) or item.get('model') != body['model'] or type(item.get('done')) is not bool
                             or not isinstance(message,dict) or message.get('role') != 'assistant'
-                            or message.get('tool_calls') or not isinstance(message.get('content'),str)):
+                            or message.get('tool_calls') or not isinstance(message.get('content'),str)
+                            or not isinstance(message.get('thinking',''),str) or (message.get('thinking') and not body.get('think'))):
                         raise GenerationIncomplete('Invalid local stream frame.')
+                    if message.get('thinking') and not thinking:
+                        thinking = True  # the hidden reasoning itself is never shown, kept or saved
+                        self.offer(dict(type='thinking'))
                     text = message['content']; answer += text
                     if len(answer.encode())>answer_cap: raise GenerationIncomplete('Local answer exceeds its limit.')
                     if preview:

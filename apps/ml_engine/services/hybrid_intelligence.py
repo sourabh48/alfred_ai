@@ -10,7 +10,8 @@ from django.conf import settings
 from alfred_ai.services.api_errors import safe_error_details
 
 from .local_embeddings import KEEP_ALIVE, OllamaEmbeddings, EmbeddingUnavailable
-from .local_ai_limits import context_bytes, context_tokens, deadline as local_deadline, learn_window, max_output_tokens as output_token_cap, payload_bytes
+from .local_ai_limits import (context_bytes, context_tokens, deadline as local_deadline, learn_window, max_output_tokens as output_token_cap,
+                              payload_bytes, supports_thinking, thinking_mode, thinking_tokens)
 from .persistent_memory import _owner, MemoryConflict
 from .memory_reasoning import reason_with_memory, reasoning_provider
 
@@ -37,6 +38,22 @@ def answer_budget(query, scope, style='auto'):
     return style, min(ANSWER_STYLES[style][0], output_token_cap())
 
 
+THINKING_SCOPES = ('general', 'travel')  # owner-record scopes copy recorded values; reasoning adds delay, not accuracy
+HARD_QUESTION = re.compile(
+    r'\b(?:puzzles?|riddles?|solve|prove|proof|deduce|logic(?:al)?|algorithms?|optimi[sz]e|maximi[sz]e|minimi[sz]e|'
+    r'shortest|fastest|cheapest route|itinerary|day[- ]by[- ]day|schedule|constraints?|trade-?offs?|'
+    r'step[- ]by[- ]step|work out|figure out|reason through|which order|plan (?:a|an|my|the|our)\b)', re.I)
+
+
+def wants_thinking(query, scope):
+    """Think before answering only where it pays off: hard multi-step general or travel questions (or every one when 'on')."""
+    mode = thinking_mode()
+    if mode == 'off' or scope not in THINKING_SCOPES or not isinstance(query, str):
+        return False
+    # Many figures or a long question usually means several constraints to juggle.
+    return mode == 'on' or bool(HARD_QUESTION.search(query)) or len(re.findall(r'\d+', query)) >= 6 or len(query) >= 600
+
+
 class OllamaReasoner(OllamaEmbeddings):
     name='ollama'
 
@@ -51,16 +68,24 @@ class OllamaReasoner(OllamaEmbeddings):
         learn_window(self, digest, deadline=deadline)
         return digest
 
-    def reason(self,payload,*,max_output_tokens=256,deadline):
+    def reason(self,payload,*,max_output_tokens=256,deadline,think=False):
         if type(max_output_tokens) is not int or not 1 <= max_output_tokens <= output_token_cap():
             raise ValueError('Choose a bounded local output budget.')
+        if type(think) is not bool: raise ValueError('Choose whether the local model thinks first.')
         style = payload.get('response_style', 'concise')
         if not isinstance(style, str) or style not in ANSWER_STYLES:
             raise ValueError('Choose a supported answer style.')
         before=self._digest(deadline=deadline)
         num_ctx=context_tokens(self)  # after the model check, which learns this model's window
-        body={'model':self.model,'stream':False,'think':False,'keep_alive':KEEP_ALIVE,
-            'options':{'num_predict':max_output_tokens,'num_ctx':num_ctx,'temperature':0},
+        # Hidden reasoning shares num_predict with the answer, so it gets its own budget on top; it is dropped,
+        # not the sources, when both do not fit the context window.
+        prompt_bytes=len(json.dumps(payload,ensure_ascii=False,allow_nan=False).encode())
+        think=(think and supports_thinking(self)
+               and prompt_bytes<=context_bytes(num_ctx,max_output_tokens+thinking_tokens()))
+        self.thought=think
+        num_predict=max_output_tokens+(thinking_tokens() if think else 0)
+        body={'model':self.model,'stream':False,'think':think,'keep_alive':KEEP_ALIVE,
+            'options':{'num_predict':num_predict,'num_ctx':num_ctx,'temperature':0},
             'messages':[{'role':'system','content':
                 'You are ALFRED. Answer general questions using general knowledge. '
                 'Fictional stories: use details stated in the query or dialogue as story premises, not verified personal facts. '
@@ -84,7 +109,7 @@ class OllamaReasoner(OllamaEmbeddings):
                 'Label advice and uncertain conclusions as hypotheses. Use word labels for lists. Never invoke tools or change records. '
                 + ANSWER_STYLES[style][1]},
                 {'role':'user','content':json.dumps(payload,ensure_ascii=False,allow_nan=False)}]}
-        if len(body['messages'][1]['content'].encode())>context_bytes(num_ctx,max_output_tokens): raise ValueError('Local context exceeds its limit.')
+        if len(body['messages'][1]['content'].encode())>context_bytes(num_ctx,num_predict): raise ValueError('Local context exceeds its limit.')
         result=(self._request('POST','/api/chat',body,deadline=deadline) if self.cancellation is None
                 else self.cancellation.chat(body,deadline=deadline))
         message=result.get('message',{})
@@ -418,8 +443,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         source={'ref':item['id'],'classification':'owner_verified_statement','data':item['content']}
         if payload_bytes(payload|{'sources':payload['sources']+[source]})<=limit:
             payload['sources'].append(source); included.append(item)
+    thinking=wants_thinking(query,scope); used=None
     try:
-        answer=(reasoner or OllamaReasoner()).reason(payload,max_output_tokens=output_limit,deadline=local_deadline())
+        used=reasoner or OllamaReasoner()
+        answer=used.reason(payload,max_output_tokens=output_limit,deadline=local_deadline(),**({'think':True} if thinking else {}))
         if not isinstance(answer,str) or not answer.strip() or len(answer.encode())>max(8192,8*output_limit): raise EmbeddingUnavailable('Invalid local answer.')
     except EmbeddingUnavailable:
         kind = 'expense' if scope == 'bank_statements' else 'baseline' if scope == 'finance' else record_type
@@ -443,6 +470,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     revalidate()
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'answer_style':style, 'local_output_token_limit':output_limit,
+        'local_thinking':getattr(used,'thought',False) is True,
         'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
