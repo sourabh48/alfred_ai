@@ -551,6 +551,10 @@ ALFRED_LOCAL_AI_TIMEOUT_SECONDS = env.int('ALFRED_LOCAL_AI_TIMEOUT_SECONDS', def
 # num_ctx is the model's own context window, capped here so a large window cannot exhaust RAM.
 ALFRED_LOCAL_AI_MAX_CONTEXT_TOKENS = env.int('ALFRED_LOCAL_AI_MAX_CONTEXT_TOKENS', default=32768)
 ALFRED_LOCAL_AI_MAX_OUTPUT_TOKENS = env.int('ALFRED_LOCAL_AI_MAX_OUTPUT_TOKENS', default=4096)
+# Hidden step-by-step reasoning for hard general and travel questions: auto (detected), on (every one) or off.
+# Thinking tokens come on top of the answer budget, so they stay inside the timeout above on a mid-range GPU.
+ALFRED_LOCAL_AI_THINKING = env('ALFRED_LOCAL_AI_THINKING', default='auto')
+ALFRED_LOCAL_AI_THINKING_TOKENS = env.int('ALFRED_LOCAL_AI_THINKING_TOKENS', default=3072)
 ALFRED_DOCUMENT_KNOWLEDGE_MAX_DOCUMENTS = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_DOCUMENTS', default=200)
 ALFRED_DOCUMENT_KNOWLEDGE_MAX_UPLOAD_BYTES = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_UPLOAD_BYTES', default=10 * 1024 * 1024)
 ALFRED_DOCUMENT_KNOWLEDGE_MAX_TEXT_BYTES = env.int('ALFRED_DOCUMENT_KNOWLEDGE_MAX_TEXT_BYTES', default=4 * 1024 * 1024)

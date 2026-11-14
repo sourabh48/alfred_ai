@@ -692,7 +692,11 @@ document.addEventListener("DOMContentLoaded", () => {
             : 'Reading and validating local sources. The answer stays buffered until checks complete.';
         const text = document.createElement('p'); partial.append(label,text); answers.append(partial); empty.hidden = true;
         let reader, timedOut = false, received = 0, buffer = '', preview = '';
-        const timeout = setTimeout(() => { timedOut = true; controller.abort(); },33000);
+        // Inactivity limit, not a total one: the server sends a heartbeat every 0.2 s and enforces the owner's own
+        // local AI timeout, so a long answer or a thinking model is not cut off while it is still working.
+        let timeout;
+        const arm = () => { clearTimeout(timeout); timeout = setTimeout(() => { timedOut = true; controller.abort(); },33000); };
+        arm();
         try {
             const response = await fetch('/api/ai/personal-insights/stream/', {method:'POST',credentials:'same-origin',
                 signal:controller.signal,headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify(payload)});
@@ -707,6 +711,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const {done,value} = await reader.read();
                 if (done) break;
                 if (!active || ticket !== generation) throw new Error('This page no longer owns the stream.');
+                arm();
                 received += value.byteLength;
                 if (received > 262144) throw new Error('Local stream exceeded its limit.');
                 buffer += decoder.decode(value,{stream:true});
@@ -720,6 +725,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         preview += event.text;
                         if (new TextEncoder().encode(preview).length > 8192) throw new Error('Local preview exceeded its limit.');
                         text.textContent = preview;
+                    } else if (event.type === 'thinking') {
+                        label.textContent = 'Thinking through this step by step on your PC. Hard questions can take a few minutes.';
                     } else if (event.type === 'buffering') {
                         preview = ''; text.textContent = ''; label.textContent = 'Validating full local output. Figures and sources are buffered.';
                     } else if (event.type === 'error') {

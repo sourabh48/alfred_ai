@@ -220,6 +220,7 @@
  "tests.test_loan_money_migration": 33.5,
  "tests.test_loan_money_retention": 0.06,
  "tests.test_local_ai_limits": 0.01,
+ "tests.test_local_thinking": 0.17,
  "tests.test_ml_readiness": 0.53,
  "tests.test_ml_role_routing": 0.18,
  "tests.test_ml_training_orchestrator": 102.89,

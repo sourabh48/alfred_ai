@@ -48,7 +48,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_career_send", "test_cashflow_forecast_acceptance", "test_celery_startup", "test_chatgpt_imports", "test_credit_score_drop_migration", "test_development_council",
     "test_document_layouts", "test_durable_queue", "test_expense_chart_granularity", "test_expense_money_migration", "test_expense_money_rehearsal", "test_expense_timeline_window",
     "test_financial_health_acceptance", "test_financial_relationships", "test_financial_scenario_reconciliation", "test_fund_look_through", "test_investment_projection", "test_large_data_materialization",
-    "test_live_data_version", "test_loan_balance_basis", "test_loan_money_migration", "test_loan_money_retention", "test_local_ai_limits", "test_ml_readiness",
+    "test_live_data_version", "test_loan_balance_basis", "test_loan_money_migration", "test_loan_money_retention", "test_local_ai_limits", "test_local_thinking", "test_ml_readiness",
     "test_ml_role_routing", "test_ml_training_orchestrator", "test_mobility_endpoint_contracts", "test_mobility_record_acceptance", "test_mobility_vehicle_dashboard", "test_model_registry_recovery",
     "test_net_worth_overdraft", "test_observation_supervisor", "test_parser_adaptive_learning", "test_pdf_recovery", "test_platform_hardening", "test_project_details_career_outcomes",
     "test_project_details_live", "test_related_loan_money_migration", "test_relationship_alignment_coverage", "test_remaining_task_closures", "test_risk_evidence_coverage", "test_service_import_receipts",
