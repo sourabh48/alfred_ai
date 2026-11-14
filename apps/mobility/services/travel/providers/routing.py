@@ -29,7 +29,7 @@ class GoogleRoutes(Provider):
     # shortcut: Google limits storing its content; an hour keeps a planning session usable. Revisit if plans must keep it.
     ttl = timedelta(hours=1)
     limits = {"minute": 10, "hour": 60, "day": 200, "month": 3000}
-    allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference", "alternatives"}
+    allowed_parameters = {"start", "end", "mode", "avoid_expressways", "avoid_tolls", "preference", "alternatives", "via"}
     MODES = {"motorcycle": "TWO_WHEELER", "ride": "TWO_WHEELER", "car": "DRIVE", "roadtrip": "DRIVE", "walking": "WALK"}
 
     def unavailable_reason(self):
@@ -45,6 +45,11 @@ class GoogleRoutes(Provider):
         body = {"origin": {"location": {"latLng": {"latitude": start[1], "longitude": start[0]}}},
                 "destination": {"location": {"latLng": {"latitude": end[1], "longitude": end[0]}}},
                 "travelMode": travel_mode, "computeAlternativeRoutes": bool(p.get("alternatives"))}
+        if p.get("via") is not None:
+            if body["computeAlternativeRoutes"]:  # Google computes no alternatives through a stop
+                raise ProviderError("unsupported_route_alternatives")
+            via = _coordinate(p["via"])
+            body["intermediates"] = [{"location": {"latLng": {"latitude": via[1], "longitude": via[0]}}}]
         if travel_mode != "WALK":
             body["routeModifiers"] = {"avoidHighways": bool(p.get("avoid_expressways")), "avoidTolls": bool(p.get("avoid_tolls"))}
         return request_json("POST", "https://routes.googleapis.com/directions/v2:computeRoutes", json=body,

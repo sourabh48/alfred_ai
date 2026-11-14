@@ -25,6 +25,22 @@ def geocoders():
     return [GooglePlaceSearch()]
 
 
+DETOUR_STOPS = 3  # one Google Routes call each; the provider's minute and day caps still apply
+
+
+def add_road_detours(fetch, router, parameters, chosen, places):
+    """Extra road distance and time to visit each of the top sights, from one routed trip through it."""
+    for place in [p for p in places if p.get("category") in {"attraction", "camping", "viewpoint"}][:DETOUR_STOPS]:
+        through = fetch(router, {**parameters, "via": [place["lon"], place["lat"]]})
+        if not through.success or through.stale:
+            continue  # the stop keeps no detour figure rather than a guessed one
+        route = through.payload["routes"][0]
+        place.update(road_detour_km=round(max(0, route["distance_km"] - chosen["distance_km"]), 1),
+                     road_detour_hours=round(max(0, route["duration_hours"] - chosen["duration_hours"]), 2),
+                     road_detour_basis="Google road route through this stop minus the chosen route; traffic, "
+                                       "closures and motorcycle legality unverified.")
+
+
 def has_locations(result):
     return bool(result.payload.get("locations"))
 from .presentation import age_saved_facts
@@ -133,6 +149,7 @@ def enrich_candidate(user, state, destination):
         d[key] = result.as_dict()
         results.append(result)
     coords = d.get("lat") is not None and d.get("lon") is not None
+    detour_from = None
     origin = CITIES.get(str(value(state,"origin","")).casefold())
     d.pop("origin_geocoding_result", None)
     if not origin and value(state,"origin"):
@@ -176,6 +193,8 @@ def enrich_candidate(user, state, destination):
                 d["selected_route_id"] = selected.get("route_id")
                 d.update(distance_km=selected["distance_km"],travel_hours=selected["duration_hours"],
                     distance_basis="Provider-calculated route; duration is a model estimate, closures and motorcycle legality unverified.")
+                if not route.stale:
+                    detour_from = (router, route_parameters, selected)
             else:
                 d.update(selected_route_id=None, route_choice_required=True, distance_km=None, travel_hours=None,
                     distance_basis="The previous route choice is unavailable; choose again before relying on a travel allowance.")
@@ -212,6 +231,8 @@ def enrich_candidate(user, state, destination):
         history = history_for(user)
         places.payload["places"] = rank_places(user,places.payload["places"],interests=value(state,"preferred_trip_style",[]),
             route=route_points,visited_names=history["visits"],weather_risks=d["weather_proposals"],only_new=value(state,"only_new_places",False))
+        if detour_from:
+            add_road_detours(fetch, *detour_from, places.payload["places"])
         d["activities"] = [p["name"] for p in places.payload["places"] if p["category"] not in {"fuel","hospital","service","restaurant","permit_office"}][:8] or d["activities"]
     attach("places_result",places)
     attach("permit_result",PermitProvider().lookup(value(state,"permit_place",d["name"]),start_date=value(state,"available_start_date")))

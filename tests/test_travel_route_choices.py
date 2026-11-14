@@ -17,11 +17,11 @@ from apps.mobility.services.travel_discovery import budget_for, candidates_for, 
 from apps.mobility.services.travel_itinerary import build_itinerary
 
 
-def route_fixture(*, distance=80):
+def route_fixture(*, distance=80, hours=2):
     now = timezone.now()
     parameters = {"start": [77.59, 12.97], "end": [77.03, 12.18], "mode": "ride"}
-    payload = GoogleRoutes().normalize({"routes": [{"distanceMeters": km*1000, "duration": f"{hours*3600}s", "description": via}
-        for km, hours, via in [(distance, 2, "NH275"), (distance+10, 3, "SH17")]]}, parameters)
+    payload = GoogleRoutes().normalize({"routes": [{"distanceMeters": km*1000, "duration": f"{h*3600}s", "description": via}
+        for km, h, via in [(distance, hours, "NH275"), (distance+10, hours+1, "SH17")]]}, parameters)
     return ProviderResult("google_routes", "routing", success=True, status="ok", freshness="LIVE", confidence="LIKELY",
         source_url="https://www.google.com/maps", retrieved_at=now.isoformat(), expires_at=(now+timedelta(days=1)).isoformat(), payload=payload)
 
@@ -92,6 +92,43 @@ class TravelRouteChoiceTests(TestCase):
         failed = run(ProviderResult("google_routes", "routing", error="quota_exhausted"))
         self.assertEqual(failed["route_result"]["payload"], self.result.payload)
         self.assertIn("retaining the single-route", failed["route_alternatives_note"])
+
+    @patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-key"})
+    @patch("apps.mobility.services.travel.providers.routing.request_json")
+    def test_route_through_a_stop_sends_one_intermediate_and_no_alternatives(self, request):
+        p = {"start": [77, 12], "end": [77.1, 12.1], "mode": "ride", "via": [77.05, 12.04]}
+        GoogleRoutes().fetch(p)
+        body = request.call_args.kwargs["json"]
+        self.assertEqual(body["intermediates"], [{"location": {"latLng": {"latitude": 12.04, "longitude": 77.05}}}])
+        self.assertFalse(body["computeAlternativeRoutes"])
+        before = request.call_count
+        for bad in ({**p, "alternatives": True}, {**p, "via": [77]}, {**p, "via": [200, 12]}, {**p, "via": "77,12"}):
+            with self.subTest(bad=bad), self.assertRaises((ProviderError, ValueError, TypeError)):
+                GoogleRoutes().fetch(bad)
+        self.assertEqual(request.call_count, before)
+
+    def test_top_sights_get_a_road_detour_and_a_failed_stop_gets_none(self):
+        sights = [{"id": f"s{i}", "name": f"Sight {i}", "lat": lat, "lon": 77.0, "category": "attraction"}
+                  for i, lat in enumerate((12.2, 12.21, 12.22, 12.23, 12.24))]
+        sights.insert(0, {"id": "h", "name": "Clinic", "lat": 12.2, "lon": 77.0, "category": "hospital"})
+        def fetch(provider, parameters, **kwargs):
+            if provider.category == "routing":
+                if parameters.get("via") == [77.0, 12.21]:
+                    return ProviderResult("google_routes", "routing", error="quota_exhausted")
+                return route_fixture(distance=95, hours=2.5) if parameters.get("via") else self.result
+            if provider.name == "google_places_nearby":
+                return ProviderResult(provider.name, "places", success=True, status="ok", freshness="LIVE", payload={"places": deepcopy(sights)})
+            return ProviderResult(provider.name, provider.category)
+        with patch("apps.mobility.services.travel.research.query", side_effect=fetch) as query, \
+                patch("apps.mobility.services.travel.cache.query", new=query):
+            candidate, _ = enrich_candidate(self.user, self.session.state, self.candidate)
+        stops = [c.args[1]["via"] for c in query.call_args_list if c.args[1].get("via")]
+        self.assertEqual(stops, [[77.0, 12.2], [77.0, 12.21], [77.0, 12.22]])  # top three sights, never the clinic
+        places = {p["name"]: p for p in candidate["places_result"]["payload"]["places"]}
+        self.assertEqual((places["Sight 0"]["road_detour_km"], places["Sight 0"]["road_detour_hours"]), (15.0, 0.5))
+        self.assertIn("traffic, closures and motorcycle legality unverified", places["Sight 2"]["road_detour_basis"])
+        for name in ("Sight 1", "Sight 3", "Clinic"):
+            self.assertNotIn("road_detour_km", places[name])
 
     def test_long_or_stale_route_never_requests_alternatives(self):
         for source in (route_fixture(distance=101), ProviderResult(**(self.result.as_dict() | {"stale": True}))):

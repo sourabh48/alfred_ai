@@ -34,7 +34,7 @@ GATES = {
     'TRAVEL-04': 'BLOCKED_APPROVAL: Google Routes is the only router since 2026-11-14 (two-wheeler, distance and time, no line drawn); verified inter-stop routing needs the owner Google key and a real-trip check; manual itineraries accepted',
     'TRAVEL-07': 'BLOCKED_EVIDENCE: bounded alternative-route choice accepted; independently reviewed scenic/legal route evidence absent',
     'TRAVEL-08': 'BLOCKED_EVIDENCE: owner-reviewed restriction references accepted; independently authenticated route-applicable restrictions absent',
-    'TRAVEL-09': 'BLOCKED_APPROVAL: straight-line stop distance labelled 2026-11-06; road-network detours need an approved routing key',
+    'TRAVEL-09': 'BLOCKED_EVIDENCE: road detours for the top three sights from one Google Routes call each through the stop, 2026-11-14 (synthetic tests, Chrome PASS); a live check with the owner Google key and a real trip remains',
     'TRAVEL-15': 'BLOCKED_EXTERNAL: no verified live permit or closure service; dated references shown stale with UNKNOWN confidence',
     'BIKE-03': 'BLOCKED_EVIDENCE: part windows and evidence score labelled 2026-11-06; prediction quality needs real logged service outcomes',
     'BIKE-05': 'BLOCKED_EXTERNAL: cost figures labelled estimates 2026-11-06; authoritative part compatibility and live prices need a manufacturer or dealer source',

@@ -2639,7 +2639,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Current sampled crow-flight corridor ranking is not verified road-detour distance. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_IMPLEMENTATION 2026-11-06: the places panel now shows each stop's straight-line distance to the route as "about X km straight-line from the route, not road detour distance" (it was computed but hidden). Road-network detours need the OpenRouteService routing key (`TRAVEL_ORS_API_KEY`), which is not configured; no key or provider was added. Places Chrome test PASS with the new label.
-- Next: with an approved routing key, compute bounded road detours for the top few stops and keep straight-line as the fallback label.
+- SCOPED_IMPLEMENTATION 2026-11-14: Google Routes (the approved router) gives each of the top three sights (attraction, camping, viewpoint) a road detour: one route from the origin through the stop to the destination, minus the chosen route, shown as "about X km and Y min extra by road to stop here" with traffic, closures and motorcycle legality unverified. A failed, stale or rate-limited call leaves that stop without a figure; nothing is estimated in its place. Google returns no route line, so the straight-line corridor figure no longer appears for Google routes. Synthetic backend tests (117 travel) and the places Chrome test PASS; no live Google call made.
+- Next: with the owner's Google key, run a real trip and compare two detours with Google Maps.
 
 ### TRAVEL-10 — Camping and attraction discovery
 
