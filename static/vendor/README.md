@@ -10,6 +10,14 @@ These assets allow the interface, dialogs and charts to work without a CDN.
   CSS: a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6.
   Travel maps use circle markers; no remote marker-image dependency. Tile loading
   is opt-in and follows the configured tile provider policy.
+- World countries and states: dr5hn/countries-states-cities-database v6.2.0,
+  https://github.com/dr5hn/countries-states-cities-database/tree/v6.2.0
+  (ODbL-1.0; world/LICENSE). Data © dr5hn and contributors, made available under the
+  Open Database License. `world/world.json` is a derived database, stripped to names,
+  ISO codes, emoji flags and coordinates by `scripts/build_world_dataset.py`, which
+  downloads only from raw.githubusercontent.com at that tag. SHA256 countries.json:
+  43df689ce9303665de103f0643b2b633adb1dca8320bf49db5d1df4b30c3a182;
+  states.json: 9ff8201f31e374ba2a1173cd3203d45fc72a365d87e446d3c66ea9d90bda34c7.
 
 Downloaded from the corresponding pinned npm package URLs at cdn.jsdelivr.net.
 Optional Google web fonts fall back to system fonts when offline.

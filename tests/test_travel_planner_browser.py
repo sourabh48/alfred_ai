@@ -471,6 +471,18 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "mountains: true" in self.text("travelPreferenceList"))
         self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
 
+    def test_world_dataset_counts_places_flags_trips_and_suggests_names_offline(self):
+        TravelPlan.objects.create(user=self.user,title="Coast",destination="Goa",status="completed",start_date=timezone.localdate()-timedelta(days=9),end_date=timezone.localdate()-timedelta(days=7))
+        TravelPlan.objects.create(user=self.user,title="Abroad",destination="Kathmandu, Nepal",status="planned",start_date=timezone.localdate()+timedelta(days=9),end_date=timezone.localdate()+timedelta(days=12))
+        self.browser.get(self.live_server_url+"/mobility/")
+        cards=lambda: self.browser.execute_script("return document.getElementById('mobilitySummaryCards').textContent.replace(/\s+/g,' ')")
+        self.wait.until(lambda _: "Countries Visited 1 1 states or regions" in cards())
+        flags=[e.get_attribute("aria-label") for e in self.browser.find_elements(self.By.CSS_SELECTOR,'#travelPlanList .trip-card [role="img"]')]
+        self.assertEqual(sorted(flags),["India","Nepal"])
+        self.browser.execute_script("const input=document.getElementById('logLocation'); input.closest('details').open=true; input.focus()")
+        self.wait.until(lambda _: self.browser.execute_script("return [...document.querySelectorAll('#worldPlaces option')].some(o => o.value === 'Goa, India')"))
+        self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+
     def test_preferences_wait_for_initial_load_and_save(self):
         reading, release_read, writing, release_write = (threading.Event() for _ in range(4))
         original = BaseHandler.get_response

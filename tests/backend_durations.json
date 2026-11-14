@@ -153,6 +153,7 @@
  "tests.test_travel_financial_reconciliation": 11.03,
  "tests.test_travel_gpx_export": 17.06,
  "tests.test_travel_http": 0.27,
+ "tests.test_travel_world": 0.3,
  "tests.test_travel_ics_export": 21.05,
  "tests.test_travel_itinerary_editor": 27.92,
  "tests.test_travel_multistop": 24.22,
