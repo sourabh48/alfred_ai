@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..services import task_bots
 from ..services.assistant_actions import ActionConflict, ActionError, cancel, confirm, prepare
 
 
@@ -42,6 +43,33 @@ class AssistantActionConfirmAPI(APIView):
         try:
             result = confirm(request.user, request.data.get("proposal_id"), request.data.get("action"), request.data.get("fields"))
             return Response(result, status=200 if result["already_applied"] else 201)
+        except (ActionError, DatabaseError) as error:
+            return _failure(error)
+
+
+@method_decorator(never_cache, name="dispatch")
+class TaskBotsAPI(APIView):
+    """GET lists the bots and pending proposals; POST runs, confirms or dismisses one (owner's own only)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"bots": task_bots.catalog(), "proposals": task_bots.pending(request.user)})
+
+    def post(self, request):
+        data = request.data if isinstance(request.data, dict) else {}
+        operation = data.get("operation")
+        shapes = {"run": {"operation", "bot"}, "dismiss": {"operation", "proposal_id"},
+                  "confirm": {"operation", "proposal_id", "item_ids", "fingerprint", "confirmed"}}
+        if operation not in shapes or set(data) != shapes[operation]:
+            return Response({"detail": "Choose run, confirm or dismiss with only its fields."}, status=400)
+        try:
+            if operation == "run":
+                return Response({"proposal": task_bots.run(request.user, data["bot"], timezone.localdate())})
+            if operation == "dismiss":
+                return Response(task_bots.dismiss(request.user, data["proposal_id"]))
+            if data["confirmed"] is not True:
+                return Response({"detail": "Confirm the reviewed items first."}, status=400)
+            return Response(task_bots.confirm(request.user, data["proposal_id"], data["item_ids"], data["fingerprint"], timezone.localdate()))
         except (ActionError, DatabaseError) as error:
             return _failure(error)
 

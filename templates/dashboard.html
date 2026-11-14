@@ -62,6 +62,14 @@
 </section>
 {% endif %}
 
+<section class="surface-card mb-4" id="taskBots" aria-labelledby="taskBotsTitle">
+    <h2 class="page-section-title" id="taskBotsTitle">Your assistants</h2>
+    <p class="page-section-copy">Each morning ALFRED's bots check your own records and prepare a review. Nothing changes until you confirm, and ALFRED never pays, books, trades or sends anything.</p>
+    <div class="d-flex flex-wrap gap-2" id="taskBotsRun" role="group" aria-label="Run a bot now"></div>
+    <p class="small mt-2" id="taskBotsStatus" role="status" aria-live="polite"></p>
+    <div id="taskBotsList"></div>
+</section>
+
 {% if setup_done < setup_steps|length %}
 <section class="surface-card mb-4 home-setup" aria-labelledby="homeSetupTitle">
     <h2 class="page-section-title" id="homeSetupTitle">Get started: {{ setup_done }} of {{ setup_steps|length }} done</h2>
@@ -174,4 +182,5 @@
 
 {% block extra_js %}
 <script src="/static/js/dashboard.js?v=2.4.0"></script>
+<script src="/static/js/task_bots.js?v=1"></script>
 {% endblock %}

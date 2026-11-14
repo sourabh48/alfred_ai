@@ -175,6 +175,9 @@ def run_research(run_id):
             rain = d["weather"].get("precipitation_total")
             if run.recheck and rain is not None and old_rain is not None and abs(rain-old_rain) >= 10:
                 changes.append(f"{d['name']}: forecast rain changed from {old_rain} to {rain} mm across the trip.")
+            old_km, km = previous.get(d["name"], {}).get("distance_km"), d.get("distance_km")
+            if run.recheck and km and old_km and abs(km-old_km) >= max(10, old_km*0.1):
+                changes.append(f"{d['name']}: route distance changed from {old_km} to {km} km.")
             researched.append(d)
             stage("costs")
         options = researched

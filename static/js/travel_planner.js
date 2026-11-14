@@ -110,6 +110,7 @@ window.TravelPlanner = (() => {
         history.replaceState(null, "", `?session=${state.session.id}`);
         state.comparison = false;
         render();
+        window.TravelSuggestions.load(state.session.id);
         return true;
     }
     async function create(planId) {
@@ -122,6 +123,7 @@ window.TravelPlanner = (() => {
         history.replaceState(null, "", `?session=${data.id}`);
         state.comparison = false;
         render();
+        window.TravelSuggestions.load(data.id);
         await list();
     }
     async function action(payload,onFailure) {
@@ -144,6 +146,7 @@ window.TravelPlanner = (() => {
             if (state.session?.id!==identity) return accepted;
             if (state.session.plan_id) populateDetails(state.session.plan_id);
             if (payload.action === "save") {
+                window.TravelSuggestions.load(identity);
                 await loadMobilityDashboard();
                 alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your Plans below.");
             } else if(payload.action==='itinerary_edit')alert('Itinerary updated. Route and cost estimates may need recalculation.');
@@ -307,6 +310,7 @@ window.TravelPlanner = (() => {
         window.TravelPacking.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
         window.TravelReminders.init({current:()=>state.session,send:action,reload:()=>open(state.session.id).catch(error=>alert(error.message))});
         window.TravelAffordability.init({current:()=>state.session,request:fetchPlanner});
+        window.TravelSuggestions.init({reload:()=>open(state.session.id)});
         $("plannerComposer").addEventListener("submit", e=>{e.preventDefault(); message($("plannerInput").value);});
         $("plannerNew").addEventListener("click", ()=>create().catch(e=>alert(e.message)));
         $("plannerDraft").addEventListener("click", ()=>action({action:"save",draft:true}));

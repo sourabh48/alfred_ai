@@ -1,5 +1,12 @@
 # Development CI and integration pipeline
 
+## Proactive travel planner and task bots - 2026-11-14
+
+LOCAL_ACCEPTED after commit, not pushed. Branch feat/proactive-bots in the proactive-bots worktree, base origin/master
+23de55f. tests.test_task_bots added to the BACKEND list with a measured duration. No migration, dependency or workflow
+change. Blocker: the owner's OK for the push. After a push: read the exact-HEAD run, including the Selenium shard that
+runs tests.test_travel_planner_browser.
+
 ## Owner checks, route optimiser and think-before-answering to master - 2026-11-14
 
 Owner asked to merge everything to master (2026-11-14). Branch work/email-signin-2026-11-14 in the

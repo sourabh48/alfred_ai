@@ -261,5 +261,6 @@
  "tests.test_windows_setup": 1.28,
  "tests.test_financial_scenario_reconciliation": 1.2,
  "tests.test_home_page": 2.4,
- "tests.test_assistant_web_lookup": 1.5
+ "tests.test_assistant_web_lookup": 1.5,
+ "tests.test_task_bots": 21.3
 }

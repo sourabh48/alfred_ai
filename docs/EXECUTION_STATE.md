@@ -1,5 +1,26 @@
 # ALFRED execution state
 
+## Proactive travel planner and task bots - 2026-11-14
+
+- Owner request: "i need more proactive travel planner..... and complete automation in app... i need bots to do tasks".
+  Branch `feat/proactive-bots` (worktree F:/ALFRED_DEV/proactive-bots), cut from origin/master 23de55f. Local commits
+  only; not pushed. No migration, dependency, provider, model or workflow change.
+- Mapping: AI-17 (task bots, propose-then-confirm) and TRAVEL-04 (saved-trip next steps); statuses unchanged, baseline
+  unchanged. The work also touches two 2.0 extensions, which the queue places after baseline closure; the owner's request
+  above is the reason: WEALTH2-002 (bot proposals carry a keyed fingerprint and Confirm refuses a stale review across
+  money, travel, career and vehicle records) and TRAVEL2-003 (a reminder proposed from the trip, created through the
+  existing opt-in reminder service). Both stay UNACCEPTED.
+- Travel: "Suggested for you" panel in the planner and GET /api/mobility/planner/suggestions/. The recheck now also
+  reports a route-distance change (10 km or 10%). Trip ideas come from the offline guide for the next free weekend.
+- Bots: GET/POST /api/ai/bots/ (run, confirm, dismiss); Home > Your assistants; daily Huey job `task-bots` in
+  DAILY_JOBS. Weekly money review runs every 7 days, the others daily; a proposal with the same fingerprint is reused.
+- Evidence (synthetic, isolated sandbox): tests.test_task_bots 14 PASS; 19 affected backend modules 257 tests PASS after
+  two fixes (test_native_daily_catch_up now counts DAILY_JOBS instead of a fixed 4; the new module is in BACKEND);
+  tests.test_travel_planner_browser 11 PASS in Chrome, including the two new tests (planner Review/Confirm reminder and
+  Plan this; Home run/confirm/dismiss); tracker check clean. Not checked: the owner's app, a live Huey worker run,
+  real records.
+- Next: owner check in the app, then the owner's OK before any push.
+
 ## Owner checks fixed one by one - 2026-11-14
 
 - Pushed to master at a4c8a64 on 2026-11-14 at the owner's request, merged with the route optimiser (a1e96ef) and

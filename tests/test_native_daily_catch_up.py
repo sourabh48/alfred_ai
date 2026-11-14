@@ -25,7 +25,7 @@ class DailyCatchUpTests(SimpleTestCase):
         return {name for name, job in self.jobs.items() if job.called}
 
     def test_jobs_that_never_ran_are_caught_up_once(self):
-        self.assertEqual(tasks.native_daily_catch_up.call_local(), {"status": "completed", "processed": 4})
+        self.assertEqual(tasks.native_daily_catch_up.call_local(), {"status": "completed", "processed": len(tasks.DAILY_JOBS)})
         self.assertEqual(self.calls(), set(tasks.DAILY_JOBS))
         self.assertEqual(tasks.native_daily_catch_up.call_local()["processed"], 0)
         for job in self.jobs.values():
@@ -42,7 +42,7 @@ class DailyCatchUpTests(SimpleTestCase):
     def test_failure_is_retried_after_an_hour_and_does_not_block_other_jobs(self):
         self.jobs["budget-publication-check"].side_effect = RuntimeError("offline")
         with self.assertLogs("alfred_ai.native_tasks", "WARNING"):
-            self.assertEqual(tasks.native_daily_catch_up.call_local()["processed"], 3)
+            self.assertEqual(tasks.native_daily_catch_up.call_local()["processed"], len(tasks.DAILY_JOBS) - 1)
         self.assertIsNone(cache.get("native:daily:budget-publication-check:success"))
         tasks.native_daily_catch_up.call_local()
         self.assertEqual(self.jobs["budget-publication-check"].call_count, 1, "no retry within the hour")
@@ -59,7 +59,7 @@ class DailyCatchUpTests(SimpleTestCase):
     def test_a_running_job_is_never_started_twice(self):
         cache.set("native:daily:nightly-training:running", 1)
         self.assertEqual(tasks.native_nightly_training.call_local(), {"status": "busy"})
-        self.assertEqual(tasks.native_daily_catch_up.call_local()["processed"], 3)
+        self.assertEqual(tasks.native_daily_catch_up.call_local()["processed"], len(tasks.DAILY_JOBS) - 1)
         self.jobs["nightly-training"].assert_not_called()
         self.assertIsNone(cache.get("native:daily:nightly-training:success"))
 
