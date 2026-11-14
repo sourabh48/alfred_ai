@@ -1,8 +1,8 @@
 """In-app task bots (owner request 2026-11-14: "i need bots to do tasks"); AI-17 propose-then-confirm, WEALTH2-002 stale check.
 
 Each bot reads the owner's own records, deterministically and without a model, and writes one reviewable proposal.
-Nothing changes until the owner confirms in the app. The only actions a confirmation can run are travel reminders
-and a travel recheck; every money, booking, trading or sending step stays with the owner on its own page.
+Nothing changes until the owner confirms in the app. The only actions a confirmation can run are travel reminders,
+a travel recheck and filing a spend under a category; every money, booking, trading or sending step stays with the owner.
 """
 from __future__ import annotations
 
@@ -151,6 +151,107 @@ def travel_prep(user, today):
             for step in upcoming_steps(user, today) if step["action"] or (step["due_on"] or "9999") <= soon]
 
 
+def categorise(user, today):
+    """Spends in Other whose merchant the owner has already categorised the same way at least twice (75% of the time)."""
+    from apps.expenses.models import Expense
+    rows = Expense.objects.filter(user=user, direction="debit")
+    history = defaultdict(lambda: defaultdict(int))
+    for merchant, category in rows.exclude(category="other").exclude(merchant="").values_list("merchant", "category"):
+        history[merchant.strip().lower()][category] += 1
+    labels, items = dict(Expense.CATEGORY_CHOICES), []
+    for expense in rows.filter(category="other", transaction_date__gte=today - timedelta(days=60)).exclude(merchant="").order_by("-transaction_date", "-id")[:200]:
+        counts = history.get(expense.merchant.strip().lower())
+        if not counts:
+            continue
+        category, seen = max(sorted(counts.items()), key=lambda pair: pair[1])
+        if seen >= 2 and seen * 4 >= sum(counts.values()) * 3:
+            label = labels.get(category, category)
+            items.append(_item(f"category:{expense.pk}:{category}", f"{expense.merchant} {_amount(expense.amount, expense.currency)} on {expense.transaction_date:%d %b} to {label}",
+                f"You filed {seen} earlier {expense.merchant} spend(s) under {label}.", "/expenses/",
+                {"type": "categorise", "expense_id": expense.pk, "category": category, "label": label}))
+    return items
+
+
+def budget_pace(user, today):
+    from apps.budgets.services.budget_intelligence import budget_spent, current_budget_plan
+    plan = current_budget_plan(user, today=today)
+    if plan is None or not plan.inflation_adjusted or plan.inflation_adjusted <= 0:
+        return []
+    spent = budget_spent(plan, today=today) or Decimal("0")
+    days = calendar.monthrange(today.year, today.month)[1]
+    used, elapsed = spent / plan.inflation_adjusted, Decimal(today.day) / days
+    if used < Decimal("0.9") and used <= elapsed + Decimal("0.1"):
+        return []
+    left, days_left = plan.inflation_adjusted - spent, days - today.day + 1
+    per_day = (max(left, Decimal("0")) / days_left).quantize(Decimal("0.01"))
+    currency = plan.currency or "INR"  # a plan without a recorded currency counts as legacy INR (FIN-15)
+    return [_item(f"budget:{plan.pk}:{today.isoformat()}", f"Budget: {_amount(spent, currency)} of {_amount(plan.inflation_adjusted, currency)} spent ({used * 100:.0f}%)",
+        f"{today.day} of {days} days have gone ({elapsed * 100:.0f}%). "
+        + (f"About {_amount(per_day, currency)} a day keeps you inside it." if left > 0 else f"You are {_amount(-left, currency)} over."), "/budgets/")]
+
+
+def goal_check(user, today):
+    from apps.budgets.models import SavingsGoal
+    from apps.budgets.money import goal_progress
+    items = []
+    for goal in SavingsGoal.objects.filter(user=user).order_by("target_date", "id"):
+        progress = goal_progress(goal.target_amount, goal.saved_amount, goal.target_date, today)
+        if progress["status"] == "overdue":
+            items.append(_item(f"goal:{goal.pk}:overdue", f"{goal.name}: target date {goal.target_date:%d %b %Y} has passed",
+                f"{_amount(progress['remaining'], goal.currency)} still to save ({progress['percent']}% done). Set a new date or record what you saved.", "/budgets/"))
+        elif progress["status"] == "open" and progress["months_left"] and progress["months_left"] <= 3:
+            items.append(_item(f"goal:{goal.pk}:{progress['remaining']}", f"{goal.name}: {_amount(progress['monthly_needed'], goal.currency)} a month to finish",
+                f"{_amount(progress['remaining'], goal.currency)} left with {progress['months_left']} month(s) to go.", "/budgets/"))
+    return items
+
+
+def subscriptions(user, today):
+    """The same merchant charged in three or more different months of the last 120 days, at a steady amount."""
+    from apps.expenses.models import Expense
+    charges = defaultdict(list)
+    for row in (Expense.objects.filter(user=user, direction="debit", transaction_date__gte=today - timedelta(days=120))
+                .exclude(merchant="").exclude(classification__in=("transfer", "investment")).order_by("transaction_date", "id")
+                .values("merchant", "currency", "amount", "transaction_date")):
+        charges[(row["merchant"].strip().lower(), row["currency"])].append(row)
+    items = []
+    for (name, currency), rows in sorted(charges.items(), key=lambda pair: (pair[0][0], pair[0][1] or "")):
+        months = {(row["transaction_date"].year, row["transaction_date"].month) for row in rows}
+        amounts = [row["amount"] for row in rows]
+        if len(months) >= 3 and max(amounts) <= min(amounts) * Decimal("1.1"):
+            last = rows[-1]
+            items.append(_item(f"subscription:{name}:{currency or 'none'}", f"{last['merchant']}: about {_amount(last['amount'], currency)} every month",
+                f"Charged in {len(months)} different months since {today - timedelta(days=120):%d %b}, last on {last['transaction_date']:%d %b}. "
+                "Still using it? Cancel with the provider if not; ALFRED never cancels for you.", "/expenses/"))
+    return items
+
+
+def duplicates(user, today):
+    """Two or more entries with the same account, day, amount, direction and merchant in the last 60 days."""
+    from django.db.models import Count
+    from apps.expenses.models import Expense
+    groups = (Expense.objects.filter(user=user, transaction_date__gte=today - timedelta(days=60)).exclude(merchant="")
+              .values("bank_account", "transaction_date", "amount", "direction", "merchant", "currency")
+              .annotate(rows=Count("id"), references=Count("external_reference", distinct=True)).filter(rows__gt=1)
+              .order_by("-transaction_date", "merchant"))
+    # As many distinct bank references as entries means separate payments; an empty reference counts as one value.
+    return [_item(f"duplicate:{g['bank_account']}:{g['transaction_date'].isoformat()}:{g['amount']}:{g['merchant'].strip().lower()}",
+                  f"{g['rows']} x {_amount(g['amount'], g['currency'])} at {g['merchant']} on {g['transaction_date']:%d %b}",
+                  "Same account, day, amount and merchant. If it was charged once, delete the extra entry on Expenses.", "/expenses/")
+            for g in groups if g["references"] < g["rows"]]
+
+
+def statements_due(user, today):
+    from apps.expenses.models import BankAccount, Expense
+    items = []
+    for account in BankAccount.objects.filter(user=user, is_active=True).order_by("id"):
+        last = (Expense.objects.filter(user=user, bank_account=account, statement_upload__isnull=False)
+                .order_by("-transaction_date").values_list("transaction_date", flat=True).first())
+        if last and last < today - timedelta(days=35):
+            items.append(_item(f"statement:{account.pk}:{last.isoformat()}", f"Upload a new statement for {account.display_name}",
+                f"The latest imported entry is from {last:%d %b %Y}; balances and reviews after that are estimates.", "/expenses/"))
+    return items
+
+
 BOTS = {
     "money_review": ("Weekly money review", 7, money_review, "Last 7 days of spending against the week before."),
     "bills_due": ("Bills and EMIs due", 1, bills_due, "Loan instalments due in the next 7 days."),
@@ -158,6 +259,12 @@ BOTS = {
     "paperwork": ("Documents and service", 1, paperwork, "Vehicle papers expiring and bike service due."),
     "career_follow_ups": ("Career follow-ups", 1, career_follow_ups, "Applications where a follow-up is due."),
     "travel_prep": ("Travel preparation", 1, travel_prep, "Next steps for trips in the coming weeks."),
+    "categorise": ("Auto-categorise", 1, categorise, "Files Other spends under the category you always use for that merchant."),
+    "budget_pace": ("Budget pace", 1, budget_pace, "Warns when this month's spending runs ahead of your budget."),
+    "goal_check": ("Savings goals", 7, goal_check, "Goals past their date or due within three months."),
+    "subscriptions": ("Subscriptions", 7, subscriptions, "Steady monthly charges you may have forgotten."),
+    "duplicates": ("Possible duplicates", 1, duplicates, "Entries that look recorded twice."),
+    "statements_due": ("Statements due", 7, statements_due, "Accounts without a statement for over 35 days."),
 }
 
 
@@ -226,7 +333,23 @@ def _pending_record(user, identity):
     return record
 
 
+def _categorise(user, action):
+    from types import SimpleNamespace
+    from apps.expenses.models import Expense
+    from apps.expenses.serializers import ExpenseSerializer
+    expense = Expense.objects.select_for_update().filter(user=user, pk=action["expense_id"], category="other").first()
+    if expense is None:
+        raise ActionConflict("That spend was changed or removed. Run the bot again.")
+    # The same validated path as editing the spend on Expenses; only the category changes.
+    serializer = ExpenseSerializer(expense, data={"category": action["category"]}, partial=True, context={"request": SimpleNamespace(user=user)})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return f"{expense.merchant} filed under {action['label']}."
+
+
 def _apply(user, action):
+    if action["type"] == "categorise":
+        return _categorise(user, action)
     from apps.mobility.models import TravelPlanningSession
     from apps.mobility.services.travel import reminders
     from apps.mobility.services.travel_research import queue_research

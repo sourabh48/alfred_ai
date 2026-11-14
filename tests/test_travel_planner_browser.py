@@ -1,4 +1,5 @@
 import os
+from contextlib import nullcontext
 from pathlib import Path
 import threading
 import unittest
@@ -9,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.core.handlers.base import BaseHandler
+from django.db import connection
 from django.utils import timezone
 
 from apps.mobility.models import TravelPlan
@@ -33,10 +35,14 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         cls.wait = WebDriverWait(cls.browser, 25)
         cls.pending = 0
         cls.lock = threading.Lock()
+        # As in UserDataBrowserTests: a direct run on one shared in-memory SQLite connection takes requests in turn.
+        shared_memory = connection.vendor == "sqlite" and connection.creation.is_in_memory_db(str(connection.settings_dict["NAME"]))
+        turn = threading.Lock() if shared_memory else nullcontext()
         original = BaseHandler.get_response
         def tracked(handler, request):
             with cls.lock: cls.pending += 1
-            try: return original(handler, request)
+            try:
+                with turn: return original(handler, request)
             finally:
                 with cls.lock: cls.pending -= 1
         tracker = patch.object(BaseHandler, "get_response", tracked)
@@ -529,13 +535,33 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "Reminder added." in self.text("plannerSuggestionsStatus"))
         policy = TravelPlan.objects.get(pk=session.plan_id).planning_state[reminders.KEY]
         self.assertEqual([(r["local_time"], r["status"]) for r in policy["reminders"]], [(f"{start-timedelta(days=1)}T18:00", "scheduled")])
-        self.wait.until(lambda _: "Add a reminder for the evening before" not in self.text("plannerSuggestions"))
+        self.wait.until(lambda _: "Add a reminder for the evening before" not in self.text("plannerSuggestions") and self.pending == 0)
         self.click("[data-suggestion-idea]")
         self.assertTrue(self.browser.find_element(self.By.ID, "plannerInput").get_attribute("value").startswith("Plan a 2-day trip to "))
         self.assertIn("not checked yet", self.text("plannerSuggestions"))
         self.assertEqual(before, [list(model.objects.values()) for model in (Expense, Loan)])
         self.browser.set_window_size(390, 1000)
         self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+        errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
+        self.assertEqual(errors, [])
+
+    def test_home_run_all_bots_and_one_confirm_files_a_spend(self):
+        from apps.expenses.models import Expense
+        for days in (40, 50):
+            Expense.objects.create(user=self.user, merchant="Synthetic Cafe", amount="120.00", currency="INR", category="food",
+                                   transaction_date=timezone.localdate()-timedelta(days=days))
+        target = Expense.objects.create(user=self.user, merchant="Synthetic Cafe", amount="130.00", currency="INR", category="other",
+                                        transaction_date=timezone.localdate()-timedelta(days=1))
+        self.browser.get(self.live_server_url+"/dashboard/")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-bot-run-all]'))
+        self.click('[data-bot-run-all]')
+        self.wait.until(lambda _: "ready below" in self.text("taskBotsStatus") and "File under Food" in self.text("taskBotsList"))
+        box = self.browser.find_element(self.By.CSS_SELECTOR, '[data-bot-item^="category:"]')
+        self.assertTrue(box.is_selected())  # pre-ticked; Confirm still has to be pressed
+        target.refresh_from_db(); self.assertEqual(target.category, "other")
+        box.find_element(self.By.XPATH, "ancestor::article").find_element(self.By.CSS_SELECTOR, "[data-bot-confirm]").click()
+        self.wait.until(lambda _: "Synthetic Cafe filed under Food." in self.text("taskBotsStatus"))
+        target.refresh_from_db(); self.assertEqual((target.category, str(target.amount)), ("food", "130.00"))
         errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
         self.assertEqual(errors, [])
 

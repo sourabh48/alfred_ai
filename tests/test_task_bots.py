@@ -240,3 +240,83 @@ class RecheckRouteChangeTests(TestCase):
         run_research(run.id)
         run.refresh_from_db()
         self.assertTrue(any(change.startswith(f"{name}: route distance changed") for change in run.changes), run.changes)
+
+
+class MoreBotsTests(Fixtures):
+    """Auto-categorise acts only on Confirm; the other five bots only read the owner's records."""
+
+    def row(self, merchant, amount, days_ago=1, category="other", user=None, **fields):
+        return Expense.objects.create(user=user or self.user, merchant=merchant, amount=Decimal(amount), category=category,
+                                      currency="INR", transaction_date=self.today - timedelta(days=days_ago), **fields)
+
+    def test_categorise_files_a_spend_only_after_confirm_and_skips_unclear_merchants(self):
+        for days in (40, 50):
+            self.row("Synthetic Cafe", "120.00", days, category="food")
+        self.row("Synthetic Mixed", "10.00", 40, category="food"); self.row("Synthetic Mixed", "10.00", 41, category="shopping")
+        self.row("Synthetic Cafe", "99.00", 40, category="other", user=self.other)  # another owner's history never counts
+        target = self.row("synthetic cafe ", "130.00")
+        self.row("Synthetic Mixed", "12.00")
+        proposal = task_bots.run(self.user, "categorise", self.today)
+        self.assertEqual([item["action"]["expense_id"] for item in proposal["items"]], [target.pk])
+        self.assertEqual(Expense.objects.get(pk=target.pk).category, "other")  # nothing changes before Confirm
+        item = proposal["items"][0]
+        response = self.post(operation="confirm", proposal_id=proposal["proposal_id"], item_ids=[item["id"]],
+                             fingerprint=proposal["fingerprint"], confirmed=True)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIn("filed under Food", response.json()["message"])
+        target.refresh_from_db()
+        self.assertEqual((target.category, target.amount), ("food", Decimal("130.00")))
+        self.assertIsNone(task_bots.run(self.user, "categorise", self.today))
+
+    def test_categorise_confirm_refuses_a_spend_changed_after_the_review(self):
+        for days in (40, 50):
+            self.row("Synthetic Cafe", "120.00", days, category="food")
+        target = self.row("Synthetic Cafe", "130.00")
+        proposal = task_bots.run(self.user, "categorise", self.today)
+        Expense.objects.filter(pk=target.pk).update(category="travel")
+        response = self.post(operation="confirm", proposal_id=proposal["proposal_id"], item_ids=[proposal["items"][0]["id"]],
+                             fingerprint=proposal["fingerprint"], confirmed=True)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Expense.objects.get(pk=target.pk).category, "travel")
+
+    def test_budget_pace_warns_only_when_spending_runs_ahead(self):
+        from datetime import date
+        from apps.budgets.models import Budget
+        day = date(2026, 11, 10)  # a third of the month has gone
+        Budget.objects.create(user=self.user, month="Nov 2026", base_budget=Decimal("3000"), inflation_adjusted=Decimal("3000"), currency="INR")
+        Expense.objects.create(user=self.user, amount=Decimal("900.00"), category="food", currency="INR", transaction_date=date(2026, 11, 5))
+        self.assertIsNone(task_bots.run(self.user, "budget_pace", day))  # 30% used, on pace
+        Expense.objects.create(user=self.user, amount=Decimal("600.00"), category="food", currency="INR", transaction_date=date(2026, 11, 6))
+        item = task_bots.run(self.user, "budget_pace", day)["items"][0]
+        self.assertEqual(item["title"], "Budget: ₹1,500.00 of ₹3,000.00 spent (50%)")
+        self.assertIn("About ₹71.43 a day keeps you inside it.", item["detail"])  # 1,500 over the 21 days left
+
+    def test_goals_subscriptions_duplicates_and_statements_are_read_only(self):
+        from apps.budgets.models import SavingsGoal
+        from apps.expenses.models import BankAccount, StatementUpload
+        SavingsGoal.objects.create(user=self.user, name="Synthetic bike fund", target_amount=Decimal("1000"), saved_amount=Decimal("400"),
+                                   target_date=self.today + timedelta(days=45), currency="INR")
+        SavingsGoal.objects.create(user=self.user, name="Synthetic old goal", target_amount=Decimal("500"), saved_amount=Decimal("100"),
+                                   target_date=self.today - timedelta(days=3), currency="INR")
+        SavingsGoal.objects.create(user=self.user, name="Synthetic far goal", target_amount=Decimal("500"), target_date=self.today + timedelta(days=400))
+        for days in (5, 35, 65):
+            self.row("Synthetic Stream", "199.00", days, category="subscription")
+        for days in (5, 35, 65):
+            self.row("Synthetic Varying", "100.00" if days != 35 else "300.00", days)
+        self.row("Synthetic Twice", "45.00", 2); self.row("Synthetic Twice", "45.00", 2)
+        self.row("Synthetic Two refs", "45.00", 3, external_reference="A1"); self.row("Synthetic Two refs", "45.00", 3, external_reference="B2")
+        account = BankAccount.objects.create(user=self.user, nickname="Synthetic Savings", account_number="TEST-BOT-1")
+        upload = StatementUpload.objects.create(user=self.user, bank_account=account, file_name="synthetic.pdf")
+        self.row("Synthetic Statement Row", "1.00", 50, bank_account=account, statement_upload=upload)
+        before = financial_rows()
+        titles = {bot: [item["title"] for item in (task_bots.run(self.user, bot, self.today) or {"items": []})["items"]]
+                  for bot in ("goal_check", "subscriptions", "duplicates", "statements_due")}
+        self.assertEqual(len(titles["goal_check"]), 2)
+        self.assertIn("Synthetic old goal: target date", titles["goal_check"][0])
+        self.assertTrue(titles["goal_check"][1].startswith("Synthetic bike fund: ₹"))
+        self.assertEqual(titles["subscriptions"], ["Synthetic Stream: about ₹199.00 every month"])
+        self.assertEqual(titles["duplicates"], [f"2 x ₹45.00 at Synthetic Twice on {self.today - timedelta(days=2):%d %b}"])
+        self.assertEqual(titles["statements_due"], ["Upload a new statement for Synthetic Savings " + account.masked_account_number])
+        self.assertEqual(financial_rows(), before)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(URL).json()["proposals"], [])

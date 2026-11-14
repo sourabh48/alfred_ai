@@ -8,12 +8,13 @@
 
     function describe(action) {
         if (action.type === "recheck") return "Recheck weather and route now";
+        if (action.type === "categorise") return `File under ${action.label}`;
         return `Add reminder at ${action.local_time.replace("T", " ")}${action.enable ? " (turns on reminders for this trip)" : ""}`;
     }
 
     function card(p) {
         return `<article class="surface-card mb-3" data-bot-proposal="${esc(p.proposal_id)}"><h3 class="h6">${esc(p.label)} <span class="small">· ${esc(p.for_date)}</span></h3><ul class="home-attention-list">${p.items.map(item =>
-            `<li><span><strong>${esc(item.title)}</strong><br>${esc(item.detail)}${item.action ? `<br><label class="small"><input type="checkbox" data-bot-item="${esc(item.id)}"> ${esc(describe(item.action))}</label>` : ""}</span><a class="btn btn-sm btn-outline-primary ms-auto" href="${esc(item.url)}">Open</a></li>`).join("")}</ul>
+            `<li><span><strong>${esc(item.title)}</strong><br>${esc(item.detail)}${item.action ? `<br><label class="small"><input type="checkbox" data-bot-item="${esc(item.id)}"${item.action.type === "categorise" ? " checked" : ""}> ${esc(describe(item.action))}</label>` : ""}</span><a class="btn btn-sm btn-outline-primary ms-auto" href="${esc(item.url)}">Open</a></li>`).join("")}</ul>
             <button type="button" class="btn btn-sm btn-primary" data-bot-confirm="${esc(p.proposal_id)}">Confirm</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-bot-dismiss="${esc(p.proposal_id)}">Dismiss</button>
             <p class="small mb-0 mt-2">Confirm marks this review done and does only the ticked steps.</p></article>`;
     }
@@ -21,7 +22,7 @@
     async function load() {
         const data = await Alfred.fetchJSON("/api/ai/bots/");
         proposals = data.proposals;
-        Alfred.setHTMLIfChanged("taskBotsRun", data.bots.map(b => `<button type="button" class="btn btn-sm btn-outline-primary" data-bot-run="${esc(b.name)}" title="${esc(b.description)}">Run ${esc(b.label)}</button>`).join(""));
+        Alfred.setHTMLIfChanged("taskBotsRun", '<button type="button" class="btn btn-sm btn-primary" data-bot-run-all="1">Run all bots</button> ' + data.bots.map(b => `<button type="button" class="btn btn-sm btn-outline-primary" data-bot-run="${esc(b.name)}" title="${esc(b.description)}">Run ${esc(b.label)}</button>`).join(""));
         Alfred.setHTMLIfChanged("taskBotsList", proposals.map(card).join("") || '<p class="small mb-0">No reviews waiting.</p>');
     }
 
@@ -29,6 +30,14 @@
         if (button.dataset.botRun) {
             const result = await post({operation: "run", bot: button.dataset.botRun});
             say(result.proposal ? `${result.proposal.label} is ready to review.` : "Nothing due right now.");
+        }
+        if (button.dataset.botRunAll) {
+            let ready = 0;
+            for (const bot of Array.from(document.querySelectorAll("[data-bot-run]"), b => b.dataset.botRun)) {
+                say(`Running bots... ${ready} ready so far.`);
+                try { if ((await post({operation: "run", bot})).proposal) ready++; } catch (error) { /* one bot failing never stops the rest */ }
+            }
+            say(ready ? `${ready} review(s) ready below.` : "Nothing due right now.");
         }
         if (button.dataset.botDismiss) say((await post({operation: "dismiss", proposal_id: button.dataset.botDismiss})).message);
         if (button.dataset.botConfirm) {

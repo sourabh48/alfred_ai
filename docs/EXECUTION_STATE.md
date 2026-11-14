@@ -10,6 +10,14 @@
   Abstains when the balance was edited by hand, a later entry has another or no currency, or the account is a card
   or investment account. Read-only, Decimal, no migration, not in canonical totals. Backend and Chrome tests PASS.
   Next slices: investment unit anchors with post-anchor purchases, dividends and recurring-plan provenance.
+- Owner 2026-11-15: "Create more bots ... most of the work is automated". Six more bots (AI-17 propose-then-confirm,
+  status unchanged): Auto-categorise (an Other spend whose merchant the owner filed the same way at least twice and 75%
+  of the time; pre-ticked, applied through the Expenses serializer only on Confirm, refused if the spend changed),
+  Budget pace (spend ahead of the month or 90% used), Savings goals (overdue or due within 3 months), Subscriptions
+  (same merchant in 3+ months at a steady amount), Possible duplicates (same account, day, amount, merchant without
+  distinct bank references) and Statements due (no statement for 35 days). Home gains "Run all bots". The five new
+  read-only bots change no record. CI timing gaps closed for the bots branch's two Chrome tests and the new one; the
+  planner Chrome class now takes requests in turn on a shared in-memory SQLite run, as UserDataBrowserTests does.
 
 ## Sprint - 2026-11-14 evening
 
