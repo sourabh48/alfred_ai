@@ -132,3 +132,5 @@ html[data-theme="dark"] :focus-visible { outline-color: #a8caff; }
 .page-index a { padding: .3rem .75rem; border-radius: 999px; background: var(--alfred-primary-soft); color: var(--alfred-primary); text-decoration: none; font-size: .9rem; }
 .page-index a:hover, .page-index a:focus-visible { text-decoration: underline; }
 #settingsProfile, #settingsFamily, #travelPreferences, #privateMemoryPanel, #settingsAccountData, [id^="vehicle"], [id^="expense"], #bankAccountsPanel, h2[id] { scroll-margin-top: 5rem; }
+/* On a phone the generated section bar is one swipeable row, not a tall block above the content. */
+@media (max-width: 767.98px) { .page-index-auto { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .25rem; width: 0; min-width: 100%; } .page-index-auto a { white-space: nowrap; flex: 0 0 auto; } }

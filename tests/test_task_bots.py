@@ -320,3 +320,45 @@ class MoreBotsTests(Fixtures):
         self.assertEqual(financial_rows(), before)
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(URL).json()["proposals"], [])
+
+
+class HourlyBotScheduleTests(Fixtures):
+    def spend(self, amount):
+        return Expense.objects.create(user=self.user, amount=Decimal(amount), category="food", currency="INR",
+                                      transaction_date=self.today - timedelta(days=1), merchant="Synthetic Shop")
+
+    def test_local_daily_bots_refresh_each_run_and_a_dismissed_list_stays_dismissed(self):
+        from apps.budgets.models import Budget
+        Budget.objects.create(user=self.user, month=self.today.strftime("%b %Y"), base_budget=Decimal("100"),
+                              inflation_adjusted=Decimal("100"), currency="INR")
+        self.spend("95.00")
+        first = task_bots.run_scheduled(self.today)
+        pace = [p for p in task_bots.pending(self.user) if p["bot"] == "budget_pace"]
+        self.assertEqual(len(pace), 1)
+        task_bots.dismiss(self.user, pace[0]["proposal_id"])
+        task_bots.run_scheduled(self.today)  # an hour later, nothing changed
+        self.assertEqual([p for p in task_bots.pending(self.user) if p["bot"] == "budget_pace"], [])
+        self.spend("10.00")  # a new spend the same day
+        task_bots.run_scheduled(self.today)
+        refreshed = [p for p in task_bots.pending(self.user) if p["bot"] == "budget_pace"]
+        self.assertEqual(len(refreshed), 1)
+        self.assertIn("₹105.00 of ₹100.00", refreshed[0]["items"][0]["title"])
+        self.assertEqual(first["failed"], 0)
+
+    def test_online_fund_bot_and_weekly_bots_keep_their_cadence(self):
+        from apps.expenses.models import BankAccount
+        account = BankAccount.objects.create(user=self.user, nickname="Synthetic Savings", account_number="TEST-HOURLY-1")
+        from apps.expenses.models import StatementUpload
+        upload = StatementUpload.objects.create(user=self.user, bank_account=account, file_name="synthetic.pdf")
+        Expense.objects.create(user=self.user, bank_account=account, statement_upload=upload, amount=Decimal("1.00"), currency="INR",
+                               transaction_date=self.today - timedelta(days=50))  # gives the weekly statements bot a review
+        with patch.object(task_bots, "run", wraps=task_bots.run) as first:
+            task_bots.run_scheduled(self.today)
+        self.assertIn("fund_review", {call.args[1] for call in first.call_args_list if call.args[0] == self.user})
+        with patch.object(task_bots, "run", wraps=task_bots.run) as again:
+            task_bots.run_scheduled(self.today)
+        bots = {call.args[1] for call in again.call_args_list if call.args[0] == self.user}
+        self.assertIn("categorise", bots)
+        reviewed_weekly = {p["bot"] for p in task_bots.pending(self.user) if task_bots.BOTS[p["bot"]][1] == 7}
+        self.assertTrue(reviewed_weekly)
+        self.assertFalse(reviewed_weekly & bots)  # a weekly bot that already produced this week's review waits a week

@@ -32,8 +32,14 @@ document.addEventListener("DOMContentLoaded", () => {
         loadChart();
     });
 
+    // Spending opens with the filter a link asks for, so Home can land on exactly the rows to review.
+    const linked = new URLSearchParams(location.search);
+    ["q", "classification", "source", "transaction_id"].forEach(key => { if (linked.get(key)) currentTimelineFilters[key] = linked.get(key).slice(0, 120); });
     syncTimelineFilterForm();
-    refreshExpenseWorkspace();
+    refreshExpenseWorkspace().then(() => {
+        // The list grows after load, so land on it once its rows are in.
+        if (location.hash === "#timelineFilterForm") document.getElementById("timelineFilterForm").scrollIntoView({block: "start"});
+    });
     Alfred.enableLiveRefresh("expenses-live", refreshExpenseWorkspace, { rootId: "expenseRoot" });
 });
 

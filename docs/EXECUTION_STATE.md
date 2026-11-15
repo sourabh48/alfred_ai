@@ -18,6 +18,16 @@
   distinct bank references) and Statements due (no statement for 35 days). Home gains "Run all bots". The five new
   read-only bots change no record. CI timing gaps closed for the bots branch's two Chrome tests and the new one; the
   planner Chrome class now takes requests in turn on a shared in-memory SQLite run, as UserDataBrowserTests does.
+- Owner 2026-11-15: "make all the pages better with less work to do by the user". Measured on a synthetic copy:
+  Investments 28 sections/32 fields, Loans 14/33, Spending 47 buttons. Every page with 4+ section titles and no
+  hand-made index now gets an "On this page" bar under its title (one swipeable row on phones); Home folds the 12
+  single-bot buttons under "Run one bot" beside "Run all bots"; the Home review notice and health pill link to
+  Spending already filtered to the Other rows held for review, and Spending reads q/classification/source/id from
+  its link and scrolls to the list. Forms already prefill dates and amounts; no form was hidden.
+- Owner 2026-11-15: "make the bots run independently automatically". The task-bots job now runs every hour
+  (was 02:30 nightly, with the 15-minute catch-up unchanged). Daily bots that read only local records refresh each
+  run; the AMFI fund bot stays daily and weekly bots weekly. A scheduled run never brings back a list the owner
+  already confirmed or dismissed until it changes. Confirm is still required for every action.
 
 ## Sprint - 2026-11-14 evening
 

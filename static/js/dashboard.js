@@ -99,6 +99,8 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
     `).join(""));
 }
 
+const REVIEW_LINK = "/expenses/?classification=other#timelineFilterForm";  // large or unclear Other debits are the ones held for review
+
 function renderHero(summary, behavior) {
     const scoreRing = document.getElementById("healthScoreRing");
     const needsReview = Number(summary.history_review_required || 0) > 0;
@@ -106,7 +108,12 @@ function renderHero(summary, behavior) {
     scoreRing.style.setProperty("--score", hasScore ? Math.round(summary.financial_health_score || 0) : 0);
     document.getElementById("healthScoreValue").textContent = hasScore ? Math.round(summary.financial_health_score || 0) : "—";
     document.getElementById("healthRiskPill").className = `status-pill ${needsReview ? "status-guarded" : statusClass(summary.risk_level)}`;
-    document.getElementById("healthRiskPill").textContent = needsReview ? "Review transactions first" : (summary.transactions ? `${summary.risk_level} estimated risk` : "No data");
+    const pill = document.getElementById("healthRiskPill");
+    if (needsReview) {
+        const link = document.createElement("a");
+        link.href = REVIEW_LINK; link.className = "text-reset"; link.textContent = "Review transactions first";
+        pill.replaceChildren(link);
+    } else pill.textContent = summary.transactions ? `${summary.risk_level} estimated risk` : "No data";
     document.getElementById("dashboardPersonality").textContent = behavior.personality;
     document.getElementById("dashboardReferenceMonth").textContent = summary.reference_month;
     document.getElementById("dashboardPeriodNote").textContent = summary.transactions
@@ -115,7 +122,10 @@ function renderHero(summary, behavior) {
     const review = document.getElementById("dashboardReviewNotice");
     const amount = Number(summary.current_month_review_required || 0);
     review.hidden = amount <= 0;
-    review.textContent = `${Alfred.formatCurrency(amount)} in debits needs review and is excluded from these totals. Cash left may be lower until you confirm these transactions on Expenses.`;
+    review.textContent = `${Alfred.formatCurrency(amount)} in debits needs review and is excluded from these totals. Cash left may be lower until you give them a category. `;
+    const fix = document.createElement("a");
+    fix.href = REVIEW_LINK; fix.textContent = "Review them now";
+    review.append(fix);
 }
 
 function renderSummaryCards(summary, loanPortfolio) {

@@ -574,6 +574,8 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url+"/dashboard/")
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-bot-run="money_review"]'))
         self.assertIn("No reviews waiting", self.text("taskBotsList"))
+        self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '[data-bot-run="money_review"]').is_displayed())  # folded under Run one bot
+        self.click("#taskBotsRun summary")
         self.click('[data-bot-run="money_review"]')
         self.wait.until(lambda _: "Spent ₹250.00 in the last 7 days" in self.text("taskBotsList"))
         self.click("[data-bot-confirm]")

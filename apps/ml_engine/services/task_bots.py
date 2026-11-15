@@ -310,6 +310,8 @@ def run(user, bot, today=None, *, trigger="request"):
         return _public(same)
     if not items:
         return None
+    if trigger == "schedule" and _records(user).filter(payload__bot=bot, payload__fingerprint=fingerprint).exclude(event_type=PENDING).exists():
+        return None  # the owner already confirmed or dismissed this exact list; it returns only when something changes
     record = operational_logging_service.log(user=user, module="assistant", category="background" if trigger == "schedule" else "api",
         scope=SCOPE, event_type=PENDING, message=f"{BOTS[bot][0]} prepared a review; nothing changes until the owner confirms.",
         payload=dict(proposal_id=uuid4().hex, bot=bot, state="pending", for_date=today.isoformat(), trigger=trigger,
@@ -402,14 +404,21 @@ def dismiss(user, identity):
     return {"message": "Dismissed. Nothing was changed."}
 
 
+# Daily bots that read only this PC's records refresh every hour, so a new spend or statement shows up the same
+# day; an unchanged review keeps its fingerprint and is reused, never duplicated. The fund bot reads AMFI online,
+# so it stays once a day, and the weekly bots stay weekly.
+NETWORK_BOTS = {"fund_review"}
+
+
 def run_scheduled(today=None):
-    """Daily Huey job: refresh every bot that is due for each active account; one failure never stops the rest."""
+    """Hourly Huey job: refresh every bot that is due for each active account; one failure never stops the rest."""
     today = today or timezone.localdate()
     ran = failed = 0
     for user in get_user_model().objects.filter(is_active=True).order_by("id"):
         for bot, (_, every, _, _) in BOTS.items():
             last = _records(user).filter(payload__bot=bot, payload__trigger="schedule").order_by("-created_at").first()
-            if last and last.payload.get("for_date", "") > (today - timedelta(days=every)).isoformat():
+            hourly = every == 1 and bot not in NETWORK_BOTS
+            if not hourly and last and last.payload.get("for_date", "") > (today - timedelta(days=every)).isoformat():
                 continue
             try:
                 run(user, bot, today, trigger="schedule")

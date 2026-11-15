@@ -165,6 +165,6 @@ def native_daily_catch_up():
     return {"status": "completed", "processed": len(ran)}
 
 
-@db_periodic_task(crontab(minute="30", hour="2"))
+@db_periodic_task(crontab(minute="30"))  # every hour; see task_bots.NETWORK_BOTS for what stays daily
 def native_task_bots():
     return _run_daily("task-bots")

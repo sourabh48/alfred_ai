@@ -22,7 +22,8 @@
     async function load() {
         const data = await Alfred.fetchJSON("/api/ai/bots/");
         proposals = data.proposals;
-        Alfred.setHTMLIfChanged("taskBotsRun", '<button type="button" class="btn btn-sm btn-primary" data-bot-run-all="1">Run all bots</button> ' + data.bots.map(b => `<button type="button" class="btn btn-sm btn-outline-primary" data-bot-run="${esc(b.name)}" title="${esc(b.description)}">Run ${esc(b.label)}</button>`).join(""));
+        if (!$("taskBotsRun").childElementCount) Alfred.setHTMLIfChanged("taskBotsRun", '<button type="button" class="btn btn-sm btn-primary" data-bot-run-all="1">Run all bots</button>'
+            + `<details class="mt-2"><summary>Run one bot</summary><div class="d-flex flex-wrap gap-2 mt-2">${data.bots.map(b => `<button type="button" class="btn btn-sm btn-outline-primary" data-bot-run="${esc(b.name)}" title="${esc(b.description)}">Run ${esc(b.label)}</button>`).join("")}</div></details>`);
         Alfred.setHTMLIfChanged("taskBotsList", proposals.map(card).join("") || '<p class="small mb-0">No reviews waiting.</p>');
     }
 

@@ -2219,6 +2219,36 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('loanSummaryCards').scrollIntoView({behavior:'instant',block:'center'});")
         self.capture('loan-other-currency')
 
+    def test_long_pages_get_a_section_bar_and_home_links_to_the_review(self):
+        self.login()
+        self.wait.until(lambda _: "Review them now" in self.text("dashboardReviewNotice"))
+        self.browser.find_element(self.By.LINK_TEXT, "Review them now").click()
+        self.wait.until(lambda _: "/expenses/" in self.browser.current_url and self.active_requests == 0
+                        and "Unidentified payment" in self.text("timelineBody"))
+        self.assertEqual(self.browser.find_element(self.By.ID, "timelineClassification").get_attribute("value"), "other")
+        self.assertNotIn("Groceries", self.text("timelineBody"))  # an Expense-class row is filtered out
+        self.browser.get(self.live_server_url + "/loans/")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, "nav.page-index-auto a") and self.active_requests == 0)
+        links = [a.text for a in self.browser.find_elements(self.By.CSS_SELECTOR, "nav.page-index-auto a")]
+        self.assertIn("Register Loan", links)
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, "nav.page-index")), 1)
+        self.browser.find_element(self.By.LINK_TEXT, "Prepayment what-if").click()
+        self.wait.until(lambda _: self.browser.execute_script(
+            "const r=document.getElementById('loanPrepaymentTitle').getBoundingClientRect();return r.top>=0&&r.top<innerHeight;"))
+        self.browser.get(self.live_server_url + "/expenses/")  # a page with its own index keeps it and gets no second one
+        self.wait.until(lambda _: self.active_requests == 0)
+        self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR, "nav.page-index")), 1)
+        self.assertEqual(self.browser.find_elements(self.By.CSS_SELECTOR, "nav.page-index-auto"), [])
+        self.browser.set_window_size(390, 900)
+        try:
+            self.browser.get(self.live_server_url + "/investments/")
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, "nav.page-index-auto a") and self.active_requests == 0)
+            self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+            self.assertLess(self.browser.find_element(self.By.CSS_SELECTOR, "nav.page-index-auto").size["height"], 60)
+            self.capture("section-bar-phone")
+        finally:
+            self.browser.set_window_size(1440, 1200)
+
     def test_account_balance_rolls_forward_from_the_last_statement(self):
         from datetime import timedelta
         from decimal import Decimal

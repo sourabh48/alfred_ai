@@ -107,3 +107,29 @@ document.addEventListener("DOMContentLoaded", () => {
         loadAccounts();
     }
 });
+
+// Long pages get an "On this page" bar so a section is one click away instead of a long scroll.
+document.addEventListener("DOMContentLoaded", () => {
+    const main = document.getElementById("alfredMainScroll");
+    if (!main || main.querySelector("nav.page-index")) return;  // pages with a hand-made index keep theirs
+    const headings = [...main.querySelectorAll("h2")].filter(h => !h.closest(".alfred-hero, [hidden], .modal")
+        && h.offsetParent !== null && /^[A-Za-z]/.test(h.textContent.trim())).slice(0, 14);
+    if (headings.length < 4) return;
+    const used = new Set();
+    const nav = document.createElement("nav");
+    nav.className = "page-index page-index-auto"; nav.setAttribute("aria-label", "On this page");
+    headings.forEach(h => {
+        if (!h.id) {
+            let id = "section-" + h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            while (document.getElementById(id) || used.has(id)) id += "-2";
+            h.id = id;
+        }
+        used.add(h.id);
+        const link = document.createElement("a");
+        const label = h.textContent.trim().replace(/\s+/g, " ");
+        link.href = "#" + h.id; link.textContent = label.length > 34 ? label.slice(0, 34).replace(/\s+\S*$/, "") + "…" : label;
+        nav.append(link);
+    });
+    const hero = main.querySelector(".alfred-hero");
+    (hero?.querySelector("h1")?.parentElement || main).append(nav);
+});
