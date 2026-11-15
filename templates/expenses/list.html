@@ -135,7 +135,7 @@
         </div>
     </div>
     <div class="card-body">
-        <canvas id="expenseTrend" height="110"></canvas>
+        <div class="chart-box"><canvas id="expenseTrend"></canvas></div>
     </div>
 </div>
 
@@ -154,7 +154,7 @@
     <div class="card-body border-top">
         <form id="timelineFilterForm" class="timeline-filter-grid" data-live-refresh-hold="true">
             <div>
-                <label class="form-label fw-semibold" for="timelineQuery">{{ ui_config.expenses.timeline.search_placeholder }}</label>
+                <label class="form-label fw-semibold" for="timelineQuery">Search</label>
                 <input id="timelineQuery" name="q" type="text" class="form-control" placeholder="{{ ui_config.expenses.timeline.search_placeholder }}">
             </div>
             <div>
@@ -222,6 +222,6 @@
     <div class="d-flex gap-2"><button id="bankAccountsPrevious" class="btn btn-outline-secondary" type="button" disabled>Previous page</button><button id="bankAccountsNext" class="btn btn-outline-secondary" type="button" disabled>Next page</button></div>
 </section>
 {% include "expenses/modal_add.html" %}
-<script src="/static/js/expenses.js?v=3.10.1"></script>
+<script src="/static/js/expenses.js?v=3.10.2"></script>
 </div>
 {% endblock %}

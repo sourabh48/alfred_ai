@@ -1122,7 +1122,7 @@ function renderBikeCharts(charts, benchmarkIsEstimate = false) {
 
     bikeServiceCostChart = drawChart(bikeServiceCostChart, "bikeServiceCostChart", "bar", {
         labels: serviceLabels,
-        datasets: [{ label: "Service cost", data: serviceValues, backgroundColor: "rgba(24, 88, 214, 0.72)", borderRadius: 12 }],
+        datasets: [{ label: "Service cost", data: serviceValues }],
     });
     setChartMeta(
         "bikeServiceCostChartMeta",
@@ -1132,8 +1132,8 @@ function renderBikeCharts(charts, benchmarkIsEstimate = false) {
     bikeServiceMixChart = drawChart(bikeServiceMixChart, "bikeServiceMixChart", "line", {
         labels: mixLabels,
         datasets: [
-            { label: "Service", data: charts.cost_mix?.service_values || [], borderColor: "#1858d6", backgroundColor: "rgba(24,88,214,0.12)", fill: true, tension: 0.25 },
-            { label: "Trips", data: charts.cost_mix?.trip_values || [], borderColor: "#ff825c", backgroundColor: "rgba(255,130,92,0.12)", fill: true, tension: 0.25 },
+            { label: "Service", data: charts.cost_mix?.service_values || [], fill: true, tension: 0.25 },
+            { label: "Trips", data: charts.cost_mix?.trip_values || [], fill: true, tension: 0.25 },
         ],
     });
     setChartMeta(
@@ -1143,7 +1143,7 @@ function renderBikeCharts(charts, benchmarkIsEstimate = false) {
 
     bikeServiceIssueChart = drawChart(bikeServiceIssueChart, "bikeServiceIssueChart", "doughnut", {
         labels: charts.issue_breakdown?.labels || [],
-        datasets: [{ data: issueValues, backgroundColor: ["#148f63", "#d97904", "#c44a3d", "#7a0f1f"] }],
+        datasets: [{ data: issueValues, backgroundColor: ["#148f63", "#d97904", "#c44a3d", "#7a0f1f"], alfredKeepColors: true }],
     });
     setChartMeta(
         "bikeServiceIssueChartMeta",
@@ -1156,8 +1156,6 @@ function renderBikeCharts(charts, benchmarkIsEstimate = false) {
             {
                 label: "Actual mileage",
                 data: actualMileageValues,
-                borderColor: "#148f63",
-                backgroundColor: "rgba(20,143,99,0.16)",
                 fill: true,
                 tension: 0.25,
                 pointRadius: 4,
@@ -1166,8 +1164,6 @@ function renderBikeCharts(charts, benchmarkIsEstimate = false) {
             {
                 label: benchmarkIsEstimate ? "Class estimate" : "Optimal benchmark",
                 data: optimalMileageValues,
-                borderColor: "#1858d6",
-                backgroundColor: "rgba(24,88,214,0.08)",
                 borderDash: [6, 6],
                 fill: false,
                 tension: 0,

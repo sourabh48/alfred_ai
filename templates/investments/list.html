@@ -19,6 +19,31 @@
 
 <section class="soft-grid four-up mb-4" id="investmentSummaryCards"></section>
 
+<section class="surface-card mb-4" id="investmentPositionsSection">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h2 class="page-section-title">Your holdings</h2>
+            <p class="page-section-copy">Every holding ALFRED is using for valuation, allocation, and risk analysis.</p>
+        </div>
+    </div>
+    {% include "partials/table_search.html" with table_id="investmentPositionsBody" table_label="investments" %}
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Recorded investments">
+        <table class="table table-alfred align-middle mb-0 metric-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th class="text-end">Invested</th>
+                    <th class="text-end">Current</th>
+                    <th class="text-end">Gain / Loss</th>
+                    <th class="text-end">SIP</th>
+                    <th>Risk</th>
+                </tr>
+            </thead>
+            <tbody id="investmentPositionsBody"></tbody>
+        </table>
+    </div>
+</section>
+
 <section class="surface-card mb-4" id="beginnerGuideSection" aria-labelledby="beginnerGuideTitle">
     <h2 id="beginnerGuideTitle" class="page-section-title mb-1">Start here: which fund to buy, hold or sell</h2>
     <p class="page-section-copy">New to investing? ALFRED checks official AMFI fund prices every day. Pick a fund below, buy it on your broker's or the fund house's site, then press "I bought this" so ALFRED tracks it and tells you when to hold or sell.</p>
@@ -149,12 +174,12 @@
                 <div class="col-lg-5">
                     <h2 class="page-section-title">Allocation</h2>
                     <p class="page-section-copy mb-3">Current asset mix by market value.</p>
-                    <canvas id="allocationChart" height="210"></canvas>
+                    <div class="chart-box chart-box-round"><canvas id="allocationChart"></canvas></div>
                 </div>
                 <div class="col-lg-7">
                     <h2 class="page-section-title">Growth Outlook</h2>
                     <p class="page-section-copy mb-3" id="investmentGrowthAssumptions">Month 0 is your recorded current value. The next 12 months assume your monthly SIP is added at the beginning of each month, then grows at your entered annual return percentage divided by 12. Actual returns can differ; recorded values are not live market prices.</p>
-                    <canvas id="growthChart" height="210"></canvas>
+                    <div class="chart-box"><canvas id="growthChart"></canvas></div>
                     <p id="investmentGrowthStatus" role="status" hidden></p>
                 </div>
             </div>
@@ -308,32 +333,8 @@
     <div id="researchDecisionList" class="data-stack mt-2"></div>
 </section>
 
-<section class="surface-card">
-    <div class="d-flex justify-content-between align-items-start mb-3">
-        <div>
-            <h2 class="page-section-title">Registered Positions</h2>
-            <p class="page-section-copy">Every holding ALFRED is using for valuation, allocation, and risk analysis.</p>
-        </div>
-    </div>
-    {% include "partials/table_search.html" with table_id="investmentPositionsBody" table_label="investments" %}
-    <div class="table-responsive" tabindex="0" role="region" aria-label="Recorded investments">
-        <table class="table table-alfred align-middle mb-0 metric-table">
-            <thead>
-                <tr>
-                    <th>Position</th>
-                    <th class="text-end">Invested</th>
-                    <th class="text-end">Current</th>
-                    <th class="text-end">Gain / Loss</th>
-                    <th class="text-end">SIP</th>
-                    <th>Risk</th>
-                </tr>
-            </thead>
-            <tbody id="investmentPositionsBody"></tbody>
-        </table>
-    </div>
-</section>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.20.0"></script>
+<script src="/static/js/investments.js?v=2.20.1"></script>
 {% endblock %}

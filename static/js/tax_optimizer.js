@@ -101,7 +101,7 @@ function renderTaxChart(comparison, incomeUnavailable) {
             datasets: [{
                 label: "Annual tax",
                 data: [comparison.old_regime.final_tax, comparison.new_regime.final_tax],
-                backgroundColor: ["rgba(24, 88, 214, 0.72)", "rgba(255, 130, 92, 0.72)"],
+                alfredByPoint: true,
                 borderRadius: 10,
             }],
         },

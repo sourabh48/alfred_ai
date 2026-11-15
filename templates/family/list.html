@@ -54,7 +54,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Next ten years</h2>
             <p class="page-section-copy mb-3">Projected household net worth if the current trajectory holds.</p>
-            <canvas id="familyNetChart" height="150"></canvas>
+            <div class="chart-box"><canvas id="familyNetChart"></canvas></div>
         </div>
     </div>
 </section>
@@ -78,5 +78,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/family.js?v=2.2.1"></script>
+<script src="/static/js/family.js?v=2.2.2"></script>
 {% endblock %}

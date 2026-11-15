@@ -381,12 +381,11 @@ function renderDocumentSummary(statementUploads, loanUploads, vehicleDocuments, 
         : "No recent uploads yet.");
 
     const cards = [
-        { label: "Statements", value: statementUploads.length, copy: "Uploaded financial statements tracked here" },
-        { label: "Loan Docs", value: loanUploads.length, copy: "Imported sanction letters, schedules, and statements" },
-        { label: "Vehicle Docs", value: vehicleDocuments.length, copy: "Compliance and service-supporting files" },
-        { label: "Career Files", value: resumes.length, copy: "Resume-based career intelligence inputs" },
-        { label: "Chat Imports", value: chatgptImports.length, copy: "Imported ChatGPT context retained for review" },
-        { label: "Parser Avg", value: `${avgConfidence}%`, copy: "Average parser confidence across recent uploads" },
+        { label: "Statements", value: statementUploads.length, copy: "Bank and card statements" },
+        { label: "Loan papers", value: loanUploads.length, copy: "Sanction letters, schedules and loan statements" },
+        { label: "Vehicle files", value: vehicleDocuments.length, copy: "Insurance, registration and service records" },
+        { label: "Resumes", value: resumes.length, copy: "CVs Career reads your skills from" },
+        { label: "ChatGPT chats", value: chatgptImports.length, copy: "Imported chats kept for your review" },
     ];
     Alfred.setHTMLIfChanged("documentCenterCards", cards.map(card => `
         <article class="metric-card">

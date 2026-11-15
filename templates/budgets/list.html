@@ -64,8 +64,8 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Forward View</h2>
             <p class="page-section-copy mb-3">Planning estimate from recent living costs, with income and fixed bills held constant. Remaining income is before investments, card payments and unrecorded bills. This is not a trained-model prediction.</p>
-            <div id="budgetForecastEvidence" class="small muted mb-3"></div>
-            <canvas id="budgetForecastChart" height="150"></canvas>
+            <div class="chart-box mb-3"><canvas id="budgetForecastChart"></canvas></div>
+            <div id="budgetForecastEvidence" class="small muted forecast-fine-print"></div>
             <div class="mt-4 data-stack" id="budgetAffordabilityPanel"></div>
         </div>
     </div>
@@ -144,5 +144,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/budgets.js?v=2.5.0"></script>
+<script src="/static/js/budgets.js?v=2.5.1"></script>
 {% endblock %}

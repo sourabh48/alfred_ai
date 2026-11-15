@@ -104,22 +104,18 @@ function loadChart(options = {}) {
                         {
                             label: "Expenses",
                             data: data.expense_values,
-                            backgroundColor: "rgba(13, 110, 253, 0.75)",
                         },
                         {
                             label: "Loans",
                             data: data.loan_values,
-                            backgroundColor: "rgba(220, 53, 69, 0.75)",
                         },
                         {
                             label: "Other",
                             data: data.other_values,
-                            backgroundColor: "rgba(108, 117, 125, 0.75)",
                         },
                         {
                             label: "Income",
                             data: data.income_values,
-                            backgroundColor: "rgba(25, 135, 84, 0.75)",
                         },
                     ],
                 },
@@ -127,10 +123,6 @@ function loadChart(options = {}) {
                     responsive: true,
                     plugins: {
                         legend: { position: "bottom" },
-                        title: {
-                            display: true,
-                            text: `${capitalizeFlowGranularity(data.granularity || granularity)} Financial Flow`,
-                        },
                     },
                     scales: {
                         y: {
@@ -462,12 +454,11 @@ function renderBalanceSheet(balanceSheet) {
         return;
     }
     const cards = [
-        { key: "assets", label: "Assets", value: balanceSheet.total_assets || 0, tone: "success" },
-        { key: "liabilities", label: "Liabilities", value: balanceSheet.total_liabilities || 0, tone: "danger" },
-        { key: "net-worth", label: "Net Worth", value: balanceSheet.net_worth || 0, tone: (balanceSheet.net_worth || 0) >= 0 ? "primary" : "warning" },
-        { key: "ratio", label: "A/L Ratio", value: Number(balanceSheet.asset_liability_ratio || 0).toFixed(2), tone: "secondary", raw: true },
+        { key: "assets", label: "What you own", value: balanceSheet.total_assets || 0, tone: "success", meta: "Bank balances and investments you track" },
+        { key: "liabilities", label: "What you owe", value: balanceSheet.total_liabilities || 0, tone: "danger", meta: "Loans and card balances still to pay" },
+        { key: "net-worth", label: "Net worth", value: balanceSheet.net_worth || 0, tone: (balanceSheet.net_worth || 0) >= 0 ? "primary" : "warning", meta: "What you own minus what you owe" },
+        { key: "ratio", label: "Owned per ₹1 owed", value: `₹${Number(balanceSheet.asset_liability_ratio || 0).toFixed(2)}`, tone: "secondary", raw: true, meta: "Above ₹1 means you own more than you owe" },
     ];
-    const sharedSummary = balanceSheet.summary || "Balance sheet view is waiting for richer data.";
 
     ensureBalanceSheetCards(cardsTarget, cards);
     cards.forEach(card => {
@@ -483,7 +474,7 @@ function renderBalanceSheet(balanceSheet) {
             Alfred.setTextIfChanged(labelNode, card.label);
         }
         Alfred.setTextIfChanged(valueNode, card.raw ? String(card.value) : formatCurrency(card.value));
-        Alfred.setTextIfChanged(metaNode, sharedSummary);
+        Alfred.setTextIfChanged(metaNode, card.meta);
     });
 
     const assets = balanceSheet.assets || [];
@@ -740,11 +731,6 @@ function syncTimelineFilterForm() {
     form.elements.classification.value = currentTimelineFilters.classification || "";
     form.elements.source.value = currentTimelineFilters.source || "";
     form.elements.limit.value = currentTimelineFilters.limit || "60";
-}
-
-function capitalizeFlowGranularity(value) {
-    const normalized = String(value || "monthly").trim().toLowerCase();
-    return normalized ? `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}` : "Monthly";
 }
 
 function submitExpenseForm(event) {

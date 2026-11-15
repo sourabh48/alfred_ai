@@ -76,7 +76,6 @@ function renderRelationshipChart(profiles, alignment) {
             datasets: [{
                 label: latest?.partner_name ? `Alignment with ${latest.partner_name}` : "Alignment factors",
                 data: factors.map(item => item.score),
-                backgroundColor: "rgba(24, 88, 214, 0.45)",
             }],
         },
         options: { indexAxis: "y", scales: { x: { min: 0, max: 100 } } },

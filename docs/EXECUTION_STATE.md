@@ -1,5 +1,29 @@
 # ALFRED execution state
 
+## Product UI pass - 2026-11-15
+
+- Owner 2026-11-15: "make ui look like more like product ... polish the whole ui ... make it release ready then
+  create a release installer", then "use more polished graphs and images". Reviewed 18 pages on a synthetic copy
+  at 1440 px and 390 px, light and dark.
+- Charts: one shared look in workspace.js (Chart.js defaults plus an alfredLook plugin). A validated colour-blind-safe
+  8-colour palette lives once in workspace.css (--series-1..8, own dark steps checked against #182b44); a series keeps
+  its colour across charts (Income always green). Every canvas sits in a fixed-height .chart-box, which fixes the
+  flattened Home monthly chart and oversized donuts. Severity charts keep their status colours. Canvases get an
+  accessible name from their card heading. Home donut legend became the category list with shares; its caption now
+  says it covers every recorded month (it did, while the page header named one month).
+- Dark mode: 17 card types, Bootstrap light table rows, progress tracks and form borders that rendered pale-on-pale
+  now use dark surfaces; the sign-in panel was unreadable in dark mode. axe misses these (gradient backgrounds), so a
+  computed-style scan of all pages was used; it reports none left.
+- Order and clutter: Loans and Investments open with your loans and holdings (were last); Budgets shows its forecast
+  chart before the caveats; Home no longer gets a 12-link section bar; stat grids fill rows evenly (no lone card) and
+  show two per row on phones; own/owe tiles got their own captions; documents lost a duplicate confidence card.
+- Images: 23 original line icons for the sidebar as CSS masks (no downloads; CSP img-src already allows data:).
+- Sign-in: form first on phones; floating labels that overlapped the text removed; "credit" and "bureau" wording
+  removed from the sign-in and sign-up copy (FIN-17 is descoped).
+- Not changed: financial definitions and numbers; the duplicated "spent"/"left" figures on Home stay because tests
+  and release checks read them. Found, not fixed: Spending "could cut" lists low-confidence groceries; Career shows
+  timing 100/100 with an empty profile; Vehicles repeats compliance in its header and stat cards.
+
 ## Sprint - 2026-11-15
 
 - Scan at 621ede6: no TODO/FIXME markers, stubs or unexplained skips in source. Open: 18 implemented-not-accepted

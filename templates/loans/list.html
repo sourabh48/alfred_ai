@@ -22,6 +22,68 @@
 <div id="loanPendingForeclosureNotice" class="d-none mb-4"></div>
 <div id="loanVerificationNotice" class="d-none mb-4" role="status"></div>
 
+<section class="surface-card mb-4" aria-label="Your loans">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h2 class="page-section-title">Your loans</h2>
+            <p class="page-section-copy">Registered loans with estimated outstanding balance, consolidation status, and foreclosure workflow.</p>
+        </div>
+    </div>
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Registered loans">
+        {% include "partials/table_search.html" with table_id="loanTableBody" table_label="loans" %}
+        <table class="table table-alfred align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Loan</th>
+                    <th class="text-end">EMI</th>
+                    <th class="text-end">Balance</th>
+                    <th class="text-end">Months Left</th>
+                    <th>Prepay Hint</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="loanTableBody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="surface-card mb-4" id="loanPrepaymentSection" aria-labelledby="loanPrepaymentTitle">
+    <h2 id="loanPrepaymentTitle" class="page-section-title mb-1">Prepayment what-if</h2>
+    <p class="page-section-copy mb-3">See the interest and months a lump-sum prepayment saves, how much cash it leaves you, and whether investing the same money instead might do better. Nothing is paid or changed.</p>
+    <form id="loanPrepaymentForm" class="row g-3 align-items-end" data-live-refresh-hold="true">
+        <div class="col-md-3"><label class="form-label" for="loanPrepaymentLoan">Loan</label>
+            <select class="form-select" id="loanPrepaymentLoan" required></select></div>
+        <div class="col-md-3"><label class="form-label" for="loanPrepaymentAmount">Prepayment amount</label>
+            <input class="form-control" id="loanPrepaymentAmount" type="number" min="1" step="0.01" required></div>
+        <div class="col-md-3"><label class="form-label" for="loanPrepaymentMode">Then</label>
+            <select class="form-select" id="loanPrepaymentMode">
+                <option value="reduce_tenure">Keep the EMI, finish sooner</option>
+                <option value="reduce_emi">Keep the end date, lower the EMI</option></select></div>
+        <div class="col-md-2"><label class="form-label" for="loanPrepaymentReturn">Investing return % (optional)</label>
+            <input class="form-control" id="loanPrepaymentReturn" type="number" min="0" max="30" step="0.1"></div>
+        <div class="col-md-1"><button class="btn btn-primary w-100" type="submit">Check</button></div>
+    </form>
+    <div id="loanPrepaymentResult" class="mt-3" aria-live="polite"></div>
+</section>
+
+<section class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="surface-card h-100">
+                <h2 class="page-section-title">Repayments over time</h2>
+                <p class="page-section-copy mb-3">Detected loan repayments from your imported transaction history.</p>
+                <div class="chart-box"><canvas id="loanTrendChart"></canvas></div>
+            </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="surface-card h-100">
+                <h2 class="page-section-title">Detected Repayments</h2>
+                <p class="page-section-copy mb-3">Loan and debt repayments inferred directly from your statement imports.</p>
+                <div id="loanDetectedRepayments"></div>
+            </div>
+    </div>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
@@ -218,46 +280,13 @@
 </section>
 
 <section class="row g-4">
-    <div class="col-xl-7">
+    <div class="col-xl-6">
         <div class="surface-card h-100">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <h2 class="page-section-title">Manual Loan Book</h2>
-                    <p class="page-section-copy">Registered loans with estimated outstanding balance, consolidation status, and foreclosure workflow.</p>
-                </div>
-            </div>
-            <div class="table-responsive" tabindex="0" role="region" aria-label="Registered loans">
-                {% include "partials/table_search.html" with table_id="loanTableBody" table_label="loans" %}
-                <table class="table table-alfred align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Select</th>
-                            <th>Loan</th>
-                            <th class="text-end">EMI</th>
-                            <th class="text-end">Balance</th>
-                            <th class="text-end">Months Left</th>
-                            <th>Prepay Hint</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="loanTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-5">
-        <div class="surface-card h-100">
-            <div class="mb-4">
-                <h2 class="page-section-title">Repayment Trend</h2>
-                <p class="page-section-copy mb-3">Detected loan repayments from your imported transaction history.</p>
-                <canvas id="loanTrendChart" height="180"></canvas>
-            </div>
-            <div>
                 <h2 class="page-section-title">Foreclosure Upload</h2>
                 <p class="page-section-copy mb-3">Close a loan only after uploading the lender's foreclosure or no-due document.</p>
                 <form id="loanForeclosureForm" class="soft-grid" enctype="multipart/form-data">
                     <input type="hidden" id="foreclosureLoanId" name="loan_id">
-                    <div class="detail-item" id="foreclosureLoanMeta">Pick an active loan from the table below to start foreclosure.</div>
+                    <div class="detail-item" id="foreclosureLoanMeta">Pick an active loan in Your loans above to start foreclosure.</div>
                     <div>
                         <label class="form-label" for="foreclosureFile">Foreclosure Document</label>
                         <input id="foreclosureFile" name="file" type="file" class="form-control" accept=".pdf,.txt" required>
@@ -270,41 +299,18 @@
                     <button class="btn btn-primary" type="submit">Upload and Close Loan</button>
                 </form>
             </div>
-            <div class="mt-4">
+    </div>
+    <div class="col-xl-6">
+        <div class="surface-card h-100">
                 <h2 class="page-section-title">Foreclosure Activity</h2>
                 <p class="page-section-copy mb-3">Recent closure letters, reconciliation status, and matched payoff totals.</p>
                 <div id="loanClosureActivity"></div>
             </div>
-            <div class="mt-4">
-                <h2 class="page-section-title">Detected Repayments</h2>
-                <p class="page-section-copy mb-3">Loan and debt repayments inferred directly from your statement imports.</p>
-                <div id="loanDetectedRepayments"></div>
-            </div>
-        </div>
     </div>
-</section>
-
-<section class="surface-card mt-4" id="loanPrepaymentSection" aria-labelledby="loanPrepaymentTitle">
-    <h2 id="loanPrepaymentTitle" class="page-section-title mb-1">Prepayment what-if</h2>
-    <p class="page-section-copy mb-3">See the interest and months a lump-sum prepayment saves, how much cash it leaves you, and whether investing the same money instead might do better. Nothing is paid or changed.</p>
-    <form id="loanPrepaymentForm" class="row g-3 align-items-end" data-live-refresh-hold="true">
-        <div class="col-md-3"><label class="form-label" for="loanPrepaymentLoan">Loan</label>
-            <select class="form-select" id="loanPrepaymentLoan" required></select></div>
-        <div class="col-md-3"><label class="form-label" for="loanPrepaymentAmount">Prepayment amount</label>
-            <input class="form-control" id="loanPrepaymentAmount" type="number" min="1" step="0.01" required></div>
-        <div class="col-md-3"><label class="form-label" for="loanPrepaymentMode">Then</label>
-            <select class="form-select" id="loanPrepaymentMode">
-                <option value="reduce_tenure">Keep the EMI, finish sooner</option>
-                <option value="reduce_emi">Keep the end date, lower the EMI</option></select></div>
-        <div class="col-md-2"><label class="form-label" for="loanPrepaymentReturn">Investing return % (optional)</label>
-            <input class="form-control" id="loanPrepaymentReturn" type="number" min="0" max="30" step="0.1"></div>
-        <div class="col-md-1"><button class="btn btn-primary w-100" type="submit">Check</button></div>
-    </form>
-    <div id="loanPrepaymentResult" class="mt-3" aria-live="polite"></div>
 </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/loans.js?v=2.15.1"></script>
+<script src="/static/js/loans.js?v=2.15.2"></script>
 {% endblock %}

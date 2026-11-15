@@ -175,7 +175,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Next five years</h2>
             <p class="page-section-copy mb-3">Projected income curve using the current profile, resume signals, and current macro context.</p>
-            <canvas id="salaryChart" height="150"></canvas>
+            <div class="chart-box"><canvas id="salaryChart"></canvas></div>
             <div class="mt-4">
                 <h3 class="h6 fw-bold mb-3">Tips</h3>
                 <ul class="insight-list" id="careerInsightList"></ul>
@@ -330,5 +330,5 @@
 
 {% block extra_js %}
 <script src="/static/js/voice.js?v=1"></script>
-<script src="/static/js/career.js?v=3.21.0"></script>
+<script src="/static/js/career.js?v=3.21.1"></script>
 {% endblock %}

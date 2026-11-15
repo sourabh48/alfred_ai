@@ -1,3 +1,69 @@
+// One chart look for every page: a colour-blind-safe palette chosen per theme, quiet axes, readable tooltips.
+// The palette lives in workspace.css (--series-1..8 per theme) so charts and legend dots share one source.
+// Charts whose values are rupees: their tooltips and axes carry ₹ in Indian digit grouping.
+const MONEY_CHARTS = new Set(["dashboardMonthlyChart", "dashboardCategoryChart", "expenseTrend", "budgetForecastChart", "loanTrendChart",
+    "allocationChart", "growthChart", "familyNetChart", "taxComparisonChart", "bikeServiceCostChart", "bikeServiceMixChart", "salaryChart"]);
+function styleCharts(dark) {
+    if (!window.Chart) return;
+    const ink = dark ? "#c9dfff" : "#53647c", grid = dark ? "#2b4462" : "#e8eef6", surface = dark ? "#182b44" : "#ffffff";
+    const css = getComputedStyle(document.documentElement);
+    const series = [1, 2, 3, 4, 5, 6, 7, 8].map(n => css.getPropertyValue(`--series-${n}`).trim());
+    const color = i => i < series.length ? series[i] : css.getPropertyValue("--series-other").trim();  // past 8, one neutral: never a cycled hue
+    const d = Chart.defaults;
+    Object.assign(d, { color: ink, borderColor: grid, maintainAspectRatio: false, locale: "en-IN" });
+    const isMoney = chart => MONEY_CHARTS.has(chart.canvas.id);
+    d.font.family = getComputedStyle(document.body).fontFamily; d.font.size = 12;
+    d.animation.duration = 350;
+    Object.assign(d.plugins.legend.labels, { usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 14,
+        // A series with nothing recorded is left out of the legend rather than shown as an empty promise.
+        filter: (item, data) => item.datasetIndex === undefined || (data.datasets[item.datasetIndex]?.data || []).some(v => Number(v)) });
+    Object.assign(d.plugins.tooltip, { backgroundColor: dark ? "#0b1626" : "#10253f", padding: 10, cornerRadius: 8, boxPadding: 4,
+        usePointStyle: true, titleFont: { weight: "600" } });
+    d.plugins.tooltip.callbacks.label = ctx => {
+        const name = ctx.dataset.label || ctx.label || "";
+        const value = isMoney(ctx.chart) && typeof ctx.raw === "number" ? Alfred.formatCurrency(ctx.raw) : ctx.formattedValue;
+        return name ? `${name}: ${value}` : value;
+    };
+    d.scale.grid.color = grid; d.scale.border.display = false; d.scale.ticks.padding = 6;
+    // Per-type scale defaults hold only what they override, so whole objects are assigned.
+    d.scales.category.grid = { display: false };
+    const compact = new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 });
+    d.scales.linear.ticks = { maxTicksLimit: 6, callback(value) { return (isMoney(this.chart) ? "₹" : "") + compact.format(value); } };
+    Object.assign(d.scales.radialLinear, { grid: { color: grid }, angleLines: { color: grid },
+        pointLabels: { color: ink, font: { size: 12 } }, ticks: { display: false, maxTicksLimit: 5 } });
+    if (!Chart.registry.plugins.get("alfredLook")) Chart.register({
+        id: "alfredLook",
+        afterInit(chart) {  // a chart is an image to a screen reader: name it after its card heading
+            const canvas = chart.canvas;
+            if (!canvas.getAttribute("aria-label")) {
+                const heading = canvas.closest(".surface-card, .card, section")?.querySelector("h2, h3, h5, .card-title");
+                canvas.setAttribute("role", "img");
+                canvas.setAttribute("aria-label", `${heading ? heading.textContent.trim() : "Chart"} (chart; figures are also listed on this page)`);
+            }
+        },
+        beforeUpdate(chart) {
+            // Colour follows the thing, not its position: Income is the same green on every chart.
+            const entity = { Expenses: 0, Spending: 0, Loans: 1, "Loan payments": 1, Investments: 3, Other: 4, Income: 5, "Card payments": 6 };
+            chart.data.datasets.forEach((ds, index) => {
+                const i = entity[ds.label] ?? index;
+                if (ds.alfredKeepColors) return;  // e.g. severity, which keeps its status colours
+                const type = ds.type || chart.config.type;
+                if (["doughnut", "pie", "polarArea"].includes(type) || ds.alfredByPoint) {
+                    ds.backgroundColor = (ds.data || []).map((_, j) => color(j));
+                    Object.assign(ds, { borderColor: surface, borderWidth: 2, hoverOffset: 4, borderRadius: type === "bar" ? 4 : 0 });
+                } else if (type === "bar") {
+                    Object.assign(ds, { backgroundColor: color(i), borderColor: surface, borderWidth: 0, borderRadius: 4, maxBarThickness: 44 });
+                } else {
+                    const c = color(i);
+                    Object.assign(ds, { borderColor: c, backgroundColor: c + "26", pointBackgroundColor: c, pointBorderColor: surface,
+                        pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 7, borderWidth: 2, tension: ds.tension ?? 0.3 });
+                }
+            });
+        },
+    });
+    Object.values(Chart.instances).forEach(chart => chart.update("none"));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const theme = document.getElementById("workspaceTheme");
     function setTheme(dark) {
@@ -5,11 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
         theme.textContent = dark ? "Light" : "Dark";
         theme.setAttribute("aria-pressed", String(dark));
         theme.setAttribute("aria-label", dark ? "Use light appearance" : "Use dark appearance");
-        if (window.Chart) {
-            Chart.defaults.color = dark ? "#c9dfff" : "#53647c";
-            Chart.defaults.borderColor = dark ? "#37506e" : "#dce4ef";
-            Object.values(Chart.instances).forEach(chart=>chart.update("none"));
-        }
+        styleCharts(dark);
     }
     let preference;
     try { preference = localStorage.getItem("alfred.appearance"); } catch (_) { /* Locked-down browser. */ }
@@ -111,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Long pages get an "On this page" bar so a section is one click away instead of a long scroll.
 document.addEventListener("DOMContentLoaded", () => {
     const main = document.getElementById("alfredMainScroll");
-    if (!main || main.querySelector("nav.page-index")) return;  // pages with a hand-made index keep theirs
+    if (!main || main.querySelector("nav.page-index, [data-no-page-index]")) return;  // a hand-made index, or a page that opts out (Home is short)
     const headings = [...main.querySelectorAll("h2")].filter(h => !h.closest(".alfred-hero, [hidden], .modal")
         && h.offsetParent !== null && /^[A-Za-z]/.test(h.textContent.trim())).slice(0, 14);
     if (headings.length < 4) return;

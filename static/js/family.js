@@ -65,8 +65,6 @@ function renderFamilyChart(items) {
             datasets: [{
                 label: "Projected net worth",
                 data: items.map(item => item.projected_net_worth),
-                borderColor: "#1858d6",
-                backgroundColor: "rgba(24, 88, 214, 0.1)",
                 fill: true,
                 tension: 0.25,
             }],

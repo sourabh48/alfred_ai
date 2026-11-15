@@ -129,8 +129,6 @@ function renderRiskChart(items) {
             datasets: [{
                 label: "Current risk",
                 data: values,
-                borderColor: "#c44a3d",
-                backgroundColor: "rgba(196, 74, 61, 0.16)",
                 borderWidth: 2,
             }],
         },

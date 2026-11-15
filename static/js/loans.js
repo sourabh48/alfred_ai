@@ -152,11 +152,8 @@ function renderLoanChart(chart) {
             datasets: [{
                 label: "Detected loan repayments",
                 data: chart.values,
-                borderColor: "#c44a3d",
-                backgroundColor: "rgba(196, 74, 61, 0.12)",
                 fill: true,
                 tension: 0.28,
-                pointBackgroundColor: "#c44a3d",
             }],
         },
         options: {
@@ -404,7 +401,7 @@ function resetForeclosureForm() {
     const form = document.getElementById("loanForeclosureForm");
     form.reset();
     document.getElementById("foreclosureLoanId").value = "";
-    document.getElementById("foreclosureLoanMeta").textContent = "Pick an active loan from the table below to start foreclosure.";
+    document.getElementById("foreclosureLoanMeta").textContent = "Pick an active loan in Your loans above to start foreclosure.";
     document.getElementById("loanForeclosureFeedback").classList.add("d-none");
 }
 
@@ -464,7 +461,7 @@ function renderConsolidationSelection() {
     const selected = [...selectedLoanIds].map(id => loanIndex.get(id)).filter(Boolean);
     if (!selected.length) {
         document.getElementById("consolidationPrincipal").value = "";
-        Alfred.setHTML(target, "Select at least two active loans from the table below.");
+        Alfred.setHTML(target, "Select at least two active loans in Your loans above.");
         return;
     }
 

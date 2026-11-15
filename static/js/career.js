@@ -177,8 +177,6 @@ function renderCareerChart(items) {
             datasets: [{
                 label: "Projected income",
                 data: items.map(item => item.projected_income),
-                borderColor: "#148f63",
-                backgroundColor: "rgba(20, 143, 99, 0.14)",
                 fill: true,
                 tension: 0.3,
             }],

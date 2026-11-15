@@ -179,43 +179,31 @@ function renderMonthlyChart(charts) {
                     type: "bar",
                     label: "Expenses",
                     data: charts.monthly_expense_values,
-                    backgroundColor: "rgba(24, 88, 214, 0.72)",
-                    borderRadius: 10,
                 },
                 {
                     type: "bar",
                     label: "Loans",
                     data: charts.monthly_loan_values,
-                    backgroundColor: "rgba(196, 74, 61, 0.72)",
-                    borderRadius: 10,
                 },
                 {
                     type: "bar",
                     label: "Card payments",
                     data: charts.monthly_credit_card_payment_values || [],
-                    backgroundColor: "rgba(122, 87, 209, 0.72)",
-                    borderRadius: 10,
                 },
                 {
                     type: "bar",
                     label: "Investments",
                     data: charts.monthly_investment_values || [],
-                    backgroundColor: "rgba(217, 121, 4, 0.72)",
-                    borderRadius: 10,
                 },
                 {
                     type: "bar",
                     label: "Other",
                     data: charts.monthly_other_values,
-                    backgroundColor: "rgba(255, 130, 92, 0.72)",
-                    borderRadius: 10,
                 },
                 {
                     type: "line",
                     label: "Income",
                     data: charts.monthly_income_values,
-                    borderColor: "#148f63",
-                    pointBackgroundColor: "#148f63",
                     borderWidth: 3,
                     tension: 0.3,
                 },
@@ -243,20 +231,20 @@ function renderCategoryChart(charts) {
             labels: charts.category_labels,
             datasets: [{
                 data: charts.category_values,
-                backgroundColor: ["#1858d6", "#ff825c", "#148f63", "#7a57d1", "#d97904", "#5c6a7f"],
                 borderWidth: 0,
             }],
         },
         options: {
-            plugins: { legend: { position: "bottom" } },
+            plugins: { legend: { display: false } },  // the list below is the legend, with amounts and shares
             cutout: "68%",
         },
     });
+    const total = charts.category_values.reduce((sum, value) => sum + Number(value || 0), 0);
 
     Alfred.setHTML(document.getElementById("dashboardCategoryList"), charts.category_labels.map((label, index) => `
-        <div class="d-flex justify-content-between py-2 border-top">
-            <span>${Alfred.escapeHtml(label)}</span>
-            <strong>${Alfred.formatCurrency(charts.category_values[index])}</strong>
+        <div class="d-flex justify-content-between align-items-center py-2 border-top">
+            <span class="d-flex align-items-center"><span class="legend-dot legend-dot-${index < 8 ? index + 1 : "other"}"></span>${Alfred.escapeHtml(label)}</span>
+            <strong>${Alfred.formatCurrency(charts.category_values[index])}<span class="category-share">${total ? Math.round(charts.category_values[index] / total * 100) : 0}%</span></strong>
         </div>
     `).join(""));
 }

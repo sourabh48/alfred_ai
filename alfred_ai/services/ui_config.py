@@ -29,12 +29,12 @@ DEFAULT_UI_CONFIG: dict[str, Any] = {
     },
     "auth": {
         "login": {
-            "eyebrow": "Finance, credit, career, and life dashboards in one place",
+            "eyebrow": "Money, career, travel and vehicles in one place",
             "title": "Sign in to Alfred",
-            "description": "Open your finance, career, credit, and vehicle workspaces from the same account.",
+            "description": "Open your money, career, travel and vehicle workspaces from the same account.",
             "highlights": [
-                "Track expenses, debt, credit, and bank-linked evidence in one workspace.",
-                "Use document-backed workflows for statements, foreclosure, and loan documents.",
+                "See spending, loans, investments and the statements behind them in one place.",
+                "Upload statements and loan papers; ALFRED reads them on this computer for you to check.",
                 "Keep the same account even after using Remove My Data to start fresh.",
             ],
             "primary_cta": "Sign in",
@@ -46,7 +46,7 @@ DEFAULT_UI_CONFIG: dict[str, Any] = {
             "description": "Start with the identity and income fields Alfred uses for finance, career, risk, and lifestyle guidance.",
             "highlights": [
                 "Finance and debt summaries stay tied to one user profile.",
-                "Career and credit modules reuse the same verified profile data.",
+                "Career and travel reuse the same profile, so you enter things once.",
                 "You can wipe user-entered data later without losing the account.",
             ],
             "primary_cta": "Create account",
@@ -77,7 +77,7 @@ DEFAULT_UI_CONFIG: dict[str, Any] = {
         "timeline": {
             "title": "All transactions",
             "description": "Search by shop name, reference or note, or filter the list.",
-            "search_placeholder": "Search merchant, reference, fingerprint, or note",
+            "search_placeholder": "Shop, reference or note",
             "id_placeholder": "Transaction ID",
             "limit_label": "Rows",
             "clear_label": "Clear",

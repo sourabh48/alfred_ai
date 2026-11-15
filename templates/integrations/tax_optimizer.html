@@ -66,7 +66,7 @@
         <div class="surface-card h-100 mt-4">
             <h2 class="page-section-title">Regime Comparison</h2>
             <p class="page-section-copy mb-3">Tax outgo comparison between old and new regime under the current assumptions.</p>
-            <canvas id="taxComparisonChart" height="150"></canvas>
+            <div class="chart-box"><canvas id="taxComparisonChart"></canvas></div>
         </div>
     </div>
 </section>
@@ -97,5 +97,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/tax_optimizer.js?v=3.5.2"></script>
+<script src="/static/js/tax_optimizer.js?v=3.5.3"></script>
 {% endblock %}

@@ -520,7 +520,8 @@ h1, h2, h3, h4, h5, h6,
 .four-up {
     display: grid;
     gap: 1rem;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* Rows fill evenly, so five or six cards never leave a lone card on the last row. */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .insight-list,
@@ -686,10 +687,6 @@ h1, h2, h3, h4, h5, h6,
 
 .data-value {
     font-weight: 700;
-}
-
-.surface-card canvas {
-    width: 100% !important;
 }
 
 .metric-table td,
@@ -1197,8 +1194,7 @@ h1, h2, h3, h4, h5, h6,
 
 @media (max-width: 991.98px) {
     .two-up,
-    .three-up,
-    .four-up {
+    .three-up {
         grid-template-columns: 1fr;
     }
 
@@ -1541,9 +1537,7 @@ body.alfred-body {
     pointer-events: none;
 }
 
-.auth-market-orb,
-.auth-market-line,
-.auth-market-chip {
+.auth-market-orb {
     position: absolute;
 }
 
@@ -1567,52 +1561,6 @@ body.alfred-body {
     height: 14rem;
     background: radial-gradient(circle, rgba(255, 130, 92, 0.24), transparent 70%);
     animation: authFloat 13s ease-in-out infinite reverse;
-}
-
-.auth-market-line {
-    height: 2px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
-    opacity: 0.7;
-}
-
-.auth-market-line-one {
-    inset: 36% 18% auto 10%;
-    transform: rotate(-8deg);
-    animation: authSweep 7s ease-in-out infinite;
-}
-
-.auth-market-line-two {
-    inset: 62% 12% auto 18%;
-    transform: rotate(6deg);
-    animation: authSweep 9s ease-in-out infinite reverse;
-}
-
-.auth-market-chip {
-    padding: 0.5rem 0.9rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    color: rgba(247, 251, 255, 0.88);
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    box-shadow: 0 18px 32px rgba(8, 21, 36, 0.2);
-}
-
-.auth-market-chip-one {
-    inset: 18% auto auto 62%;
-    animation: authChipFloat 8s ease-in-out infinite;
-}
-
-.auth-market-chip-two {
-    inset: 54% auto auto 56%;
-    animation: authChipFloat 9.5s ease-in-out infinite reverse;
-}
-
-.auth-market-chip-three {
-    inset: 74% auto auto 18%;
-    animation: authChipFloat 10s ease-in-out infinite;
 }
 
 .auth-finance-board {
@@ -1755,25 +1703,7 @@ body.alfred-body {
     }
 }
 
-@keyframes authSweep {
-    0%, 100% {
-        transform: translateX(0) rotate(-8deg);
-        opacity: 0.35;
-    }
-    50% {
-        transform: translateX(18px) rotate(-5deg);
-        opacity: 0.82;
-    }
-}
 
-@keyframes authChipFloat {
-    0%, 100% {
-        transform: translate3d(0, 0, 0);
-    }
-    50% {
-        transform: translate3d(0, -10px, 0);
-    }
-}
 
 .surface-card--compact {
     padding: 1rem;
@@ -1941,9 +1871,6 @@ body.alfred-body {
         white-space: normal;
     }
 
-    .auth-market-chip {
-        display: none;
-    }
 
     .investment-watch-metrics {
         grid-template-columns: 1fr;

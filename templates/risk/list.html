@@ -103,7 +103,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Risk chart</h2>
             <p class="page-section-copy mb-3">Current category spread across the full consolidated risk stack.</p>
-            <canvas id="riskRadar" height="150"></canvas>
+            <div class="chart-box chart-box-round"><canvas id="riskRadar"></canvas></div>
             <p id="riskRadarMeta" class="page-section-copy mt-3 mb-0">Current category spread from live consolidated risk items.</p>
         </div>
     </div>
@@ -135,5 +135,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/risk.js?v=2.6.2"></script>
+<script src="/static/js/risk.js?v=2.6.3"></script>
 {% endblock %}

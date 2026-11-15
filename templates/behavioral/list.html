@@ -54,7 +54,7 @@
         <div class="surface-card h-100">
             <h2 class="page-section-title">Weekly Stress Pattern</h2>
             <p class="page-section-copy mb-3">Recent stress readings tracked by the behavioral engine.</p>
-            <canvas id="stressChart" height="150"></canvas>
+            <div class="chart-box"><canvas id="stressChart"></canvas></div>
         </div>
     </div>
 </section>
@@ -86,5 +86,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/behavioral.js?v=2.6"></script>
+<script src="/static/js/behavioral.js?v=2.7"></script>
 {% endblock %}

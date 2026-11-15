@@ -656,28 +656,28 @@
     <div class="col-xl-6 col-xxl-3">
         <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Service Cost Trend</h2>
-            <canvas id="bikeServiceCostChart" height="220"></canvas>
+            <div class="chart-box"><canvas id="bikeServiceCostChart"></canvas></div>
             <p id="bikeServiceCostChartMeta" class="page-section-copy mt-3 mb-0">Live service spend from actual logs.</p>
         </div>
     </div>
     <div class="col-xl-6 col-xxl-3">
         <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Trip vs Service Cost</h2>
-            <canvas id="bikeServiceMixChart" height="220"></canvas>
+            <div class="chart-box"><canvas id="bikeServiceMixChart"></canvas></div>
             <p id="bikeServiceMixChartMeta" class="page-section-copy mt-3 mb-0">Live trip and service cost mix from stored history.</p>
         </div>
     </div>
     <div class="col-xl-6 col-xxl-3">
         <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Fault Severity Mix</h2>
-            <canvas id="bikeServiceIssueChart" height="220"></canvas>
+            <div class="chart-box chart-box-round"><canvas id="bikeServiceIssueChart"></canvas></div>
             <p id="bikeServiceIssueChartMeta" class="page-section-copy mt-3 mb-0">Open fault distribution from actual issue reports.</p>
         </div>
     </div>
     <div class="col-xl-6 col-xxl-3">
         <div class="surface-card surface-card-accent h-100">
             <h2 class="page-section-title">Mileage vs Optimal</h2>
-            <canvas id="bikeMileageChart" height="220"></canvas>
+            <div class="chart-box"><canvas id="bikeMileageChart"></canvas></div>
             <p id="bikeMileageChartMeta" class="page-section-copy mt-3 mb-0">Live refill-based mileage compared with the saved benchmark.</p>
         </div>
     </div>
@@ -726,5 +726,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/bike_service.js?v=3.10"></script>
+<script src="/static/js/bike_service.js?v=3.11"></script>
 {% endblock %}

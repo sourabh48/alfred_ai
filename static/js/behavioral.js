@@ -88,8 +88,6 @@ function renderStressChart(values, windowLabels) {
             datasets: [{
                 label: "Stress",
                 data: ordered,
-                borderColor: "#c44a3d",
-                backgroundColor: "rgba(196, 74, 61, 0.14)",
                 fill: true,
                 tension: 0.3,
             }],

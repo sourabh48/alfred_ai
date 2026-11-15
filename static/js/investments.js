@@ -154,7 +154,6 @@ function renderAllocationChart(data) {
             labels: data.labels,
             datasets: [{
                 data: data.values,
-                backgroundColor: ["#1858d6", "#ff825c", "#148f63", "#d97904", "#5c6a7f", "#0f9d8a"],
                 borderWidth: 0,
             }],
         },
@@ -185,8 +184,6 @@ function renderGrowthChart(data) {
             datasets: [{
                 label: "Projected Value",
                 data: data.values,
-                borderColor: "#1858d6",
-                backgroundColor: "rgba(24, 88, 214, 0.12)",
                 fill: true,
                 tension: 0.3,
             }],
