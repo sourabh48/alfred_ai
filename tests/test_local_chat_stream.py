@@ -7,6 +7,7 @@ import socket
 from tempfile import TemporaryDirectory
 from threading import Event
 import time
+import unittest
 from unittest.mock import Mock, patch
 
 from django.conf import settings
@@ -14,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 from django.test import Client, SimpleTestCase, TransactionTestCase, override_settings
 
+from apps.ml_engine.services import local_ai_limits as limits
 from apps.ml_engine.services.hybrid_intelligence import OllamaReasoner
 from apps.ml_engine.services.local_chat_stream import LocalChatStream, GenerationCancelled, GenerationIncomplete
 from apps.ml_engine.services.persistent_memory import MemoryStore
@@ -45,6 +47,21 @@ def wire(model,*texts,**last):
 
 
 class LocalStreamProtocolTests(SimpleTestCase):
+    def setUp(self):
+        # The model window and thinking capability are learned process-wide; a protocol test must not inherit what an
+        # earlier test or a real local model taught the process, and must not leave its own behind.
+        self.enterContext(patch.dict(limits._windows, {}, clear=True))
+        self.enterContext(patch.dict(limits._thinks, {}, clear=True))
+
+    def test_protocol_ignores_a_model_window_learned_before_it_ran(self):
+        name = 'test_actual_reasoner_uses_ndjson_but_preserves_budgets_prompt_and_digest'
+        learned = {settings.ALFRED_MEMORY_OLLAMA_MODEL: ('a' * 64, 32768)}
+        with patch.dict(limits._windows, learned), patch.dict(limits._thinks, {settings.ALFRED_MEMORY_OLLAMA_MODEL: ('a' * 64, True)}):
+            result = unittest.TestResult(); type(self)(name).run(result)
+            self.assertEqual(limits._windows, learned)  # the fixture restores what it found
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+        self.assertEqual(result.testsRun, 1)
+
     def stream(self):
         return LocalChatStream(lambda stream:None,lambda exc:dict(detail='Synthetic failure'),lambda:None)
 
