@@ -371,11 +371,11 @@ def app_health(user, today):
     if low:
         items.append(_item("disk", "Less than 5 GB is free on the drive that holds your data",
             "Free some space yourself. ALFRED deletes nothing to make room.", DIAGNOSTICS))
-    errors = (OperationalLog.objects.filter(user=user, severity="error", created_at__gte=timezone.now() - timedelta(hours=24))
-              .values("module").annotate(total=Count("pk")).order_by("-total", "module"))
-    for row in errors:
+    errors = OperationalLog.objects.filter(user=user, severity="error", created_at__gte=timezone.now() - timedelta(hours=24))
+    for row in errors.values("module").annotate(total=Count("pk")).order_by("-total", "module"):
+        latest = errors.filter(module=row["module"]).order_by("-created_at", "-id").values_list("message", flat=True).first() or ""
         items.append(_item(f"errors:{row['module']}:{row['total']}", f"{row['total']} error(s) in {row['module']} in the last 24 hours",
-            "Open diagnostics to look. ALFRED does not restart, upgrade or repair anything by itself.", DIAGNOSTICS))
+            f"Latest: {latest[:160]} ALFRED does not restart, upgrade or repair anything by itself.", DIAGNOSTICS))
     return items
 
 

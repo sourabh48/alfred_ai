@@ -451,7 +451,9 @@ class NoticeBotsTests(Fixtures):
         self.assertEqual(titles, ["Background processing needs attention", "Less than 5 GB is free on the drive that holds your data",
                                   "1 error(s) in expenses in the last 24 hours"])
         with self.settings(ALFRED_NATIVE_RUNTIME=False), patch("shutil.disk_usage", return_value=type("Usage", (), {"free": 10 ** 12})()):
-            self.assertEqual([item["id"] for item in self.items("app_health")], ["errors:expenses:1"])
+            item, = self.items("app_health")
+        self.assertEqual(item["id"], "errors:expenses:1")
+        self.assertIn("Latest: Synthetic failure", item["detail"])
 
     def test_daily_review_lists_the_first_item_of_the_three_most_pressing_reviews_and_changes_nothing(self):
         from apps.budgets.models import SavingsGoal
