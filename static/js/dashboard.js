@@ -124,7 +124,7 @@ function renderHero(summary, behavior) {
     review.hidden = amount <= 0;
     review.textContent = `${Alfred.formatCurrency(amount)} in debits needs review and is excluded from these totals. Cash left may be lower until you give them a category. `;
     const fix = document.createElement("a");
-    fix.href = REVIEW_LINK; fix.textContent = "Review them now";
+    fix.href = REVIEW_LINK; fix.className = "alert-link"; fix.textContent = "Review them now";
     review.append(fix);
 }
 
