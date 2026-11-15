@@ -28,6 +28,7 @@
     <p class="mb-0">Direct bank connections and MCP providers are not configured here. Local file imports do not require a bank API subscription.</p>
 </section>
 <p class="alert alert-info" role="status">Bank, loan and investment files are extracted for review first. Correct the preview and explicitly confirm before creating records. Linking loan or investment sources preserves existing records.</p>
+<p class="small">Counts cover only your account. Record acceptance and rejection totals are not inferred from parser status. Freshness of balances and public evidence must be checked in the source screen.</p>
 <section class="row g-3 mb-4" aria-label="Your data sources">
 {% for source in sources %}
     <div class="col-12 col-xl-6"><article class="surface-card h-100">
@@ -53,7 +54,7 @@
             </li>{% endfor %}
         </ul>{% endif %}
         {% endif %}
-        <p class="small">{{ source.provenance }} Counts cover only your account. Record acceptance and rejection totals are not inferred from parser status. Freshness of balances and public evidence must be checked in the source screen.</p>
+        <p class="small">{{ source.provenance }}</p>
         {% for label, url in source.links %}<a class="btn btn-outline-primary mb-2" href="{{ url }}">{{ label }}</a> {% endfor %}
         {% if source.imports %}<a href="/documents/" class="btn btn-outline-secondary mb-2">Review, retry or remove files</a>{% endif %}
     </article></div>
