@@ -252,6 +252,169 @@ def statements_due(user, today):
                 f"The latest imported entry is from {last:%d %b %Y}; balances and reviews after that are estimates.", "/expenses/"))
     return items
 
+# The seven checks below only read and report (owner request 2026-11-15). None carries an action: a correction,
+# posting, upload, restart or deletion always stays with the owner.
+DIAGNOSTICS = "/settings/diagnostics/"
+BACKUP_MAX_AGE_DAYS, OLD_UPLOAD_DAYS, LOW_DISK_BYTES = 7, 90, 5 * 1024 ** 3
+
+
+def reconciliation(user, today):
+    from apps.expenses.models import BankAccount
+    from apps.expenses.services.balance_roll_forward import balance_roll_forward
+    from apps.investments.models import Investment
+    from apps.investments.money import investment_money
+    items = []
+    for account in BankAccount.objects.filter(user=user, is_active=True).order_by("id"):
+        roll = balance_roll_forward(account)
+        if roll["status"] == "estimated" and roll["estimated_balance"] != roll["anchor_balance"]:
+            items.append(_item(f"balance:{account.pk}", f"{account.display_name}: the balance may be out of date",
+                f"The statement to {roll['anchor_date']} closed at {_amount(roll['anchor_balance'], account.currency)}. "
+                f"{roll['entries']} later entries bring it to about {_amount(roll['estimated_balance'], account.currency)}. "
+                "Import a newer statement or correct the balance yourself; ALFRED changes no balance.", "/expenses/"))
+    for holding in Investment.objects.filter(user=user, units__isnull=False, nav__isnull=False).order_by("asset_name", "id"):
+        try:
+            expected = investment_money(holding.units * holding.nav)
+        except ValueError:
+            continue
+        if expected != investment_money(holding.current_value):
+            items.append(_item(f"holding:{holding.pk}", f"{holding.asset_name}: value does not match units x price",
+                f"Units x price gives {_amount(expected, holding.currency)}, but the saved value is "
+                f"{_amount(investment_money(holding.current_value), holding.currency)}. Open the holding and correct it yourself.",
+                "/investments/"))
+    return items
+
+
+def document_inbox(user, today):
+    from alfred_ai.services.data_sources import data_sources_snapshot
+    items = []
+    for source in data_sources_snapshot(user)["sources"]:
+        imports = source.get("imports") or {}
+        page = (source["reviews"][0]["url"] if source["reviews"] else source["links"][-1][1])
+        if imports.get("awaiting_review"):
+            items.append(_item(f"review:{source['label']}", f"{imports['awaiting_review']} {source['label']} upload(s) wait for your review",
+                "Nothing from these files is posted to your records until you check and confirm it.", page))
+        if imports.get("failed"):
+            items.append(_item(f"failed:{source['label']}", f"{imports['failed']} {source['label']} upload(s) could not be read",
+                "Open the upload to see why, then upload a clearer copy or enter the record yourself.", source["links"][-1][1]))
+    return items
+
+
+def backup_guardian(user, today):
+    from datetime import date
+    from pathlib import Path
+    from django.conf import settings
+    from alfred_ai.services.online_services import can_manage
+    if not can_manage(user):
+        return []
+    if not settings.ALFRED_BACKUP_DIR:
+        return [_item("backup:unset", "ALFRED cannot see your backups",
+            "No backup folder is set, so ALFRED cannot tell when you last backed up. Set ALFRED_BACKUP_DIR in config/local.env "
+            "to the folder that holds your backups. ALFRED only reads the date; it never uploads or replaces anything.", DIAGNOSTICS)]
+    newest = None
+    try:
+        folder = Path(settings.ALFRED_BACKUP_DIR)
+        for path in [*folder.glob("backup.json"), *folder.glob("*/backup.json")]:
+            # shortcut: "complete" in backup.json is the proof used, as written by scripts/release_recovery.py; other backup tools need their own check
+            if path.stat().st_size <= 65536 and json.loads(path.read_text(encoding="utf-8")).get("complete") is True:
+                newest = max(newest or 0, path.stat().st_mtime)
+    except (OSError, ValueError, AttributeError):
+        return [_item("backup:unreadable", "The backup folder could not be read", "Check that the folder in ALFRED_BACKUP_DIR exists and opens.", DIAGNOSTICS)]
+    if newest is None:
+        return [_item("backup:none", "No complete backup found", "The backup folder holds no finished backup. Make one and keep the key with it.", DIAGNOSTICS)]
+    made = date.fromtimestamp(newest)
+    if (today - made).days <= BACKUP_MAX_AGE_DAYS:
+        return []
+    return [_item(f"backup:old:{made.isoformat()}", f"Your last complete backup is from {made.isoformat()}",
+        f"That is more than {BACKUP_MAX_AGE_DAYS} days ago. Make a new backup yourself; ALFRED never uploads or replaces live data.", DIAGNOSTICS)]
+
+
+def evidence_check(user, today):
+    from alfred_ai.services.data_sources import data_sources_snapshot
+    from apps.investments.models import Investment
+    from apps.investments.services.fund_prices import nav_state
+    items = []
+    for holding in Investment.objects.filter(user=user).exclude(amfi_scheme_code="").order_by("asset_name", "id"):
+        state = nav_state(holding)
+        if state == "stale":
+            items.append(_item(f"nav:{holding.pk}:{holding.nav_date}", f"{holding.asset_name}: the price is out of date",
+                f"The last AMFI price is from {holding.nav_date}, and the value shown still uses it. ALFRED updates it when AMFI "
+                "publishes a fresh price and never replaces a figure you reviewed.", "/investments/"))
+        elif state == "waiting":
+            items.append(_item(f"nav:{holding.pk}:none", f"{holding.asset_name}: no AMFI price yet",
+                "The value shown is the one you entered. It is not checked against AMFI until a fresh price arrives.", "/investments/"))
+    for source in data_sources_snapshot(user)["sources"]:
+        for review in source["reviews"]:
+            if review["status"] == "Expired":
+                items.append(_item(f"expired:{review['url']}", f"A {source['label']} import review has expired",
+                    "Its extracted figures are no longer offered for posting. Upload the file again if you still need it.", review["url"]))
+    return items
+
+
+def app_health(user, today):
+    import shutil
+    from pathlib import Path
+    from django.conf import settings
+    from django.db import connection
+    from django.db.models import Count
+    from alfred_ai.services.native_readiness import native_readiness_snapshot
+    from alfred_ai.services.online_services import can_manage
+    if not can_manage(user):
+        return []
+    items = []
+    if getattr(settings, "ALFRED_NATIVE_RUNTIME", False):  # heartbeats exist only under the native launcher
+        for check in native_readiness_snapshot()["blocked_checks"]:
+            items.append(_item(f"check:{check['key']}", f"{check['label']} needs attention", f"{check['detail']} {check['manual_task']}", DIAGNOSTICS))
+    try:
+        low = shutil.disk_usage(Path(str(connection.settings_dict["NAME"])).resolve().parent).free < LOW_DISK_BYTES
+    except OSError:
+        low = False
+    if low:
+        items.append(_item("disk", "Less than 5 GB is free on the drive that holds your data",
+            "Free some space yourself. ALFRED deletes nothing to make room.", DIAGNOSTICS))
+    errors = (OperationalLog.objects.filter(user=user, severity="error", created_at__gte=timezone.now() - timedelta(hours=24))
+              .values("module").annotate(total=Count("pk")).order_by("-total", "module"))
+    for row in errors:
+        items.append(_item(f"errors:{row['module']}:{row['total']}", f"{row['total']} error(s) in {row['module']} in the last 24 hours",
+            "Open diagnostics to look. ALFRED does not restart, upgrade or repair anything by itself.", DIAGNOSTICS))
+    return items
+
+
+def privacy_housekeeping(user, today):
+    from apps.career.models import CareerResume
+    from apps.expenses.models import StatementUpload
+    from apps.investments.models import InvestmentImportDocument
+    from apps.loans.models import LoanImportDocument
+    before = timezone.now() - timedelta(days=OLD_UPLOAD_DAYS)
+    items = []
+    for model, field, stamp, label in ((StatementUpload, "original_file", "uploaded_at", "bank statement"),
+                                       (LoanImportDocument, "uploaded_file", "created_at", "loan document"),
+                                       (InvestmentImportDocument, "uploaded_file", "updated_at", "investment statement"),
+                                       (CareerResume, "uploaded_file", "updated_at", "resume")):
+        count = model.objects.filter(user=user, parser_status="parsed", **{f"{stamp}__lt": before}).exclude(**{field: ""}).count()
+        if count:
+            items.append(_item(f"old:{label}:{count}", f"{count} {label} file(s) older than {OLD_UPLOAD_DAYS} days are still stored",
+                "Their records are already saved. If you no longer need the original files, delete them yourself in Documents. "
+                "ALFRED never deletes a file or changes how long files are kept.", "/documents/"))
+    return items
+
+
+DAILY_FIRST = ("bills_due", "app_health", "backup_guardian", "reconciliation", "document_inbox")
+
+
+def daily_review(user, today):
+    """The first item of the three most pressing open reviews; it adds no check of its own."""
+    lists = {}
+    for proposal in pending(user):
+        lists.setdefault(proposal["bot"], proposal)  # newest pending list per bot
+    lists.pop("daily_review", None)
+    order = sorted(lists, key=lambda bot: (DAILY_FIRST.index(bot) if bot in DAILY_FIRST else len(DAILY_FIRST), list(BOTS).index(bot)))
+    items = []
+    for bot in order[:3]:
+        first, more = lists[bot]["items"][0], len(lists[bot]["items"]) - 1
+        items.append(_item(f"{bot}:{first['id']}", f"{BOTS[bot][0]}: {first['title']}",
+            first["detail"] + (f" ({more} more in that review.)" if more else ""), first["url"]))
+    return items
+
 
 def research_watch(user, today):
     from apps.investments.services.research_searches import review_recent
@@ -272,6 +435,13 @@ BOTS = {
     "subscriptions": ("Subscriptions", 7, subscriptions, "Steady monthly charges you may have forgotten."),
     "duplicates": ("Possible duplicates", 1, duplicates, "Entries that look recorded twice."),
     "statements_due": ("Statements due", 7, statements_due, "Accounts without a statement for over 35 days."),
+    "reconciliation": ("Reconciliation checker", 1, reconciliation, "Balances and holdings that no longer match their own records."),
+    "document_inbox": ("Document inbox", 1, document_inbox, "Uploads waiting for your review or that could not be read."),
+    "backup_guardian": ("Backup guardian", 1, backup_guardian, "Warns when your last complete backup is over a week old."),
+    "evidence_check": ("Evidence checker", 1, evidence_check, "Fund prices that are out of date and import reviews that expired."),
+    "app_health": ("App health", 1, app_health, "Stopped background work, low disk space and recent errors."),
+    "privacy_housekeeping": ("Privacy housekeeping", 7, privacy_housekeeping, "Original files kept longer than 90 days."),
+    "daily_review": ("Daily review", 1, daily_review, "The three most pressing items from the other bots."),  # keep last: it reads the others
 }
 
 

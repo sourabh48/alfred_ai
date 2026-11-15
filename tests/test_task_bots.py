@@ -363,3 +363,121 @@ class HourlyBotScheduleTests(Fixtures):
         reviewed_weekly = {p["bot"] for p in task_bots.pending(self.user) if task_bots.BOTS[p["bot"]][1] == 7}
         self.assertTrue(reviewed_weekly)
         self.assertFalse(reviewed_weekly & bots)  # a weekly bot that already produced this week's review waits a week
+
+
+class NoticeBotsTests(Fixtures):
+    """The seven notice-only bots read the owner's records and carry no action at all."""
+
+    def items(self, bot, user=None):
+        return task_bots.BOTS[bot][2](user or self.user, self.today)
+
+    def test_reconciliation_flags_a_stale_balance_and_a_holding_that_disagrees_with_its_price(self):
+        from apps.expenses.models import BankAccount
+        account = BankAccount.objects.create(user=self.user, bank_name="Synthetic Bank", account_number="0001", currency="INR",
+                                             current_balance=Decimal("1000.00"))
+        Expense.objects.create(user=self.user, bank_account=account, amount=Decimal("10"), currency="INR", direction="debit",
+                               closing_balance=Decimal("1000.00"), transaction_date=self.today - timedelta(days=5))
+        self.assertEqual(self.items("reconciliation"), [])  # the statement balance is still the latest figure
+        Expense.objects.create(user=self.user, bank_account=account, amount=Decimal("250.50"), currency="INR", direction="debit",
+                               transaction_date=self.today - timedelta(days=2))
+        Investment.objects.create(user=self.user, asset_name="Synthetic Fund", currency="INR", units=Decimal("10"), nav=Decimal("12.5"),
+                                  current_value=Decimal("100"), invested_amount=Decimal("100"))
+        Investment.objects.create(user=self.other, asset_name="Other Fund", currency="INR", units=Decimal("1"), nav=Decimal("2"),
+                                  current_value=Decimal("9"), invested_amount=Decimal("9"))
+        before = financial_rows()
+        balance, holding = self.items("reconciliation")
+        self.assertIn("₹749.50", balance["detail"])
+        self.assertIn("₹125.00", holding["detail"])
+        self.assertEqual((balance["action"], holding["action"], financial_rows()), (None, None, before))
+        self.assertEqual(len(self.items("reconciliation", self.other)), 1)
+
+    def test_document_inbox_evidence_and_privacy_bots_report_uploads_without_touching_them(self):
+        from apps.expenses.models import StatementUpload
+        old = StatementUpload.objects.create(user=self.user, file_name="synthetic-old.pdf", original_file="statement_uploads/synthetic-old.pdf",
+                                             parser_status="parsed")
+        StatementUpload.objects.filter(pk=old.pk).update(uploaded_at=timezone.now() - timedelta(days=120))
+        StatementUpload.objects.create(user=self.user, file_name="synthetic-new.pdf", parser_status="needs_review")
+        StatementUpload.objects.create(user=self.user, file_name="synthetic-bad.pdf", parser_status="failed")
+        expired = StatementUpload.objects.create(user=self.user, file_name="synthetic-expired.pdf", parser_status="parsed", extracted_payload={
+            "import_review": {"state": "pending", "expires_at": (timezone.now() - timedelta(hours=1)).isoformat()}})
+        Investment.objects.create(user=self.user, asset_name="Synthetic Stale Fund", amfi_scheme_code="100001", currency="INR", units=Decimal("1"),
+                                  nav=Decimal("10"), nav_date=self.today - timedelta(days=30), current_value=Decimal("10"), invested_amount=Decimal("10"))
+        Investment.objects.create(user=self.user, asset_name="Synthetic Waiting Fund", amfi_scheme_code="100002", currency="INR", units=Decimal("1"),
+                                  current_value=Decimal("10"), invested_amount=Decimal("10"))
+        inbox = {item["id"]: item for item in self.items("document_inbox")}
+        self.assertIn("2 Finance upload(s) wait", inbox["review:Finance"]["title"])
+        self.assertIn("1 Finance upload(s) could not be read", inbox["failed:Finance"]["title"])
+        evidence = [item["title"] for item in self.items("evidence_check")]
+        self.assertEqual(evidence, ["Synthetic Stale Fund: the price is out of date", "Synthetic Waiting Fund: no AMFI price yet",
+                                    "A Finance import review has expired"])
+        self.assertIn(f"/expenses/uploads/{expired.pk}/review/", [item["url"] for item in self.items("evidence_check")])
+        privacy = self.items("privacy_housekeeping")
+        self.assertEqual([item["title"] for item in privacy], ["1 bank statement file(s) older than 90 days are still stored"])
+        self.assertIn("never deletes", privacy[0]["detail"])
+        self.assertEqual(StatementUpload.objects.filter(user=self.user).exclude(original_file="").count(), 1)
+        for bot in ("document_inbox", "evidence_check", "privacy_housekeeping"):
+            self.assertEqual(self.items(bot, self.other), [])
+
+    def test_backup_guardian_reads_only_the_age_of_the_newest_complete_backup(self):
+        import json, os, tempfile
+        from pathlib import Path
+        with self.settings(ALFRED_BACKUP_DIR=""):
+            self.assertEqual([item["id"] for item in self.items("backup_guardian")], ["backup:unset"])
+            self.assertEqual(self.items("backup_guardian", self.other), [])  # only the person who runs this PC
+        with tempfile.TemporaryDirectory() as folder, self.settings(ALFRED_BACKUP_DIR=folder):
+            self.assertEqual([item["id"] for item in self.items("backup_guardian")], ["backup:none"])
+            unfinished, done = Path(folder, "a", "backup.json"), Path(folder, "b", "backup.json")
+            for path, complete in ((unfinished, False), (done, True)):
+                path.parent.mkdir(); path.write_text(json.dumps({"complete": complete}), encoding="utf-8")
+            self.assertEqual(self.items("backup_guardian"), [])
+            stamp = (timezone.now() - timedelta(days=20)).timestamp()
+            os.utime(done, (stamp, stamp))
+            item, = self.items("backup_guardian")
+            self.assertIn("more than 7 days ago", item["detail"])
+            self.assertNotIn(folder, json.dumps(item))
+            self.assertEqual(sorted(path.name for path in Path(folder).iterdir()), ["a", "b"])
+        with self.settings(ALFRED_BACKUP_DIR=os.path.join(tempfile.gettempdir(), "synthetic-missing-backups")):
+            self.assertEqual([item["id"] for item in self.items("backup_guardian")], ["backup:none"])
+
+    def test_app_health_reports_blocked_checks_low_disk_and_recent_errors_for_the_operator_only(self):
+        operational_logging_service.log(user=self.user, module="expenses", category="api", scope="synthetic", event_type="synthetic_error",
+                                        severity="error", message="Synthetic failure")
+        blocked = {"blocked_checks": [{"key": "worker", "label": "Background processing", "detail": "No heartbeat.", "manual_task": "Restart ALFRED."}]}
+        usage = type("Usage", (), {"free": 1024 ** 3})()
+        with self.settings(ALFRED_NATIVE_RUNTIME=True), patch("alfred_ai.services.native_readiness.native_readiness_snapshot", return_value=blocked), \
+                patch("shutil.disk_usage", return_value=usage):
+            titles = [item["title"] for item in self.items("app_health")]
+            self.assertEqual(self.items("app_health", self.other), [])
+        self.assertEqual(titles, ["Background processing needs attention", "Less than 5 GB is free on the drive that holds your data",
+                                  "1 error(s) in expenses in the last 24 hours"])
+        with self.settings(ALFRED_NATIVE_RUNTIME=False), patch("shutil.disk_usage", return_value=type("Usage", (), {"free": 10 ** 12})()):
+            self.assertEqual([item["id"] for item in self.items("app_health")], ["errors:expenses:1"])
+
+    def test_daily_review_lists_the_first_item_of_the_three_most_pressing_reviews_and_changes_nothing(self):
+        from apps.budgets.models import SavingsGoal
+        Loan.objects.create(user=self.user, lender="Synthetic Bank", principal=Decimal("100000"), interest_rate=9.5, emi=Decimal("4321.00"),
+                            currency="INR", start_date=(self.today + timedelta(days=3)).replace(year=self.today.year - 1))
+        SavingsGoal.objects.create(user=self.user, name="Synthetic goal", target_amount=Decimal("1000"), saved_amount=Decimal("100"),
+                                   target_date=self.today + timedelta(days=30), currency="INR")
+        self.assertEqual(self.items("daily_review"), [])
+        with self.settings(ALFRED_BACKUP_DIR=""):
+            for bot in ("goal_check", "backup_guardian", "bills_due"):
+                task_bots.run(self.user, bot, self.today)
+            task_bots.run(self.other, "backup_guardian", self.today)
+            before = financial_rows()
+            proposal = task_bots.run(self.user, "daily_review", self.today)
+            again = task_bots.run(self.user, "daily_review", self.today)
+            done = task_bots.confirm(self.user, proposal["proposal_id"], [item["id"] for item in proposal["items"]], proposal["fingerprint"], self.today)
+        opened = [task_bots.BOTS[bot][0] for bot in ("bills_due", "backup_guardian", "goal_check") if any(p["bot"] == bot for p in task_bots.pending(self.user))]
+        self.assertEqual([item["title"].split(":")[0] for item in proposal["items"]], opened)
+        self.assertIn("Backup guardian", opened)
+        self.assertEqual(proposal["proposal_id"], again["proposal_id"])
+        self.assertEqual((done["applied"], financial_rows()), ([], before))
+        self.assertTrue(all(item["action"] is None for item in proposal["items"]))
+
+    def test_every_notice_bot_is_listed_and_daily_review_runs_last(self):
+        names = list(task_bots.BOTS)
+        self.assertEqual(names[-7:], ["reconciliation", "document_inbox", "backup_guardian", "evidence_check", "app_health",
+                                      "privacy_housekeeping", "daily_review"])
+        self.assertFalse(task_bots.NETWORK_BOTS & set(names[-7:]))
+        self.assertEqual(self.client.get(URL).json()["bots"][-1]["label"], "Daily review")
