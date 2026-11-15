@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const financialChoice = document.getElementById("intelligenceFinancial");
     const consent = document.getElementById("intelligenceCloudConsent");
     const webSearch = document.getElementById("intelligenceWebSearch");
+    let searchOnce = false;  // one confirmed lookup, without changing the "always" tick
     const feedback = document.getElementById("intelligenceFeedback");
     const answers = document.getElementById("intelligenceAnswers");
     const memoryText = document.getElementById("intelligenceMemoryText");
@@ -485,6 +486,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
         if (historical) label.textContent = `Historical AI hypothesis · Ollama (local) · saved ${new Date(result.saved_at).toLocaleString()}`;
         assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
+        if (result.web_offer && !historical) {
+            // ALFRED never sends a possibly private question by itself: the owner sees the exact text first.
+            const offer = document.createElement("p"); offer.className = "small mt-2";
+            offer.textContent = `ALFRED did not look this up online, because the question may be about someone's private life. Only this exact text would go to Wikipedia and Google News, which may keep it: “${result.web_offer}” `;
+            const send = document.createElement("button"); send.type = "button"; send.className = "btn btn-outline-primary btn-sm"; send.textContent = "Search online with this text";
+            send.addEventListener("click", () => { scope.value = "general"; scope.dispatchEvent(new Event("change")); query.value = result.web_offer; searchOnce = true; form.requestSubmit(); });
+            offer.append(send); assistantMessage.append(offer);
+        }
         const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
         const summary = document.createElement("summary"); summary.textContent = `Sources & evidence (${(result.sources || []).length})`;
         evidence.append(summary); assistantMessage.append(evidence);
@@ -735,7 +744,8 @@ document.addEventListener("DOMContentLoaded", () => {
         button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
         if (consent.checked) payload.provider = "openai";
-        if (webSearch.checked && scope.value === "general") payload.web_search = true;
+        if ((webSearch.checked || searchOnce) && scope.value === "general") payload.web_search = true;
+        searchOnce = false;
         if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && pageDialogue.length) payload.page_context = pageDialogue;
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);

@@ -45,6 +45,34 @@ class QuestionFilterTests(SimpleTestCase):
         self.assertFalse(web_lookup.should_search("what is a mutual fund", [{"id": "saved"}]))  # memory answers it
         self.assertTrue(web_lookup.should_search("latest mutual fund news", [{"id": "saved"}]))  # memory cannot be current
 
+    def test_a_question_that_may_be_about_someones_private_life_is_offered_not_sent(self):
+        # Third-party health, money trouble, work and family facts; no pronoun or keyword is needed for the default to hold.
+        for question in ("What should Anika do after her HIV diagnosis?", "How should Anika handle bankruptcy after losing her job?",
+                         "Does Anika have cancer?", "Is Anika pregnant?", "When did Anika leave Infosys?", "What is Anika's rent today",
+                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression"):
+            with self.subTest(question=question):
+                self.assertFalse(web_lookup.clearly_public(question))
+                self.assertFalse(web_lookup.should_search(question))
+                self.assertEqual(web_lookup.offer(question), question)  # the exact text, for the owner to confirm
+        for question in ("latest repo rate in India", "what is a mutual fund", "What is the capital of France?", "how does a SIP work"):
+            with self.subTest(public=question):
+                self.assertTrue(web_lookup.should_search(question))
+                self.assertIsNone(web_lookup.offer(question))
+        self.assertIsNone(web_lookup.offer("what did I save about my trip"))  # about the owner: memory answers it
+        self.assertIsNone(web_lookup.offer("suggest a quiet hobby"))  # nothing a lookup would help
+        self.assertIsNone(web_lookup.offer("what is a mutual fund", [{"id": "saved"}]))
+
+    def test_written_out_amounts_and_identifiers_never_leave_even_when_confirmed(self):
+        for private in ("Is salary of fifty thousand rupees fair today?", "is two lakh a month enough", "loan of one and a half crore",
+                        "twenty-five thousand dollars bonus", "my aadhaar is 1234 5678 9012", "card 4111 1111 1111 1111 expiry"):
+            with self.subTest(private=private):
+                self.assertFalse(web_lookup.should_search(private))
+                self.assertIsNone(web_lookup.offer(private))
+                with patch("apps.ml_engine.services.web_lookup.public_http.request") as request, self.assertRaises(web_lookup.PrivateQuestion):
+                    web_lookup.search(private)
+                request.assert_not_called()
+        self.assertTrue(web_lookup.should_search("one in a million meaning today"))  # a number word alone is not an amount
+
     def test_search_sends_only_the_question_cleans_results_and_skips_a_failed_source(self):
         with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
             results = web_lookup.search("current repo rate in India")
@@ -117,6 +145,28 @@ class HybridWebLookupTests(TestCase):
             self.assertEqual(web(self.ask("is 12 lakh a good salary today")), [])  # private-looking: never searched
             self.assertEqual(web(self.ask("latest repo rate news", scope="finance")), [])
         self.assertEqual(web(self.ask("latest repo rate news")), [])  # switched off
+
+    def test_a_possibly_private_question_reaches_the_web_only_after_the_owner_confirms_the_exact_text(self):
+        self.local.reason.return_value = "Synthetic general answer."
+        question = "What should Anika do after her  HIV diagnosis?"
+        exact = "What should Anika do after her HIV diagnosis?"
+        with override_settings(ALFRED_ASSISTANT_AUTO_WEB=True),                 patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
+            result = self.ask(question)
+            request.assert_not_called()  # automatic lookup: nothing left this PC
+            self.assertEqual(result["web_offer"], exact)
+            self.assertFalse(any(s.get("classification") == "public_web_result" for s in result["sources"]))
+            self.assertNotIn("web_offer", self.ask("latest repo rate news"))  # plainly public: looked up, nothing to confirm
+            request.reset_mock()
+            confirmed = self.ask(exact, web_search=True)  # the owner pressed "Search online with this text"
+            self.assertEqual({call.kwargs.get("params", {}).get("q", exact) for call in request.call_args_list}, {exact})
+            self.assertNotIn("web_offer", confirmed)
+            request.reset_mock()
+            cloud = self.ask("When did Anika leave Infosys?", provider="openai", cloud_consent=True, query_sensitivity="public")
+            request.assert_not_called()
+            self.assertEqual(cloud["web_offer"], "When did Anika leave Infosys?")
+            with self.assertRaises(PermissionError):  # the cloud path keeps its own stricter refusal for sensitive text
+                self.ask(question, provider="openai", cloud_consent=True, query_sensitivity="public")
+        self.assertNotIn("web_offer", self.ask(question))  # automatic lookup switched off: no offer either
 
     def test_openai_answers_directly_when_chosen_with_consent(self):
         result = self.ask(web_search=True, provider="openai", cloud_consent=True, query_sensitivity="public")
