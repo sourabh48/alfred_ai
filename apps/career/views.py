@@ -21,6 +21,7 @@ from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extracti
 from apps.expenses.models import BankAccount
 from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
 from apps.integrations.services import verified_intelligence
+from apps.integrations.services.verified_intelligence import freshness_snapshot
 from apps.loans.models import Loan
 from apps.reports.services import operational_logging_service
 from .models import CareerJobAnalysis, CareerProfile, CareerResume
@@ -142,11 +143,38 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None, la
     available_fit = latest_analysis.available_fit_score if latest_analysis else None
     fit_score = float(available_fit or 0)
 
+    # Unknown is not zero risk. Without recorded income, fresh market evidence for a recorded role and a scored job
+    # comparison there is nothing to measure, so no readiness number, window or go/hold advice is given.
+    missing = []
+    if monthly_income <= 0:
+        missing.append("your income and bank balances")
+    if (market.get("measured") is False or "risk_score" not in market  # no role recorded: the market was never scored
+            or not freshness_snapshot(market.get("evidence") or [])["proof_complete"]):
+        missing.append("fresh job-market evidence for your role")
+    if available_fit is None:
+        missing.append("a job comparison with a fit score")
+    if missing:
+        return {
+            "readiness_score": None,
+            "readiness_level": "insufficient_evidence",
+            "window_start": None,
+            "window_end": None,
+            "next_review_date": (today + timedelta(days=30)).isoformat(),
+            "summary": "ALFRED cannot judge career timing yet. It still needs " + ", ".join(missing) + ".",
+            "next_step": "Add what is missing and this view fills in. Until then ALFRED gives no readiness score and no go or hold advice.",
+            "signals": [],
+            "blockers": [f"Missing: {item}." for item in missing],
+            "moves": [],
+            "missing_evidence": missing,
+            "income_source_summary": resolved_income_signals.get("source_summary", ""),
+            "financial_baseline": baseline,
+        }
+
     readiness_score = _clamp(
         100
         - market_risk
         + min(emergency_months * 9, 28)
-        + (max(fit_score - 60, 0) * 0.45 if latest_analysis else 4)
+        + max(fit_score - 60, 0) * 0.45
         + (6 if 0 < fixed_load_ratio <= 40 else 0)
         - (16 if emergency_months < 2 else (8 if emergency_months < 4 else 0))
         - (8 if fixed_load_ratio >= 55 else 0)
@@ -174,7 +202,7 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None, la
     moves = [
         {
             "label": "Job switch",
-            "status": "go" if readiness_score >= 72 and (fit_score >= 65 or not latest_analysis) else ("prepare" if readiness_score >= 52 else "hold"),
+            "status": "go" if readiness_score >= 72 and fit_score >= 65 else ("prepare" if readiness_score >= 52 else "hold"),
             "note": "Best used when runway and role-fit are both strong enough to absorb a slower search cycle.",
         },
         {
@@ -196,17 +224,17 @@ def _career_timing_payload(user, profile, market: dict, latest_analysis=None, la
 
     signals = [
         f"Liquid runway is {emergency_months:.1f} months.",
-        f"Fixed monthly load is {fixed_load_ratio:.1f}% of income." if monthly_income else "Income data is still incomplete, so readiness is conservative.",
+        f"Fixed monthly load is {fixed_load_ratio:.1f}% of income.",
         f"External market risk is {market_risk:.0f}/100.",
-        f"Latest rule-based job-fit is {fit_score:.0f}/100, not a hiring probability." if available_fit is not None else "Job-fit evidence is unavailable; review the saved sources.",
+        f"Latest rule-based job-fit is {fit_score:.0f}/100, not a hiring probability.",
     ]
     blockers = []
     if emergency_months < 3:
         blockers.append("Increase liquid runway before making a high-volatility move.")
     if market_risk >= 55:
         blockers.append("Hiring conditions are still elevated-risk for this role.")
-    if latest_analysis and fit_score < 65:
-        blockers.append("Review incomplete job-fit evidence before prioritizing a switch." if available_fit is None else "Close the visible skill or experience gaps before treating the matched role as a target.")
+    if fit_score < 65:
+        blockers.append("Close the visible skill or experience gaps before treating the matched role as a target.")
     if not blockers:
         blockers.append("No major blocker is dominant right now, but keep evidence and runway under review.")
 
@@ -252,7 +280,8 @@ def _career_data_pipeline_payload(profile, latest_resume, latest_analysis, proje
             f"Profile and resume skills are normalized into a comparable skill set of {len(resume_payload.get('skills', [])) or projection['projection_basis']['skills_count']} items.",
             "Job links are parsed for title, company, location, skill requirements, and experience expectations before fit scoring.",
             f"Projection mode is {projection.get('projection_mode', 'heuristic').replace('_', ' ')}. {projection.get('projection_method', '')}",
-            f"Career timing then blends market risk, financial runway, fixed monthly load, and job-fit into a readiness score of {career_timing['readiness_score']}/100.",
+            (f"Career timing then blends market risk, financial runway, fixed monthly load, and job-fit into a readiness score of {career_timing['readiness_score']}/100."
+             if career_timing["readiness_score"] is not None else "Career timing gives no readiness score until income, fresh market evidence and a scored job comparison all exist."),
         ],
         "verification": [
             "Resume files are stored with parser status and confidence instead of being silently trusted.",

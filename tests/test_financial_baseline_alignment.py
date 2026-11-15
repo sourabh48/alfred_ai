@@ -612,3 +612,62 @@ def _insight(payload, source_name):
 
 def _future_stale_after():
     return (timezone.now() + timedelta(days=2)).isoformat()
+
+
+class CareerTimingEvidenceTests(TestCase):
+    """Career timing gives a score and go/hold advice only when income, fresh market evidence and a scored job comparison exist."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+        self.user = get_user_model().objects.create_user("synthetic-career-timing")
+        self.profile = SimpleNamespace(role="Synthetic analyst")
+        self.analysis = SimpleNamespace(available_fit_score=82)
+        fresh = (timezone.now() + timedelta(hours=4)).isoformat()
+        self.market = {"risk_score": 20, "evidence": [{"status": "fresh", "stale_after": fresh, "source_url": "https://example.org/synthetic"}]}
+        self.baseline = {"monthly_income": 100000.0, "liquid_runway_months": 7.0, "debt_burden_ratio": 20.0}
+
+    def timing(self, *, baseline=None, profile=None, market=None, analysis="scored"):
+        with patch("apps.career.views.resolve_canonical_financial_baseline", return_value=self.baseline if baseline is None else baseline):
+            return _career_timing_payload(self.user, self.profile if profile is None else None, self.market if market is None else market,
+                                          self.analysis if analysis == "scored" else analysis, income_signals={"source_summary": "Synthetic"})
+
+    def test_an_adequately_supported_profile_gets_a_score_window_and_moves(self):
+        result = self.timing()
+        self.assertEqual((result["readiness_level"], result["moves"][0]["status"]), ("favorable", "go"))
+        self.assertGreaterEqual(result["readiness_score"], 72)
+        self.assertTrue(result["window_start"] and result["window_end"])
+        self.assertNotIn("missing_evidence", result)
+
+    def test_empty_partial_and_stale_evidence_give_no_score_and_no_go(self):
+        from types import SimpleNamespace
+        stale = {"risk_score": 20, "evidence": [{"status": "fresh", "source_url": "https://example.org/synthetic",
+                                                 "stale_after": (timezone.now() - timedelta(hours=1)).isoformat()}]}
+        cases = {
+            "audit case: nothing recorded": (dict(baseline={}, profile=False, market={}, analysis=None), 3),
+            "no income": (dict(baseline={"liquid_runway_months": 9.0}), 1),
+            "no role, so the market was never scored": (dict(market=self.market | {"risk_score": 0.0, "measured": False}), 1),
+            "market not measured": (dict(market={"evidence": self.market["evidence"]}), 1),
+            "market evidence missing": (dict(market={"risk_score": 0.0, "evidence": []}), 1),
+            "market evidence stale": (dict(market=stale), 1),
+            "no job comparison": (dict(analysis=None), 1),
+            "fit score unavailable": (dict(analysis=SimpleNamespace(available_fit_score=None)), 1),
+        }
+        for name, (changes, count) in cases.items():
+            with self.subTest(name):
+                result = self.timing(**changes)
+                self.assertIsNone(result["readiness_score"])
+                self.assertEqual((result["readiness_level"], result["moves"], result["window_start"], result["window_end"]),
+                                 ("insufficient_evidence", [], None, None))
+                self.assertEqual(len(result["missing_evidence"]), count)
+                self.assertIn("cannot judge career timing yet", result["summary"])
+                self.assertNotIn("go", [move.get("status") for move in result["moves"]])
+                self.assertIn("financial_baseline", result)
+
+    def test_the_career_page_payload_carries_the_insufficient_state_for_a_new_account(self):
+        self.client.force_login(self.user)
+        offline = {"payload": {"unemployment": {}, "inflation": {}, "market": {}}, "evidence": []}
+        with patch("apps.career.views.verified_intelligence.macro_context", return_value=offline):
+            data = self.client.get("/api/career/dashboard/").json()
+        timing = data["career_timing"]
+        self.assertEqual((timing["readiness_score"], timing["readiness_level"], timing["moves"]), (None, "insufficient_evidence", []))
+        self.assertTrue(any("no readiness score" in line for line in data["data_pipeline"]["processing"]))

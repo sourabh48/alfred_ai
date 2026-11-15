@@ -154,7 +154,7 @@ function renderCareerSummary(profile, projection, resume, jobAnalysis, market, t
         { title: "Rule-based Job Fit", value: jobAnalysis ? (jobAnalysis.fit_score == null ? "Unavailable" : `${Alfred.formatNumber(jobAnalysis.fit_score, 0)}/100`) : "No comparison", copy: jobAnalysis ? `${Alfred.escapeHtml(jobAnalysis.company || jobAnalysis.source_name || "Latest analysis")} · Not a hiring probability` : "Provide a job description" },
         {
             title: "Career Timing",
-            value: timing?.readiness_score != null ? `${Alfred.formatNumber(timing.readiness_score || 0, 0)}/100` : (market ? `${Alfred.formatNumber(market.risk_score || 0, 0)}/100` : "N/A"),
+            value: timing?.readiness_score != null ? `${Alfred.formatNumber(timing.readiness_score, 0)}/100` : "Not enough data",
             copy: timing?.summary || projectionConfidence.summary || (latest ? `Year 5 projection ${Alfred.formatCurrency(latest.projected_income || 0)}` : "Projection pending"),
         },
     ];
@@ -299,37 +299,37 @@ function renderCareerTiming(timing) {
         <div class="mini-card">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
-                    <div class="fw-semibold">Readiness ${Alfred.formatNumber(timing.readiness_score || 0, 0)}/100</div>
+                    <div class="fw-semibold">${timing.readiness_score != null ? `Readiness ${Alfred.formatNumber(timing.readiness_score, 0)}/100` : "Readiness: not enough data yet"}</div>
                     <div class="muted small mt-1">${Alfred.escapeHtml(timing.summary || "")}</div>
-                    <div class="muted small mt-2">Window ${Alfred.formatDate(timing.window_start)} to ${Alfred.formatDate(timing.window_end)} | review again on ${Alfred.formatDate(timing.next_review_date)}</div>
+                    <div class="muted small mt-2">${timing.window_start ? `Window ${Alfred.formatDate(timing.window_start)} to ${Alfred.formatDate(timing.window_end)} | ` : ""}review again on ${Alfred.formatDate(timing.next_review_date)}</div>
                     <div class="muted small mt-2">${Alfred.escapeHtml(timing.next_step || "")}</div>
                 </div>
-                <span class="status-pill ${careerTone(timing.readiness_level)}">${Alfred.escapeHtml(timing.readiness_level || "guarded")}</span>
+                <span class="status-pill ${careerTone(timing.readiness_level)}">${Alfred.escapeHtml(timing.readiness_level === "insufficient_evidence" ? "needs data" : (timing.readiness_level || "guarded"))}</span>
             </div>
         </div>
-        <div class="mini-card surface-card">
+        ${(timing.signals || []).length ? `<div class="mini-card surface-card">
             <div class="fw-semibold mb-2">Current signals</div>
             <ul class="insight-list mb-0">
-                ${(timing.signals || []).map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("")}
+                ${timing.signals.map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("")}
             </ul>
-        </div>
+        </div>` : ""}
         <div class="mini-card surface-card">
-            <div class="fw-semibold mb-2">What blocks a bigger move</div>
+            <div class="fw-semibold mb-2">${timing.readiness_score != null ? "What blocks a bigger move" : "What ALFRED still needs"}</div>
             <ul class="insight-list mb-0">
                 ${(timing.blockers || []).map(item => `<li class="insight-item surface-card">${Alfred.escapeHtml(item)}</li>`).join("")}
             </ul>
         </div>
-        <div class="mini-card">
+        ${(timing.moves || []).length ? `<div class="mini-card">
             <div class="fw-semibold mb-2">Recommended move types</div>
             <div class="data-stack">
-                ${(timing.moves || []).map(item => `
+                ${timing.moves.map(item => `
                     <div class="data-row">
                         <div class="data-label">${Alfred.escapeHtml(item.label)}</div>
                         <div class="data-value"><span class="status-pill ${careerTone(item.status)}">${Alfred.escapeHtml(item.status)}</span> <span class="muted small">${Alfred.escapeHtml(item.note || "")}</span></div>
                     </div>
                 `).join("")}
             </div>
-        </div>
+        </div>` : ""}
     `);
 }
 
