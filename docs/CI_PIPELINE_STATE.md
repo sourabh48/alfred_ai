@@ -1,5 +1,17 @@
 # Development CI and integration pipeline
 
+## Workflow automation — 2026-11-17
+
+LOCAL_ACCEPTED (bounded), implementation commit `2213702f590b6bad20981771ba9812ef9fdefd40`; not pushed. Branch `work/travel-workflow-2026-11-16`, base
+`1377eff37191d61ea190b9d5f261c36f89987ab2`. No exact-source hosted CI exists for this change. Local synthetic receipts
+and inherited release artifact hashes are in `docs/UX_AUTOMATION_VALIDATION_20261117.md`; old package/CI acceptance
+must not be transferred to this branch. New backend labels and measured browser inventory are wired into existing CI.
+
+Dependencies: Google configuration/live verification; Nuitée or another approved inventory provider and booking adapter;
+new additive research-history migration; reconcile separate repair branch `2987931` and its privacy/streaming/bot changes.
+Push SHA and post-push checks: none. Independent integration/release reviews and owner's push/deployment approval remain.
+Recovery: preserve both worktrees, use synthetic data, resolve overlaps, then run full exact-source checks before publishing.
+
 ## Proactive travel planner and task bots - 2026-11-14
 
 LOCAL_ACCEPTED after commit, not pushed. Branch feat/proactive-bots in the proactive-bots worktree, base origin/master

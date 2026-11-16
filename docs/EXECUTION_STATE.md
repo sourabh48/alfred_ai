@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Workflow automation phase — 2026-11-17
+
+LOCAL_ACCEPTED for the bounded workflow scope; live hotel inventory/booking remains BLOCKED_EXTERNAL. Branch
+`work/travel-workflow-2026-11-16`, worktree `F:/ALFRED_DEV/travel-workflow-1116`, base `1377eff`. Implementation committed locally as `2213702`; no push, CI, master merge, runtime migration or release publication is authorized by this checkpoint.
+
+Implemented automatic trip drafts/research and an attributed photo carousel; minimal assistant/settings with recovery
+in Health; reduced-motion charts; bounded private stock-search history and daily reviews; stale financial/hotel evidence
+guards. Reused fund fix `f3976cb`; chart theme closure fixed as in `4ce8991`. Existing scheduler/memory services reused.
+Additive `investments.0010_researchsearch` is synthetic-tested only. Primary dirty checkout and repair branch preserved.
+
+Evidence: 191 backend PASS, 66 overlapping finance/provider PASS, final 10 history PASS; 17 workflow browser PASS plus
+assistant desktop/mobile light/dark accessibility PASS on focused rerun. Details, earlier failures, artifacts and exact
+limits: `docs/UX_AUTOMATION_VALIDATION_20261117.md`. Provider setup: `docs/LIVE_TRAVEL_SETUP_20261116.md`.
+
+Next: owner sandbox onboarding for live hotels; implementation and checkpoint are committed locally. Before any release, reconcile the
+other unmerged audit repairs, run full exact-source/backend/browser/package checks, review/apply migration separately,
+and obtain publication authorization. Do not select another queue item from this `continue` request. Original ledger
+states/progress remain unchanged; no whole-repository or real-world accuracy claim.
+
 ## Product UI pass - 2026-11-15
 
 - Owner 2026-11-15: "make ui look like more like product ... polish the whole ui ... make it release ready then
