@@ -3,17 +3,19 @@
 // Charts whose values are rupees: their tooltips and axes carry ₹ in Indian digit grouping.
 const MONEY_CHARTS = new Set(["dashboardMonthlyChart", "dashboardCategoryChart", "expenseTrend", "budgetForecastChart", "loanTrendChart",
     "allocationChart", "growthChart", "familyNetChart", "taxComparisonChart", "bikeServiceCostChart", "bikeServiceMixChart", "salaryChart"]);
+const chartTheme = {series: [], other: "", surface: ""};
 function styleCharts(dark) {
     if (!window.Chart) return;
-    const ink = dark ? "#c9dfff" : "#53647c", grid = dark ? "#2b4462" : "#e8eef6", surface = dark ? "#182b44" : "#ffffff";
+    const ink = dark ? "#c9dfff" : "#53647c", grid = dark ? "#2b4462" : "#e8eef6";
     const css = getComputedStyle(document.documentElement);
-    const series = [1, 2, 3, 4, 5, 6, 7, 8].map(n => css.getPropertyValue(`--series-${n}`).trim());
-    const color = i => i < series.length ? series[i] : css.getPropertyValue("--series-other").trim();  // past 8, one neutral: never a cycled hue
+    Object.assign(chartTheme, {series: [1,2,3,4,5,6,7,8].map(n=>css.getPropertyValue(`--series-${n}`).trim()),
+        other: css.getPropertyValue("--series-other").trim(), surface: dark ? "#182b44" : "#ffffff"});
     const d = Chart.defaults;
     Object.assign(d, { color: ink, borderColor: grid, maintainAspectRatio: false, locale: "en-IN" });
     const isMoney = chart => MONEY_CHARTS.has(chart.canvas.id);
     d.font.family = getComputedStyle(document.body).fontFamily; d.font.size = 12;
-    d.animation.duration = 350;
+    d.animation.duration = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650;
+    d.animation.easing = "easeOutQuart";
     Object.assign(d.plugins.legend.labels, { usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 14,
         // A series with nothing recorded is left out of the legend rather than shown as an empty promise.
         filter: (item, data) => item.datasetIndex === undefined || (data.datasets[item.datasetIndex]?.data || []).some(v => Number(v)) });
@@ -42,6 +44,8 @@ function styleCharts(dark) {
             }
         },
         beforeUpdate(chart) {
+            const surface=chartTheme.surface, color=i=>chartTheme.series[i] || chartTheme.other;
+            if(matchMedia("(prefers-reduced-motion: reduce)").matches) chart.options.animation=false;
             // Colour follows the thing, not its position: Income is the same green on every chart.
             const entity = { Expenses: 0, Spending: 0, Loans: 1, "Loan payments": 1, Investments: 3, Other: 4, Income: 5, "Card payments": 6 };
             chart.data.datasets.forEach((ds, index) => {
@@ -65,6 +69,11 @@ function styleCharts(dark) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change",()=>{
+        if(!window.Chart)return;
+        Object.values(Chart.instances).forEach(chart=>{chart.stop();chart.options.animation={duration:matchMedia("(prefers-reduced-motion: reduce)").matches?0:650,easing:"easeOutQuart"};});
+        styleCharts(document.documentElement.dataset.theme==="dark");
+    });
     const theme = document.getElementById("workspaceTheme");
     function setTheme(dark) {
         document.documentElement.dataset.theme = dark ? "dark" : "light";

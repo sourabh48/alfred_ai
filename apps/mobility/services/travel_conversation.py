@@ -248,11 +248,10 @@ def ready_prompt(session, prefix=""):
     elif not value(state, "origin"):
         state["pending_question"] = fact("origin", "assistant", False)
         say(session, prefix+"Where will you be starting from? A city is enough.")
-    elif not value(state, "budget") and not value(state, "budget_type"):
-        state["pending_question"] = fact("budget", "assistant", False)
-        say(session, prefix+"I can suggest places without an exact budget. Do you want budget, moderate or premium options?",
-            ["Budget options", "Moderate options", "Premium options"])
     else:
+        if not value(state, "budget") and not value(state, "budget_type"):
+            state["budget_type"] = fact("moderate", "planning_assumption", False, .5)
+            prefix += "I'll use mid-range estimates for now; tell me your budget whenever you like. "
         state.pop("pending_question", None)
         session.save()
         session.candidates = candidates_for(session.user, state)
@@ -267,10 +266,13 @@ def ready_prompt(session, prefix=""):
 def send_message(session_id, user, text):
     session = TravelPlanningSession.objects.select_for_update().get(pk=session_id, user=user)
     before, revision = deepcopy(session.itinerary), session.revision
+    destination = value(session.state, "selected_destination")
     session = _send_message(session, user, text)
     if session.itinerary != before and session.revision == revision:
         session.revision += 1
         session.save(update_fields=["revision", "updated_at"])
+    if session.itinerary and value(session.state, "selected_destination") != destination:
+        queue_research(session, recheck=True, categories={"places", "hotels", "weather", "routing"})
     return session
 
 
@@ -399,12 +401,12 @@ def _send_message(session, user, text):
             session.save()
         say(session,"Applied the proposed indoor/rest alternatives; existing budget allowances are retained." if proposals else "No current weather alternatives are available. Recheck the trip first.")
         return session
-    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|availability|trains?|flights?|bus(?:es)?|permit|permission|open|unexplored|hidden|camping)\b",lower))
+    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|attractions?|offbeat|availability|trains?|flights?|bus(?:es)?|permit|permission|open|unexplored|hidden|camping)\b",lower))
     route_change = any(value(session.state,k) != value(old_state,k) for k in ("avoid_expressways","avoid_tolls","scenic_preference"))
     if (research_followup or route_change) and session.candidates:
         queue_research(session,recheck=True,force=bool(re.search(r"\b(?:refresh|live refresh)\b",lower)),
                        categories=research_categories(text) | ({"routing"} if route_change else set()))
-        reply = "I'll update research using your saved trip details and fresh cached results where available."
+        reply = "I'll update research using your saved trip details and fresh cached results where available. Open Attractions, Find a stay or Map & routes below to explore the results."
         if "flight" in lower and not (value(session.state,"origin_airport") and value(session.state,"destination_airport")):
             reply += " For flight search, give the airport codes, for example BLR to CCJ; I won't guess the nearest airports."
         say(session,reply)
@@ -441,14 +443,15 @@ def _send_message(session, user, text):
         session.state["selected_destination"] = fact(choice["name"])
         session.state["requested_destination"] = fact(choice["name"])
         session.state["selected_location"] = fact({k:choice[k] for k in ("id","name","lat","lon","region","country") if k in choice})
-        session.status = "researched"
-        session.itinerary = {}
+        session.status = "ready"
+        session.itinerary = build_itinerary(session.state, choice)
         session.title = f"{choice['name']} escape"
         for style in choice["styles"]:
             learn(user, style, True, f"Accepted recommendation: {choice['name']}", .55)
         say(session, f"Great. {choice['name']} for {value(session.state, 'trip_duration')} days from {value(session.state, 'origin')}, "
             + (f"target ₹{value(session.state, 'budget'):,.0f}. " if value(session.state, "budget") else "with your chosen budget style. ")
-            + "Shall I build the full itinerary?", ["Build itinerary", "Compare again", "Adjust budget", "Change dates"])
+            + "Your draft itinerary is ready below. Explore attractions and stays, then adjust the days or budget. Prices and access still need checking.",
+            ["Show attractions", "Find hotels", "Find offbeat places", "Adjust budget", "Change dates"])
     elif lower in {"build itinerary", "build the itinerary"}:
         stops = value(session.state, "_itinerary_stops", [])
         selected = next((c for c in session.candidates if c["name"] == value(session.state, "selected_destination")), None)

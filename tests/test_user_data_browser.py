@@ -157,12 +157,19 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
               .then(async response=>done({status:response.status,data:await response.json(),cache:response.headers.get('Cache-Control')}));
         ''',path,payload,csrf)
 
+    def open_answer_options(self):
+        panel=self.browser.find_element(self.By.ID,'intelligenceOptions')
+        if not panel.get_attribute('open'):
+            self.memory_click('#intelligenceOptions > summary')
+
     def memory_click(self,selector):
         from selenium.common.exceptions import ElementClickInterceptedException, NoSuchElementException, StaleElementReferenceException
 
         def click_when_uncovered(_):
             try:
                 element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+                if element.get_attribute('id') in ('intelligenceWebSearch','intelligenceCloudConsent'):
+                    self.open_answer_options()
                 self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
                 if not element.is_displayed() or not element.is_enabled():
                     return False
@@ -1151,7 +1158,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Kotlin', CareerProfile.objects.get(user=owner).skills)
         self.capture('career-weak-resume-confirmed')
 
-    def memory_evaluation_fixture(self):
+    def memory_evaluation_fixture(self, health=True):
         from unittest.mock import Mock
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_memory_evaluation import synthetic_embedding
@@ -1163,14 +1170,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         identities=[store.save_verified(owner,{'statement':text},{'source':'Synthetic owner review'},verified=True)
             for text in ('mountain preference','I prefer the coast','I dislike the coast')]
-        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.login(); self.browser.get(self.live_server_url+('/settings/diagnostics/#memoryHealth' if health else '/settings/#privateMemoryPanel'))
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
         return store,owner,identities
 
     def test_own_openai_key_is_saved_from_settings_never_shown_and_removable(self):
         from unittest.mock import patch as mock_patch
         from tests.test_memory_reasoning import KEY
-        store, owner, _ = self.memory_evaluation_fixture()
+        store, owner, _ = self.memory_evaluation_fixture(health=False)
         http = self.enterContext(mock_patch('apps.ml_engine.services.memory_reasoning.request', side_effect=AssertionError('No OpenAI call')))
         self.wait.until(lambda _: 'no key saved' in self.text('memoryReasoningStatus'))
         self.assertIn('No key saved', self.text('memoryReasoningKeyStatus'))
@@ -1488,7 +1495,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
-        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'No verified memories saved.' in self.text('memoryList'))
         payload={'action':'extract','text':'synthetic mountain <img src=x onerror="window.memoryLeak=true">','provenance':{'source':'synthetic browser review'},'sensitivity':'public'}
         self.assertEqual(self.memory_post('learning',payload,False)['status'],403)
@@ -1531,7 +1538,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         original=store.save_verified(owner,{'statement':'synthetic original'}, {'source':'synthetic owner review'},verified=True)
-        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'synthetic original' in self.text('memoryList'))
         self.memory_click('#memoryList details[data-memory-correction] summary')
         correction=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryList textarea')
@@ -1562,7 +1569,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         store.save_verified(owner,{'note':'synthetic public mountain preference'},{'source':'synthetic'},sensitivity='public',verified=True)
-        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'synthetic public mountain preference' in self.text('memoryList'))
         post=self.memory_post
         configure={'action':'configure','enabled':True,'consent':True}
@@ -1781,7 +1788,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.execute_script("return Alfred.formatRecordedMoney({amount:'0.00',currency:'INR',evidence_status:'unavailable'})"),'Financial evidence unavailable')
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'intelligenceDocument').find_elements(self.By.TAG_NAME,'option'))>1)
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('documents')
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceDocument')).select_by_value(str(document.pk))
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain my closure evidence')
         self.memory_click('#intelligenceForm button')
@@ -1806,7 +1815,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store = MemoryStore(root/'vault'); owner = self.scenario['user']
         source = store.save_verified(owner, {'statement': 'SYNTHETIC public hiking <b>reference</b>'}, {'source': 'synthetic reviewed guide'}, sensitivity='public', verified=True)
         store.save_verified(owner, {'statement': 'SYNTHETIC PRIVATE MUST STAY OUT OF PACKS'}, {'source': 'synthetic private'}, verified=True)
-        self.login(); self.browser.get(self.live_server_url+'/settings/#knowledgeHub')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'durable checkpoint' in self.text('knowledgeHubStatus'))
         self.assertFalse(self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
         self.memory_click('#knowledgeHubEnabled'); self.memory_click('#knowledgeHubPolicy button')
@@ -1858,7 +1867,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store = MemoryStore(root/'vault'); owner = self.scenario['user']
         source = store.save_verified(owner, {'statement': 'SYNTHETIC retained public selection'}, {'source': 'synthetic guide'}, sensitivity='public', verified=True)
         KnowledgeHub(store).configure(owner, enabled=True, consent=True)
-        self.login(); self.browser.get(self.live_server_url+'/settings/#knowledgeHub')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'knowledgeHubSources').is_enabled())
         Select(self.browser.find_element(self.By.ID, 'knowledgeHubSources')).select_by_value(source)
         with patch.object(KnowledgeHub, 'draft', side_effect=RuntimeError('synthetic unavailable')):
@@ -1963,7 +1972,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             artifact_evidence=dict(role='expense_forecaster',sha256='0'*64),
             next_refresh_due_at=timezone.now()+timedelta(hours=12)))[0]
         with patch('apps.ml_engine.api.views.run_training_cycle') as train, patch('joblib.load') as load:
-            self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
+            self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/')
             self.memory_click('#modelReadinessPanel summary')
             self.wait.until(lambda _: 'Registry checked' in self.text('modelReadinessStatus'))
             text=self.text('modelReadinessItems')
@@ -2638,6 +2647,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: 'Ollama available' in self.text('intelligenceLocalStatus'))
         self.assertEqual(self.text('intelligenceCloudStatus'), 'OpenAI disabled')
+        self.open_answer_options()
         style = self.browser.find_element(self.By.ID, 'intelligenceAnswerStyle')
         self.assertEqual(Select(style).first_selected_option.get_attribute('value'), 'auto')
         style.send_keys(Keys.HOME, Keys.ARROW_DOWN, Keys.ARROW_DOWN, Keys.ENTER)
@@ -2690,7 +2700,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.execute_script('return innerWidth'), 390)
         self.memory_click('[aria-controls="sidebarMenu"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'sidebarMenu').is_displayed())
-        self.assertIn('AI Memory', self.text('sidebarMenu'))
+        self.assertIn('Settings', self.text('sidebarMenu'))
         self.browser.switch_to.active_element.send_keys(Keys.ESCAPE)
         self.wait.until(lambda _: not self.browser.find_element(self.By.ID,'sidebarMenu').is_displayed())
         self.browser.execute_script("document.getElementById('alfredMainScroll').scrollTo({top:0,behavior:'instant'}); window.scrollTo({top:0,behavior:'instant'})")
@@ -2717,12 +2727,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'AI hypothesis' in self.text('intelligenceAnswers'))
         self.assertIn(identity,self.text('intelligenceAnswers')); self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
         self.assertEqual(len(store.list_memories(owner)),1)
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('finance')
         self.ask_history_question('show my financial snapshot')
         self.wait.until(lambda _: 'canonical-finance' in self.text('intelligenceAnswers'))
         self.assertIn('canonical_financial_baseline',self.text('intelligenceAnswers'))
         from apps.mobility.models import TravelPreferenceProfile
         TravelPreferenceProfile.objects.update_or_create(user=owner,defaults={'novelty':0.4,'preferences':{'pace':'quiet'}})
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('travel')
         self.ask_history_question('show my Travel preferences')
         self.wait.until(lambda _: 'travel-preferences' in self.text('intelligenceAnswers'))
@@ -2735,7 +2747,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Verified memory saved locally.' in self.text('intelligenceFeedback'))
         self.assertEqual(len(store.list_memories(owner)),2)
         self.capture('hybrid-insights-local-grounding-verified-memory')
-        self.browser.get(self.live_server_url+'/settings/')
+        self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'synthetic owner checked hiking fact' in self.text('memoryList'))
         self.assertEqual(MemoryStore(root/'vault').restore_owner(owner),2)
 
@@ -2754,7 +2766,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store.save_verified(owner,{'statement':'synthetic public mountain preference'},{'source':'synthetic review'},verified=True,sensitivity='public')
         from apps.ml_engine.services.conversation_history import ConversationHistory
         ConversationHistory(store).configure(owner, enabled=False)  # history is on by default; cloud answers need it off
-        self.login(); self.browser.get(self.live_server_url+'/settings/')
+        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'Provider: mock.' in self.text('memorySyncStatus'))
         self.memory_click('#memorySyncEnabled'); self.memory_click('#memorySyncForm button[type=submit]')
         self.wait.until(lambda _: 'Synchronization consent saved.' in self.text('memoryCloudFeedback'))
@@ -2804,7 +2816,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             clock.fromisoformat = datetime.fromisoformat
             store.save_verified(owner, {'note': 'synthetic-expiring-memory'}, {'source': 'synthetic'}, verified=True)
         self.login()
-        self.browser.get(self.live_server_url + '/settings/')
+        self.browser.get(self.live_server_url + '/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'synthetic-delete' in self.text('memoryList'))
         self.assertNotIn('synthetic-other-owner-private', self.text('memoryList'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))
@@ -2899,6 +2911,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('intelligenceAnswers'), '')
         title = 'Synthetic <img src=x onerror="window.historyLeak=true">'
         self.browser.find_element(self.By.ID, 'conversationHistoryTitle').send_keys(title)
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID, 'intelligenceAnswerStyle')).select_by_value('steps')
         self.ask_history_question('Synthetic private saved question')
         self.wait.until(lambda _: 'Saved locally' in self.text('conversationHistoryCurrent'))
@@ -3391,6 +3404,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for record,period in ((row,'2026-09-01 through 2026-09-30 (inclusive)'),
                 (other,'2026-08-01 through 2026-08-31 (inclusive)'),(row,'2026-09-01 through 2026-09-30 (inclusive)')):
             self.browser.execute_script("document.getElementById('intelligenceStatement').scrollIntoView({block:'center',behavior:'instant'})")
+            self.open_answer_options()
             Select(self.browser.find_element(self.By.ID,'intelligenceStatement')).select_by_value(str(record.pk))
             self.ask_history_question('Show statement period')
             self.wait.until(lambda _: 'Recorded statement periods ready' in self.text('intelligenceFeedback'))
@@ -3407,6 +3421,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('statement-period-mobile')
         StatementUpload.objects.filter(pk=other_upload.pk).update(statement_end=None)
         self.browser.execute_script("document.getElementById('intelligenceStatement').scrollIntoView({block:'center',behavior:'instant'})")
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceStatement')).select_by_value(str(other.pk))
         self.ask_history_question('Show statement period')
         self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
@@ -3976,6 +3991,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_enabled())
         self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
         self.wait.until(lambda _: self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceSourceItems input[value="{records[0].pk}"]').is_enabled())
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('general')
         question=dict(query='Synthetic competing history turn',scope='general',document_id=None); identity=uuid4().hex
         generation,_=history.prepare(owner,saved['id'],0,identity,question)
@@ -3986,6 +4002,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Reopen this conversation' in self.text('intelligenceFeedback'))
         local.reason.assert_not_called()
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').is_enabled())
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('financial_document')
         self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
         self.assertIn('never saved',self.text('conversationHistoryCurrent'))
@@ -4993,11 +5010,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         rows,local=self.canonical_grounding_fixture()
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'intelligenceFinancial').find_elements(self.By.TAG_NAME,'option'))>4)
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('financial_records')
         models=(Expense,BankAccount,Budget,Loan,Investment)
         before=[list(model.objects.order_by('pk').values()) for model in models]
         for kind,field,value in (('expense','amount','12.34'),('budget','base budget','234.56'),
                                 ('loan','emi','100.01'),('investment','current value','2,345.67')):
+            self.open_answer_options()
             Select(self.browser.find_element(self.By.ID,'intelligenceFinancial')).select_by_value(f'{kind}:{rows[kind].pk}')
             self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('Explain this record')
             self.memory_click('#intelligenceForm button')
@@ -5103,6 +5122,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertNotIn('SYNTHETIC-HISTORY-FAILURE',self.text('conversationHistoryFeedback'))
             self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceCloudConsent').get_property('disabled'))
             count=len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers > article'))
+            self.open_answer_options()
             Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('general')
             self.ask_history_question('KEEP MY DRAFT DURING STATUS RECOVERY')
             self.wait.until(lambda _: 'Reopen the saved conversation' in self.text('intelligenceFeedback'))
@@ -5815,7 +5835,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script('arguments[0].scrollIntoView({block:"center"})', panel); panel.send_keys(Keys.ENTER)
         self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceToolsPanel').get_property('open'))
         self.assertIn('external MCP servers', self.text('intelligenceToolsPanel'))
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('financial_records')
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceFinancial')).select_by_value(f'investment:{rows["investment"].pk}')
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceToolPolicy').get_attribute('data-tool'),'finance.record')
         self.assertIn('does not change them or contact external providers',self.text('intelligenceToolPolicy'))
@@ -5824,6 +5846,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertGreaterEqual(sum(call.args[1] == 'finance.record' for call in execute.call_args_list),2)
         self.assertNotIn('input_schema',json.dumps(local.reason.call_args.args[0]))
         self.capture('local-tool-policy-and-financial-evidence')
+        self.open_answer_options()
         Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('travel')
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceToolPolicy').get_attribute('data-tool'),'travel.preferences')
         self.ask_history_question('Explain my saved travel preferences')
@@ -9079,6 +9102,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + '/investments/')
         self.wait.until(lambda _: 'Checked' in self.text('researchDecisionList'))
+        self.memory_click('#researchPersonalNotes > summary')
         form = '#researchDecisionForm '
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=instrument]').send_keys('synth')
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').click()  # change event loads lessons
@@ -9117,6 +9141,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + '/investments/')
         self.wait.until(lambda _: 'Synthetic Owned Co' in self.text('researchHistory'))
+        self.memory_click('#researchPersonalNotes > summary')
         form = '#researchDecisionForm '
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=instrument]').send_keys('synthetic owned  co')
         self.browser.find_element(self.By.CSS_SELECTOR, form + '[name=thesis]').send_keys('Synthetic second thesis')
@@ -9147,12 +9172,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from unittest.mock import patch
         from apps.investments.models import Investment, ResearchDecision
         from tests.test_research_packet import GOOD, RISING, FakeReasoner, _fund, _prices
+        from datetime import timedelta
+        from django.utils import timezone
+        from tests.test_research_packet import Y2
+        shift=timezone.localdate()-timedelta(days=180)-Y2
+        fresh_fund={name:[(day+shift,amount,currency) for day,amount,currency in rows] for name,rows in _fund(currency='USD').items()}
+        fresh_prices=_prices(RISING)
+        end=int(timezone.now().timestamp())
+        fresh_prices['timestamp']=[end-(len(RISING)-1-i)*86400 for i in range(len(RISING))]
         owner = self.scenario['user']
         holdings, calls = list(Investment.objects.filter(user=owner).values()), ResearchDecision.objects.count()
         self.login()
         reasoner = FakeReasoner(GOOD)
         matches = [{'symbol': 'SYNTH.NS', 'name': 'Synthetic Co', 'exchange': 'NSE'}]
-        with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=_fund(currency='USD')),                 patch('apps.investments.services.research_packet.fetch_prices', return_value=_prices(RISING)), \
+        with patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=fresh_fund),                 patch('apps.investments.services.research_packet.fetch_prices', return_value=fresh_prices), \
                 patch('apps.investments.services.research_packet.find_symbols', return_value=matches) as find, \
                 patch('apps.investments.services.research_challenge.local_reasoner', return_value=reasoner):
             self.browser.get(self.live_server_url + '/investments/')

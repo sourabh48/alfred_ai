@@ -1,6 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
     const panel = document.getElementById("privateMemoryPanel");
     if (!panel) return;
+    if(location.hash==='#privateMemoryPanel' || /^#memory-[a-f0-9]{32}$/.test(location.hash))panel.querySelector('details').open=true;
+    if(location.hash==='#memoryHealth')document.getElementById('memoryHealth').open=true;
     const list = document.getElementById("memoryList");
     const feedback = document.getElementById("memoryFeedback");
     const expected = document.getElementById("memoryEvaluationExpected");

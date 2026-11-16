@@ -98,6 +98,81 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def text(self, ident): return self.browser.find_element(self.By.ID,ident).text
 
+    def test_automatic_shortlist_gallery_and_mobile_review(self):
+        from selenium.webdriver.common.keys import Keys
+        image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
+        def photo(provider, parameters, **kwargs):
+            if provider.category == "photos":
+                return ProviderResult(provider.name, "photos", success=True, payload={"count": 2, "index": parameters["index"], "image": image, "authors": [{"name": "Synthetic photo credit", "url": "https://example.com/credit"}]})
+            return query(provider, parameters, **kwargs)
+        with patch("apps.mobility.planner_views.query", side_effect=photo):
+            self.browser.get(self.live_server_url+"/mobility/")
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,"plannerSend").is_enabled())
+            self.send("I have a 2 day holiday. Plan a trip from Bengaluru.")
+            self.wait.until(lambda _: any(b.is_enabled() for b in self.browser.find_elements(self.By.CSS_SELECTOR, '.travel-candidate [data-planner-message^="Choose "]')))
+            self.click('.travel-candidate [data-planner-message^="Choose "]')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerItinerary').is_displayed())
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerGalleryImage').is_displayed())
+            self.assertIn('Synthetic photo credit', self.text('plannerGalleryCaption'))
+            self.click('#plannerGalleryNext')
+            self.wait.until(lambda _: self.text('plannerGalleryCount')=='2 / 2')
+            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerGalleryPrevious').is_enabled())
+            self.browser.find_element(self.By.ID,'plannerGalleryFrame').send_keys(Keys.ARROW_LEFT)
+            self.wait.until(lambda _: self.text('plannerGalleryCount')=='1 / 2')
+            self.assertIn('draft is ready',self.text('plannerNextStep'))
+            self.browser.set_window_size(390,844)
+            self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= window.innerWidth'))
+            self.browser.save_screenshot(str(self.artifacts/'workflow-mobile.png'))
+            self.browser.set_window_size(1440,1100)
+            self.click('#plannerGalleryFrame')
+            self.browser.save_screenshot(str(self.artifacts/'workflow-gallery.png'))
+
+    def test_minimal_settings_and_assistant_controls(self):
+        self.browser.get(self.live_server_url+'/settings/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'privateMemoryPanel'))
+        self.assertFalse(self.browser.find_element(self.By.ID,'memoryEvaluationForm').is_displayed())
+        self.assertFalse(self.browser.find_element(self.By.ID,'travelPreferenceForm').is_displayed())
+        self.browser.get(self.live_server_url+'/ai/insights/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'intelligenceQuery'))
+        self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceQuery').is_displayed())
+        self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceAnswerStyle').is_displayed())
+        self.browser.save_screenshot(str(self.artifacts/'assistant-minimal.png'))
+
+    def test_research_search_history_and_optional_notes(self):
+        from apps.investments.models import ResearchSearch, Investment
+        from apps.investments.services.research_packet import build_packet
+        from tests.test_research_packet import _fund, _prices, RISING
+        packet=build_packet('SYNTH.NS',_fund(),_prices(RISING))
+        with patch('apps.investments.research_views._packet',return_value=(packet,None)):
+            self.browser.get(self.live_server_url+'/investments/')
+            self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'researchPacketSymbol'))
+            self.assertFalse(self.browser.find_element(self.By.ID,'researchDecisionForm').is_displayed())
+            self.browser.find_element(self.By.ID,'researchPacketSymbol').send_keys('SYNTH.NS')
+            self.click('#researchPacketForm button[type=submit]')
+            self.wait.until(lambda _: 'SYNTH.NS' in self.text('researchSearches'))
+            self.assertIn('not a real-time trading quote',self.text('researchPacket'))
+            self.assertEqual(ResearchSearch.objects.filter(user=self.user).count(),1)
+            self.assertFalse(Investment.objects.filter(user=self.user).exists())
+            self.browser.save_screenshot(str(self.artifacts/'research-searches.png'))
+            self.click('#researchSearchClear')
+            self.wait.until(lambda _: 'No journal entry is required' in self.text('researchSearches'))
+            self.assertFalse(ResearchSearch.objects.filter(user=self.user).exists())
+
+    def test_charts_follow_theme_and_reduced_motion(self):
+        self.browser.get(self.live_server_url+'/dashboard/')
+        self.wait.until(lambda _: self.browser.execute_script('return !!window.Chart && Object.keys(Chart.instances).length>0'))
+        self.browser.execute_script('styleCharts(false)')
+        before=self.browser.execute_script('return chartTheme.surface')
+        self.browser.execute_script('styleCharts(true)')
+        self.assertNotEqual(before,self.browser.execute_script('return chartTheme.surface'))
+        self.browser.execute_cdp_cmd('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'reduce'}]})
+        self.browser.execute_script('styleCharts(true)')
+        self.assertEqual(self.browser.execute_script('return Chart.defaults.animation.duration'),0)
+        self.browser.execute_cdp_cmd('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'no-preference'}]})
+        self.browser.execute_script('styleCharts(false)')
+        self.assertEqual(self.browser.execute_script('return Chart.defaults.animation.duration'),650)
+        self.browser.execute_cdp_cmd('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'reduce'}]})
+
     def test_motorcycle_restriction_review_status_retry_conflict_withdrawal_and_expiry(self):
         from copy import deepcopy
         from django.http import JsonResponse
@@ -274,8 +349,6 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, panel+' > div:nth-of-type(2) button[data-route-choice]').is_enabled())
             self.browser.save_screenshot(str(self.artifacts/"route-choice-desktop.png"))
             self.click('[data-planner-message="Choose Talakadu"]')
-            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#plannerChips [data-planner-message="Build itinerary"]'))
-            self.click('#plannerChips [data-planner-message="Build itinerary"]')
             self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR, ".travel-day")) == 3)
             self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", self.browser.find_element(self.By.ID, "plannerItinerary"))
             self.wait.until(lambda _: "~3.0 hours per leg" in self.text("plannerItinerary"))
@@ -345,7 +418,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             finally:
                 release.set()
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerSend').is_enabled())
-            self.assertTrue(all(button.is_enabled() for button in self.browser.find_elements(self.By.CSS_SELECTOR,'[data-planner-message]')))
+            self.assertTrue(all(button.is_enabled() for button in self.browser.find_elements(self.By.CSS_SELECTOR,'[data-planner-message]:not([data-batch-unavailable="true"])')))
 
     def test_chat_to_saved_plan_desktop_and_mobile(self):
         self.browser.set_window_size(1440,1100)
@@ -364,8 +437,6 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.browser.save_screenshot(str(self.artifacts/"desktop-comparison.png"))
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,"plannerSend").is_enabled())
         self.click('[data-planner-message="Choose Chikmagalur"]')
-        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerChips [data-planner-message="Build itinerary"]'))
-        self.click('#plannerChips [data-planner-message="Build itinerary"]')
         self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,".travel-day"))==4)
         self.send("Show cheaper hotels")
         # The POST queues work on commit; wait for its polled result before
@@ -545,17 +616,18 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
         self.assertEqual(errors, [])
 
-    def test_home_run_all_bots_and_one_confirm_files_a_spend(self):
+    def test_health_run_all_bots_and_one_confirm_files_a_spend(self):
         from apps.expenses.models import Expense
         for days in (40, 50):
             Expense.objects.create(user=self.user, merchant="Synthetic Cafe", amount="120.00", currency="INR", category="food",
                                    transaction_date=timezone.localdate()-timedelta(days=days))
         target = Expense.objects.create(user=self.user, merchant="Synthetic Cafe", amount="130.00", currency="INR", category="other",
                                         transaction_date=timezone.localdate()-timedelta(days=1))
-        self.browser.get(self.live_server_url+"/dashboard/")
+        self.browser.get(self.live_server_url+"/settings/diagnostics/")
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-bot-run-all]'))
+        self.click("#botRecovery > summary")
         self.click('[data-bot-run-all]')
-        self.wait.until(lambda _: "ready below" in self.text("taskBotsStatus") and "File under Food" in self.text("taskBotsList"))
+        self.wait.until(lambda _: "review(s) ready" in self.text("taskBotsStatus") and "File under Food" in self.text("taskBotsList"))
         box = self.browser.find_element(self.By.CSS_SELECTOR, '[data-bot-item^="category:"]')
         self.assertTrue(box.is_selected())  # pre-ticked; Confirm still has to be pressed
         target.refresh_from_db(); self.assertEqual(target.category, "other")
@@ -571,8 +643,9 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         Expense.objects.create(user=self.user, description="Synthetic bot spend", amount="250.00", currency="INR", category="food",
                                transaction_date=timezone.localdate()-timedelta(days=1))
         before = list(Expense.objects.values())
-        self.browser.get(self.live_server_url+"/dashboard/")
+        self.browser.get(self.live_server_url+"/settings/diagnostics/")
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-bot-run="money_review"]'))
+        self.click("#botRecovery > summary")
         self.assertIn("No reviews waiting", self.text("taskBotsList"))
         self.assertFalse(self.browser.find_element(self.By.CSS_SELECTOR, '[data-bot-run="money_review"]').is_displayed())  # folded under Run one bot
         self.click("#taskBotsRun summary")

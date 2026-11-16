@@ -19,6 +19,7 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 .workspace-heading { margin-bottom: 1.5rem; }
 .workspace-heading h1 { font-size: clamp(1.6rem, 3vw, 2.25rem); letter-spacing: -.035em; margin: .4rem 0; }
 .workspace-heading p { color: var(--alfred-muted); max-width: 64ch; margin: 0; }
+.workspace-heading > a { color: var(--alfred-ink); }
 .workspace-status { display: flex; flex-wrap: wrap; gap: .5rem; }
 .workspace-badge { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .65rem; border-radius: 7px; background: #edf2f9; color: #334a69; font-size: .78rem; font-weight: 600; }
 .workspace-badge[data-state="ready"] { background: #e5f5ee; color: #17603f; }
@@ -26,6 +27,9 @@ h1, h2, h3, h4, h5, h6, .metric-value, .alfred-brand strong { font-family: inher
 .conversation-header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--alfred-stroke); }
 .conversation-empty { padding: 2.5rem 1rem; text-align: center; color: var(--alfred-muted); }
 .conversation-empty h3 { color: var(--alfred-ink); font-size: 1.15rem; }
+#intelligencePanel .conversation-empty { padding: 1rem 0; text-align: left; }
+#intelligencePanel .conversation-messages:empty { padding: 0; }
+#intelligencePanel .page-section-title, #intelligencePanel summary span { color: var(--alfred-ink); }
 .conversation-messages { display: grid; gap: 1.25rem; padding-block: 1.25rem; }
 .conversation-message { max-width: 100%; overflow-wrap: anywhere; padding: 1rem 1.2rem; border-radius: 14px; background: #f4f7fc; }
 .conversation-message--user { max-width: 85%; margin-left: auto; background: #e8efff; }

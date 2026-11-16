@@ -18,12 +18,12 @@ from django.utils import timezone
 
 from alfred_ai.services import public_http
 
-SYMBOL = re.compile(r"^[A-Z0-9][A-Z0-9.-]{0,19}$")
+SYMBOL = re.compile(r"^\^?[A-Z0-9][A-Z0-9.-]{0,19}$")
 SOURCE = "https://finance.yahoo.com/quote/{}/financials/"
 TYPES = ("TotalRevenue", "NetIncome", "OperatingIncome", "OperatingCashFlow", "FreeCashFlow", "TotalDebt",
          "StockholdersEquity", "CurrentAssets", "CurrentLiabilities", "DilutedAverageShares")
 USER_AGENT = "AlfredAI/1.0 (verified-intelligence)"
-CACHE_SECONDS = 6 * 3600
+CACHE_SECONDS = 15 * 60
 TENTH = Decimal("0.1")
 
 
@@ -146,7 +146,14 @@ def beginner_view(bullish: list, bearish: list, portfolio: dict) -> dict:
 def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None, portfolio_total=None) -> dict:
     point = lambda text, metric, value, as_of: {"point": text, "metric": metric, "value": value, "as_of": as_of}
     bullish, bearish, changes, missing, metrics = [], [], [], [], {}
-    statement_currency = next((rows[-1][2] for rows in fundamentals.values() if rows and rows[-1][2]), None)
+    today = timezone.localdate()
+    fundamentals = {name: [r for r in rows if r[0] <= today and r[1].is_finite()] for name, rows in fundamentals.items()}
+    currencies = sorted((r[0], r[2]) for rows in fundamentals.values() for r in rows if r[2])
+    main_series = fundamentals.get("TotalRevenue") or fundamentals.get("NetIncome") or []
+    statement_currency = main_series[-1][2] if main_series else currencies[-1][1] if currencies else None
+    # Do not combine money in different currencies, even at the same period end.
+    fundamentals = {name: [r for r in rows if name == "DilutedAverageShares" or r[2] and r[2] == statement_currency]
+                    for name, rows in fundamentals.items()}
 
     def at(name, period):
         return next((row[1] for row in fundamentals.get(name) or [] if row[0] == period), None) if period else None
@@ -211,6 +218,7 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
         missing.append("Dated current assets and liabilities")
 
     price = price_metrics(prices.get("close") or [], prices.get("timestamp") or []) if prices else {}
+    price_current = bool(price and 0 <= (today - datetime.strptime(price["as_of"], "%Y-%m-%d").date()).days <= 7)
     if price:
         metrics["price"] = price
         if price["volatility_pct"] > 40:
@@ -227,7 +235,7 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
     period = _common_period(fundamentals, "DilutedAverageShares", "NetIncome")
     shares, profit = at("DilutedAverageShares", period), at("NetIncome", period)
     price_currency = prices.get("currency") if prices else None
-    if not (price and shares and profit):
+    if not (price_current and shares and profit and period and (today - period).days <= 550):
         valuation = {"status": "unavailable", "reason": "Needs a recent price, diluted shares and profit."}
     elif not statement_currency or statement_currency != price_currency:
         valuation = {"status": "unavailable", "reason": f"The statements are in {statement_currency or 'an unrecorded currency'} and the price in "
@@ -253,33 +261,41 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
 
     missing += ["News and management commentary", "Sector and competitor comparison", "Filing dates (statements are dated by period end)"]
     latest_period = max((rows[-1][0] for rows in fundamentals.values() if rows), default=None)
-    review = (latest_period.replace(year=latest_period.year + 1) + timedelta(days=60)).isoformat() if latest_period else None
+    review = (latest_period + timedelta(days=425)).isoformat() if latest_period else None
+    statement_current = bool(latest_period and 0 <= (today - latest_period).days <= 550
+        and all(0 <= (today - datetime.strptime(item["as_of"], "%Y-%m-%d").date()).days <= 550 for item in bullish + bearish))
+    beginner = beginner_view(bullish, bearish, portfolio) if price_current and statement_current else beginner_view([], [], portfolio)
+    freshness = {"price_status": "recent_close" if price_current else "stale" if price else "unavailable",
+                 "price_as_of": price.get("as_of"), "statement_status": "recent" if statement_current else "stale" if latest_period else "unavailable",
+                 "note": "Daily market observations, not a real-time trading quote. Verify executable prices with your broker."}
     return {"symbol": symbol, "retrieved_at": timezone.now().isoformat(), "source_url": SOURCE.format(symbol),
             "statement_currency": statement_currency, "price_currency": price_currency,
             "latest_period_end": latest_period.isoformat() if latest_period else None,
             "metrics": metrics, "bullish": bullish, "bearish": bearish, "valuation": valuation, "portfolio": portfolio,
-            "thesis_changes": changes, "missing_evidence": missing, "beginner": beginner_view(bullish, bearish, portfolio),
-            "options": ["Do nothing for now.", "Write down your view in step 2 and check it later.",
+            "thesis_changes": changes, "missing_evidence": missing, "beginner": beginner, "freshness": freshness,
+            "options": ["Do nothing for now.", "Your search is saved for automatic reviews; adding a personal note is optional.",
                         f"Look again after the next annual results{f', around {review}' if review else ''}."],
             "limits": ["Screens are rules of thumb, not forecasts; there is no rating or price target.",
                        "Yahoo data is not independently verified and may be revised.", "Nothing is bought, sold or changed."]}
 
 
-def research_packet(symbol: str, *, holding=None, portfolio_total=None) -> dict:
-    """Fetch (cached six hours) and build; raises ValueError for a bad symbol or when no dated data came back."""
+def research_packet(symbol: str, *, holding=None, portfolio_total=None, refresh=False) -> dict:
+    """Fetch (cached fifteen minutes) and build; raises ValueError for a bad symbol or when no dated data came back."""
     symbol = str(symbol or "").strip().upper()
-    if not SYMBOL.fullmatch(symbol):
+    if len(symbol) > 20 or not SYMBOL.fullmatch(symbol):
         raise ValueError("Enter an exchange symbol such as INFY.NS or TCS.BO.")
     key = f"invest2-packet:{symbol}"
-    data = cache.get(key)
+    data = None if refresh else cache.get(key)
     if data is None:
-        fundamentals = fetch_fundamentals(symbol)
+        fundamentals = {} if symbol.startswith("^") else fetch_fundamentals(symbol)
         try:
             prices = fetch_prices(symbol)
         except ValueError:
             prices = {}
         if not fundamentals and not prices:
             raise ValueError("No dated data came back for that symbol.")
-        data = {"fundamentals": fundamentals, "prices": prices}
+        data = {"fundamentals": fundamentals, "prices": prices, "retrieved_at": timezone.now().isoformat()}
         cache.set(key, data, CACHE_SECONDS)
-    return build_packet(symbol, data["fundamentals"], data["prices"], holding=holding, portfolio_total=portfolio_total)
+    packet = build_packet(symbol, data["fundamentals"], data["prices"], holding=holding, portfolio_total=portfolio_total)
+    packet["retrieved_at"] = data.get("retrieved_at")
+    return packet

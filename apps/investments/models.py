@@ -174,3 +174,17 @@ class FundPortfolioSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.investment_id} - {self.as_of}"
+
+
+class ResearchSearch(models.Model):
+    """Bounded owner search history, separate from holdings and personal investment decisions."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="research_searches")
+    symbol = models.CharField(max_length=20)
+    searched_at = models.DateTimeField()
+    checked_at = models.DateTimeField(null=True)
+    summary = models.JSONField(default=dict)
+    error = models.CharField(max_length=160, blank=True)
+
+    class Meta:
+        ordering = ["-searched_at", "-id"]
+        constraints = [models.UniqueConstraint(fields=["user", "symbol"], name="unique_research_search")]

@@ -47,6 +47,15 @@ class PlannerWriteThrottle(UserRateThrottle):
         return True if request.method == "GET" else super().allow_request(request, view)
 
 
+def gallery_places(session):
+    selected = value(session.state, "_itinerary_stops", [])
+    names = {p["name"] for p in selected} or {value(session.state, "selected_destination")}
+    places = {}
+    for place in [*selected, *session.candidates, *value(session.state, "_destination_pool", [])]:
+        places.setdefault(place_key(place), place)
+    return [(key, place, place["name"] in names) for key, place in list(places.items())[:20]]
+
+
 @transaction.atomic
 def session_payload(session):
     # Keep the session and worker status in one snapshot; terminal status stops UI polling.
@@ -82,6 +91,8 @@ def session_payload(session):
                 "has_more": offset+3 < pool_count and (not value(session.state, "selected_destination") or bool(value(session.state, "_itinerary_stops")))},
             "map_config":map_configuration(), "booking_sites":booking_sites(), "can_view_provider_usage":session.user.is_staff,
             "revision": session.revision, "plan_id": session.plan_id, "candidates": candidates, "itinerary": itinerary,
+            "gallery_places": [{"key": key, "name": place["name"], "selected": selected}
+                               for key, place, selected in gallery_places(session)],
             "itinerary_editor": editor, "trip_documents": document_links(session), "packing_checklist": packing_payload(session), "travel_reminders": reminder_payload(session),
             "messages": list(session.messages.values("id", "role", "text", "chips", "created_at")),
             "research": ({"id": run.id, "status": run.status, "outdated": outdated,
@@ -103,6 +114,41 @@ class PrivateTravelSessionAPI(APIView):
         response = super().finalize_response(request, response, *args, **kwargs)
         response["Cache-Control"] = "no-store, private"
         return response
+
+
+class TravelPhotoThrottle(UserRateThrottle):
+    scope = "travel_photos"
+    rate = "12/min"
+
+
+class TravelPlacePhotoView(PrivateTravelSessionAPI):
+    throttle_classes = [TravelPhotoThrottle]
+
+    def get(self, request, pk):
+        from .services.travel.providers.photos import GooglePlacePhoto
+        session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
+        place = next((place for key, place, _ in gallery_places(session) if key == request.query_params.get("place")), None)
+        if place is None:
+            raise ValidationError("Choose a place from this trip before viewing its photos.")
+        index = request.query_params.get("index", "0")
+        if index not in {str(i) for i in range(6)}:
+            raise ValidationError("Choose a photo from this gallery.")
+        identity = str(place.get("id") or "")
+        google_id = identity.removeprefix("google:") if identity.startswith("google:") or place.get("geocoding_result", {}).get("provider") == "google_places" else ""
+        parameters = {"place_id": google_id, "index": int(index)} if google_id else {
+            "name": place["name"], "latitude": place.get("lat"), "longitude": place.get("lon"), "index": int(index)}
+        result = query(GooglePlacePhoto(), parameters)
+        if result.success:
+            return Response({"status": "ready" if result.payload.get("count") else "empty", "place": place["name"], **result.payload})
+        messages = {
+            "missing_TRAVEL_GOOGLE_MAPS_API_KEY": "Connect Google Maps in Settings to see photos of this place.",
+            "place_identity_unconfirmed": "We could not match photos to this exact place. Your itinerary is unchanged.",
+            "invalid_parameters": "This place needs a confirmed map location before we can show photos.",
+            "local_quota_exhausted": "Today's photo allowance has been reached. You can keep planning without photos.",
+            "provider_busy_or_backoff": "Photos are temporarily busy. Try again shortly.",
+        }
+        return Response({"status": "unavailable", "place": place["name"], "count": 0,
+                         "message": messages.get(result.error, "Photos could not load. Try again; your itinerary is unchanged.")})
 
 
 class TravelSessionList(PrivateTravelSessionAPI):
@@ -380,9 +426,10 @@ class TravelProviderUsage(APIView):
         from .services.travel.providers.weather import GoogleWeather
         from .services.travel.providers.routing import GoogleRoutes
         from .services.travel.providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
+        from .services.travel.providers.photos import GooglePlacePhoto
         from .services.travel.providers.transport import IndianRailProvider, SkyscannerFlights
         providers = [GooglePlaceSearch(),GoogleWeather(),GoogleRoutes(),GooglePlacesNearby(),GoogleLodging(),GoogleDestinations(),
-                     SkyscannerFlights(),IndianRailProvider()]
+                     SkyscannerFlights(),IndianRailProvider(),GooglePlacePhoto()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 

@@ -53,3 +53,17 @@ html[data-theme="dark"] .trip-when { color:#8fd3c4; }
 html[data-theme="dark"] .travel-day > ul { border-left-color:#3d5d70; }
 html[data-theme="dark"] .travel-day > ul > li::before { background:#8fd3c4; box-shadow:0 0 0 3px var(--alfred-surface); }
 .trip-card-grid > .empty-state { grid-column:1 / -1; }
+/* The next action stays visible without making the trip workspace a wizard. */
+.travel-flow{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;padding:1rem;border:1px solid var(--alfred-stroke);border-radius:1rem;background:var(--alfred-surface)}
+.travel-flow a{padding:.5rem .8rem;border-radius:2rem;text-decoration:none;color:var(--alfred-ink)}
+.travel-flow a[aria-current="step"]{background:#206c65;color:white}
+.travel-flow p{flex-basis:100%;color:var(--alfred-muted)}
+.travel-gallery-frame{position:relative;display:grid;place-items:center;background:var(--alfred-canvas,#edf4f3);border-radius:1rem;overflow:hidden;min-height:220px;aspect-ratio:16/7}
+.travel-gallery-frame img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.travel-gallery-frame p{max-width:36rem;padding:1.5rem;text-align:center;color:var(--alfred-ink)}
+.travel-gallery-frame:focus-visible{outline:3px solid #238980;outline-offset:3px}
+.travel-gallery label{display:flex;align-items:center;gap:.5rem}
+#plannerTripActions{position:relative;scroll-margin-top:1rem}
+#plannerItinerary,#plannerAttractions,#plannerStays,#plannerMapPanel{scroll-margin-top:1.5rem}
+@media(max-width:600px){.travel-gallery-frame{aspect-ratio:4/3}.travel-flow{gap:.25rem}.travel-flow a{font-size:.85rem;padding:.5rem}.travel-gallery label{width:100%}}
+@media(prefers-reduced-motion:no-preference){.travel-candidate,.travel-gallery{animation:travel-reveal .35s ease-out}.travel-gallery-frame img{animation:travel-reveal .25s ease-out}@keyframes travel-reveal{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:none}}}

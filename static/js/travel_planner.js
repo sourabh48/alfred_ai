@@ -9,6 +9,7 @@ window.TravelPlanner = (() => {
     let documentEpoch=0, documentActive=true, documentRefreshPending=false;
     let exportController=null;
     function clearDocuments() {
+        window.TravelGallery.clear();
         window.TravelAffordability.clear();
         exportController?.abort();
         $('plannerExport').hidden=true;
@@ -61,7 +62,7 @@ window.TravelPlanner = (() => {
         document.querySelectorAll('#plannerReminders [data-reminder-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerPacking [data-packing-control]').forEach(control=>{control.disabled=state.busy || control.dataset.batchUnavailable==='true';});
         document.querySelectorAll('#plannerSend, #plannerNew, #plannerVehicle, #plannerChips button, [data-planner-message], [data-reject], [data-route-choice], [data-restriction-fields], [data-restriction-withdraw], [data-add-stop], [data-stop-index], #plannerCompareOrder, #plannerApplyOrder, #plannerDraft, #plannerSave, #plannerRecheck, #plannerPlans button, #plannerSessions button, [data-editor-control], #plannerDocuments button')
-            .forEach(control => { control.disabled = state.busy || control.dataset.batchUnavailable === "true"; });
+            .forEach(control => { control.disabled = !state.session || state.busy || control.dataset.batchUnavailable === "true"; });
     }
     function alert(message) { $("plannerAlert").textContent = message; $("plannerAlert").hidden = !message; }
     function retainActionFocus() {
@@ -221,11 +222,17 @@ window.TravelPlanner = (() => {
         Alfred.setHTMLIfChanged("plannerContext", Object.entries(labels).filter(([k]) => field(k)).map(([k,l]) => `<strong>${l}</strong>${esc(k === "budget" ? money(field(k)) : field(k))}${session.state[k].confirmed_by_user ? "" : " · please confirm"}`).join("") || "Start with an idea. We'll fill in the details together.");
         Alfred.setHTMLIfChanged("plannerProvenance", Object.entries(session.state).filter(([k]) => k !== "pending_question").map(([k,v]) => `<div class="travel-fact"><strong>${esc(k.replaceAll("_", " "))}</strong>: ${esc(Array.isArray(v.value) ? v.value.join(", ") : v.value)}<br>${esc(v.source)} · ${v.confirmed_by_user ? "Confirmed by you" : "Unconfirmed"} · confidence ${esc(v.confidence)}</div>`).join(""));
         const r = session.research;
-        $("plannerResearch").textContent = r ? `${r.stage} · ${r.sources_checked} source checks. ${r.completed_at ? `Updated ${Math.max(0,Math.floor((Date.now()-new Date(r.completed_at))/60000))} minutes ago. ` : ""}${r.error || r.summary || "You can leave this page and return later."}` : "Discovery starts with your idea. Research begins when we have enough context.";
+        $("plannerResearch").textContent = r ? `${r.stage}. ${r.completed_at ? `Checked ${new Date(r.completed_at).toLocaleString()}. ` : (!["ready","failed","superseded"].includes(r.status) ? "Researching in the background. " : "")}${r.error || r.summary || "You can leave this page and return later."}` : "Discovery starts with your idea. Research begins when we have enough context.";
         $("plannerSave").hidden = !session.itinerary?.days?.length;
         $("plannerRecheck").hidden = !session.candidates?.length;
         $("plannerResults").hidden = !session.candidates.length;
         candidates(); comparison(); itinerary(); stops(); documents();
+        const ready=!!session.itinerary?.days?.length;
+        $('plannerTripActions').hidden=!ready;
+        $('plannerStops').hidden=!session.candidates.length;
+        $('plannerNextStep').textContent=ready ? 'Your draft is ready. Explore places and stays, adjust the days, then save your trip.' : session.candidates.length ? 'Choose a destination to create your draft itinerary.' : 'Start with your days off and starting city.';
+        ['plannerStepPlan','plannerStepChoose','plannerStepReview'].forEach((id,i)=>{if(i===(ready?2:session.candidates.length?1:0))$(id).setAttribute('aria-current','step');else $(id).removeAttribute('aria-current');});
+        if(documentActive)window.TravelGallery.sync(session);
         if(documentActive)window.TravelPacking.render(session);
         if(documentActive)window.TravelReminders.render(session);
         if(documentActive)window.TravelAffordability.sync(session);
@@ -256,7 +263,7 @@ window.TravelPlanner = (() => {
             `<p>Showing ${pool.offset+1}–${pool.offset+state.session.candidates.length} of ${pool.total} ranked candidates (at most 20). Research runs three at a time; source freshness and unknown availability remain separate.</p>`+
             `<div class="travel-actions"><button id="plannerPreviousCandidates" type="button" class="btn btn-outline-primary" data-planner-message="Previous destinations" data-batch-unavailable="${!pool.has_previous || pending}">Previous destinations</button>`+
             `<button id="plannerMoreCandidates" type="button" class="btn btn-outline-primary" data-planner-message="Show more destinations" data-batch-unavailable="${!pool.has_more || pending}">Show more destinations</button></div>` : "");
-        Alfred.setHTMLIfChanged("plannerCandidates", state.session.candidates.map((d,i) => `<article class="travel-candidate" data-destination="${esc(d.name)}"><header><span class="travel-fit">Option ${i+1} / ${esc(d.fit)}</span><h3 class="mt-2 mb-0">${esc(d.name)}</h3><p class="small mt-2 mb-0">${esc(d.styles.slice(0,3).join(" · "))}</p></header><div class="travel-candidate-body"><dl><dt>Expected trip budget</dt><dd>${money(d.budget.expected)} · range ${money(d.budget.minimum)}–${money(d.budget.comfortable)}</dd><dt>Travel from ${esc(field("origin"))}</dt><dd>${d.distance_km ? `~${esc(d.distance_km)} km / ~${esc(d.travel_hours)} hours one way` : "Distance and travel time unverified"}<br><small>Estimate · includes no live traffic</small></dd><dt>Weather</dt><dd>${esc(d.weather.summary)}</dd></dl><strong>Why it fits</strong><ul>${d.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul><strong>Watch out</strong><p class="small">${esc(d.issues.join(" "))}</p><div class="travel-actions"><button type="button" class="btn btn-primary btn-sm" data-planner-message="Choose ${esc(d.name)}">Choose ${esc(d.name)}</button><button type="button" class="btn btn-outline-secondary btn-sm" data-reject="${esc(d.name)}">Not this time</button></div>${routeChoices(d,i)}<details class="mt-3"><summary>Details · Why this recommendation?</summary><div class="small mt-2">${Object.entries(d.factors).map(([k,v])=>`<p><strong>${esc(k)}</strong>: ${esc(v)}</p>`).join("")}<p>Ranking uses budget, travel time, your stated preferences and recorded visits. Fit labels are guidance, not probabilities.</p></div></details><details class="mt-2"><summary>Sources</summary>${sourceMarkup(d.sources)}</details></div></article>`).join(""));
+        Alfred.setHTMLIfChanged("plannerCandidates", state.session.candidates.map((d,i) => `<article class="travel-candidate" data-destination="${esc(d.name)}"><header><span class="travel-fit">Option ${i+1} / ${esc(d.fit)}</span><h3 class="mt-2 mb-0">${esc(d.name)}</h3><p class="small mt-2 mb-0">${esc(d.styles.slice(0,3).join(" · "))}</p></header><div class="travel-candidate-body"><dl><dt>Expected trip budget</dt><dd>${money(d.budget.expected)} · range ${money(d.budget.minimum)}–${money(d.budget.comfortable)}</dd><dt>Travel from ${esc(field("origin"))}</dt><dd>${d.distance_km ? `~${esc(d.distance_km)} km / ~${esc(d.travel_hours)} hours one way` : "Distance and travel time unverified"}<br><small>Estimate · includes no live traffic</small></dd><dt>Weather</dt><dd>${esc(d.weather.summary)}</dd></dl><strong>Why it fits</strong><ul>${d.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul><strong>Watch out</strong><p class="small">${esc(d.issues.join(" "))}</p><div class="travel-actions"><button type="button" class="btn btn-primary btn-sm" data-batch-unavailable="${!!pending}" data-planner-message="Choose ${esc(d.name)}">Choose ${esc(d.name)}</button><button type="button" class="btn btn-outline-secondary btn-sm" data-batch-unavailable="${!!pending}" data-reject="${esc(d.name)}">Not this time</button></div>${routeChoices(d,i)}<details class="mt-3"><summary>Details · Why this recommendation?</summary><div class="small mt-2">${Object.entries(d.factors).map(([k,v])=>`<p><strong>${esc(k)}</strong>: ${esc(v)}</p>`).join("")}<p>Ranking uses budget, travel time, your stated preferences and recorded visits. Fit labels are guidance, not probabilities.</p></div></details><details class="mt-2"><summary>Sources</summary>${sourceMarkup(d.sources)}</details></div></article>`).join(""));
     }
     function stops() {
         const names = state.session.itinerary_stops || [];

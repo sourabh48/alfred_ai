@@ -1,5 +1,6 @@
 from math import isfinite
 
+from django.db import transaction
 from rest_framework import serializers
 from alfred_ai.services.currency import CURRENCY_CHOICES, currency_status
 from .money import investment_money, investment_total_float
@@ -37,6 +38,7 @@ class InvestmentSerializer(serializers.ModelSerializer):
     annual_return_rate = InvestmentReturnRateField(required=False)
     currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
     currency_status = serializers.SerializerMethodField()
+    nav_state = serializers.SerializerMethodField()
 
     class Meta:
         model = Investment
@@ -55,6 +57,7 @@ class InvestmentSerializer(serializers.ModelSerializer):
             "nav",
             "nav_date",
             "value_before_nav",
+            "nav_state",
             "currency",
             "currency_status",
             "annual_return_rate",
@@ -79,6 +82,28 @@ class InvestmentSerializer(serializers.ModelSerializer):
 
     def get_currency_status(self, obj):
         return currency_status(obj.currency)
+
+    def get_nav_state(self, obj):
+        from .services.fund_prices import nav_state
+        return nav_state(obj)
+
+    def update(self, instance, validated_data):
+        """Keep units, fund identity, the retained NAV and the value consistent when a priced fund is edited."""
+        before = (instance.amfi_scheme_code, instance.currency, instance.units)
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            after = (instance.amfi_scheme_code, instance.currency, instance.units)
+            if after != before and instance.nav is not None:
+                if after[:2] != before[:2] or not instance.units:
+                    instance.nav = instance.nav_date = None  # another fund or currency: this NAV proves nothing about it
+                else:  # same fund, different units: the value follows the retained NAV at once
+                    try:
+                        instance.current_value = investment_money(instance.units * instance.nav)
+                    except ValueError as exc:
+                        raise serializers.ValidationError({"units": str(exc)}) from exc
+                instance.value_before_nav = None  # the old comparison no longer describes a price move
+                instance.save(update_fields=["nav", "nav_date", "current_value", "value_before_nav", "updated_at"])
+        return instance
 
     def validate_currency(self, value):
         return value or None  # blank means not recorded, never a guessed INR

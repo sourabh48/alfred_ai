@@ -5,7 +5,7 @@
 <header class="workspace-heading">
     <div class="workspace-badge">Private by default</div>
     <h1>Your ALFRED assistant</h1>
-    <p>Think through your finances and plans, with the records and memories you choose.</p>
+    <p>Ask, explore and plan. Alfred handles the routine work.</p><a class="small" href="/settings/diagnostics/">Assistant health</a>
 </header>
 <section class="surface-card mb-4" id="intelligencePanel">
     <div class="conversation-header">
@@ -17,14 +17,6 @@
         </div>
         <button id="intelligenceNew" class="btn btn-outline-secondary btn-sm" type="button">New conversation</button>
     </div>
-    <details id="modelReadinessPanel" class="conversation-evidence mb-3">
-        <summary>Local model readiness</summary>
-        <p class="small mt-2">Adaptive-model registry gates are separate from Ollama connectivity. This view does not train or activate models, change providers, or prove predictive accuracy.</p>
-        <button id="modelReadinessRefresh" type="button" class="btn btn-outline-secondary btn-sm">Recheck readiness</button>
-        <p id="modelReadinessStatus" class="small mt-2" role="status" aria-live="polite">Open to check registry gates.</p>
-        <ul id="modelReadinessItems" class="list-unstyled"></ul>
-        <p id="modelReadinessScope" class="small"></p>
-    </details>
     <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
         <summary>Your chats · <span id="conversationHistoryStatus">loading</span></summary>
         <ul id="conversationHistoryList" class="list-unstyled mt-2" aria-label="Your saved chats"></ul>
@@ -61,9 +53,13 @@
     <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
     <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
         <p>Ask about a saved memory, your financial snapshot or your Travel preferences.</p>
-        <p class="small">Your chats are saved on this PC; delete any of them from the list above.</p></div>
+        <div class="d-flex flex-wrap gap-2"><a class="btn btn-sm btn-outline-primary" href="/mobility/">Plan a trip</a><a class="btn btn-sm btn-outline-primary" href="/investments/#researchJournalSection">Research a stock</a><a class="btn btn-sm btn-outline-primary" href="/dashboard/#taskBots">See what needs attention</a></div></div>
     <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
     <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
+        <label for="intelligenceQuery" class="form-label">Your question</label>
+        <textarea id="intelligenceQuery" class="form-control mb-3" rows="3" maxlength="1024" required autocomplete="off" placeholder="Ask a question…" aria-describedby="intelligencePrivacy"></textarea>
+        <details class="small mb-2"><summary>Examples of things you can ask</summary><p id="intelligenceActionHint">Try “add a savings goal Emergency fund of 1 lakh by March 2027” or “update Emergency fund saved to 25000”. ALFRED shows the change and saves it only when you press Confirm.</p></details>
+        <details id="intelligenceOptions" class="conversation-evidence mb-3"><summary>Answer options and sources</summary>
         <label class="form-label" for="intelligenceAnswerStyle">Local answer style</label>
         <select id="intelligenceAnswerStyle" class="form-select mb-2" aria-describedby="intelligenceAnswerStyleHelp">
             <option value="auto">Automatic</option><option value="concise">Concise</option>
@@ -71,9 +67,6 @@
             <option value="steps">Step by step</option>
         </select>
         <p class="small" id="intelligenceAnswerStyleHelp">Local answers stay within a bounded length and deadline. Financial and document replies keep stricter limits and source validation.</p>
-        <label for="intelligenceQuery" class="form-label">Your question</label>
-        <textarea id="intelligenceQuery" class="form-control mb-3" rows="3" maxlength="1024" required autocomplete="off" placeholder="Ask a question…" aria-describedby="intelligencePrivacy"></textarea>
-        <p class="small" id="intelligenceActionHint">You can also say “add a savings goal Emergency fund of 1 lakh by March 2027” or “update Emergency fund saved to 25000”. ALFRED shows the change and saves it only when you press Confirm.</p>
         <div class="conversation-options mb-3"><div>
         <label for="intelligenceScope" class="form-label">Include local records</label>
         <select id="intelligenceScope" class="form-select mb-2">
@@ -110,9 +103,10 @@
             Always look this up online. Without the tick ALFRED decides: questions about you stay in your memory, and current or general questions your memory does not answer are looked up. Only the question goes to Wikipedia and Google News, never your records; questions with amounts, long numbers, emails or keys are never sent.</label>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Answer it with OpenAI using your own key from Settings.</label>
+</details>
         <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
-        <p class="small" id="intelligenceStreamHelp">Local general chat can show an unverified preview with history on or off. Finance, saved records, statement evidence, verified closures and Travel answers stay buffered until source checks finish; Stop generation keeps your draft. A completed turn may already be saved if its final response is lost; reopen history or retry the same draft.</p>
-        <p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone until you pause or press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Without hands-free, check the text before you ask.</p>
+        <details class="small mb-2"><summary>How answers and privacy work</summary><p class="small" id="intelligenceStreamHelp">Local general chat can show an unverified preview with history on or off. Finance, saved records, statement evidence, verified closures and Travel answers stay buffered until source checks finish; Stop generation keeps your draft. A completed turn may already be saved if its final response is lost; reopen history or retry the same draft.</p>
+        </details><p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone until you pause or press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Without hands-free, check the text before you ask.</p>
         <label class="d-block mb-2" hidden><input id="intelligenceHandsFree" type="checkbox"> Hands-free conversation: ask when I pause, read the answer aloud, then listen again. Changes still wait for Confirm.</label>
         <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
             <button id="intelligenceStop" class="btn btn-outline-danger" type="button" hidden aria-describedby="intelligenceStreamHelp">Stop generation</button>
@@ -225,5 +219,5 @@
 <script src="/static/js/ai_insights.js?v=2.1.2"></script>
 <script src="/static/js/answer_markdown.js?v=1"></script>
 <script src="/static/js/voice.js?v=1"></script>
-<script src="/static/js/intelligence.js?v=39"></script>
+<script src="/static/js/intelligence.js?v=40"></script>
 {% endblock %}

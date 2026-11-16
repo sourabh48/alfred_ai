@@ -152,7 +152,7 @@ def _packet(user, params):
         same = same.in_rupee_totals() if holding.currency in (None, "INR") else same.filter(currency=holding.currency)
         total = same.aggregate(total=Sum("current_value"))["total"] or None
     try:
-        return research_packet(str(params.get("symbol") or ""), holding=holding, portfolio_total=total), None
+        return research_packet(str(params.get("symbol") or ""), holding=holding, portfolio_total=total, refresh=params.get("refresh") == "1"), None
     except ValueError as exc:
         from .services.research_packet import find_symbols
         try:
@@ -173,7 +173,25 @@ class ResearchPacketView(APIView):
 
     def get(self, request):
         packet, error = _packet(request.user, request.query_params)
-        return error or Response(packet)
+        if error:
+            return error
+        from .services.research_searches import remember
+        remember(request.user, packet)
+        return Response(packet, headers={"Cache-Control": "no-store, private"})
+
+
+class ResearchSearchHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import ResearchSearch
+        rows = ResearchSearch.objects.filter(user=request.user).values("symbol", "searched_at", "checked_at", "summary", "error")[:20]
+        return Response({"searches": list(rows)}, headers={"Cache-Control": "no-store, private"})
+
+    def delete(self, request):
+        from .models import ResearchSearch
+        ResearchSearch.objects.filter(user=request.user).delete()
+        return Response(status=204)
 
 
 class ResearchChallengeView(APIView):

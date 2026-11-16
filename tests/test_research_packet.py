@@ -32,6 +32,9 @@ RISING = [100 + i * 0.5 for i in range(250)]  # last close 224.5, above its 200-
 
 
 class PacketRuleTests(SimpleTestCase):
+    def setUp(self):
+        self.enterContext(patch("apps.investments.services.research_packet.timezone.localdate", return_value=date(2025, 9, 8)))
+
     def test_known_metrics_and_both_sides(self):
         p = build_packet("SYNTH.NS", _fund(), _prices(RISING))
         m = p["metrics"]
@@ -282,6 +285,10 @@ class PrivateChallengerTests(TestCase):
 class BeginnerTests(TestCase):
     """A newcomer can type a company name and gets a plain lean counted from the packet's own screens."""
     setUp = PacketApiTests.setUp
+
+    def setUp(self):
+        PacketApiTests.setUp(self)
+        self.enterContext(patch("apps.investments.services.research_packet.timezone.localdate", return_value=date(2025, 9, 8)))
 
     def test_plain_lean_follows_the_counted_signs(self):
         from apps.investments.services.research_packet import beginner_view

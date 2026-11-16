@@ -182,11 +182,11 @@
  "tests.test_online_services": 8.0,
  "tests.test_travel_google_maps": 5.0,
  "tests.test_offline_maps": 4.0,
-  "tests.test_social_login": 3.0,
-  "tests.test_fund_prices": 3.0,
-  "tests.test_beginner_guide": 2.0,
-  "tests.test_loan_dummy_lenders": 3.0,
-  "tests.test_investment_dummy_brokers": 3.0,
+ "tests.test_social_login": 3.0,
+ "tests.test_fund_prices": 3.0,
+ "tests.test_beginner_guide": 2.0,
+ "tests.test_loan_dummy_lenders": 3.0,
+ "tests.test_investment_dummy_brokers": 3.0,
  "tests.test_exchange_rates": 3.0,
  "tests.test_loan_prepayment": 2.0,
  "tests.test_advisory_evidence_freshness": 2.4,
@@ -266,5 +266,7 @@
  "tests.test_financial_scenario_reconciliation": 1.2,
  "tests.test_home_page": 2.4,
  "tests.test_assistant_web_lookup": 1.5,
- "tests.test_task_bots": 21.3
+ "tests.test_task_bots": 21.3,
+ "tests.test_research_searches": 0.981,
+ "tests.test_travel_photos": 0.331
 }

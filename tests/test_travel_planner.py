@@ -57,6 +57,17 @@ class TravelPlannerTests(TestCase):
         s = send_message(s.id, self.user, "Choose "+s.candidates[0]["name"])
         return send_message(s.id, self.user, "Build itinerary")
 
+    def test_short_holiday_shortlists_without_a_budget_and_choice_builds_draft(self):
+        session = send_message(new_session(self.user).id, self.user, "I have a 2 day holiday. Plan me a trip from Bengaluru.")
+        self.assertTrue(session.candidates)
+        self.assertFalse(session.state["budget_type"]["confirmed_by_user"])
+        self.assertEqual(value(session.state, "budget_type"), "moderate")
+        session = send_message(session.id, self.user, "Choose " + session.candidates[0]["name"])
+        self.assertEqual(session.status, "researching")
+        self.assertEqual(len(session.itinerary["days"]), 2)
+        self.assertEqual(session.itinerary["destination"], value(session.state, "selected_destination"))
+        self.assertIn("Find hotels", session.messages.last().chips)
+
     def test_draft_optional_destination_and_dates(self):
         for status in ("draft", "researching", "suggestions_ready"):
             r = self.post("/api/mobility/travel-plans/", {"title":"October weekend", "status":status})
@@ -102,7 +113,8 @@ class TravelPlannerTests(TestCase):
 
     def test_budget_optional_with_tier(self):
         s = send_message(new_session(self.other).id, self.other, "3 days from Bengaluru")
-        self.assertIn("premium", s.messages.last().text)
+        self.assertIn("mid-range", s.messages.last().text)
+        self.assertTrue(s.candidates)
         s = send_message(s.id, self.other, "Budget options")
         self.assertTrue(s.research_runs.exists())
 
@@ -148,7 +160,7 @@ class TravelPlannerTests(TestCase):
         s=send_message(s.id,self.user,"Choose that")
         self.assertEqual(value(s.state,"selected_destination"),name)
         self.assertEqual(value(s.state,"origin"),"Bengaluru")
-        self.assertEqual(s.itinerary,{})
+        self.assertEqual(s.itinerary["destination"], name)
 
     def test_itinerary_only_after_selection(self):
         s=self.ready()

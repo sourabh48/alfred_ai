@@ -22,7 +22,7 @@
     async function load() {
         const data = await Alfred.fetchJSON("/api/ai/bots/");
         proposals = data.proposals;
-        if (!$("taskBotsRun").childElementCount) Alfred.setHTMLIfChanged("taskBotsRun", '<button type="button" class="btn btn-sm btn-primary" data-bot-run-all="1">Run all bots</button>'
+        if ($("taskBots").dataset.recovery === "true" && !$("taskBotsRun").childElementCount) Alfred.setHTMLIfChanged("taskBotsRun", '<button type="button" class="btn btn-sm btn-primary" data-bot-run-all="1">Run all bots</button>'
             + `<details class="mt-2"><summary>Run one bot</summary><div class="d-flex flex-wrap gap-2 mt-2">${data.bots.map(b => `<button type="button" class="btn btn-sm btn-outline-primary" data-bot-run="${esc(b.name)}" title="${esc(b.description)}">Run ${esc(b.label)}</button>`).join("")}</div></details>`);
         Alfred.setHTMLIfChanged("taskBotsList", proposals.map(card).join("") || '<p class="small mb-0">No reviews waiting.</p>');
     }
@@ -33,12 +33,12 @@
             say(result.proposal ? `${result.proposal.label} is ready to review.` : "Nothing due right now.");
         }
         if (button.dataset.botRunAll) {
-            let ready = 0;
+            let ready = 0, failed = 0;
             for (const bot of Array.from(document.querySelectorAll("[data-bot-run]"), b => b.dataset.botRun)) {
                 say(`Running bots... ${ready} ready so far.`);
-                try { if ((await post({operation: "run", bot})).proposal) ready++; } catch (error) { /* one bot failing never stops the rest */ }
+                try { if ((await post({operation: "run", bot})).proposal) ready++; } catch (error) { failed++; }
             }
-            say(ready ? `${ready} review(s) ready below.` : "Nothing due right now.");
+            say(`${ready} review(s) ready. ${failed ? `${failed} failed; check the worker and retry later.` : "All checks completed."}`);
         }
         if (button.dataset.botDismiss) say((await post({operation: "dismiss", proposal_id: button.dataset.botDismiss})).message);
         if (button.dataset.botConfirm) {

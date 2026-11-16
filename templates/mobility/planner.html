@@ -1,3 +1,9 @@
+<nav class="travel-flow mb-3" aria-label="Trip planning steps">
+    <a href="#travelPlanner" id="plannerStepPlan">1 · Tell Alfred</a>
+    <a href="#plannerResults" id="plannerStepChoose">2 · Choose a place</a>
+    <a href="#plannerItinerary" id="plannerStepReview">3 · Review your trip</a>
+    <p id="plannerNextStep" class="small mb-0" role="status">Start with your days off and starting city.</p>
+</nav>
 <section class="travel-workspace mb-4" id="travelPlanner" aria-label="AI Travel Planner">
     <div class="travel-chat surface-card">
         <header class="d-flex justify-content-between align-items-start gap-2 mb-3">
@@ -10,7 +16,7 @@
         <form id="plannerComposer" class="travel-composer">
             <label for="plannerInput" class="visually-hidden">Message Alfred about your trip</label>
             <input id="plannerInput" type="text" class="form-control" maxlength="2000" autocomplete="off" placeholder="3 days, ₹15,000, somewhere peaceful…" required>
-            <button type="submit" class="btn btn-primary" id="plannerSend">Send</button>
+            <button type="submit" class="btn btn-primary" id="plannerSend" disabled>Send</button>
         </form>
         <div id="plannerResearch" class="travel-research mt-3" role="status" aria-live="polite"></div>
         <div class="travel-actions mt-3">
@@ -27,9 +33,16 @@
             <details class="mt-3"><summary class="small">What Alfred understood</summary><div id="plannerProvenance" class="small mt-2"></div></details>
         </section>
         <section class="surface-card"><h2 class="h5">Your Plans</h2><div id="plannerPlans" class="travel-session-list"></div><details class="mt-3"><summary>Your conversations</summary><div id="plannerSessions" class="travel-session-list mt-2"></div></details></section>
-        <section class="surface-card"><h2 class="h5">Your Travel Style</h2><p class="small">You control what Alfred remembers.</p><a href="/settings/#travelPreferences">View, edit or reset travel preferences →</a><div id="plannerStyle" class="travel-chips mt-2"></div><a class="btn btn-outline-primary btn-sm mt-3" href="/ai/insights/?scope=travel#intelligencePanel">Recall my Travel preferences</a></section>
+        <section class="surface-card"><h2 class="h5">Made for you</h2><p class="small mb-0">Alfred learns from the trips you choose. Tell the chat when your preferences change.</p><div id="plannerStyle" class="travel-chips mt-2"></div><details class="mt-2"><summary class="small">Privacy and corrections</summary><a href="/settings/#travelPreferences">Review or forget travel preferences</a></details></section>
     </aside>
 </section>
+<section id="plannerGallery" class="surface-card mb-4 travel-gallery" hidden aria-roledescription="carousel" aria-label="Selected destination photos">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"><h2 class="h5 mb-0">Picture your trip</h2><label>Place <select id="plannerGalleryPlace" class="form-select"></select></label></div>
+    <figure class="mb-0"><div class="travel-gallery-frame" id="plannerGalleryFrame" tabindex="0" aria-label="Photo viewer; use left and right arrows to change photos"><img id="plannerGalleryImage" hidden alt=""><p id="plannerGalleryStatus" role="status"></p></div><figcaption id="plannerGalleryCaption" class="small mt-2"></figcaption></figure>
+    <div class="travel-actions mt-2"><button id="plannerGalleryPrevious" type="button" class="btn btn-outline-primary btn-sm" disabled aria-label="Previous photo">← Previous</button><span id="plannerGalleryCount" class="small align-self-center"></span><button id="plannerGalleryNext" type="button" class="btn btn-outline-primary btn-sm" disabled aria-label="Next photo">Next →</button><button id="plannerGalleryRetry" type="button" class="btn btn-outline-secondary btn-sm" hidden>Retry photos</button></div>
+    <p class="small mt-2 mb-0">Google Maps · Photos show the place, not current weather or room availability.</p>
+</section>
+<nav id="plannerTripActions" class="travel-actions mb-3" aria-label="Explore your selected trip" hidden><a class="btn btn-outline-primary" href="#plannerAttractions">Attractions & offbeat leads</a><a class="btn btn-outline-primary" href="#plannerStays">Find a stay</a><a class="btn btn-outline-primary" href="#plannerMapPanel">Map & routes</a><a class="btn btn-primary" href="#plannerItinerary">Review itinerary</a></nav>
 <section id="plannerSuggestions" class="surface-card mb-4" aria-labelledby="plannerSuggestionsTitle" hidden></section>
 <section id="plannerResults" class="mb-4" hidden aria-label="Destination recommendations">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"><h2 class="page-section-title mb-0">Places that fit your escape</h2><button type="button" class="btn btn-outline-primary" id="plannerCompare">Compare destinations</button></div>
@@ -55,7 +68,7 @@
 <section id="plannerEvidence" class="mb-4" hidden aria-label="Travel research, map and sources">
     <h2 id="plannerEvidenceTitle" class="page-section-title">Travel research</h2>
     <div id="plannerResearchChoices" class="travel-actions mb-3" role="group" aria-label="Choose destination research"></div>
-    <section class="surface-card mb-3"><h3 class="h5">Map and routes</h3>
+    <section class="surface-card mb-3" id="plannerMapPanel"><h3 class="h5">Map and routes</h3>
         <p class="small">Loading tiles shares the displayed map area with the configured map provider. Route lines do not establish motorcycle legality or current road conditions.</p>
         <button type="button" id="plannerLoadMap" class="btn btn-sm btn-outline-primary">Load map</button>
         <p id="plannerMapStatus" class="small" role="status">Available route geometry and places will appear here. Missing routes remain unverified.</p>

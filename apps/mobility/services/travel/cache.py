@@ -50,7 +50,7 @@ def query(provider, parameters, *, force=False, cache_only=False):
         return ProviderResult(provider.name, provider.category, error="invalid_parameters")
     digest = hashlib.sha256((provider.cache_partition+json.dumps(parameters, sort_keys=True, allow_nan=False)).encode()).hexdigest()
     key = f"{provider.name}:{provider.category}:{provider.version}:{digest}"
-    record = VerifiedExternalInsight.objects.filter(scope="travel_provider", cache_key=key, is_active=True).first()
+    record = VerifiedExternalInsight.objects.filter(scope="travel_provider", cache_key=key, is_active=True).first() if provider.cacheable else None
 
     def log(status, network=False, latency=0, error=""):
         TravelProviderRequest.objects.create(provider=provider.name, category=provider.category,
@@ -112,11 +112,12 @@ def query(provider, parameters, *, force=False, cache_only=False):
             retrieved_at=retrieved.isoformat(), verified_at=retrieved.isoformat(),
             expires_at=expires.isoformat(),
             response_hash=response_hash, request_parameters=parameters)
-        VerifiedExternalInsight.objects.update_or_create(scope="travel_provider", cache_key=key,
-            defaults={"title": f"{provider.category} from {provider.name}", "source_name": provider.name,
-                "source_url": provider.source_url, "payload": result.as_dict(), "checksum": response_hash,
-                "status": "fresh", "fetched_at": retrieved, "verified_at": retrieved,
-                "stale_after": expires, "is_active": True})
+        if provider.cacheable:
+            VerifiedExternalInsight.objects.update_or_create(scope="travel_provider", cache_key=key,
+                defaults={"title": f"{provider.category} from {provider.name}", "source_name": provider.name,
+                    "source_url": provider.source_url, "payload": result.as_dict(), "checksum": response_hash,
+                    "status": "fresh", "fetched_at": retrieved, "verified_at": retrieved,
+                    "stale_after": expires, "is_active": True})
         TravelProviderRequest.objects.filter(pk=event.pk).update(status="ok", latency_ms=round((monotonic()-start)*1000))
         return result
     except requests.Timeout:

@@ -252,7 +252,13 @@ def statements_due(user, today):
     return items
 
 
+def research_watch(user, today):
+    from apps.investments.services.research_searches import review_recent
+    return review_recent(user, today)
+
+
 BOTS = {
+    "research_watch": ("Stock research", 1, research_watch, "Refresh up to three recent stock searches daily; never trade."),
     "money_review": ("Weekly money review", 7, money_review, "Last 7 days of spending against the week before."),
     "bills_due": ("Bills and EMIs due", 1, bills_due, "Loan instalments due in the next 7 days."),
     "fund_review": ("Fund review", 1, fund_review, "Owned funds that dropped from their recent high (AMFI prices)."),
@@ -407,7 +413,7 @@ def dismiss(user, identity):
 # Daily bots that read only this PC's records refresh every hour, so a new spend or statement shows up the same
 # day; an unchanged review keeps its fingerprint and is reused, never duplicated. The fund bot reads AMFI online,
 # so it stays once a day, and the weekly bots stay weekly.
-NETWORK_BOTS = {"fund_review"}
+NETWORK_BOTS = {"fund_review", "research_watch"}
 
 
 def run_scheduled(today=None):

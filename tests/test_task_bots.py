@@ -186,8 +186,9 @@ class TaskBotTests(Fixtures):
     def test_fund_review_reports_drops_and_abstains_when_prices_are_missing(self):
         Investment.objects.create(user=self.user, asset_name="Synthetic Flexi Cap", amfi_scheme_code="100001", currency="INR",
                                   invested_amount=Decimal("1000"), current_value=Decimal("1000"))
-        history = {"series": [{"scheme_code": "100001", "nav_date": f"2026-10-{day:02d}", "nav": Decimal(nav)}
-                              for day, nav in ((1, "100"), (2, "90"), (3, "80"))]}
+        navs = ["100"] * 18 + ["90", "80"]  # enough fresh daily prices for a signal; the parser gives real dates
+        history = {"series": [{"scheme_code": "100001", "nav_date": self.today - timedelta(days=len(navs) - index), "nav": Decimal(nav)}
+                              for index, nav in enumerate(navs)]}
         target = "apps.investments.services.portfolio_intelligence.portfolio_intelligence_service._get_amfi_history_report"
         with patch(target, return_value=history):
             proposal = task_bots.run(self.user, "fund_review", self.today)

@@ -1,3 +1,4 @@
+from .research_views import ResearchSearchHistoryView
 from django.urls import path
 from .import_review_views import InvestmentImportReviewAPI, InvestmentImportConfirmAPI
 from .alert_views import InvestmentReviewAlertView
@@ -22,6 +23,7 @@ urlpatterns = [
     path("research/", ResearchDecisionListCreateView.as_view(), name="research_decisions"),
     path("research/lessons/", ResearchLessonsView.as_view(), name="research_lessons"),
     path("research/history/", ResearchHistoryView.as_view(), name="research_history"),
+    path("research/searches/", ResearchSearchHistoryView.as_view(), name="research_searches"),
     path("research/packet/", ResearchPacketView.as_view(), name="research_packet"),
     path("research/packet/challenge/", ResearchChallengeView.as_view(), name="research_packet_challenge"),
     path("research/packet/personal-challenge/", ResearchPersonalChallengeView.as_view(), name="research_packet_personal_challenge"),

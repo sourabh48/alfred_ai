@@ -52,7 +52,7 @@ def research_categories(text):
         (r"\b(?:weather|forecasts?|rain)\b", "weather"), (r"hotel|stay", "hotels"),
         (r"flight|fly", "flights"), (r"train|rail", "trains"), (r"\bbus(?:es)?\b", "buses"),
         (r"permit|permission|\bopen\b|closure", "permits"),
-        (r"discover|unexplored|camp|hidden|restaurant", "places"),
+        (r"discover|unexplored|offbeat|attraction|camp|hidden|restaurant", "places"),
         (r"route|expressway|toll|scenic", "routing"),
     ] if re.search(terms, text.casefold())}
     if "availability" in text.casefold() and not categories & {"hotels", "flights", "trains", "buses"}:

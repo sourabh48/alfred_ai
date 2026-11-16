@@ -374,6 +374,9 @@ function renderInvestmentPositions(items) {
                 <div class="muted small">${Alfred.escapeHtml(item.asset_type.replaceAll("_", " "))} | ${Alfred.escapeHtml(item.institution || "Unspecified institution")}</div>
                 <div class="muted small">Account: ${Alfred.escapeHtml(item.account_number ? `…${item.account_number.slice(-4)}` : "not recorded")}</div>
                 <div class="muted small" data-position-currency>Currency: ${Alfred.escapeHtml(item.currency || "not recorded, shown in ₹")}</div>
+                ${item.nav_state === "stale" ? `<div class="small text-danger" data-nav-state="stale">Value uses the AMFI price of ${Alfred.escapeHtml(item.nav_date)}. No newer price has arrived, so it may be out of date.</div>`
+                    : item.nav_state === "waiting" ? `<div class="muted small" data-nav-state="waiting">Waiting for a fresh AMFI price. The value shown is the one you entered.</div>`
+                    : item.nav_state === "current" ? `<div class="muted small" data-nav-state="current">Valued at the AMFI price of ${Alfred.escapeHtml(item.nav_date)}.</div>` : ""}
             </td>
             <td class="text-end">${Alfred.formatCurrency(item.invested_amount, item.currency)}</td>
             <td class="text-end">${Alfred.formatCurrency(item.current_value, item.currency)}</td>
@@ -582,20 +585,26 @@ function fillPacketHoldings(items) {
     select.value = items.some(item => String(item.id) === chosen) ? chosen : "";
 }
 
+let researchLookupEpoch=0, researchLookupController;
 async function loadResearchPacket(event) {
     event.preventDefault();
+    const ticket=++researchLookupEpoch; researchLookupController?.abort(); researchLookupController=new AbortController();
     const form = event.currentTarget, target = document.getElementById("researchPacket");
     const query = new URLSearchParams({ symbol: form.elements.symbol.value.trim() });
     if (form.elements.holding.value) query.set("holding", form.elements.holding.value);
     target.innerHTML = `<p class="muted small mb-0">Fetching dated public data…</p>`;
     try {
-        const packet = await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`);
+        query.set("refresh", "1");
+        const packet = await Alfred.fetchJSON(`/api/investments/research/packet/?${query}`,{signal:researchLookupController.signal});
+        if(ticket!==researchLookupEpoch)return;
+        window.ResearchSearches?.refresh();
         target.innerHTML = researchPacketHtml(packet);
         prefillResearchView(packet);
         document.getElementById("researchChallengeButton").addEventListener("click", () =>
             loadResearchChallenge(Object.fromEntries(query), document.getElementById("researchChallengeRole").value));
         document.getElementById("researchPersonalButton").addEventListener("click", () => loadResearchPersonalChallenge(Object.fromEntries(query)));
     } catch (error) {
+        if(ticket!==researchLookupEpoch || error.name==="AbortError")return;
         const e = Alfred.escapeHtml, matches = error.code === "choose_symbol" ? error.payload?.matches || [] : [];
         target.innerHTML = `<div class="alert alert-warning mb-0" role="alert">${e(error.message || "The packet could not be built.")}
             ${matches.length ? `<div class="d-flex flex-wrap gap-2 mt-2" id="researchSymbolMatches">${matches.map(m =>
@@ -619,6 +628,7 @@ function researchPacketHtml(p) {
         : `Unavailable: ${e(v.reason || "")}`;
     const b = p.beginner || {};
     return `<div class="mini-card" id="researchPacketResult">
+        <p class="small">${e(p.freshness?.note || "Source freshness unavailable.")} Price evidence: ${e(p.freshness?.price_status || "unknown")} · ${e(p.freshness?.price_as_of || "no dated quote")}.</p>
         ${b.label ? `<div class="border-bottom pb-2 mb-2" id="researchBeginner">
             <p class="fw-semibold mb-1">In plain words: <span class="badge text-bg-${{ positive: "success", caution: "danger", mixed: "warning" }[b.lean] || "secondary"}">${e(b.label)}</span></p>
             <p class="mb-1">${e(b.headline)} (${e(String(b.good_signs))} good, ${e(String(b.warning_signs))} warning)</p>

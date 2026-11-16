@@ -236,7 +236,7 @@ def run_research(run_id):
                     current.plan.status = "suggestions_ready"
                     current.plan.save(update_fields=["status","updated_at"])
                 TravelMessage.objects.create(session=current, role="assistant", text=summary,
-                                             chips=["Compare destinations", "Research thoroughly", "Something cheaper"])
+                                             chips=["Show attractions", "Find hotels", "Find offbeat places", "Change dates"] if current.itinerary else ["Compare destinations", "Research thoroughly", "Something cheaper"])
         return {"status": status, "candidate_count": len(options)}
     except Exception:
         logger.exception("Travel research run %s failed", run_id)

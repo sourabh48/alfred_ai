@@ -63,7 +63,8 @@
 {% endif %}
 
 <section class="surface-card mb-4" id="taskBots" aria-labelledby="taskBotsTitle">
-    <h2 class="page-section-title" id="taskBotsTitle">Your assistants</h2>
+    <h2 class="page-section-title" id="taskBotsTitle">For your attention</h2>
+    <p class="small">Alfred checks automatically while the app is running. Review suggested changes below. <a href="/settings/diagnostics/#botRecovery">Having an issue?</a></p>
     <p class="page-section-copy">ALFRED's bots run by themselves every hour while ALFRED is on (fund prices once a day, weekly reviews once a week) and prepare a review when something needs you. Nothing changes until you confirm, and ALFRED never pays, books, trades or sends anything.</p>
     <div class="d-flex flex-wrap gap-2" id="taskBotsRun" role="group" aria-label="Run a bot now"></div>
     <p class="small mt-2" id="taskBotsStatus" role="status" aria-live="polite"></p>
@@ -182,5 +183,5 @@
 
 {% block extra_js %}
 <script src="/static/js/dashboard.js?v=2.5.2"></script>
-<script src="/static/js/task_bots.js?v=3"></script>
+<script src="/static/js/task_bots.js?v=4"></script>
 {% endblock %}

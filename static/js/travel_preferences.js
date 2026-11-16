@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const root = document.getElementById("travelPreferences");
     if (!root) return;
+    if(location.hash==="#travelPreferences")root.querySelector("details").open=true;
     const $ = id=>document.getElementById(id);
     const esc = x=>Alfred.escapeHtml(String(x ?? ""));
     const url = "/api/mobility/planner/preferences/";

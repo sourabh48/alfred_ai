@@ -41,4 +41,20 @@
         </article>
     {% endfor %}</div>{% endif %}
 </section>
+    <details id="modelReadinessPanel" class="surface-card mb-3">
+        <summary>Local model readiness</summary>
+        <p class="small mt-2">Adaptive-model registry gates are separate from Ollama connectivity. This view does not train or activate models, change providers, or prove predictive accuracy.</p>
+        <button id="modelReadinessRefresh" type="button" class="btn btn-outline-secondary btn-sm">Recheck readiness</button>
+        <p id="modelReadinessStatus" class="small mt-2" role="status" aria-live="polite">Open to check registry gates.</p>
+        <ul id="modelReadinessItems" class="list-unstyled"></ul>
+        <p id="modelReadinessScope" class="small"></p>
+    </details>
+<details id="botRecovery" class="surface-card my-4"><summary>Assistant recovery · use if scheduled reviews are missing</summary>
+<p>Reviews run automatically while the native app and its scheduler are running. Check worker and scheduler status above before retrying.</p>
+<section id="taskBots" data-recovery="true"><div id="taskBotsRun"></div><p id="taskBotsStatus" role="status"></p><div id="taskBotsList"></div></section></details>
+<details id="memoryHealth" class="surface-card my-4"><summary>Memory diagnostics and recovery</summary>
+{% include "settings/memory.html" with health_mode=True %}
+</details>
 {% endblock %}
+
+{% block extra_js %}<script src="/static/js/task_bots.js?v=4"></script><script src="/static/js/memory.js?v=8"></script><script src="/static/js/model_readiness.js?v=1"></script>{% endblock %}

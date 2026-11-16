@@ -6,8 +6,11 @@ holding leaves it, and nothing is ever bought or sold for the person.
 """
 from decimal import Decimal
 
+from django.utils import timezone
+
 from ..models import Investment
-from .portfolio_intelligence import WATCHLIST_HISTORY_DAYS, portfolio_intelligence_service
+from .fund_prices import nav_is_fresh
+from .portfolio_intelligence import WATCHLIST_HISTORY_DAYS, WATCHLIST_MIN_OBSERVATIONS, portfolio_intelligence_service
 
 PICKS = 3
 SELL_DROP_PCT = Decimal("15")    # this far below its recent high: think about selling or switching
@@ -41,6 +44,34 @@ def holding_signal(navs):
     return "hold", "It is close to its recent high. Keep holding and keep your SIP going."
 
 
+def dated_navs(rows, today):
+    """A fund's NAVs in date order with their latest date, or the reason its history cannot support a signal.
+
+    The watchlist's evidence rules: one agreed identity, one price per day, nothing dated in the future, a latest price
+    within the accepted age, and enough observations inside the history window.
+    """
+    by_day, identities = {}, set()
+    for row in rows:
+        day = row["nav_date"]
+        if day > today:
+            return None, None, "AMFI sent a price dated in the future"
+        if (today - day).days > WATCHLIST_HISTORY_DAYS:
+            continue
+        if by_day.setdefault(day, row["nav"]) != row["nav"]:
+            return None, None, f"AMFI lists two different prices for {day:%d %b %Y}"
+        identities.add(tuple(str(row.get(field, "")).casefold() for field in ("scheme_name", "isin_growth", "isin_reinvestment")))
+    if len(identities) > 1:
+        return None, None, "its AMFI records do not agree on which fund this is"
+    if not by_day:
+        return None, None, "AMFI has no recent prices for it"
+    days = sorted(by_day)
+    if not nav_is_fresh(days[-1], today):
+        return None, days[-1], f"its latest AMFI price is from {days[-1]:%d %b %Y}, which is too old"
+    if len(days) < WATCHLIST_MIN_OBSERVATIONS:
+        return None, days[-1], f"AMFI has only {len(days)} recent prices for it"
+    return [by_day[day] for day in days], days[-1], ""
+
+
 def beginner_guide(user, watchlist):
     picks = [_pick(item) for item in (watchlist.get("items") or [])[:PICKS]] if watchlist.get("available") else []
     owned = list(Investment.objects.filter(user=user, currency="INR").exclude(amfi_scheme_code="").only("id", "asset_name", "amfi_scheme_code"))
@@ -49,13 +80,17 @@ def beginner_guide(user, watchlist):
         # The watchlist has just loaded this window, so this normally reads the cache rather than downloading again.
         history = portfolio_intelligence_service._get_amfi_history_report(days=WATCHLIST_HISTORY_DAYS)["series"]
         codes = {item.amfi_scheme_code for item in owned}
-        series = {}
+        series, today = {}, timezone.localdate()
         for row in history:
             if row["scheme_code"] in codes:
-                series.setdefault(row["scheme_code"], {})[row["nav_date"]] = row["nav"]
+                series.setdefault(row["scheme_code"], []).append(row)
         for item in owned:
-            navs = [nav for _, nav in sorted(series.get(item.amfi_scheme_code, {}).items())]
-            signal = holding_signal(navs)
-            action, text = signal or ("unknown", "No recent AMFI prices for this fund yet, so ALFRED cannot judge it.")
-            holdings.append({"id": item.id, "name": item.asset_name, "action": action, "text": text})
+            navs, as_of, reason = dated_navs(series.get(item.amfi_scheme_code, []), today)
+            signal = holding_signal(navs) if navs else None
+            if signal:
+                action, text = signal[0], f"{signal[1]} Based on AMFI prices up to {as_of:%d %b %Y}."
+            else:  # no hold, review or sell without dated, complete evidence
+                action, text = "unknown", f"ALFRED cannot judge this fund now: {reason or 'its prices are incomplete'}. No signal is given."
+            holdings.append({"id": item.id, "name": item.asset_name, "action": action, "text": text,
+                             "as_of": as_of.isoformat() if as_of else None})
     return {"picks": picks, "holdings": holdings, "note": NOTE}

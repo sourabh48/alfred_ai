@@ -55,6 +55,7 @@ class Provider:
     allowed_parameters = frozenset()
     version = 1
     cache_partition = "public"
+    cacheable = True
 
     def unavailable_reason(self):
         return "provider_not_configured"
