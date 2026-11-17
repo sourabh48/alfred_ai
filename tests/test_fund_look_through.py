@@ -240,6 +240,29 @@ class SavedFundPortfolioTests(FundLookThroughApiTests):
     def saved(self, ids, client=None):
         return (client or self.client).post("/api/investments/look-through/saved/", {"investment": ids}, content_type="application/json")
 
+    def test_saved_dated_explicit_asset_classes_inform_ranking_without_guessing(self):
+        from datetime import timedelta
+        from apps.investments.services.portfolio_intelligence import portfolio_intelligence_service as service
+
+        fund = Investment.objects.create(user=self.owner, asset_name="Mixed", asset_type="mutual_fund",
+                                         current_value="100.00", currency="INR")
+        Investment.objects.filter(user=self.owner).exclude(pk=fund.pk).update(current_value=0)
+        typed_csv = (f"Synthetic Mixed Fund\nMonthly portfolio as on {TODAY.isoformat()}\n"
+                     "Company,ISIN,Sector,% to NAV,Asset Class\n"
+                     "Synthetic Bank Plc,INE000A01011,Banks,30%,Equity Shares\n"
+                     "Synthetic Bank Bond,INE000C01013,Banks,50%,Debt Securities\n"
+                     "Synthetic ETF units,INF000D01014,Fund units,20%,Equity Shares\n").encode()
+        self.assertEqual(self.post([(fund.pk, typed_csv, "mixed.csv")]).status_code, 200)
+        with patch("apps.investments.services.portfolio_intelligence.timezone.localdate", return_value=TODAY):
+            mix = service._portfolio_mix(self.owner)
+        self.assertEqual((mix["equity_pct"], mix["debt_pct"], mix["unknown_pct"]), (30, 50, 20))
+        self.assertEqual(sum(mix.values()), 100)
+        self.assertEqual(service._diversification_fit_score("equity_core", mix), 0)
+
+        with patch("apps.investments.services.portfolio_intelligence.timezone.localdate", return_value=TODAY + timedelta(days=46)):
+            stale = service._portfolio_mix(self.owner)
+        self.assertEqual((stale["equity_pct"], stale["debt_pct"], stale["unknown_pct"]), (0, 0, 100))
+
     def test_save_keeps_only_parsed_rows_and_saved_look_through_matches_the_files(self):
         fresh = self.post(self.pairs(), save=False).json()
         self.assertFalse(FundPortfolioSnapshot.objects.exists())

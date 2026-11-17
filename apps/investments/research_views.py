@@ -206,8 +206,8 @@ class ResearchChallengeView(APIView):
         from .services.research_challenge import ROLES
 
         data = request.data if isinstance(request.data, dict) else {}
-        role = data.get("role") or "sceptic"
-        if role not in ROLES:
+        role = data.get("role", "sceptic")
+        if not isinstance(role, str) or role not in ROLES:
             return Response({"detail": "Choose the sceptic, advocate or risk manager."}, status=status.HTTP_400_BAD_REQUEST)
         packet, error = _packet(request.user, data)
         if error:

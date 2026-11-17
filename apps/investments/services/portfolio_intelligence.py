@@ -271,21 +271,20 @@ class PortfolioIntelligenceService:
                 "message": f"Latest tracked inflation reference is {inflation_value:.2f}%, which matters for real-return planning and debt-vs-equity balance.",
             })
 
-        # Analyze user's portfolio and suggest actions
-        user_investments = list(Investment.objects.filter(user=user).in_rupee_totals())
-
-        # Suggest rebalancing if needed
-        if user_investments:
-            total_value = sum(item.current_value for item in user_investments)
-            equity_percentage = sum(item.current_value for item in user_investments if item.asset_type == "equity") / total_value * 100 if total_value > 0 else 0
-
+        mix = self._portfolio_mix(user)
+        if mix["unknown_pct"]:
+            suggestions.append({"type": "incomplete_exposure", "message":
+                f"Asset class is unknown for {mix['unknown_pct']:.1f}% of the recorded portfolio. "
+                "Portfolio rebalancing guidance waits for enough dated fund evidence."})
+        elif any(mix.values()):
+            equity_percentage = mix["equity_pct"]
             if equity_percentage > 70:
                 suggestions.append({
                     "type": "rebalancing",
                     "message": f"Your portfolio has {equity_percentage:.1f}% equity exposure. "
                               "Consider diversifying into debt or gold for better risk management.",
                 })
-            elif equity_percentage < 25 and total_value > 0:
+            elif equity_percentage < 25:
                 suggestions.append({
                     "type": "rebalancing",
                     "message": f"Equity exposure is only {equity_percentage:.1f}%. If your horizon is long, you may be under-exposed to growth assets.",
@@ -756,19 +755,24 @@ class PortfolioIntelligenceService:
                 "return_baselines": {str(days): day.isoformat() if day else None for days, day in baselines.items()}}
 
     def _portfolio_mix(self, user) -> dict:
+        from .fund_look_through import current_class_weights
+
+        amounts = dict.fromkeys(("equity", "debt", "gold", "cash", "reit", "crypto", "unknown"), Decimal(0))
         investments = list(Investment.objects.filter(user=user).in_rupee_totals().only("asset_type", "current_value"))
         total_value = sum(item.current_value for item in investments)
-        if not total_value:
-            return {"equity_pct": 0.0, "debt_pct": 0.0, "gold_pct": 0.0, "hybrid_pct": 0.0}
-        equity_types = {"equity", "mutual_fund", "reit", "crypto"}
-        debt_types = {"debt", "cash"}
-        gold_types = {"gold"}
-        return {
-            "equity_pct": float(round(sum(item.current_value for item in investments if item.asset_type in equity_types) / total_value * 100, 2)),
-            "debt_pct": float(round(sum(item.current_value for item in investments if item.asset_type in debt_types) / total_value * 100, 2)),
-            "gold_pct": float(round(sum(item.current_value for item in investments if item.asset_type in gold_types) / total_value * 100, 2)),
-            "hybrid_pct": float(round(sum(item.current_value for item in investments if item.asset_type == "mutual_fund") / total_value * 100, 2)),
-        }
+        fund_ids = [item.pk for item in investments if item.asset_type == "mutual_fund" and item.current_value > 0]
+        fund_weights = current_class_weights(user, fund_ids, today=timezone.localdate())
+        for item in investments:
+            if item.asset_type == "mutual_fund":
+                weights = fund_weights.get(item.pk, {})
+                for asset_class, weight in weights.items():
+                    amounts[asset_class] += item.current_value * weight / 100
+                amounts["unknown"] += item.current_value * (100 - sum(weights.values())) / 100
+            else:
+                bucket = item.asset_type if item.asset_type in amounts else "unknown"
+                amounts[bucket] += item.current_value
+        return {f"{bucket}_pct": float(amount * 100 / total_value) if total_value > 0 else 0.0
+                for bucket, amount in amounts.items()}
 
     def _market_regime(self, *, market_return: float, vix: float) -> dict:
         if market_return >= 1.5 and (not vix or vix < 16):
@@ -795,6 +799,8 @@ class PortfolioIntelligenceService:
         return float(matrix.get(regime_label, {}).get(family, 0))
 
     def _diversification_fit_score(self, family: str, portfolio_mix: dict) -> float:
+        if portfolio_mix.get("unknown_pct") or not any(portfolio_mix.values()):
+            return 0.0
         equity_pct = float(portfolio_mix.get("equity_pct", 0) or 0)
         debt_pct = float(portfolio_mix.get("debt_pct", 0) or 0)
         gold_pct = float(portfolio_mix.get("gold_pct", 0) or 0)

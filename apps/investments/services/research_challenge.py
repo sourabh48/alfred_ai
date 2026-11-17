@@ -10,12 +10,15 @@ from __future__ import annotations
 import json
 import re
 import time
+from unicodedata import category, normalize, numeric
 
+from apps.ml_engine.services.local_chat_stream import _NUMBER_WORDS
 from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 
 SECONDS = 120  # measured 2026-11-07: the CPU-only local model writes about 3 tokens a second here
 TEXT = 300
-DIGIT = re.compile(r"\d")
+TRADE_LANGUAGE = re.compile(r"\b(?:buy|sell|hold|accumulate|overweight|underweight|target price|price target)\b", re.I)
+QUANTITY_LANGUAGE = re.compile(r"\b(?:trillion|lakhs?|lacs?|crores?|half|quarters?|percent|per cent|basis points?)\b", re.I)
 JSON_OBJECT = re.compile(r"\{.*\}", re.S)
 
 
@@ -60,8 +63,17 @@ def challenge_payload(packet: dict, role: str = "sceptic") -> dict:
 
 
 def _clean(value):
-    text = " ".join(str(value or "").split())[:TEXT]
-    return text if text and not DIGIT.search(text) else None
+    from apps.ml_engine.services.hybrid_intelligence import CURRENCY_LANGUAGE
+
+    if not isinstance(value, str):
+        return None
+    text = " ".join(normalize("NFKC", value).split())
+    if not text or len(text) > TEXT:
+        return None
+    if (_NUMBER_WORDS.search(text) or QUANTITY_LANGUAGE.search(text) or TRADE_LANGUAGE.search(text)
+            or CURRENCY_LANGUAGE.search(text) or any(numeric(char, None) is not None or category(char) == "Sc" for char in text)):
+        return None
+    return text
 
 
 def parse_challenge(raw: str, points: dict) -> dict:
@@ -77,7 +89,7 @@ def parse_challenge(raw: str, points: dict) -> dict:
     for item in (data.get("objections") if isinstance(data.get("objections"), list) else [])[:3]:
         key = item.get("point") if isinstance(item, dict) else None
         why = _clean(item.get("why")) if isinstance(item, dict) else None
-        if key in points and why:
+        if isinstance(key, str) and key in points and why:
             objections.append({"point_id": key, "point": points[key]["point"], "as_of": points[key]["as_of"], "objection": why})
         else:
             dropped += 1
@@ -109,7 +121,7 @@ def output_tokens():
 
 
 def challenge_packet(packet: dict, *, reasoner=None, role: str = "sceptic") -> dict:
-    if role not in ROLES:
+    if not isinstance(role, str) or role not in ROLES:
         raise ValueError("Choose the sceptic, advocate or risk manager.")
     reasoner = reasoner or local_reasoner()
     payload, points = challenge_payload(packet, role)

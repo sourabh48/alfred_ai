@@ -31,7 +31,12 @@ MAX_ROWS = 5000
 STALE_DAYS = 45
 MAX_SHEETS = 200
 KEEP_PER_HOLDING = 3
-PARSER_VERSION = 1
+PARSER_VERSION = 2
+ASSET_CLASSES = {
+    "equity": "equity", "equity shares": "equity", "listed equity shares": "equity",
+    "debt": "debt", "debt securities": "debt", "fixed income": "debt",
+    "gold": "gold", "reit": "reit",
+}
 ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december"
@@ -206,6 +211,8 @@ def parse_portfolio(raw: bytes, filename: str, sheet: str | None = None) -> dict
     sheet_name, rows, found = tables[0]
     start, name_col, isin_col, sector_col, weight_col = found
     scheme, as_of = _title(rows, start, sheet_name)
+    class_col = next((index for index, label in enumerate(rows[start])
+                      if _text(label).casefold() in {"asset class", "security type", "instrument type"}), None)
     cell = lambda row, index: row[index] if index is not None and index < len(row) else None
     securities, opaque = defaultdict(lambda: {"weight_pct": Decimal(0)}), []
     for row in rows[start + 1:]:
@@ -215,6 +222,8 @@ def parse_portfolio(raw: bytes, filename: str, sheet: str | None = None) -> dict
         isin = _text(cell(row, isin_col)).upper()
         if ISIN.match(isin) and not isin.startswith("INF"):  # INF… ISINs are fund units (e.g. a fund of funds holding)
             entry = securities[isin]
+            asset_class = ASSET_CLASSES.get(_text(cell(row, class_col)).casefold())
+            entry["asset_class"] = asset_class if entry.get("asset_class", asset_class) == asset_class else None
             entry.update(isin=isin, name=entry.get("name") or name[:160],
                          sector=entry.get("sector") or (_text(cell(row, sector_col))[:80] or None), country=isin[:2])
             entry["weight_pct"] += weight
@@ -288,6 +297,35 @@ def look_through_saved(user, ids: list[int], *, today: date) -> dict:
         parsed.append((identity, _from_snapshot(snapshot), snapshot))
     result = _combine(holdings, parsed, today)
     result["limits"][-1] = "Uses the portfolios you saved earlier; upload a newer file each month to keep this current."
+    return result
+
+
+def current_class_weights(user, holding_ids, *, today):
+    """Fresh explicitly classified weights from the owner's latest saved portfolio for each fund."""
+    if not holding_ids:
+        return {}
+    snapshots = FundPortfolioSnapshot.objects.filter(
+        user=user, investment_id__in=holding_ids,
+    ).values_list("investment_id", "as_of", "securities", "opaque")
+    result = {}
+    for holding_id, as_of, securities, opaque in snapshots:
+        if holding_id in result:
+            continue
+        result[holding_id] = {}
+        if as_of is None or not 0 <= (today - as_of).days <= STALE_DAYS:
+            continue
+        try:
+            rows = [(item.get("asset_class"), Decimal(str(item["weight_pct"]))) for item in securities]
+            rows += [(None, Decimal(str(item["weight_pct"]))) for item in opaque]
+            weights = [weight for _, weight in rows]
+            if any(not weight.is_finite() or weight < 0 for weight in weights) or sum(weights) > 100:
+                continue
+            for asset_class, weight in rows:
+                if asset_class in ASSET_CLASSES.values():
+                    bucket = result[holding_id]
+                    bucket[asset_class] = bucket.get(asset_class, Decimal(0)) + weight
+        except (AttributeError, InvalidOperation, KeyError, TypeError, ValueError):
+            continue
     return result
 
 

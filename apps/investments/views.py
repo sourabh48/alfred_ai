@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date
+from hashlib import sha256
 from decimal import Decimal, DecimalException, localcontext
 
 from django.db.models import Count, Max
@@ -18,7 +19,7 @@ from alfred_ai.services.currency import RUPEE
 from alfred_ai.services.exchange_rates import approximate
 from .services.beginner_guide import beginner_guide
 from .services.portfolio_intelligence import portfolio_intelligence_service
-from .models import Investment, InvestmentImportDocument
+from .models import FundPortfolioSnapshot, Investment, InvestmentImportDocument
 from .money import investment_money, investment_total_float
 from .serializers import InvestmentImportDocumentSerializer, InvestmentSerializer
 
@@ -63,7 +64,9 @@ class InvestmentSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        revision = f"{_investment_revision(request.user)}:market-v3:{timezone.localdate().isoformat()}"
+        portfolios = FundPortfolioSnapshot.objects.filter(user=request.user).order_by("pk").values_list("pk", "parser_version")
+        portfolio_revision = sha256(repr(list(portfolios)).encode()).hexdigest()
+        revision = f"{_investment_revision(request.user)}:market-v4:{timezone.localdate().isoformat()}:{portfolio_revision}"
         payload = materialize_payload(
             namespace="investments-summary",
             user_id=request.user.id,

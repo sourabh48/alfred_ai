@@ -250,6 +250,9 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
 
     if holding is None:
         portfolio = {"status": "not_selected", "detail": "Choose the matching holding to see its share of your portfolio."}
+    elif holding.asset_type != "equity" or symbol.startswith("^") or holding.asset_name.strip().upper() != symbol:
+        portfolio = {"status": "unmatched", "detail": "The selected holding does not record this stock symbol. "
+                     "Its share was left out of this research."}
     elif not portfolio_total or holding.current_value is None:
         portfolio = {"status": "unknown", "detail": "No current value recorded for your holdings in this currency."}
     else:

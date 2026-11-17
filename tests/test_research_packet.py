@@ -94,7 +94,7 @@ class PacketApiTests(TestCase):
         self.user = get_user_model().objects.create_user(username="packet", password="pw-synthetic-1")
         self.other = get_user_model().objects.create_user(username="packet-other", password="pw-synthetic-2")
         self.client.force_login(self.user)
-        self.holding = Investment.objects.create(user=self.user, asset_name="Synth Ltd", asset_type="equity",
+        self.holding = Investment.objects.create(user=self.user, asset_name="SYNTH.NS", asset_type="equity",
                                                  invested_amount=D(1000), current_value=D(3000), currency="INR")
         Investment.objects.create(user=self.user, asset_name="Fund", asset_type="mutual_fund",
                                   invested_amount=D(1000), current_value=D(7000), currency="INR")
@@ -114,6 +114,17 @@ class PacketApiTests(TestCase):
         self.assertEqual((body["symbol"], body["portfolio"]["weight_pct"]), ("SYNTH.NS", 30.0))
         self.holding.refresh_from_db()
         self.assertEqual((Investment.objects.count(), ResearchDecision.objects.count(), self.holding.current_value), before)
+
+    def test_unrelated_positions_do_not_enter_research_concentration(self):
+        for name, asset_type in (("OTHER.NS", "equity"), ("SYNTH.BO", "equity"), ("SYNTH.NS", "mutual_fund")):
+            with self.subTest(name=name, asset_type=asset_type):
+                Investment.objects.filter(pk=self.holding.pk).update(asset_name=name, asset_type=asset_type)
+                response = self._get(symbol="SYNTH.NS", holding=self.holding.pk)
+                self.assertEqual(response.status_code, 200)
+                packet = response.json()
+                self.assertEqual(packet["portfolio"]["status"], "unmatched")
+                self.assertNotIn("weight_pct", packet["portfolio"])
+                self.assertNotIn("portfolio_weight_pct", {point["metric"] for point in packet["bearish"]})
 
     def test_bad_input_other_owner_and_upstream_failure(self):
         self.assertEqual(self._get(symbol="../etc").status_code, 400)
@@ -156,6 +167,20 @@ class ChallengeTests(SimpleTestCase):
         self.assertEqual(set(sent), {"task", "symbol", "points", "valuation", "already_missing"})  # no portfolio record
         self.assertIn("leans for", sent["task"])
 
+    def test_challenge_drops_malformed_points_spelled_amounts_and_trade_advice(self):
+        from apps.investments.services.research_challenge import parse_challenge
+
+        points = {"F1": {"point": "Dated revenue evidence", "as_of": "2025-03-31"}}
+        result = parse_challenge(
+            '{"objections":[{"point":[],"why":"Invented reference"},'
+            '{"point":"F1","why":"Buy at three hundred rupees"},'
+            '{"point":"F1","why":"Market share may be falling"}],'
+            '"overlooked":["Sell now",{"guess":"untrusted"}]}', points,
+        )
+        self.assertEqual(result["dropped"], 4)
+        self.assertEqual([row["objection"] for row in result["objections"]], ["Market share may be falling"])
+        self.assertEqual(result["overlooked"], [])
+
     def test_challenge_waits_for_the_slow_cpu_and_the_owner_timeout(self):
         from django.test import override_settings
         from apps.investments.services.research_challenge import SECONDS, local_reasoner
@@ -197,6 +222,11 @@ class ChallengeApiTests(TestCase):
                 patch("apps.investments.services.research_packet.fetch_prices", return_value=_prices(RISING)), \
                 patch("apps.investments.services.research_challenge.local_reasoner", return_value=FakeReasoner(reply)):
             return self.client.post("/api/investments/research/packet/challenge/", body, content_type="application/json")
+
+    def test_malformed_role_is_a_validation_error(self):
+        for role in ([], {"role": "sceptic"}, True):
+            with self.subTest(role=role):
+                self.assertEqual(self._post(GOOD, symbol="SYNTH.NS", role=role).status_code, 400)
 
     def test_challenge_rebuilds_the_packet_server_side(self):
         response = self._post(GOOD, symbol="SYNTH.NS", holding=self.holding.pk, points={"F1": "injected"})
