@@ -863,8 +863,6 @@ document.addEventListener("DOMContentLoaded", () => {
         active = true;
         if (event.persisted) {
             controlsLoading = true; historyRefresh.disabled = true;
-            modelRefresh.disabled=modelPending;
-            if (modelPanel.open) refreshModelReadiness();
             refreshControls().catch(error => { if (active) feedback.textContent = error.message; })
                 .finally(() => { controlsLoading = false; updateHistoryControls(); });
         }

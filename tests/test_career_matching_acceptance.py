@@ -169,7 +169,10 @@ class CareerMatchingOwnerAcceptanceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.json()["analysis"]["fit_score"])
         self.assertIn("unavailable", response.json()["analysis"]["summary"].lower())
-        self.assertTrue(any("unavailable" in item.lower() for item in response.json()["career_timing"]["signals"]))
+        timing = response.json()["career_timing"]
+        self.assertIsNone(timing["readiness_score"])
+        self.assertEqual(timing["readiness_level"], "insufficient_evidence")
+        self.assertIn("a job comparison with a fit score", timing["missing_evidence"])
 
     def test_document_review_preserves_captured_resume_and_nullable_fit(self):
         from alfred_ai.services.document_review import _apply_recruiter_analysis_update

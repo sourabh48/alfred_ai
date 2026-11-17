@@ -287,8 +287,10 @@ class TravelSelectiveRefreshTests(TestCase):
 
     def test_earlier_window_research_cannot_claim_a_current_forecast_in_the_api(self):
         session = self.itinerary()
+        run_research(session.research_runs.first().id)
         old = session.research_runs.first()
         old_summary = old.summary
+        self.assertTrue(old_summary)
         old_count = old.evidence.count()
         start = timezone.localdate() + timedelta(days=6)
         session = send_message(session.id, self.user, f"{start} to {start + timedelta(days=2)}")

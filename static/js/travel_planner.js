@@ -229,7 +229,7 @@ window.TravelPlanner = (() => {
         candidates(); comparison(); itinerary(); stops(); documents();
         const ready=!!session.itinerary?.days?.length;
         $('plannerTripActions').hidden=!ready;
-        $('plannerStops').hidden=!session.candidates.length;
+        $('plannerStops').hidden=!session.candidates.length && !ready;
         $('plannerNextStep').textContent=ready ? 'Your draft is ready. Explore places and stays, adjust the days, then save your trip.' : session.candidates.length ? 'Choose a destination to create your draft itinerary.' : 'Start with your days off and starting city.';
         ['plannerStepPlan','plannerStepChoose','plannerStepReview'].forEach((id,i)=>{if(i===(ready?2:session.candidates.length?1:0))$(id).setAttribute('aria-current','step');else $(id).removeAttribute('aria-current');});
         if(documentActive)window.TravelGallery.sync(session);

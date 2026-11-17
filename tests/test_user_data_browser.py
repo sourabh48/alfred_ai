@@ -1316,6 +1316,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click(f'#memoryEvaluationDetails a[href="/settings/#memory-{identities[0]}"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,f'memory-{identities[0]}').is_displayed())
         self.assertIn('mountain preference',self.browser.find_element(self.By.ID,f'memory-{identities[0]}').text)
+        self.browser.back()
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'memoryEvaluationQuery').is_displayed())
+        self.browser.find_element(self.By.ID,'memoryEvaluationQuery').send_keys('synthetic draft to clear')
+        self.memory_click('#memoryEvaluationAdd')
         self.memory_click('#memoryEvaluationClear')
         self.assertEqual(self.text('memoryEvaluationCases'),''); self.assertEqual(self.text('memoryEvaluationDetails'),'')
         self.browser.find_element(self.By.ID,'memoryEvaluationQuery').send_keys('private synthetic draft')
@@ -1518,6 +1522,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'synthetic corrected hiking preference' in self.text('memoryList'))
         self.assertNotIn('<img',self.browser.find_element(self.By.ID,'memoryList').get_attribute('innerHTML'))
         self.assertEqual(store.restore_owner(owner),1); self.assertNotEqual(store.list_memories(owner)[0]['id'],identity)
+        self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
+        self.wait.until(lambda _: 'synthetic corrected hiking preference' in self.text('memoryList'))
         from selenium.webdriver.support.ui import Select
         query=self.browser.find_element(self.By.ID,'memoryEvaluationQuery')
         query.send_keys('synthetic hiking question')
@@ -1538,7 +1544,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         original=store.save_verified(owner,{'statement':'synthetic original'}, {'source':'synthetic owner review'},verified=True)
-        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'synthetic original' in self.text('memoryList'))
         self.memory_click('#memoryList details[data-memory-correction] summary')
         correction=self.browser.find_element(self.By.CSS_SELECTOR,'#memoryList textarea')
@@ -1641,8 +1647,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url+'/mobility/')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerComposer').is_displayed())
         self.wait.until(lambda _: self.text('plannerStyle'))
-        self.memory_click('a[href="/ai/insights/?scope=travel#intelligencePanel"]')
-        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value')=='travel')
+        self.memory_click('#sidebarMenu a[href="/ai/insights/"]')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').is_displayed())
+        self.open_answer_options()
+        from selenium.webdriver.support.ui import Select
+        Select(self.browser.find_element(self.By.ID,'intelligenceScope')).select_by_value('travel')
+        self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceScope').get_attribute('value'),'travel')
 
     def test_dashboard_reloads_only_after_a_data_change_and_redraws_only_changed_cards(self):
         from apps.loans.models import Loan
@@ -1924,7 +1934,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         learning.extract(foreign,'FOREIGN-UI-CANDIDATE',{'source':'synthetic other'})
         self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
         self.wait.until(lambda _: 'mountain hiking' in self.text('memoryList') and 'NEEDS REVIEW' in self.text('memoryCandidates'))
-        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#sidebarMenu a[href="/settings/#privateMemoryPanel"]').get_attribute('aria-current'),'page')
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#sidebarMenu a[href="/settings/"]').get_attribute('aria-current'),'page')
         self.assertNotIn('FOREIGN-UI-CANDIDATE',self.text('privateMemoryPanel'))
         Select(self.browser.find_element(self.By.ID,'memoryCategory')).select_by_value('Travel')
         self.assertIn('1 of 2',self.text('memoryCount'))
@@ -2770,6 +2780,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Provider: mock.' in self.text('memorySyncStatus'))
         self.memory_click('#memorySyncEnabled'); self.memory_click('#memorySyncForm button[type=submit]')
         self.wait.until(lambda _: 'Synchronization consent saved.' in self.text('memoryCloudFeedback'))
+        self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID,'memorySyncNow').is_enabled())
         self.memory_click('#memorySyncNow')
         self.wait.until(lambda _: 'Revision 1;' in self.text('memorySyncStatus'))
         self.memory_click('#memoryReasoningEnabled')
@@ -3930,6 +3942,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("window.dispatchEvent(new Event('pagehide'))")
         for identity in ('intelligenceSourceItems','intelligenceSourcesSelected','intelligenceFinancialDocumentContext','intelligenceAnswers'):
             self.assertEqual(self.text(identity),'')
+        self.browser.execute_script("window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))")
+        self.wait.until(lambda _: '7 linked records' in self.text('intelligenceSourcesStatus'))
+        self.assertIn('0/3 selected',self.text('intelligenceSourcesStatus'))
+        self.assertEqual(self.text('intelligenceAnswers'),'')
 
     def test_financial_document_field_questions_require_every_selected_reviewed_value(self):
         document,records,service,local=self.financial_document_question_fixture(); owner=self.scenario['user']
@@ -5831,6 +5847,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         execute = self.enterContext(patch.object(assistant_tools, 'execute_tool', wraps=assistant_tools.execute_tool))
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceToolsList li')) == 7)
+        self.open_answer_options()
         panel = self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceToolsPanel summary')
         self.browser.execute_script('arguments[0].scrollIntoView({block:"center"})', panel); panel.send_keys(Keys.ENTER)
         self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceToolsPanel').get_property('open'))
@@ -7666,6 +7683,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 return original(url,options);};''')
         keyboard_to('[data-trip-document-list]').send_keys(Keys.ENTER)
         self.wait.until(lambda _:self.browser.execute_script('return window.d2Release!==null'))
+        keyboard_to('.travel-sidebar details:has(a[href="/settings/#travelPreferences"]) > summary').send_keys(Keys.ENTER)
         elsewhere=keyboard_to('a[href="/settings/#travelPreferences"]')
         self.browser.execute_script('window.d2Release()')
         self.wait.until(lambda _: 'Private document choices updated' in self.text('plannerAlert') and self.active_requests==0)

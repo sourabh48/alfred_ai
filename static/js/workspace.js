@@ -91,10 +91,9 @@ document.addEventListener("DOMContentLoaded", () => {
         try { localStorage.setItem("alfred.appearance", dark ? "dark" : "light"); } catch (_) { /* Theme still applies. */ }
     });
     function markNavigation() {
-        const memory = location.pathname === "/settings/" && /^#(?:privateMemoryPanel|memoryReviewPanel|memory-[a-f0-9]{32})$/.test(location.hash);
         const banking = location.pathname === "/expenses/" && location.hash === "#bankAccountsPanel";
         document.querySelectorAll("#sidebarMenu .nav-link").forEach(link => {
-            if (location.pathname === "/settings/" && link.getAttribute("href").startsWith("/settings/")) link.classList.toggle("active", memory ? link.hash === "#privateMemoryPanel" : !link.hash);
+            if (location.pathname === "/settings/" && link.getAttribute("href").startsWith("/settings/")) link.classList.toggle("active", link.getAttribute("href") === "/settings/");
             if (location.pathname === "/expenses/" && link.getAttribute("href").startsWith("/expenses/")) link.classList.toggle("active", banking ? link.hash === "#bankAccountsPanel" : !link.hash);
             if (link.classList.contains("active")) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
         });

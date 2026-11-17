@@ -121,7 +121,7 @@ class TravelContinuationTests(TestCase):
             self.assertTrue(all(item["remaining"]==item["limit"]-item["used"] for item in row["application_budget"].values()))
         configured = {(p["provider"], p["category"]) for p in response.json()["configuration"]}
         self.assertEqual(configured, {("google_places", "geocoding"), ("google_weather", "weather"), ("google_routes", "routing"),
-                                      ("google_places_nearby", "places"), ("google_lodging", "hotels"), ("google_destinations", "destinations"),
+                                      ("google_places_nearby", "places"), ("google_place_photos", "photos"), ("google_lodging", "hotels"), ("google_destinations", "destinations"),
                                       ("skyscanner", "flights"), ("indian_rail_authorized", "trains")})
         with patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": "secret-test-sentinel", "TRAVEL_SKYSCANNER_API_KEY": "secret-test-sentinel"}):
             self.assertNotIn("secret-test-sentinel", self.client.get("/api/mobility/planner/providers/").content.decode())
