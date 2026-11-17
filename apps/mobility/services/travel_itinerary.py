@@ -199,17 +199,102 @@ def build_itinerary(state, destination):
         "edits": []}
 
 
+_ACTIVITY_TERMS = {
+    "waterfall": r"waterfalls?",
+    "camping": r"camp(?:ing|sites?)",
+    "trekking": r"trek(?:s|king)?|hikes?|hiking",
+    "photography": r"photography|photos?",
+}
+_ACTIVITY_COMMAND = re.compile(
+    r"\b(?P<negative>(?:do not|don['’]t|never|not)\s+)?"
+    r"(?P<action>keep|add|include|remove|drop|skip|avoid|no|without)\s+"
+    r"(?:(?:a|an|one|the|another|existing|any|all|my|our)\s+)*"
+    r"(?:" + "|".join(f"(?P<{topic}>{pattern})" for topic, pattern in _ACTIVITY_TERMS.items()) + r")\b",
+    re.IGNORECASE,
+)
+_DAYLIGHT_COMMAND = re.compile(
+    r"\b(?:avoid|no|without)\s+(?:night[- ](?:driving|riding)|(?:driving|riding)\s+(?:at night|after dark))\b",
+    re.IGNORECASE,
+)
+_DAYLIGHT_CHECK = "Daylight driving only: verify arrival before dark, and shorten or split any leg that will not fit."
+
+
+def without_itinerary_commands(text):
+    # Trip edits must not change discovery preferences or trigger a rebuild.
+    return _DAYLIGHT_COMMAND.sub(" ", _ACTIVITY_COMMAND.sub(" ", text))
+
+
 def edit_itinerary(itinerary, text, state):
     result = deepcopy(itinerary)
     lower = text.lower()
     match = re.search(r"day\s*(\d+)", lower)
     day_number = int(match[1]) if match else None
-    if day_number and not 1 <= day_number <= len(result["days"]):
+    if day_number is not None and not 1 <= day_number <= len(result["days"]):
         return None, "That day is outside this itinerary. Which day should I change?"
     changed = False
     activity_discount = 0
     stay_discount = 0
     target_days = [d for d in result["days"] if not day_number or d["day"] == day_number]
+    replies = []
+    protected = set()
+    requested = {}
+    for command in _ACTIVITY_COMMAND.finditer(lower):
+        topic = next(topic for topic in _ACTIVITY_TERMS if command[topic])
+        verb = command["action"]
+        if command["negative"] or verb == "keep":
+            action = "keep"
+        else:
+            action = "add" if verb in {"add", "include"} else "remove"
+        requested.setdefault(topic, set()).add(action)
+    for topic, actions in requested.items():
+        pattern = rf"\b(?:{_ACTIVITY_TERMS[topic]})\b"
+        matches = [
+            (day, item) for day in target_days for item in day["items"]
+            if item["type"] in {"activity", "trekking", "photography"}
+            and re.search(pattern, f"{item['title']} {item['type']}", re.IGNORECASE)
+        ]
+        if len(actions) > 1:
+            protected.update(id(item) for _, item in matches)
+            replies.append(f"Should I add, keep or remove the {topic} activity?")
+            continue
+        action, = actions
+        if action == "keep":
+            protected.update(id(item) for _, item in matches)
+            replies.append(f"Kept the existing {topic} activity." if matches else f"There is no {topic} activity to keep in the selected days.")
+        elif action == "remove":
+            if not matches:
+                replies.append(f"There is no {topic} activity to remove in the selected days.")
+            elif len(matches) > 1 and topic in {"waterfall", "camping"}:
+                protected.update(id(item) for _, item in matches)
+                replies.append(f"Several activities match {topic}. Please choose the one to remove in the itinerary editor.")
+            else:
+                for day, item in matches:
+                    reduction = item.get("cost", 0)
+                    activity_discount += reduction
+                    day["estimated_cost"] = max(0, day["estimated_cost"] - reduction)
+                    day["items"].remove(item)
+                count = len(matches)
+                replies.append(f"Removed {count} {topic} {'activity' if count == 1 else 'activities'}.")
+                changed = True
+        elif topic in {"waterfall", "camping"}:
+            day = next((d for d in target_days if 1 < d["day"] < len(result["days"])), target_days[0])
+            if len(day["items"]) >= 30:
+                replies.append(f"Day {day['day']} is full. Choose another day or remove an activity.")
+                continue
+            title = (
+                "Waterfall visit, subject to access and weather checks" if topic == "waterfall"
+                else "Licensed campsite enquiry; replace stay only after confirmation"
+            )
+            item = {
+                "title": title, "priority": "Optional", "period": "Flexible", "type": "activity", "cost": 0,
+                "duration": "1–2 hours; verify location and permission first",
+                "cost_note": "Not quoted; included in activity allowance only if affordable",
+            }
+            day["items"].append(item)
+            protected.add(id(item))
+            changed = True
+        else:
+            replies.append(f"Choose a specific {topic} activity in the itinerary editor.")
     if any(w in lower for w in ("relax", "too busy", "slow")):
         for day in target_days:
             day["pace"] = "relaxed"
@@ -218,30 +303,21 @@ def edit_itinerary(itinerary, text, state):
             for item in day["items"]:
                 if item["type"] in {"activity", "photography", "trekking"}:
                     activity_count += 1
-                    if activity_count > 1:
+                    if activity_count > 1 and id(item) not in protected:
                         activity_discount += item.get("cost", 0)
                         day["estimated_cost"] = max(0, day["estimated_cost"]-item.get("cost", 0))
                         continue
                 kept.append(item)
             day["items"] = kept
-            day["title"] = "A relaxed day with one main activity"
+            day["title"] = "A relaxed day"
         changed = True
-    if "remove" in lower or "no trek" in lower:
-        term = "trek" if "trek" in lower else "photography" if "photo" in lower else None
-        if term:
-            for day in target_days:
-                removed = [i for i in day["items"] if term in i["title"].lower() or term in i["type"]]
-                reduction = sum(i.get("cost",0) for i in removed)
-                activity_discount += reduction
-                day["estimated_cost"] = max(0,day["estimated_cost"]-reduction)
-                day["items"] = [i for i in day["items"] if i not in removed]
+    daylight = _DAYLIGHT_COMMAND.search(lower)
+    if daylight:
+        checks = result.setdefault("checks", [])
+        if _DAYLIGHT_CHECK not in checks:
+            checks.append(_DAYLIGHT_CHECK)
             changed = True
-    if "waterfall" in lower or "camping" in lower:
-        chosen = next((d for d in target_days if 1 < d["day"] < len(result["days"])), target_days[0])
-        activity = "Waterfall visit, subject to access and weather checks" if "waterfall" in lower else "Licensed campsite enquiry; replace stay only after confirmation"
-        chosen["items"].append({"title": activity, "priority": "Optional", "period": "Flexible", "duration": "1–2 hours; verify location and permission first",
-                                "type": "activity", "cost": 0, "cost_note": "Not quoted; included in activity allowance only if affordable"})
-        changed = True
+        replies.append(_DAYLIGHT_CHECK + " Route and arrival times still need checking.")
     if "wake" in lower or "start" in lower and "8" in lower:
         for day in result["days"]:
             for item in day["items"]:
@@ -263,9 +339,11 @@ def edit_itinerary(itinerary, text, state):
             reduction = (old-new)//nights + ((old-new) % nights if day["day"] == nights else 0)
             day["estimated_cost"] = max(0, day["estimated_cost"]-reduction)
         result["budget"]["assumptions"].append("Budget edit: lower stay allowance by up to 25%, keeping a ₹600/room/night planning floor; verify a suitable stay before booking.")
+        if stay_discount:
+            replies.append("Reduced the estimated stay allowance.")
         changed = True
     if not changed:
-        return None, "I haven't changed your itinerary. Try ‘Make day 2 relaxed’, ‘Remove trekking’, ‘Add one waterfall’, or ‘Reduce the budget’."
+        return None, " ".join(replies) or "I haven't changed your itinerary. Try ‘Make day 2 relaxed’, ‘Remove trekking’, ‘Add one waterfall’, or ‘Reduce the budget’."
     discount = activity_discount + stay_discount
     if discount:
         result["budget"]["categories"]["Activities"] = max(0, result["budget"]["categories"]["Activities"]-activity_discount)
@@ -288,4 +366,6 @@ def edit_itinerary(itinerary, text, state):
         result["budget"]["low"] = result["budget"]["minimum"] = sum(i["low"] for i in result["budget"]["line_items"])
         result["budget"]["high"] = result["budget"]["comfortable"] = sum(i["high"] for i in result["budget"]["line_items"])
     result["edits"].append({"request": text, "day": day_number})
-    return result, f"Updated {f'day {day_number}' if day_number else 'your plan'}. " + ("The other days are unchanged." if day_number else "Review the revised allowances before booking.")
+    single_day = day_number and not (daylight or stay_discount)
+    reply = f"Updated day {day_number}. The other days are unchanged." if single_day else "Updated your plan. Review the revised allowances before booking."
+    return result, " ".join([reply, *replies])

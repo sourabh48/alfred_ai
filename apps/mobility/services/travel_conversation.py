@@ -17,7 +17,7 @@ from apps.expenses.money import money_float
 from apps.mobility.models import BikeProfile, TravelMessage, TravelPlan, TravelPlanningSession
 from .travel_catalog import ALIASES, CITIES, DESTINATIONS, lookup
 from .travel_discovery import budget_for, candidates_for, fact, learn, profile_for, value
-from .travel_itinerary import build_itinerary, build_multi_stop_itinerary, edit_itinerary
+from .travel_itinerary import build_itinerary, build_multi_stop_itinerary, edit_itinerary, without_itinerary_commands
 from .travel_research import queue_research
 
 STYLE_WORDS = {
@@ -299,7 +299,8 @@ def _send_message(session, user, text):
         say(session, "The requested batch is saved and queued. Selection is unchanged; availability and access still need verification.")
         return session
     old_state = deepcopy(session.state)
-    session.state, notes = extract(session.state, text)
+    discovery_text = without_itinerary_commands(text) if session.itinerary else text
+    session.state, notes = extract(session.state, discovery_text)
     for stop in value(session.state, "_itinerary_stops", []):
         if any(str(term).casefold() in stop["name"].casefold() for term in value(session.state, "must_avoid", [])):
             raise ValidationError("Remove the destination from your ordered stops before excluding it from the trip.")
@@ -401,7 +402,8 @@ def _send_message(session, user, text):
             session.save()
         say(session,"Applied the proposed indoor/rest alternatives; existing budget allowances are retained." if proposals else "No current weather alternatives are available. Recheck the trip first.")
         return session
-    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|attractions?|offbeat|availability|trains?|flights?|bus(?:es)?|permit|permission|open|unexplored|hidden|camping)\b",lower))
+    discovery_lower = discovery_text.lower()
+    research_followup = bool(re.search(r"\b(?:check|find|show|compare|re-plan|replan|refresh|is|need)\b",discovery_lower) and re.search(r"\b(?:weather|rain|forecast|hotels?|attractions?|offbeat|availability|trains?|flights?|bus(?:es)?|permit|permission|open|unexplored|hidden|camping)\b",discovery_lower))
     route_change = any(value(session.state,k) != value(old_state,k) for k in ("avoid_expressways","avoid_tolls","scenic_preference"))
     if (research_followup or route_change) and session.candidates:
         queue_research(session,recheck=True,force=bool(re.search(r"\b(?:refresh|live refresh)\b",lower)),

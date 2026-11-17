@@ -198,10 +198,9 @@ class TravelMultiStopTests(TestCase):
         chosen = session.candidates[-1]["name"]
         session = send_message(session.pk, self.user, f"Choose {chosen}")
         self.assertNotIn("_itinerary_stops", session.state)
-        self.assertEqual(session.itinerary, {})
-        session = send_message(session.pk, self.user, "Build itinerary")
         self.assertEqual(session.itinerary["destination"], chosen)
         self.assertNotIn("stops", session.itinerary)
+        self.assertTrue(session.itinerary["days"])
 
     def test_saved_details_destination_change_clears_previous_stop_selection(self):
         session, _ = self.multi()

@@ -173,6 +173,59 @@ class TravelItineraryEditorTests(TestCase):
         self.assertIn(waterfall["id"], [i["id"] for i in items])
         self.assertEqual(sum(i["title"] == waterfall["title"] for i in items), 2)
 
+    def test_compound_chat_edit_preserves_manual_activities_route_and_daylight_check_on_reopen(self):
+        session, order = self.multi()
+        day = self.payload(session)["itinerary"]["days"][1]
+        response = self.edit(session, "add", day_id=day["id"], fields={
+            "title": "Synthetic waterfall", "period": "Before lunch", "duration": "45 minutes",
+        })
+        self.assertEqual(response.status_code, 200, response.content)
+        original = deepcopy(session.itinerary)
+        url = f"/api/mobility/planner/sessions/{session.pk}/"
+        message = "Make it cheaper, avoid night driving, and keep the waterfall"
+        result = self.client.post(url, {"text": message}, content_type="application/json")
+        self.assertEqual(result.status_code, 200, result.content)
+        session.refresh_from_db()
+        actual = session.itinerary
+        self.assertEqual(actual["route"], original["route"])
+        self.assertEqual(actual["stops"], original["stops"])
+        self.assertEqual([d["items"] for d in actual["days"]], [d["items"] for d in original["days"]])
+        self.assertLess(actual["budget"]["categories"]["Stay"], original["budget"]["categories"]["Stay"])
+        self.assertEqual(sum(day["estimated_cost"] for day in actual["days"]), actual["budget"]["expected"])
+        self.assertTrue(any(check.startswith("Daylight driving only") for check in actual["checks"]))
+        reply = session.messages.filter(role="assistant").last().text
+        self.assertIn("Kept the existing waterfall", reply)
+        self.assertIn("Route and arrival times still need checking", reply)
+        self.assertEqual(self.client.post(url, {"action": "save", "revision": session.revision}, content_type="application/json").status_code, 200)
+        session.refresh_from_db()
+        reopened = self.client.post("/api/mobility/planner/sessions/", {"plan_id": session.plan_id}, content_type="application/json")
+        self.assertEqual(reopened.status_code, 200, reopened.content)
+        self.assertEqual(reopened.json()["itinerary_stops"], order)
+        self.assertEqual(reopened.json()["itinerary"]["checks"], actual["checks"])
+        self.assertEqual(reopened.json()["itinerary"]["days"][1]["items"][-1], actual["days"][1]["items"][-1])
+
+    def test_chat_activity_commands_remove_only_the_requested_activity(self):
+        session, _ = self.multi()
+        url = f"/api/mobility/planner/sessions/{session.pk}/"
+
+        def send(text):
+            result = self.client.post(url, {"text": text}, content_type="application/json")
+            self.assertEqual(result.status_code, 200, result.content)
+            session.refresh_from_db()
+
+        send("Add one waterfall and add camping")
+        original = deepcopy(session.itinerary)
+        items = original["days"][1]["items"]
+        waterfall, campsite = items[-2:]
+        self.assertIn("Waterfall", waterfall["title"])
+        self.assertIn("campsite", campsite["title"])
+        send("Keep camping and don't add another waterfall")
+        self.assertEqual(session.itinerary, original)
+        send("Remove the waterfall and keep camping")
+        self.assertEqual(session.itinerary["days"][1]["items"], [item for item in items if item != waterfall])
+        send("Remove camping")
+        self.assertEqual(session.itinerary["days"][1]["items"], items[:-2])
+
     def test_history_and_activity_limits_are_bounded_without_changing_the_plan(self):
         session, _ = self.multi()
         day = self.payload(session)["itinerary"]["days"][0]
