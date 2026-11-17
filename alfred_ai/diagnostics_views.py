@@ -20,12 +20,15 @@ from .services.native_readiness import native_readiness_snapshot
 def diagnostics_view(request):
     snapshot = native_readiness_snapshot()
     checks = [dict(item, state='running' if item['ready'] else 'requires_user_action') for item in snapshot['checks']]
+    research_failures = 0
     try:
         executor = MigrationExecutor(connection)
         pending = len(executor.migration_plan(executor.loader.graph.leaf_nodes()))
         checks.append(dict(label='Database schema', state='requires_user_action' if pending else 'running',
                            detail=f'{pending} pending migration(s).' if pending else 'The selected database matches this source.',
                            manual_task='Review migrations and make a private backup before approving an upgrade.' if pending else ''))
+        if not pending:
+            research_failures = request.user.research_searches.exclude(error="").count()
     except Exception:
         checks.append(dict(label='Database schema', state='error', detail='Schema inspection failed.',
                            manual_task='Keep the existing data folder and backups. Check the local server log.'))
@@ -44,6 +47,7 @@ def diagnostics_view(request):
             error = 'A local inference test was recently started, or the cache is unavailable. Wait one minute and retry.'
     response = render(request, 'settings/diagnostics.html', {
         'checks': checks, 'inference': results, 'diagnostic_error': error,
+        'research_failures': research_failures,
         'chat_model': settings.ALFRED_MEMORY_OLLAMA_MODEL,
         'database_path': str(Path(connection.settings_dict['NAME']).resolve()) if request.user.is_superuser else '',
         'native_runtime': getattr(settings, 'ALFRED_NATIVE_RUNTIME', False),

@@ -3,7 +3,8 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import F
+from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -28,24 +29,42 @@ def remember(user, packet):
     return row
 
 
+@transaction.atomic
+def _claim_due(user):
+    # Reserve the owner's bounded daily batch before making any network requests.
+    get_user_model().objects.select_for_update().get(pk=user.pk)
+    now = timezone.now()
+    cutoff = now - timedelta(hours=20)
+    owned = ResearchSearch.objects.filter(user=user)
+    slots = max(0, 3 - owned.filter(last_attempt_at__gt=cutoff).count())
+    due = owned.filter(
+        Q(last_attempt_at__isnull=True) | Q(last_attempt_at__lte=cutoff),
+        Q(checked_at__isnull=True) | Q(checked_at__lte=cutoff),
+    ).order_by(Coalesce("last_attempt_at", "checked_at").asc(nulls_first=True), "id")
+    rows = list(due[:slots])
+    owned.filter(pk__in=[row.pk for row in rows]).update(last_attempt_at=now)
+    return rows, now
+
+
 def review_recent(user, today):
     from apps.ml_engine.services.task_bots import _item
+
     items = []
-    cutoff = timezone.now() - timedelta(hours=20)
-    rows = ResearchSearch.objects.filter(user=user).order_by(F("checked_at").asc(nulls_first=True), "id")
-    for row in rows[:3]:
-        if row.checked_at and row.checked_at > cutoff:
-            continue
+    rows, attempted_at = _claim_due(user)
+    for row in rows:
+        current = ResearchSearch.objects.filter(
+            pk=row.pk, user=user, searched_at=row.searched_at, last_attempt_at=attempted_at,
+        )
         try:
             packet = research_packet(row.symbol)
             data = summary(packet)
             # Updating an existing row cannot resurrect history deleted while the network was busy.
-            updated = ResearchSearch.objects.filter(pk=row.pk, user=user, searched_at=row.searched_at).update(
+            updated = current.update(
                 summary=data, checked_at=parse_datetime(packet["retrieved_at"]) if packet.get("retrieved_at") else None, error="")
             if updated:
                 items.append(_item(f"research:{row.pk}:{today}", f"{row.symbol}: research updated",
                     data["headline"] + " " + data["freshness"].get("note", "Evidence may be incomplete."),
                     "/investments/#researchJournalSection"))
         except Exception:
-            ResearchSearch.objects.filter(pk=row.pk, user=user, searched_at=row.searched_at).update(error="Online research could not refresh. Previous evidence keeps its original check time.")
+            current.update(error="Online research could not refresh. Previous evidence keeps its original check time.")
     return items

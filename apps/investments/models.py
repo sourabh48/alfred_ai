@@ -182,6 +182,7 @@ class ResearchSearch(models.Model):
     symbol = models.CharField(max_length=20)
     searched_at = models.DateTimeField()
     checked_at = models.DateTimeField(null=True)
+    last_attempt_at = models.DateTimeField(null=True)
     summary = models.JSONField(default=dict)
     error = models.CharField(max_length=160, blank=True)
 

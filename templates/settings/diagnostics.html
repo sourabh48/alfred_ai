@@ -51,6 +51,7 @@
     </details>
 <details id="botRecovery" class="surface-card my-4"><summary>Assistant recovery · use if scheduled reviews are missing</summary>
 <p>Reviews run automatically while the native app and its scheduler are running. Check worker and scheduler status above before retrying.</p>
+{% if research_failures %}<p role="status">{{ research_failures }} stock research refresh{{ research_failures|pluralize:" has,es have" }} failed. Previous evidence keeps its original date. <a href="/investments/#researchJournalSection">Review search history</a>.</p>{% endif %}
 <section id="taskBots" data-recovery="true"><div id="taskBotsRun"></div><p id="taskBotsStatus" role="status"></p><div id="taskBotsList"></div></section></details>
 <details id="memoryHealth" class="surface-card my-4"><summary>Memory diagnostics and recovery</summary>
 {% include "settings/memory.html" with health_mode=True %}

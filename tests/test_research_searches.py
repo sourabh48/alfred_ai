@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.investments.models import ResearchSearch
 from apps.investments.services.research_packet import build_packet, research_packet
 from apps.investments.services.research_searches import remember, review_recent
+from apps.ml_engine.services import task_bots
 from tests.test_research_packet import _fund, _prices, RISING
 
 
@@ -61,6 +62,8 @@ class ResearchSearchTests(TestCase):
         with patch("apps.investments.services.research_searches.research_packet", return_value=self.packet) as fetch:
             self.assertEqual(len(review_recent(self.user, timezone.localdate())), 3)
             self.assertEqual(fetch.call_count, 3)
+        ResearchSearch.objects.update(last_attempt_at=timezone.now()-timedelta(days=1))
+
         def deleted(symbol):
             ResearchSearch.objects.filter(user=self.user).delete()
             return self.packet
@@ -118,7 +121,61 @@ class ResearchSearchTests(TestCase):
         def newer_search(symbol):
             remember(self.user, self.packet)
             raise RuntimeError("old request failed after the new search succeeded")
-        with patch("apps.investments.services.research_searches.research_packet", side_effect=newer_search):
+        ResearchSearch.objects.filter(pk=row.pk).update(last_attempt_at=old_check)
+        with patch("apps.investments.services.research_searches.research_packet", side_effect=newer_search) as fetch:
             self.assertEqual(review_recent(self.user, timezone.localdate()), [])
+            fetch.assert_called_once()
         row.refresh_from_db()
         self.assertEqual(row.error, "")
+
+    def test_old_failures_rotate_and_do_not_retry_in_the_same_window(self):
+        now = timezone.now()
+        with patch("apps.investments.services.research_searches.timezone.now", return_value=now-timedelta(days=4)):
+            for i in range(4):
+                remember(self.user, {**self.packet, "symbol": f"S{i}.NS"})
+        ResearchSearch.objects.filter(user=self.user).update(checked_at=now-timedelta(days=4))
+        untouched = remember(self.other, self.packet)
+
+        def fetch(symbol):
+            if symbol != "S3.NS":
+                raise RuntimeError("synthetic outage")
+            return self.packet
+
+        with patch("apps.investments.services.research_searches.research_packet", side_effect=fetch) as provider:
+            self.assertEqual(review_recent(self.user, timezone.localdate()), [])
+            self.assertEqual(review_recent(self.user, timezone.localdate()), [])
+            self.assertEqual([call.args[0] for call in provider.call_args_list], ["S0.NS", "S1.NS", "S2.NS"])
+            with patch("apps.investments.services.research_searches.timezone.now", return_value=now+timedelta(days=1)):
+                self.assertEqual(len(review_recent(self.user, timezone.localdate())), 1)
+            self.assertEqual(provider.call_args_list[3].args[0], "S3.NS")
+        untouched.refresh_from_db()
+        self.assertIsNone(untouched.last_attempt_at)
+
+    def test_stock_review_acknowledgment_never_repeats_the_provider_call(self):
+        row = remember(self.user, self.packet)
+        ResearchSearch.objects.filter(pk=row.pk).update(checked_at=timezone.now()-timedelta(days=2))
+        with patch("apps.investments.services.research_searches.research_packet", return_value=self.packet) as fetch:
+            review = task_bots.run(self.user, "research_watch")
+            self.assertIsNone(task_bots.run(self.user, "research_watch"))
+            self.assertIn(review["proposal_id"], [proposal["proposal_id"] for proposal in task_bots.pending(self.user)])
+            result = task_bots.confirm(self.user, review["proposal_id"], [review["items"][0]["id"]], review["fingerprint"])
+            self.assertEqual(result["applied"], [])
+            fetch.assert_called_once()
+        self.assertEqual(task_bots.pending(self.user), [])
+
+    def test_scheduled_empty_or_failed_online_run_keeps_daily_cadence(self):
+        today = timezone.localdate()
+        row = remember(self.user, self.packet)
+        ResearchSearch.objects.filter(pk=row.pk).update(checked_at=timezone.now()-timedelta(days=2))
+        with patch.object(task_bots, "BOTS", {"research_watch": task_bots.BOTS["research_watch"]}), patch(
+            "apps.investments.services.research_searches.research_packet", side_effect=RuntimeError("synthetic outage")
+        ) as provider:
+            self.assertEqual(task_bots.run_scheduled(today)["processed"], 2)
+            self.assertEqual(task_bots.run_scheduled(today)["processed"], 0)
+            provider.assert_called_once()
+        row.refresh_from_db()
+        self.assertIsNotNone(row.last_attempt_at)
+        self.assertIn("could not refresh", row.error)
+        self.assertContains(self.client.get("/settings/diagnostics/"), "1 stock research refresh has failed")
+        self.client.force_login(self.other)
+        self.assertNotContains(self.client.get("/settings/diagnostics/"), "stock research refresh")

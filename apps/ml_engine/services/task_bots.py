@@ -17,7 +17,7 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 
@@ -27,6 +27,7 @@ from .assistant_actions import ActionConflict, ActionError
 
 SCOPE = "assistant_bot"
 PENDING, CONFIRMED, DISMISSED, SUPERSEDED = "bot_proposal_pending", "bot_proposal_confirmed", "bot_proposal_dismissed", "bot_proposal_superseded"
+SCHEDULE_ATTEMPT = "bot_schedule_attempt"
 ITEM_LIMIT = 20
 logger = logging.getLogger(__name__)
 
@@ -300,11 +301,18 @@ def _public(record):
             "fingerprint": payload["fingerprint"], "items": payload["items"]}
 
 
-@transaction.atomic
 def run(user, bot, today=None, *, trigger="request"):
     """Prepare or refresh the bot's proposal. Returns it, or None when nothing is due."""
     today = today or timezone.localdate()
     items = _items(user, bot, today)
+    if bot == "research_watch" and not items:
+        return None  # a cooldown or outage must not remove an unread successful review
+    return _save_proposal(user, bot, today, trigger, items)
+
+
+@transaction.atomic
+def _save_proposal(user, bot, today, trigger, items):
+    get_user_model().objects.select_for_update().get(pk=user.pk)
     fingerprint = _fingerprint(user, bot, items)
     pending = _records(user).select_for_update().filter(event_type=PENDING, payload__bot=bot)
     same = next((record for record in pending if record.payload["fingerprint"] == fingerprint), None)
@@ -389,7 +397,9 @@ def confirm(user, identity, item_ids, fingerprint, today=None):
     items = {item["id"]: item for item in payload["items"]}
     if set(item_ids) - set(items):
         raise ActionError("Choose items from this proposal.")
-    if _fingerprint(user, payload["bot"], _items(user, payload["bot"], today or timezone.localdate())) != payload["fingerprint"]:
+    # Stock notices show an already completed check. Acknowledgment must not run another check.
+    stock_notice = payload["bot"] == "research_watch" and all(not item["action"] for item in items.values())
+    if not stock_notice and _fingerprint(user, payload["bot"], _items(user, payload["bot"], today or timezone.localdate())) != payload["fingerprint"]:
         raise ActionConflict("Your records changed after this review. Run the bot again for a fresh one.")
     results = []
     for key in item_ids:
@@ -416,17 +426,37 @@ def dismiss(user, identity):
 NETWORK_BOTS = {"fund_review", "research_watch"}
 
 
+@transaction.atomic
+def _claim_network_schedule(user, bot, today):
+    get_user_model().objects.select_for_update().get(pk=user.pk)
+    date_key = today.isoformat()
+    if _records(user).filter(
+        Q(payload__for_date=date_key) | Q(created_at__gt=timezone.now()-timedelta(hours=20)),
+        payload__bot=bot, payload__trigger="schedule",
+    ).exists():
+        return False
+    operational_logging_service.log(
+        user=user, module="assistant", category="background", scope=SCOPE,
+        event_type=SCHEDULE_ATTEMPT, message="Scheduled online review started.",
+        payload={"bot": bot, "trigger": "schedule", "for_date": date_key},
+    )
+    return True
+
+
 def run_scheduled(today=None):
     """Hourly Huey job: refresh every bot that is due for each active account; one failure never stops the rest."""
     today = today or timezone.localdate()
     ran = failed = 0
     for user in get_user_model().objects.filter(is_active=True).order_by("id"):
         for bot, (_, every, _, _) in BOTS.items():
-            last = _records(user).filter(payload__bot=bot, payload__trigger="schedule").order_by("-created_at").first()
-            hourly = every == 1 and bot not in NETWORK_BOTS
-            if not hourly and last and last.payload.get("for_date", "") > (today - timedelta(days=every)).isoformat():
-                continue
             try:
+                if bot in NETWORK_BOTS:
+                    if not _claim_network_schedule(user, bot, today):
+                        continue
+                elif every > 1:
+                    last = _records(user).filter(payload__bot=bot, payload__trigger="schedule").order_by("-created_at").first()
+                    if last and last.payload.get("for_date", "") > (today - timedelta(days=every)).isoformat():
+                        continue
                 run(user, bot, today, trigger="schedule")
                 ran += 1
             except Exception as error:
