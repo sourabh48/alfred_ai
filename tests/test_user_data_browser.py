@@ -7595,6 +7595,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertFalse(audit['overflow'],(audit['width'],audit['theme']))
             self.assertEqual(audit['axe']['violations'],[],(audit['width'],audit['theme'],audit['axe']['violations']))
             self.assertEqual(audit['contrast']['failures'],[],(audit['width'],audit['theme'],audit['contrast']['failures']))
+        from selenium.webdriver import ActionChains
+        for selector in ('#plannerTripActions .btn-outline-primary', '[data-editor-reload]'):
+            button = self.browser.find_element(self.By.CSS_SELECTOR, selector)
+            self.browser.execute_script("arguments[0].scrollIntoView({block:'center',behavior:'instant'})", button)
+            ActionChains(self.browser).move_to_element(button).perform()
+            self.wait.until(lambda _: self.browser.execute_script("return document.getAnimations().filter(a=>a.effect.getTiming().iterations!==Infinity).every(a=>['finished','idle'].includes(a.playState))"))
+            violations = self.browser.execute_async_script("const [target,done]=arguments;axe.run(target,{runOnly:{type:'rule',values:['color-contrast']}}).then(r=>done(r.violations));", button)
+            self.assertEqual(violations, [], selector)
 
     def test_travel_d2_keyboard_focus_consent_and_error_states(self):
         from datetime import timedelta

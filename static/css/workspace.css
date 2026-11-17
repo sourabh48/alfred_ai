@@ -101,6 +101,7 @@ html[data-theme="dark"] .alfred-nav-list .nav-link:hover, html[data-theme="dark"
 html[data-theme="dark"] .btn-primary, html[data-theme="dark"] .btn-secondary { color: #fff; }
 html[data-theme="dark"] .btn-soft-primary { color: #a8caff; }
 html[data-theme="dark"] .btn-outline-primary, html[data-theme="dark"] .btn-outline-secondary { color: #a8caff; border-color: #789cc8; }
+html[data-theme="dark"] :is(.btn-outline-primary, .btn-outline-secondary):is(:hover, :focus-visible, :active) { color: #fff; }
 html[data-theme="dark"] .btn-outline-danger { color: #ffb8c1; border-color: #dc7890; }
 html[data-theme="dark"] .workspace-badge[data-state="ready"] { background: #184535; color: #c0f4d9; }
 html[data-theme="dark"] .workspace-badge[data-state="unavailable"] { background: #4c3516; color: #ffe1a2; }

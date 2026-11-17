@@ -1,12 +1,16 @@
 # ALFRED execution state
 
-## Audit repair sprint — 2026-11-17
+## Audit repair sprint — 2026-11-18
 
-Implementation is committed locally at `9a21c73991cc4c8aba8e31989312cd65f4afa18c` on `work/audit-sprint-2026-11-17`, based on `1377eff` with the workflow changes from `2213702`. The user requested integration to master after verification. Work proceeded in a separate worktree.
+Local integration candidate on `work/audit-sprint-browser-fix-2026-11-17`, based on master `1377eff`. The user requested the sprint fixes and then integration to master. The primary dirty checkout and personal runtime remain untouched.
 
-The sprint integrates the assistant web privacy, evidence-dependent Career and streaming test isolation repairs. Tax estimates use entered qualifying amounts for the selected year. Rounded loan payments fit the baseline term. Portfolio exposure is disjoint and research concentration needs a matching symbol. Scheduled stock reviews rotate through failures and acknowledge results without another fetch. Trip follow-ups distinguish keep, add and remove and retain explicit edits.
+The sprint includes automatic trip drafts and attributed photos, minimal Settings with maintenance in Health, bounded stock-search history and scheduled reviews, assistant query consent, evidence-dependent Career timing, stream test isolation, qualifying-year tax inputs, rounded loan payments, disjoint investment exposure, grounded research challenges and durable travel edits. Full browser testing additionally found and repaired restored assistant controls, hidden saved-trip stop controls and low-contrast travel links. Settings navigation and obsolete browser journeys now follow the simplified UI. Dark outline-button interaction contrast is corrected in the final frontend follow-up.
 
-The additive investment migrations create owner search history and track review attempts. Synthetic checks use disposable databases. Live providers, personal data migrations and package lifecycle tests are outside this source sprint. Acceptance status in the capability ledger is unchanged.
+All 3,104 backend tests passed without skips on `b46b672cbe74c79f7e6965226db44f1fa46fdf19`. Its backend application code is unchanged in the frontend/CI follow-up. The earlier full run at `331f02b` failed and is retained as evidence; all reported failing journeys passed targeted retests after repairs. Final full Chrome and native verification is pending on the new committed candidate. No test result is reassigned to another SHA.
+
+CI now pins the reviewed dependency/migration contents at `b46b672`, including additive investments 0010 and 0011. The gate still refuses later unreviewed changes. This source review does not authorize personal runtime migration. The capability ledger remains unchanged at 89/143 and 0/13 extensions accepted.
+
+Next: finish exact-source Chrome/native checks, record results and source privacy preflight, then complete the authorized master integration only after the separately required Pages publication approval. Live provider validation, hotel booking onboarding, real-document accuracy and installer lifecycle remain separate gates.
 
 ## Workflow automation phase — 2026-11-17
 

@@ -1,10 +1,14 @@
 # Development CI and integration pipeline
 
-## Audit repair sprint — 2026-11-17
+## Audit repair sprint — 2026-11-18
 
-LOCAL_TESTING on `work/audit-sprint-2026-11-17`. Base `1377eff`, implementation `9a21c73991cc4c8aba8e31989312cd65f4afa18c`. Existing local workflow evidence and the historical 1377eff installer apply to their recorded versions. The sprint candidate includes additive investments migrations 0010 and 0011 and uses the existing CI workflows and dependencies.
+LOCAL_TESTING on `work/audit-sprint-browser-fix-2026-11-17`. Baseline `1377eff37191d61ea190b9d5f261c36f89987ab2`. Backend implementation and full-suite receipt source `b46b672cbe74c79f7e6965226db44f1fa46fdf19`; the subsequent delta changes only frontend contrast, browser coverage, the reviewed CI pin and these checkpoints. No dependency changes or personal runtime migration.
 
-Targeted synthetic checks cover the privacy, Career, stream, tax, loan, investment, stock scheduler and travel repairs. Full backend, browser and native gates use the pinned sprint candidate. The exact-source CI run and merge must be verified after publication. Existing master Pages configuration publishes docs on master updates.
+Verified on b46b672: 3,104 backend PASS across four shards, no skips; clean-source/dependency/migration/privacy preflight PASS. Before that, 103 focused backend PASS and repaired Chrome journeys PASS. The initial 331f02b full run had 3 backend failures and 1 error, plus 5 browser failures and 13 errors; these receipts are retained. The isolated Git fixture error and upload timeout did not reproduce in focused retests. Native 27/27 PASS belongs to 331f02b only. Final full Chrome/native checks remain pending for this candidate.
+
+The old CI pin reproduced an unexpected-migrations failure. The workflow now pins exact reviewed source b46b672, whose additive migrations create owner-scoped stock-search history and a nullable attempt timestamp. It keeps all existing jobs, coverage, security and future-change rejection. Independent browser/migration review found no new correctness or privacy blockers; its pre-existing dark hover contrast finding is corrected in this follow-up.
+
+Push SHA and hosted CI: none. Remote master is still 1377eff. The owner's requested master merge authorizes source integration; AGENTS.md separately requires explicit publication approval for the five changed docs files served by master Pages. That approval remains pending. No PR, Pages configuration, app deployment, installer or real data has been changed. Preserve the original source branches and use a normal fast-forward after all applicable gates; verify exact-head hosted CI afterward.
 
 ## Workflow automation — 2026-11-17
 
