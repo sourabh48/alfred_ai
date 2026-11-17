@@ -1,8 +1,8 @@
 """Public web results for a general Ask ALFRED question: when the owner ticks "Look this up online", or when ALFRED decides
 a plainly public question needs current or reference information that saved memories do not hold.
 
-Only the question text leaves this PC. Automatic lookup is default-deny: it sends only short reference questions and
-current public information about nobody's situation; anything else waits until the owner confirms the exact text.
+Only the question text leaves this PC. Automatic lookup is default-deny: it sends only recognized public reference and
+current information queries; anything else waits until the owner confirms the exact text.
 No records, memories or history are ever sent. ALFRED does not cache the question or the results, but Wikipedia and
 Google receive the text and may keep it under their own policies.
 """
@@ -40,33 +40,27 @@ PERSONAL = re.compile(r"(?i)\b(?:my|me|mine|myself|i|i'm|i've|i'd|our|ours|we|yo
 # Words that mean the answer changes over time, so saved memories cannot hold it.
 CURRENT = re.compile(r"(?i)\b(?:latest|today|tonight|tomorrow|yesterday|now|current(?:ly)?|recent(?:ly)?|news|this (?:week|month|year)"
                      r"|20\d\d|prices?|rates?|scores?|weather|forecast|who won|elections?|released?|launch(?:ed|es)?|happening|update[sd]?)\b")
-GENERAL = re.compile(r"(?i)^\s*(?:who|what|when|where|which|why|how|is|are|was|were|does|did|tell me about|explain)\b")
+GENERAL = re.compile(r"(?i)^\s*(?:who|what|when|where|which|why|how|is|are|was|were|does|did|tell me about|explain|define|meaning of)\b")
 
-# Automatic lookup is default-deny. Only these two plainly public shapes go out without the owner confirming the text:
-# a short reference question, or current public information that is not a yes/no question about something.
-REFERENCE = re.compile(r"(?i)^\s*(?:(?:what(?:'s| is| are| was| were)|who (?:is|was|are|were)|define|explain|tell me about|meaning of)"
-                       r"\s+(?:\S+\s*){1,6}|how (?:does|do)\s+(?:\S+\s+){1,5}work\s*)\??\s*$")
-YES_NO = re.compile(r"(?i)^\s*(?:is|are|was|were|am|do|does|did|has|have|had|will|would|can|could|should|shall|may|might|must)\b")
-# Somebody's situation, advice about it, a named owner of something, or a sensitive life area: never sent without the owner's say.
-ABOUT_SOMEONE = re.compile(
-    r"(?i)\b(?:he|him|his|she|her|hers|they|them|their|theirs|someone|somebody|anyone|anybody|person|wife|husband|spouse|partner"
-    r"|girlfriend|boyfriend|fianc[eé]e?|mother|father|mom|mum|dad|parents?|son|daughter|brother|sister|child|kids?|baby|uncle|aunt"
-    r"|cousin|friend|boss|manager|colleague|coworker|neighbou?r|landlord|tenant|should|ought|advice|advise)\b"
-    r"|\b(?!(?:what|who|it|that|there|here|let|how|where|when|why)'s)\w+'s\b")
-SENSITIVE = re.compile(
-    r"(?i)\b(?:diagnos\w*|hiv|aids|cancer|tumou?r|chemo\w*|pregnan\w*|miscarr\w*|abortion|infertil\w*|ivf|depress\w*|anxiety|suicid\w*"
-    r"|self[- ]harm|therap\w*|psychiatr\w*|mental|disorder|disease|illness|symptoms?|medication|surgery|disab\w*|addict\w*|rehab|std"
-    r"|sti|diabet\w*|epilep\w*|autis\w*|adhd|dementia|bankrupt\w*|insolven\w*|in debt|defaulted|evict\w*|repossess\w*"
-    r"|fired|sacked|laid off|terminated|unemploy\w*|redundan\w*|arrest\w*|lawsuit|sued|convict\w*|criminal|bail|custody|divorc\w*"
-    r"|alimony|deport\w*|asylum|affair|cheat\w*|abus\w*|assault\w*|harass\w*|rape\w*|gay|lesbian|bisexual|transgender|sexuality"
-    r"|caste|religion)\b")
+# With no reliable way to identify people in free text, automatic searches use complete public query patterns.
+PUBLIC_LOOKUP = re.compile(
+    r"(?i)(?:"
+    r"(?:what (?:is|are) (?:an? )?|define |explain |meaning of )"
+    r"(?:mutual funds?|index funds?|systematic investment plans?|exchange.traded funds?|compound interest|inflation|repo rate)"
+    r"|how does (?:a sip|compound interest|an index fund) work"
+    r"|what is the capital of (?:india|france|japan|germany|canada|australia|the united states)"
+    r"|(?:what is the )?(?:current |latest )?repo rate(?: in india| news)?"
+    r"|latest mutual fund news|who won the election today"
+    r"|interest rates in (?:india|the us|the uk)(?: this year| today)?"
+    r"|(?:petrol price|weather|weather forecast) in (?:bengaluru|bangalore|kolkata|mumbai|delhi|chennai|hyderabad|pune|mysuru)"
+    r"(?: today| tomorrow)?"
+    r")\??"
+)
 
 
 def clearly_public(question):
-    """True only for a plainly public question; an unsure answer is False, so the owner is asked instead."""
-    if len(question.split()) > 12 or PERSONAL.search(question) or ABOUT_SOMEONE.search(question) or SENSITIVE.search(question):
-        return False
-    return bool(REFERENCE.match(question) or (CURRENT.search(question) and not YES_NO.match(question)))
+    """Only a complete recognized public query may be sent automatically."""
+    return bool(PUBLIC_LOOKUP.fullmatch(question))
 
 
 def should_search(question, memories=()):

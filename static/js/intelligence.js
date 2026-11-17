@@ -489,7 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (result.web_offer && !historical) {
             // ALFRED never sends a possibly private question by itself: the owner sees the exact text first.
             const offer = document.createElement("p"); offer.className = "small mt-2";
-            offer.textContent = `ALFRED did not look this up online, because the question may be about someone's private life. Only this exact text would go to Wikipedia and Google News, which may keep it: “${result.web_offer}” `;
+            offer.textContent = `Search Wikipedia and Google News with this exact text? Those services may keep it: “${result.web_offer}” `;
             const send = document.createElement("button"); send.type = "button"; send.className = "btn btn-outline-primary btn-sm"; send.textContent = "Search online with this text";
             send.addEventListener("click", () => { scope.value = "general"; scope.dispatchEvent(new Event("change")); query.value = result.web_offer; searchOnce = true; form.requestSubmit(); });
             offer.append(send); assistantMessage.append(offer);

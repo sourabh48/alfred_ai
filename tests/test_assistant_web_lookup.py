@@ -49,7 +49,8 @@ class QuestionFilterTests(SimpleTestCase):
         # Third-party health, money trouble, work and family facts; no pronoun or keyword is needed for the default to hold.
         for question in ("What should Anika do after her HIV diagnosis?", "How should Anika handle bankruptcy after losing her job?",
                          "Does Anika have cancer?", "Is Anika pregnant?", "When did Anika leave Infosys?", "What is Anika's rent today",
-                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression"):
+                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression",
+                         "Who is the director of Cedar Clinic?", "Current interview results at Cedar Clinic"):
             with self.subTest(question=question):
                 self.assertFalse(web_lookup.clearly_public(question))
                 self.assertFalse(web_lookup.should_search(question))
@@ -71,7 +72,7 @@ class QuestionFilterTests(SimpleTestCase):
                 with patch("apps.ml_engine.services.web_lookup.public_http.request") as request, self.assertRaises(web_lookup.PrivateQuestion):
                     web_lookup.search(private)
                 request.assert_not_called()
-        self.assertTrue(web_lookup.should_search("one in a million meaning today"))  # a number word alone is not an amount
+        self.assertEqual(web_lookup.offer("one in a million meaning today"), "one in a million meaning today")
 
     def test_search_sends_only_the_question_cleans_results_and_skips_a_failed_source(self):
         with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
