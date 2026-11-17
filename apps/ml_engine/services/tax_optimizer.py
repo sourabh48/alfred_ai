@@ -127,10 +127,7 @@ class TaxOptimizerService:
         if annual_income is None:
             annual_income = user.confirmed_annual_income
 
-        # Calculate current deductions
-        current_deductions = deductions if deductions is not None else self._calculate_current_deductions(
-            user, financial_year=policy.financial_year,
-        )
+        current_deductions = deductions or {}
 
         # Calculate current tax
         current_tax = self.calculate_tax(annual_income, 'old', current_deductions, **policy_options)
@@ -139,7 +136,7 @@ class TaxOptimizerService:
         suggestions = []
 
         # 80C - Up to 1.5L
-        current_80c = current_deductions.get('80C', 0)
+        current_80c = float(current_deductions.get('80C', 0))
         available_80c = 150000 - current_80c
 
         if available_80c > 0:
@@ -175,7 +172,7 @@ class TaxOptimizerService:
             })
 
         # 80CCD(1B) - Additional 50K for NPS
-        current_nps_additional = current_deductions.get('80CCD(1B)', 0)
+        current_nps_additional = float(current_deductions.get('80CCD(1B)', 0))
         available_nps = 50000 - current_nps_additional
 
         if available_nps > 0:
@@ -195,7 +192,7 @@ class TaxOptimizerService:
             })
 
         # 80D - Health Insurance
-        current_80d = current_deductions.get('80D', 0)
+        current_80d = float(current_deductions.get('80D', 0))
         # Assume max 75K (25K self + 50K parents if senior)
         available_80d = 75000 - current_80d
 
@@ -231,7 +228,7 @@ class TaxOptimizerService:
             'calculation_status': 'ESTIMATED',
             'financial_year': policy.financial_year,
             'assumptions': [
-                'Deduction eligibility must be reviewed; portfolio values are only deduction leads.',
+                'Only deductions confirmed for the selected financial year are used for the current tax estimate.',
                 'Action-level benefits assume a 30% slab; actual overall savings use the selected tax policy.',
                 'The 80D scenario assumes eligible self/family and senior-parent premiums.',
                 'Investment returns and lock-in descriptions are planning references, not verified offers.',
@@ -289,61 +286,10 @@ class TaxOptimizerService:
             'recommendation': self._hra_recommendation(basic_salary, hra_received, rent_paid, metro_city)
         }
 
-    def calculate_home_loan_benefits(self, loan_principal_paid: float,
-                                    loan_interest_paid: float,
-                                    is_first_home: bool = True) -> Dict:
-        """
-        Calculate tax benefits on home loan.
-
-        Args:
-            loan_principal_paid: Principal repayment in FY
-            loan_interest_paid: Interest paid in FY
-            is_first_home: First time home buyer
-
-        Returns:
-            Dict with home loan tax benefits
-        """
-        # Principal under 80C (max 1.5L)
-        principal_benefit = min(loan_principal_paid, 150000)
-        principal_tax_saved = principal_benefit * 0.3  # 30% bracket
-
-        # Interest under Section 24 (max 2L for self-occupied)
-        interest_benefit = min(loan_interest_paid, 200000)
-        interest_tax_saved = interest_benefit * 0.3
-
-        # Additional benefit for first-time home buyers under 80EEA (max 1.5L additional)
-        additional_benefit = 0
-        if is_first_home:
-            # 80EEA: Additional interest deduction up to 1.5L
-            additional_interest = max(0, min(loan_interest_paid - 200000, 150000))
-            additional_benefit = additional_interest
-            interest_tax_saved += additional_benefit * 0.3
-
-        total_deduction = principal_benefit + interest_benefit + additional_benefit
-        total_tax_saved = total_deduction * 0.3
-
-        return {
-            'principal_paid': loan_principal_paid,
-            'principal_deduction': principal_benefit,
-            'principal_tax_saved': principal_tax_saved,
-            'interest_paid': loan_interest_paid,
-            'interest_deduction_24': interest_benefit,
-            'interest_deduction_80eea': additional_benefit,
-            'total_interest_deduction': interest_benefit + additional_benefit,
-            'interest_tax_saved': interest_tax_saved,
-            'total_deduction': total_deduction,
-            'total_tax_saved': total_tax_saved,
-            'effective_interest_rate': self._calculate_effective_rate(
-                loan_interest_paid, total_tax_saved
-            )
-        }
-
-    def _calculate_current_deductions(self, user, *, financial_year=None) -> Dict[str, float]:
-        """Calculate user's current tax deductions from their financial data."""
-        from apps.investments.models import Investment
+    def recorded_home_loan_payments(self, user, *, financial_year=None) -> Dict[str, float] | None:
+        """Show matched repayments from the selected year separately from qualifying deductions."""
         from apps.loans.models import Loan, LoanPaymentHistory
 
-        deductions = {}
         if financial_year is None:
             fy_start, fy_end = self._current_financial_year_bounds()
         else:
@@ -351,36 +297,22 @@ class TaxOptimizerService:
             start_year = int(policy.financial_year[:4])
             fy_start, fy_end = date(start_year, 4, 1), date(start_year + 1, 3, 31)
 
-        # 80C - Approximate from tagged tax-saving instruments already tracked in portfolio.
-        qualifying_tokens = ("elss", "ppf", "nsc", "tax saver", "nps")
-        investments_80c = 0
-        for investment in Investment.objects.filter(user=user).in_rupee_totals():  # Indian deductions need INR
-            name = f"{investment.asset_name} {investment.notes}".lower()
-            if any(token in name for token in qualifying_tokens):
-                investments_80c += investment.current_value or investment.invested_amount or 0
-
-        home_loans = Loan.objects.filter(user=user, loan_type='home', verification_status='confirmed').in_rupee_totals()  # Indian tax uses INR
-        home_principal_paid = Decimal("0")
-        home_interest_paid = Decimal("0")
-        for payment in LoanPaymentHistory.objects.filter(
+        home_loans = Loan.objects.filter(
+            user=user, loan_type="home", verification_status="confirmed",
+        ).in_rupee_totals()
+        principal_total = Decimal("0")
+        interest_total = Decimal("0")
+        payments = LoanPaymentHistory.objects.filter(
             loan__in=home_loans,
-            payment_date__gte=fy_start,
-            payment_date__lte=fy_end,
-        ).exclude(match_status="rejected").only(
-            "principal_paid",
-            "principal_component",
-            "interest_paid",
-            "interest_component",
-        ):
-            home_principal_paid += loan_money(payment.principal_paid or payment.principal_component)
-            home_interest_paid += loan_money(payment.interest_paid or payment.interest_component)
-
-        deductions['80C'] = loan_money_float(min(Decimal(str(investments_80c)) + home_principal_paid, Decimal("150000")))
-
-        if home_interest_paid > 0:
-            deductions['24B'] = loan_money_float(min(home_interest_paid, Decimal("200000")))
-
-        return deductions
+            payment_date__range=(fy_start, min(fy_end, timezone.localdate())),
+            match_status="matched",
+        ).only("principal_paid", "principal_component", "interest_paid", "interest_component")
+        for payment in payments:
+            principal_total += loan_money(payment.principal_paid or payment.principal_component)
+            interest_total += loan_money(payment.interest_paid or payment.interest_component)
+        if not (principal_total or interest_total):
+            return None
+        return {"principal_paid": loan_money_float(principal_total), "interest_paid": loan_money_float(interest_total)}
 
     def _current_financial_year_bounds(self, today: date | None = None) -> tuple[date, date]:
         today = today or timezone.localdate()
@@ -447,15 +379,6 @@ class TaxOptimizerService:
             return f"Consider increasing rent to ₹{ideal_rent:,.0f}/month for maximum HRA benefit"
         else:
             return "Your rent is optimized for maximum HRA exemption"
-
-    def _calculate_effective_rate(self, interest_paid: float, tax_saved: float) -> float:
-        """Calculate effective interest rate after tax benefit."""
-        if interest_paid == 0:
-            return 0
-
-        effective_interest = interest_paid - tax_saved
-        # Simplified calculation
-        return (effective_interest / interest_paid) * 8.5  # Assuming 8.5% nominal rate
 
 
 # Singleton instance

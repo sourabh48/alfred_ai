@@ -65,14 +65,7 @@ class TaxDeductionTests(TestCase):
             monthly_income=120000,
         )
 
-    def test_current_deductions_use_recorded_home_loan_payment_components(self):
-        Investment.objects.create(
-            user=self.user,
-            asset_type="mutual_fund",
-            asset_name="ELSS Growth Fund",
-            institution="Test AMC",
-            current_value=30000,
-        )
+    def test_home_loan_reference_excludes_pending_and_rejected_payment_components(self):
         loan = Loan.objects.create(
             user=self.user,
             loan_type="home",
@@ -101,10 +94,12 @@ class TaxDeductionTests(TestCase):
             match_status="rejected",
         )
 
-        deductions = tax_optimizer._calculate_current_deductions(self.user)
-
-        self.assertEqual(deductions["80C"], 90000)
-        self.assertEqual(deductions["24B"], 90000)
+        LoanPaymentHistory.objects.create(
+            loan=loan, payment_date=date(2026, 9, 12), amount=20000,
+            principal_component=10000, interest_component=10000, match_status="review",
+        )
+        payments = tax_optimizer.recorded_home_loan_payments(self.user, financial_year="2026-27")
+        self.assertEqual(payments, {"principal_paid": 60000, "interest_paid": 90000})
 
 
 class InvestmentEmailImportTests(TestCase):

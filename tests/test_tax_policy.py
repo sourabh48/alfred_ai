@@ -11,6 +11,7 @@ from django.utils import timezone
 from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import latest_budget_year
+from apps.investments.models import Investment
 from apps.loans.models import Loan, LoanPaymentHistory
 from apps.ml_engine.services.tax_optimizer import tax_optimizer
 from apps.ml_engine.services.tax_policy import (
@@ -289,7 +290,7 @@ class TaxOverviewTests(TestCase):
         self.assertIn(current["tax_policy_coverage"]["status"],
                       ("CURRENT", "NEXT_BUDGET_UNVERIFIED", "CURRENT_YEAR_UNVERIFIED"))
 
-    def test_payment_deductions_use_selected_year(self):
+    def test_recorded_payments_use_selected_year_without_inferred_eligibility(self):
         loan = Loan.objects.create(user=self.user, loan_type="home", lender="Test", principal=1000000,
                                    interest_rate=8, emi=10000, tenure_months=120, remaining_balance=900000,
                                    start_date=date(2025, 4, 1))
@@ -298,7 +299,36 @@ class TaxOverviewTests(TestCase):
             LoanPaymentHistory.objects.create(loan=loan, payment_date=payment_date, amount=principal,
                                                principal_component=principal, match_status="matched")
         data = self.client.get(self.url, {"financial_year": "2025-26"}).json()
-        self.assertEqual(data["deductions"]["80C"], 30000)
+        self.assertEqual(data["home_loan"], {"principal_paid": 30000, "interest_paid": 0})
+        self.assertEqual(data["deductions"], {})
+
+    def test_only_confirmed_deductions_affect_tax_estimates(self):
+        holding = Investment.objects.create(
+            user=self.user, asset_type="mutual_fund", asset_name="ELSS Growth Fund",
+            invested_amount=120000, current_value=150000,
+        )
+        Investment.objects.filter(pk=holding.pk).update(created_at=timezone.make_aware(
+            timezone.datetime(2018, 1, 1),
+        ))
+        Loan.objects.create(
+            user=self.user, loan_type="home", lender="Test", principal=6000000, interest_rate=8,
+            emi=80000, tenure_months=120, remaining_balance=5000000, start_date=date(2025, 4, 1),
+        )
+        params = {"annual_income": "1500000", "financial_year": "2025-26"}
+        baseline = self.client.get(self.url, params).json()
+        self.assertEqual(baseline["deductions"], {})
+        self.assertEqual(baseline["regime_comparison"]["old_regime"]["final_tax"], 257400)
+        self.assertIsNone(baseline["home_loan"])
+
+        confirmed = self.client.get(self.url, {
+            **params, "qualified_80c": "10000.50", "qualified_home_loan_interest": "20000",
+        }).json()
+        self.assertEqual(confirmed["deductions"], {"80C": 10000.50, "24B": 20000})
+        self.assertEqual(confirmed["regime_comparison"]["old_regime"]["total_deductions"], 30000.50)
+        self.assertEqual(confirmed["tax_savings"]["current_tax"],
+                         confirmed["regime_comparison"]["old_regime"]["final_tax"])
+        self.assertEqual(self.client.get(self.url, {**params, "qualified_80c": "NaN"}).status_code, 400)
+        self.assertEqual(self.client.get(self.url, params).json()["deductions"], {})
 
     def test_reference_uses_versioned_rules_and_refresh_does_not_change_rule_date(self):
         from apps.integrations.models import VerifiedExternalInsight

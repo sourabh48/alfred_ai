@@ -38,6 +38,21 @@ class AmortizationTests(SimpleTestCase):
             with self.subTest(bad), self.assertRaises(ValueError):
                 simulate(**{**base, **bad})
 
+    def test_reduce_emi_clears_rounding_residual_before_comparison_horizon(self):
+        result = simulate(balance="100014", emi="2000", annual_rate=8, amount="20000",
+                          mode="reduce_emi", expected_return=0)
+        self.assertEqual(result["baseline"]["months"], 62)
+        self.assertEqual(result["after"]["months"], 62)
+        self.assertEqual(result["months_saved"], 0)
+        monthly_rate = D(8) / D(1200)
+        emi = result["after"]["emi"]
+        self.assertIsNone(schedule(D("80014.00"), emi - D("0.01"), monthly_rate, max_months=62))
+        self.assertEqual(result["versus_investing"]["horizon_months"], 62)
+        self.assertEqual(
+            result["versus_investing"]["prepay_path_value"] - D("20000.00"),
+            result["interest_saved"],
+        )
+
     def test_prepay_versus_invest_follows_both_paths_to_the_original_end(self):
         base = dict(balance="100000", emi="8884.88", annual_rate=12, amount="50000")
         nothing = simulate(**base, expected_return=0)["versus_investing"]

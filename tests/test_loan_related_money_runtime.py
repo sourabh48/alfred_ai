@@ -457,7 +457,7 @@ class LoanRelatedMoneyRuntimeTests(TestCase):
         self.assertEqual(loan.remaining_balance, Decimal("499.90"))
         self.assertEqual(loan.total_paid, Decimal("0.30"))
 
-    def test_tax_history_sums_cents_with_legacy_fallback_and_owned_year_filter(self):
+    def test_tax_payment_reference_sums_cents_with_legacy_fallback_and_owned_year_filter(self):
         loan = self.loan()
         day = timezone.localdate()
         self.payment(loan, principal_paid="0.10", interest_paid="0.10", match_status="matched")
@@ -468,7 +468,6 @@ class LoanRelatedMoneyRuntimeTests(TestCase):
         self.payment(foreign, principal_paid="999", interest_paid="999", match_status="matched")
         self.payment(loan, principal_paid="999", interest_paid="999", match_status="matched",
                      payment_date=day - timedelta(days=730))
-        deductions = tax_optimizer._calculate_current_deductions(self.user)
-        self.assertEqual(deductions["80C"], .3)
-        self.assertEqual(deductions["24B"], .3)
-        self.assertIsInstance(deductions["80C"], float)
+        payments = tax_optimizer.recorded_home_loan_payments(self.user)
+        self.assertEqual(payments, {"principal_paid": .3, "interest_paid": .3})
+        self.assertIsInstance(payments["principal_paid"], float)

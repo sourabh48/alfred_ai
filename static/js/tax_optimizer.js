@@ -6,7 +6,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    document.getElementById("taxInputForm").addEventListener("submit", submitTaxForm);
+    const form = document.getElementById("taxInputForm");
+    form.addEventListener("submit", submitTaxForm);
+    form.financial_year.addEventListener("change", () => {
+        form.qualified_80c.value = "";
+        form.qualified_home_loan_interest.value = "";
+    });
     loadTaxDashboard();
     Alfred.enableLiveRefresh("tax-live", loadTaxDashboard, { rootId: "taxRoot" });
 });
@@ -119,6 +124,8 @@ function renderTaxInputs(inputs) {
     form.hra_received.value = inputs.hra_received;
     form.rent_paid.value = inputs.rent_paid;
     form.metro.value = String(inputs.metro);
+    form.qualified_80c.value = inputs.qualified_80c ?? "";
+    form.qualified_home_loan_interest.value = inputs.qualified_home_loan_interest ?? "";
 }
 
 function renderTaxActions(items, incomeUnavailable) {
@@ -130,19 +137,15 @@ function renderTaxActions(items, incomeUnavailable) {
 
 function renderTaxBenefits(hra, homeLoan, incomeUnavailable) {
     const panel = document.getElementById("taxBenefitPanel");
-    if (incomeUnavailable) {
-        Alfred.setHTML(panel, `<div class="data-row"><div class="data-label">Tax benefits</div><div class="data-value">Unavailable</div></div>`);
-        return;
-    }
-    const rows = [
+    const rows = incomeUnavailable ? [["HRA estimate", "Unavailable"]] : [
         ["HRA exemption", Alfred.formatCurrency(hra.hra_exemption || 0)],
         ["HRA tax saved", Alfred.formatCurrency(hra.tax_saved || 0)],
         ["Monthly HRA shield", Alfred.formatCurrency(hra.monthly_exemption || 0)],
     ];
 
     if (homeLoan) {
-        rows.push(["Home loan deduction", Alfred.formatCurrency(homeLoan.total_deduction || 0)]);
-        rows.push(["Home loan tax saved", Alfred.formatCurrency(homeLoan.total_tax_saved || 0)]);
+        rows.push(["Recorded home loan principal", Alfred.formatCurrency(homeLoan.principal_paid)]);
+        rows.push(["Recorded home loan interest", Alfred.formatCurrency(homeLoan.interest_paid)]);
     }
 
     Alfred.setHTML(panel, rows.map(([label, value]) => `

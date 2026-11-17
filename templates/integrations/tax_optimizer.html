@@ -56,6 +56,15 @@
                             <option value="false">No</option>
                         </select>
                     </div>
+                    <div class="col-12">
+                        <label class="form-label" for="taxQualified80c">Eligible savings and principal payments (₹)</label>
+                        <input id="taxQualified80c" name="qualified_80c" type="number" min="0" step="0.01" class="form-control" aria-describedby="taxDeductionHelp">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="taxQualifiedHomeInterest">Eligible home loan interest (₹)</label>
+                        <input id="taxQualifiedHomeInterest" name="qualified_home_loan_interest" type="number" min="0" step="0.01" class="form-control" aria-describedby="taxDeductionHelp">
+                    </div>
+                    <p class="form-text mb-0" id="taxDeductionHelp">The comparison uses only amounts you confirm qualify for the selected year. Leave them blank if unverified.</p>
                 </div>
                 <button class="btn btn-primary" type="submit">Recalculate Tax Plan</button>
             </form>
@@ -82,7 +91,7 @@
     <div class="col-xl-4">
         <div class="surface-card h-100">
             <h2 class="page-section-title">HRA and Home Loan</h2>
-            <p class="page-section-copy mb-3">Estimated HRA and home-loan scenarios assume a 30% slab. Eligibility, loan conditions and recorded deductions require review.</p>
+            <p class="page-section-copy mb-3">The HRA estimate assumes a 30% slab. Recorded loan payments show the selected year’s split. Use your tax documents to confirm which amounts qualify.</p>
             <div id="taxBenefitPanel" class="data-stack"></div>
         </div>
     </div>
@@ -97,5 +106,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/tax_optimizer.js?v=3.5.3"></script>
+<script src="/static/js/tax_optimizer.js?v=3.5.4"></script>
 {% endblock %}

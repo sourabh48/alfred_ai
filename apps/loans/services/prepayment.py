@@ -8,7 +8,7 @@ Nothing here writes to the loan.
 """
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP, ROUND_UP
+from decimal import Decimal, ROUND_HALF_UP
 
 from apps.loans.money import loan_money
 
@@ -21,12 +21,14 @@ def _monthly_rate(annual_percent) -> Decimal:
     return Decimal(str(annual_percent)) / Decimal("1200")
 
 
-def schedule(balance: Decimal, emi: Decimal, rate: Decimal) -> list[tuple[Decimal, Decimal]] | None:
-    """(payment, interest) for each month until paid off, or None when the EMI never clears the balance."""
+def schedule(
+    balance: Decimal, emi: Decimal, rate: Decimal, *, max_months=MAX_MONTHS,
+) -> list[tuple[Decimal, Decimal]] | None:
+    """Monthly (payment, interest) rows, or None if the loan cannot finish within max_months."""
     rows = []
     while balance > 0:
         interest = (balance * rate).quantize(CENT, rounding=ROUND_HALF_UP)
-        if emi <= interest or len(rows) >= MAX_MONTHS:
+        if emi <= interest or len(rows) >= max_months:
             return None
         payment = min(emi, balance + interest)
         rows.append((payment, interest))
@@ -35,11 +37,16 @@ def schedule(balance: Decimal, emi: Decimal, rate: Decimal) -> list[tuple[Decima
 
 
 def level_emi(balance: Decimal, months: int, rate: Decimal) -> Decimal:
-    """The EMI that clears the balance in the given months, rounded up so it never runs over."""
-    if rate == 0:
-        return (balance / months).quantize(CENT, rounding=ROUND_UP)
-    growth = (1 + rate) ** months
-    return (balance * rate * growth / (growth - 1)).quantize(CENT, rounding=ROUND_UP)
+    """Find the lowest EMI that pays off within the term under monthly paisa rounding."""
+    opening_interest = (balance * rate).quantize(CENT, rounding=ROUND_HALF_UP)
+    low, high = 1, int((balance + opening_interest) / CENT)
+    while low < high:
+        middle = (low + high) // 2
+        if schedule(balance, middle * CENT, rate, max_months=months) is None:
+            low = middle + 1
+        else:
+            high = middle
+    return low * CENT
 
 
 def simulate(*, balance, emi, annual_rate, amount, mode="reduce_tenure", expected_return=None) -> dict:
@@ -47,6 +54,8 @@ def simulate(*, balance, emi, annual_rate, amount, mode="reduce_tenure", expecte
     rate = _monthly_rate(annual_rate)
     if balance <= 0 or emi <= 0:
         raise ValueError("The loan needs a recorded outstanding balance and EMI above zero.")
+    if not rate.is_finite() or rate < 0:
+        raise ValueError("The loan needs a valid, non-negative interest rate.")
     if amount <= 0:
         raise ValueError("Enter a prepayment amount above zero.")
     if mode not in {"reduce_tenure", "reduce_emi"}:
@@ -82,7 +91,7 @@ def _versus_investing(base, after, amount, annual_return: Decimal) -> dict:
     prepay_path = Decimal("0")
     for month, (payment, _) in enumerate(base, start=1):
         freed = payment - (after[month - 1][0] if month <= len(after) else Decimal("0"))
-        prepay_path += max(freed, Decimal("0")) * (1 + rate) ** (months - month)
+        prepay_path += freed * (1 + rate) ** (months - month)
     invest_path, prepay_path = invest_path.quantize(CENT, rounding=ROUND_HALF_UP), prepay_path.quantize(CENT, rounding=ROUND_HALF_UP)
     better = "prepay" if prepay_path > invest_path else ("invest" if invest_path > prepay_path else "equal")
     return {"expected_annual_return_percent": annual_return, "horizon_months": months, "prepay_path_value": prepay_path,
