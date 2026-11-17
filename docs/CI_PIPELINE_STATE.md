@@ -1,5 +1,11 @@
 # Development CI and integration pipeline
 
+## Audit repair sprint — 2026-11-17
+
+LOCAL_TESTING on `work/audit-sprint-2026-11-17`. Base `1377eff`, implementation `9a21c73991cc4c8aba8e31989312cd65f4afa18c`. Existing local workflow evidence and the historical 1377eff installer apply to their recorded versions. The sprint candidate includes additive investments migrations 0010 and 0011 and uses the existing CI workflows and dependencies.
+
+Targeted synthetic checks cover the privacy, Career, stream, tax, loan, investment, stock scheduler and travel repairs. Full backend, browser and native gates use the pinned sprint candidate. The exact-source CI run and merge must be verified after publication. Existing master Pages configuration publishes docs on master updates.
+
 ## Workflow automation — 2026-11-17
 
 LOCAL_ACCEPTED (bounded), implementation commit `2213702f590b6bad20981771ba9812ef9fdefd40`; not pushed. Branch `work/travel-workflow-2026-11-16`, base

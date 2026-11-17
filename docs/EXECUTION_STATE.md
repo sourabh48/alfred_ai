@@ -1,5 +1,13 @@
 # ALFRED execution state
 
+## Audit repair sprint — 2026-11-17
+
+Implementation is committed locally at `9a21c73991cc4c8aba8e31989312cd65f4afa18c` on `work/audit-sprint-2026-11-17`, based on `1377eff` with the workflow changes from `2213702`. The user requested integration to master after verification. Work proceeded in a separate worktree.
+
+The sprint integrates the assistant web privacy, evidence-dependent Career and streaming test isolation repairs. Tax estimates use entered qualifying amounts for the selected year. Rounded loan payments fit the baseline term. Portfolio exposure is disjoint and research concentration needs a matching symbol. Scheduled stock reviews rotate through failures and acknowledge results without another fetch. Trip follow-ups distinguish keep, add and remove and retain explicit edits.
+
+The additive investment migrations create owner search history and track review attempts. Synthetic checks use disposable databases. Live providers, personal data migrations and package lifecycle tests are outside this source sprint. Acceptance status in the capability ledger is unchanged.
+
 ## Workflow automation phase — 2026-11-17
 
 LOCAL_ACCEPTED for the bounded workflow scope; live hotel inventory/booking remains BLOCKED_EXTERNAL. Branch
