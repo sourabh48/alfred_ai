@@ -135,6 +135,7 @@ def build_itinerary(state, destination):
     activities = destination.get("activities", [])
     itinerary_days = []
     avoid = value(state, "must_avoid", [])
+    used = 0  # each activity once; when they run out, days keep the free and backup blocks instead of repeats
     for n in range(1, days+1):
         first, last = n == 1, n == days
         items = []
@@ -148,8 +149,9 @@ def build_itinerary(state, destination):
             items.append({"title": "Meal, hydration and rest stops", "priority": "Must Do", "period": "At comfortable intervals",
                           "duration": "20–30 minutes per break; stop sooner if tired", "type": "break", "cost": 0})
         if not last or days == 1:
-            chosen = activities[:1] if first else activities[(n-2) % max(1, len(activities)):] or activities[:1]
-            for title in chosen[:1 if first else 2]:
+            chosen = activities[used:used + (1 if first else 2)]
+            used += len(chosen)
+            for title in chosen:
                 tags = ACTIVITY_TAGS.get(title, [])
                 if any(word in title.lower() or word in tags for word in avoid):
                     continue

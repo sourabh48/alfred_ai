@@ -11,7 +11,7 @@
     "duration_semantics":  "Per-test setup+body+teardown;class/browser/database overhead separate;not an after-runtime prediction",
     "workflow_measurement_20261117": "17 travel/workflow tests passed; assistant accessibility passed on focused rerun after scanner setup and contrast correction. Isolated worktree based on 1377eff; see docs/UX_AUTOMATION_VALIDATION_20261117.md.",
     "durations":  {
-                      "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_automatic_shortlist_gallery_and_mobile_review":  15.234,
+                      "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_automatic_shortlist_photo_on_each_card_and_mobile_review":  15.234,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_charts_follow_theme_and_reduced_motion":  3.11,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_health_run_all_bots_and_one_confirm_files_a_spend":  9.813,
                       "tests.test_travel_planner_browser.TravelPlannerBrowserTests.test_minimal_settings_and_assistant_controls":  7.015,

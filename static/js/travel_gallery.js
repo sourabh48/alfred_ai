@@ -1,72 +1,35 @@
-/* Keep photo bytes only in the current view; never in saved trips or browser storage. */
-window.TravelGallery = (() => {
-    const $ = id => document.getElementById(id);
+/* One photo at the top of each suggested place (owner request 2026-11-19); photo bytes stay in this view only. */
+window.TravelPhotos = (() => {
     const esc = value => Alfred.escapeHtml(String(value ?? ""));
-    let sessionId, key, index=0, count=0, controller, generation=0, busy=false;
-    function controls() {
-        $("plannerGalleryFrame").setAttribute("aria-busy",String(busy));
-        $('plannerGalleryPrevious').disabled=busy || index<=0;
-        $('plannerGalleryNext').disabled=busy || index+1>=count;
-        $('plannerGalleryCount').textContent=count ? `${index+1} / ${count}` : '';
+    const cache = new Map();  // "session|place" -> {status, image, credit}
+
+    function html(id, name) {
+        const entry = cache.get(id);
+        if (entry.status === "ready") {
+            return `<figure class="travel-card-photo" data-travel-photo="${esc(id)}"><img src="${entry.image}" alt="${esc(name)}"><figcaption class="small">Photo: ${entry.credit}</figcaption></figure>`;
+        }
+        return entry.status === "none" ? "" : `<div class="travel-card-photo travel-card-photo-loading" data-travel-photo="${esc(id)}" aria-hidden="true"></div>`;
     }
-    function clear() {
-        generation++; controller?.abort(); controller=null; sessionId=null; key=null; count=0; busy=false;
-        $('plannerGallery').hidden=true;
-        $('plannerGalleryImage').removeAttribute('src');
-        $('plannerGalleryImage').hidden=true;
-        $('plannerGalleryCaption').replaceChildren();
+
+    // Only the photo element is swapped when it arrives, so open panels, focus and disabled buttons around it stay as they are.
+    function arrived(id, name) {
+        document.querySelectorAll("[data-travel-photo]").forEach(node => { if (node.dataset.travelPhoto === id) node.outerHTML = html(id, name); });
     }
-    async function load(nextIndex=0) {
-        controller?.abort(); controller=new AbortController();
-        const epoch=++generation;
-        busy=true; index=nextIndex; controls();
-        const img=$('plannerGalleryImage');
-        img.hidden=true; img.removeAttribute('src');
-        $('plannerGalleryCaption').replaceChildren();
-        $('plannerGalleryStatus').textContent='Finding photos for this place…';
-        $('plannerGalleryRetry').hidden=true;
-        try {
-            const data=await Alfred.fetchJSON(`/api/mobility/planner/sessions/${sessionId}/photos/?place=${encodeURIComponent(key)}&index=${index}`, {signal:controller.signal});
-            if(epoch!==generation || document.hidden)return;
-            count=data.count || 0;
-            if(data.status==='ready' && /^data:image\/(jpeg|png|webp|gif);base64,/.test(data.image || '')) {
-                img.alt=`${data.place} — photo ${index+1}`;
-                img.onload=()=>{if(epoch===generation){img.hidden=false;$('plannerGalleryStatus').textContent='';}};
-                img.onerror=()=>{if(epoch===generation){img.hidden=true;$('plannerGalleryStatus').textContent='This photo could not be displayed.';$('plannerGalleryRetry').hidden=false;}};
-                img.src=data.image;
-                Alfred.setHTMLIfChanged('plannerGalleryCaption', `${esc(data.place)} · ${(data.authors || []).map(a=>window.TravelResearchPanels.link(a.url,a.name)).join(' · ') || 'Google Maps'}`);
-            } else {
-                $('plannerGalleryStatus').textContent=data.message || 'No photos are available for this place yet. Your itinerary is ready below.';
-                $('plannerGalleryRetry').hidden=false;
-            }
-        } catch(error) {
-            if(epoch!==generation || error.name==='AbortError')return;
-            if([401,403].includes(error.status)){clear();return;}
-            count=0; $('plannerGalleryStatus').textContent=error.message || 'Photos are unavailable. Try again later.';
-            $('plannerGalleryRetry').hidden=false;
-        } finally {if(epoch===generation){busy=false;controls();}}
+
+    function markup(sessionId, place) {
+        if (!sessionId || !place?.name) return "";
+        const id = `${sessionId}|${place.key || place.name}`;
+        if (!cache.has(id)) {
+            cache.set(id, {status: "loading"});
+            const query = place.key ? `place=${encodeURIComponent(place.key)}` : `name=${encodeURIComponent(place.name)}`;
+            Alfred.fetchJSON(`/api/mobility/planner/sessions/${sessionId}/photos/?${query}&index=0`)
+                .then(data => cache.set(id, data.status === "ready" && /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(data.image || "")
+                    ? {status: "ready", image: data.image, credit: (data.authors || []).map(a => window.TravelResearchPanels.link(a.url, a.name)).join(" · ") || "Google Maps"}
+                    : {status: "none"}))
+                .catch(() => cache.set(id, {status: "none"}))
+                .finally(() => arrived(id, place.name));
+        }
+        return html(id, place.name);
     }
-    function sync(session) {
-        const places=(session.gallery_places || []).filter(p=>p.selected);
-        if(document.hidden || !places.length){clear();return;}
-        const switched=sessionId!==session.id;
-        const next=places.find(p=>!switched && p.key===key) || places[0];
-        const changed=switched || key!==next.key;
-        sessionId=session.id; key=next.key;
-        $('plannerGallery').hidden=false;
-        Alfred.setHTMLIfChanged('plannerGalleryPlace', places.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join(''));
-        $('plannerGalleryPlace').value=key;
-        if(changed){count=0;load();}
-    }
-    document.addEventListener('DOMContentLoaded',()=>{
-        $('plannerGalleryPlace')?.addEventListener('change',e=>{key=e.target.value;count=0;load();});
-        $('plannerGalleryPrevious')?.addEventListener('click',()=>load(index-1));
-        $('plannerGalleryNext')?.addEventListener('click',()=>load(index+1));
-        $('plannerGalleryRetry')?.addEventListener('click',()=>load(0));
-        $('plannerGalleryFrame')?.addEventListener('keydown',e=>{
-            if(e.key==='ArrowLeft' && !busy && index>0){e.preventDefault();load(index-1);}
-            if(e.key==='ArrowRight' && !busy && index+1<count){e.preventDefault();load(index+1);}
-        });
-    });
-    return {sync,clear};
+    return {markup};
 })();

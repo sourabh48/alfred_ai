@@ -13,10 +13,10 @@ def map_features(destination):
     point(destination["name"], "overnight", destination.get("lat"), destination.get("lon"), destination.get("source_freshness","STATIC_REFERENCE"), source_url=destination.get("source",""),expires_at=destination.get("discovery_result",{}).get("expires_at"))
     route = destination.get("route_result", {})
     for index, item in enumerate(route.get("payload", {}).get("routes", [])):
-        if not item.get("geometry"):  # Google fallback routes carry no line for a non-Google map
+        if not item.get("geometry"):  # routes saved before the line was requested have none
             continue
         features.append({"type": "Feature", "geometry": item["geometry"],
-            "properties": {"name": f"Route {index+1}", "kind": "route", "selected": bool(item.get("route_id") and item["route_id"] == destination.get("selected_route_id")), "freshness": route.get("freshness", "UNKNOWN"), "expires_at":route.get("expires_at")}})
+            "properties": {"name": f"Route {index+1}", "kind": "route", "google": str(item.get("profile", "")).startswith("google-"), "selected": bool(item.get("route_id") and item["route_id"] == destination.get("selected_route_id")), "freshness": route.get("freshness", "UNKNOWN"), "expires_at":route.get("expires_at")}})
     if destination.get("origin_location"):
         origin = destination["origin_location"]
         point(origin["name"],"origin",origin["lat"],origin["lon"],origin.get("freshness","STATIC_REFERENCE"))

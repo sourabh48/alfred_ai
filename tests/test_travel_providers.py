@@ -15,7 +15,9 @@ from apps.mobility.services.travel.providers.routing import GoogleRoutes
 from apps.mobility.services.travel.mapping import map_features
 from apps.mobility.services.travel.providers.weather import GoogleWeather, replan_proposals
 from apps.mobility.services.travel.providers.base import ProviderResult
-from apps.mobility.services.travel.discovery import rank_places, remember
+from apps.mobility.services.travel.discovery import rank_places, remember, same_place_once
+from apps.mobility.services.travel_catalog import lookup
+from apps.mobility.services.travel_itinerary import build_itinerary
 from apps.mobility.services.travel.providers.places import GoogleDestinations, GooglePlacesNearby
 from apps.mobility.services.travel.providers.permits import PermitProvider
 from apps.mobility.services.travel.costs import calculate_budget
@@ -215,9 +217,28 @@ class TravelRoutingTests(TestCase):
         data = provider.normalize({"routes": [{"distanceMeters": 250000, "duration": "18000s"}]}, p)
         self.assertEqual((data["routes"][0]["motorcycle_legal"], data["routes"][0]["distance_km"]), ("UNKNOWN", 250))
         features = map_features({"name": "Wayanad", "lat": 11, "lon": 76, "route_result": {"payload": data, "freshness": "LIVE"}})
-        self.assertFalse(any(f["geometry"]["type"] == "LineString" for f in features["features"]))  # Google routes draw no line
+        self.assertFalse(any(f["geometry"]["type"] == "LineString" for f in features["features"]))  # no line was sent
         with self.assertRaises(ProviderError):
             provider.fetch({**p, "mode": "train"})
+
+    @patch.dict("os.environ", GOOGLE)
+    @patch("apps.mobility.services.travel.providers.routing.request_json")
+    def test_google_route_line_is_decoded_drawn_and_keeps_the_route_id(self, request):
+        provider = GoogleRoutes()
+        p = {"start": [-120.2, 38.5], "end": [-126.453, 43.252], "mode": "car"}
+        provider.fetch(p)
+        self.assertIn("routes.polyline.encodedPolyline", request.call_args.kwargs["headers"]["X-Goog-FieldMask"])
+        plain = provider.normalize({"routes": [{"distanceMeters": 1000, "duration": "60s"}]}, p)["routes"][0]
+        # Google's documented example polyline
+        lined = provider.normalize({"routes": [{"distanceMeters": 1000, "duration": "60s",
+                                                "polyline": {"encodedPolyline": "_p~iF~ps|U_ulLnnqC_mqNvxq`@"}}]}, p)["routes"][0]
+        self.assertEqual(lined["geometry"]["coordinates"], [[-120.2, 38.5], [-120.95, 40.7], [-126.453, 43.252]])
+        self.assertEqual(lined["route_id"], plain["route_id"])  # a saved route choice survives
+        features = map_features({"name": "X", "lat": 43, "lon": -126, "route_result": {"payload": {"routes": [lined]}, "freshness": "LIVE"}})
+        route = next(f for f in features["features"] if f["geometry"]["type"] == "LineString")
+        self.assertTrue(route["properties"]["google"])  # the page draws it on Google tiles only
+        broken = provider.normalize({"routes": [{"distanceMeters": 1000, "duration": "60s", "polyline": {"encodedPolyline": "_p~i"}}]}, p)
+        self.assertIsNone(broken["routes"][0]["geometry"])  # a cut-off line is dropped, the route is kept
 
     @patch.dict("os.environ", GOOGLE)
     @patch("apps.mobility.services.travel.providers.routing.request_json")
@@ -301,6 +322,20 @@ class TravelDiscoveryTests(TestCase):
         self.user = get_user_model().objects.create_user("discovery")
         self.places = [{"id": f"osm:node:{i}", "name": f"Viewpoint {i}", "lat": 12+i*.01, "lon": 77,
                        "category": "viewpoint", "access": "yes"} for i in range(1, 5)]
+
+    def test_same_spot_under_two_names_is_shown_once_and_days_do_not_repeat(self):
+        spots = [{"name": "Nellarachal View Point", "lat": 11.62, "lon": 76.17}, {"name": "Nellarachal", "lat": 11.625, "lon": 76.17},
+                 {"name": "Kurumbalakotta Mala", "lat": 11.70, "lon": 76.05}, {"name": "Kurumbalakotta View Point", "lat": 11.701, "lon": 76.05},
+                 {"name": "Viewpoint 3", "lat": 12.03, "lon": 77}, {"name": "Viewpoint 4", "lat": 12.04, "lon": 77},
+                 {"name": "Nellarachal", "lat": 13.5, "lon": 76.17}]  # same name far away is a different place
+        self.assertEqual([p["name"] for p in same_place_once(spots)],
+                         ["Nellarachal View Point", "Kurumbalakotta Mala", "Viewpoint 3", "Viewpoint 4", "Nellarachal"])
+        destination = {**(lookup("Wayanad") or lookup("Coorg")), "weather": {"status": "unknown"}}
+        state = {"trip_duration": fact(4), "origin": fact("Bengaluru")}
+        titles = [item["title"] for day in build_itinerary(state, destination)["days"] for item in day["items"]
+                  if item["title"] in destination.get("activities", [])]
+        self.assertTrue(titles)
+        self.assertEqual(len(titles), len(set(titles)))
 
     def test_deduplication_visited_rejected_and_repeat_suppression(self):
         remember(self.user, self.places[0], "visited")

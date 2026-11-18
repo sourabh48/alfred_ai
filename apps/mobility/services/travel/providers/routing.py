@@ -18,13 +18,38 @@ def _coordinate(value):
 GOOGLE_KEY = "TRAVEL_GOOGLE_MAPS_API_KEY"
 
 
+def decode_polyline(encoded, limit=500):
+    """Google's encoded polyline as GeoJSON [lon, lat] pairs, thinned to at most `limit` points (ends kept)."""
+    points, index, lat, lon = [], 0, 0, 0
+    while index < len(encoded):
+        for axis in (0, 1):
+            shift = result = 0
+            while True:
+                byte = ord(encoded[index]) - 63
+                index += 1
+                result |= (byte & 0x1F) << shift
+                shift += 5
+                if byte < 0x20:
+                    break
+            delta = ~(result >> 1) if result & 1 else result >> 1
+            if axis == 0:
+                lat += delta
+            else:
+                lon += delta
+        points.append([round(lon / 1e5, 5), round(lat / 1e5, 5)])
+    step = max(1, -(-len(points) // limit))
+    thinned = points[::step]
+    return thinned if thinned[-1] == points[-1] else thinned + [points[-1]]
+
+
 class GoogleRoutes(Provider):
     """Routes from the Google Routes API, the only router (owner decision 2026-11-14).
 
-    Distance and time only: the offline country map is not a Google map, and Google's terms forbid its route there.
+    The route line is drawn only on Google's own map tiles; Google's terms forbid it on the offline country map.
     """
     name = "google_routes"
     category = "routing"
+    version = 2  # adds the route line
     source_url = "https://www.google.com/maps"
     attribution = "Powered by Google"
     # shortcut: Google limits storing its content; an hour keeps a planning session usable. Revisit if plans must keep it.
@@ -54,7 +79,7 @@ class GoogleRoutes(Provider):
         if travel_mode != "WALK":
             body["routeModifiers"] = {"avoidHighways": bool(p.get("avoid_expressways")), "avoidTolls": bool(p.get("avoid_tolls"))}
         return request_json("POST", "https://routes.googleapis.com/directions/v2:computeRoutes", json=body,
-            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY], "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.description",
+            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY], "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.description,routes.polyline.encodedPolyline",
                      "Content-Type": "application/json"})
 
     def normalize(self, raw, p):
@@ -69,8 +94,16 @@ class GoogleRoutes(Provider):
                 "ascent_m": None, "descent_m": None, "profile": f"google-{travel_mode.lower()}", "via": str(item.get("description") or "")[:120],
                 "motorcycle_legal": "UNKNOWN", "closures": "UNKNOWN", "traffic": "UNKNOWN",
                 "constraints_requested": {"avoid_expressways": bool(p.get("avoid_expressways")), "avoid_tolls": bool(p.get("avoid_tolls"))},
-                "note": "Google route: distance and time only. Check signs and closures."}
-            route["route_id"] = sha256(json.dumps(route, sort_keys=True, allow_nan=False).encode()).hexdigest()
+                "note": "Google route. Check signs and closures."}
+            route["route_id"] = sha256(json.dumps(route, sort_keys=True, allow_nan=False).encode()).hexdigest()  # line excluded: ids stay stable
+            encoded = str((item.get("polyline") or {}).get("encodedPolyline") or "")
+            if encoded:
+                try:
+                    coordinates = decode_polyline(encoded)
+                except (IndexError, ValueError):
+                    coordinates = []
+                if len(coordinates) >= 2 and all(-180 <= x <= 180 and -90 <= y <= 90 for x, y in coordinates):
+                    route["geometry"] = {"type": "LineString", "coordinates": coordinates}
             routes.append(route)
         if not routes:
             raise ProviderError("no_route")

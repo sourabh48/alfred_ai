@@ -128,6 +128,11 @@ class TravelPlacePhotoView(PrivateTravelSessionAPI):
         from .services.travel.providers.photos import GooglePlacePhoto
         session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
         place = next((place for key, place, _ in gallery_places(session) if key == request.query_params.get("place")), None)
+        if place is None and request.query_params.get("name"):
+            # Weekend ideas come from the offline guide, so only its known places (with their map point) are looked up.
+            from .services.travel_catalog import lookup
+            guide = lookup(request.query_params["name"])
+            place = guide and {"name": guide["name"], "lat": guide["lat"], "lon": guide["lon"]}
         if place is None:
             raise ValidationError("Choose a place from this trip before viewing its photos.")
         index = request.query_params.get("index", "0")
@@ -447,9 +452,10 @@ class TravelSuggestionsView(APIView):
                 raise ValidationError("Choose one of your trips.")
             session = get_object_or_404(TravelPlanningSession.objects.select_related("plan"), pk=int(identity), user=request.user)
             steps = next_steps(session.plan) if session.plan_id else []
+            shown = [c["name"] for c in session.candidates or []] + [value(session.state, "selected_destination") or ""]
         else:
-            steps = upcoming_steps(request.user)
-        response = Response({"next_steps": steps, "trip_ideas": trip_ideas(request.user)})
+            steps, shown = upcoming_steps(request.user), []
+        response = Response({"next_steps": steps, "trip_ideas": trip_ideas(request.user, exclude=[n for n in shown if n])})
         response["Cache-Control"] = "no-store, private"
         return response
 

@@ -80,4 +80,23 @@ def rank_places(user, places, *, interests=(), route=None, visited_names=(), wea
                      opening_status="UNKNOWN", popularity="UNKNOWN",
                      checks=["Confirm opening hours, permission, seasonal access and current conditions."])
         ranked.append(place)
-    return sorted(ranked, key=lambda p: -p["discovery_score"])[:limit]
+    return same_place_once(sorted(ranked, key=lambda p: -p["discovery_score"]))[:limit]
+
+
+# Words that describe a kind of spot, not which spot it is.
+GENERIC_WORDS = {"view", "point", "viewpoint", "the", "of", "and", "top", "peak", "hill", "hills", "spot", "area", "park", "mala"}
+
+
+def same_place_once(places):
+    """Drop a listing that is the same spot under another name ("Nellarachal" and "Nellarachal View Point"): one name's
+    own words are all in the other's, and the two are within 2 km. The higher-ranked one stays."""
+    def words(place):
+        return set(re.findall(r"[a-z0-9]+", place["name"].casefold())) - GENERIC_WORDS
+    kept = []
+    for place in places:
+        mine = words(place)
+        if mine and any((theirs := words(k)) and (mine <= theirs or theirs <= mine)
+                        and km_between((place["lat"], place["lon"]), (k["lat"], k["lon"])) <= 2 for k in kept):
+            continue
+        kept.append(place)
+    return kept

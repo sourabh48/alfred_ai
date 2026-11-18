@@ -118,8 +118,9 @@ def free_weekend(user, today=None):
     return None
 
 
-def trip_ideas(user, today=None, limit=3):
-    """Destinations from the offline guide that fit saved preferences, for the next free weekend."""
+def trip_ideas(user, today=None, limit=3, exclude=()):
+    """Destinations from the offline guide that fit saved preferences, for the next free weekend; `exclude` names the
+    places the open trip already shows, so no place is suggested twice on the page."""
     window = free_weekend(user, today)
     if window is None:
         return {"free_dates": None, "ideas": [], "note": "No free weekend in the next eight weeks."}
@@ -135,7 +136,8 @@ def trip_ideas(user, today=None, limit=3):
                  available_end_date=fact(window[1].isoformat(), "free_weekend"))
     ideas = [{"name": d["name"], "fit": d["fit"], "why": d["why"], "distance_km": d.get("distance_km"),
               "distance_basis": d.get("distance_basis"), "source_freshness": d.get("source_freshness", "STATIC_REFERENCE")}
-             for d in candidates_for(user, state, limit=limit)]
+             for d in candidates_for(user, state, limit=limit + len(exclude))
+             if d["name"].casefold() not in {str(name).casefold() for name in exclude}][:limit]
     return {"free_dates": {"start": window[0].isoformat(), "end": window[1].isoformat()}, "ideas": ideas,
             "origin": value(state, "origin"),
             "note": "From ALFRED's offline destination guide and your saved preferences. Weather, prices, roads and rooms are not checked yet."}

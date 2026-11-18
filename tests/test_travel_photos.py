@@ -67,3 +67,19 @@ class TravelPhotoTests(TestCase):
         self.assertIn("no-store", response["Cache-Control"])
         session.refresh_from_db()
         self.assertNotIn("photos", str(session.candidates))
+
+    def test_weekend_idea_photo_looks_up_only_offline_guide_places(self):
+        from apps.mobility.services.travel_catalog import DESTINATIONS
+        owner = get_user_model().objects.create_user("photo-guide-owner")
+        session = TravelPlanningSession.objects.create(user=owner)
+        path = f"/api/mobility/planner/sessions/{session.pk}/photos/"
+        self.client.force_login(owner)
+        self.assertEqual(self.client.get(path, {"name": "Somewhere not in the guide"}).status_code, 400)
+        self.api.assert_not_called()
+        guide = DESTINATIONS[0]
+        with patch("apps.mobility.planner_views.query") as provider:
+            provider.return_value.success = False
+            provider.return_value.error = "provider_busy_or_backoff"
+            response = self.client.get(path, {"name": guide["name"].upper()})
+        self.assertEqual(response.json()["place"], guide["name"])
+        self.assertEqual(provider.call_args.args[1], {"name": guide["name"], "latitude": guide["lat"], "longitude": guide["lon"], "index": 0})

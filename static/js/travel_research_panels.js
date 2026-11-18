@@ -4,7 +4,7 @@ window.TravelResearchPanels = (() => {
     const money = (v, currency="INR") => v == null ? "Not available" : `${esc(currency)} ${esc(Number(v).toLocaleString(undefined,{maximumFractionDigits:2}))}`;
     const stamp = v => v && Number.isFinite(Date.parse(v)) ? new Date(v).toLocaleString() : "Not checked";
     const label = r => `${r?.freshness || "UNKNOWN"}${r?.stale ? " · STALE" : ""}`;
-    let session, selectedName, chosenDestination, map, layers, mapGeometry, mapEnabled = false;
+    let session, selectedName, chosenDestination, map, layers, mapGeometry, mapEnabled = false, google = null, local = null;
     const $ = id => document.getElementById(id);
     function link(url, title) {
         try {
@@ -91,10 +91,12 @@ window.TravelResearchPanels = (() => {
         if (!map) {
             map = L.map("plannerMap").setView([20,78],5);
             const tile = session.map_config?.tile_url, offline = session.map_config?.offline_url;
-            let google = null, local = null;
+            google = null; local = null;
             const useOffline = () => {  // country maps downloaded in Settings, served from this PC
                 if (local || !offline?.startsWith("/mobility/offline-tiles/") || !window.protomapsL) return Boolean(local);
                 if (google) map.removeLayer(google);
+                // Google's route line may be shown only on Google's map, so it leaves with Google's tiles
+                if (layers) layers.eachLayer(layer => { if (layer.feature?.properties?.google) layers.removeLayer(layer); });
                 local = protomapsL.leafletLayer({url:offline,flavor:"light",lang:"en",maxDataZoom:14,attribution:esc(session.map_config.offline_attribution)}).addTo(map);
                 return true;
             };
@@ -114,6 +116,7 @@ window.TravelResearchPanels = (() => {
         if (layers) map.removeLayer(layers);
         try {
             layers = L.geoJSON(d.map || {type:"FeatureCollection",features:[]},{
+                filter:f=>!(f.properties?.google && (local || !google)),
                 style:f=>({color:f.properties?.freshness === "CACHED" ? "#946335" : "#206c65",weight:f.properties?.selected ? 7 : 3,opacity:f.properties?.selected ? 1 : 0.6}),
                 pointToLayer:(f,latlng)=>L.circleMarker(latlng,{radius:7,color:"#206c65",fillOpacity:.8}),
                 onEachFeature:(f,layer)=>layer.bindPopup(`<strong>${esc(f.properties?.name)}</strong><br>${esc(f.properties?.kind)} · ${esc(f.properties?.freshness || "UNKNOWN")}<br>${link(f.properties?.source_url,"Source")}`)

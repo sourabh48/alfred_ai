@@ -98,8 +98,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def text(self, ident): return self.browser.find_element(self.By.ID,ident).text
 
-    def test_automatic_shortlist_gallery_and_mobile_review(self):
-        from selenium.webdriver.common.keys import Keys
+    def test_automatic_shortlist_photo_on_each_card_and_mobile_review(self):
         image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
         def photo(provider, parameters, **kwargs):
             if provider.category == "photos":
@@ -107,25 +106,26 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             return query(provider, parameters, **kwargs)
         with patch("apps.mobility.planner_views.query", side_effect=photo):
             self.browser.get(self.live_server_url+"/mobility/")
+            self.assertFalse(self.browser.find_elements(self.By.ID, "plannerGallery"))  # no separate gallery any more
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,"plannerSend").is_enabled())
             self.send("I have a 2 day holiday. Plan a trip from Bengaluru.")
             self.wait.until(lambda _: any(b.is_enabled() for b in self.browser.find_elements(self.By.CSS_SELECTOR, '.travel-candidate [data-planner-message^="Choose "]')))
+            # The photo sits at the top of each suggestion card, with its credit.
+            self.wait.until(lambda _: self.browser.execute_script(
+                "const cards = [...document.querySelectorAll('.travel-candidate')];"
+                "return cards.length > 0 && cards.every(c => c.querySelector(':scope > .travel-card-photo:first-child img'));"))
+            first = self.browser.find_element(self.By.CSS_SELECTOR, '.travel-candidate .travel-card-photo')
+            self.assertIn('Synthetic photo credit', first.text)
+            self.assertTrue(first.find_element(self.By.TAG_NAME, 'img').get_attribute('alt'))
+            self.browser.execute_script("document.querySelector('.travel-candidate').scrollIntoView()")
+            self.browser.save_screenshot(str(self.artifacts/'workflow-card-photos.png'))
             self.click('.travel-candidate [data-planner-message^="Choose "]')
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerItinerary').is_displayed())
-            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerGalleryImage').is_displayed())
-            self.assertIn('Synthetic photo credit', self.text('plannerGalleryCaption'))
-            self.click('#plannerGalleryNext')
-            self.wait.until(lambda _: self.text('plannerGalleryCount')=='2 / 2')
-            self.wait.until(lambda _: self.browser.find_element(self.By.ID,'plannerGalleryPrevious').is_enabled())
-            self.browser.find_element(self.By.ID,'plannerGalleryFrame').send_keys(Keys.ARROW_LEFT)
-            self.wait.until(lambda _: self.text('plannerGalleryCount')=='1 / 2')
             self.assertIn('draft is ready',self.text('plannerNextStep'))
             self.browser.set_window_size(390,844)
             self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= window.innerWidth'))
             self.browser.save_screenshot(str(self.artifacts/'workflow-mobile.png'))
             self.browser.set_window_size(1440,1100)
-            self.click('#plannerGalleryFrame')
-            self.browser.save_screenshot(str(self.artifacts/'workflow-gallery.png'))
 
     def test_minimal_settings_and_assistant_controls(self):
         self.browser.get(self.live_server_url+'/settings/')
