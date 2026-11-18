@@ -24,7 +24,14 @@
         proposals = data.proposals;
         if ($("taskBots").dataset.recovery === "true" && !$("taskBotsRun").childElementCount) Alfred.setHTMLIfChanged("taskBotsRun", '<button type="button" class="btn btn-sm btn-primary" data-bot-run-all="1">Run all bots</button>'
             + `<details class="mt-2"><summary>Run one bot</summary><div class="d-flex flex-wrap gap-2 mt-2">${data.bots.map(b => `<button type="button" class="btn btn-sm btn-outline-primary" data-bot-run="${esc(b.name)}" title="${esc(b.description)}">Run ${esc(b.label)}</button>`).join("")}</div></details>`);
-        Alfred.setHTMLIfChanged("taskBotsList", proposals.map(card).join("") || '<p class="small mb-0">No reviews waiting.</p>');
+        // The daily review already shows the first item of each review; a notice-only review it repeats is folded, not shown twice.
+        const daily = proposals.filter(p => p.bot === "daily_review");
+        const shown = new Set(daily.flatMap(p => p.items.map(item => item.id.split(":")[0])));
+        const repeated = p => p.bot !== "daily_review" && shown.has(p.bot) && p.items.every(item => !item.action);
+        const open = proposals.filter(p => !repeated(p)), folded = proposals.filter(repeated);
+        Alfred.setHTMLIfChanged("taskBotsList", (open.map(card).join("") + (folded.length
+            ? `<details class="mb-2" data-bot-folded><summary class="small">The same reviews in full (${folded.length})</summary>${folded.map(card).join("")}</details>` : ""))
+            || '<p class="small mb-0">No reviews waiting.</p>');
     }
 
     async function handle(button) {

@@ -247,8 +247,9 @@ class MoreBotsTests(Fixtures):
     """Auto-categorise acts only on Confirm; the other five bots only read the owner's records."""
 
     def row(self, merchant, amount, days_ago=1, category="other", user=None, **fields):
+        fields.setdefault("currency", "INR")
         return Expense.objects.create(user=user or self.user, merchant=merchant, amount=Decimal(amount), category=category,
-                                      currency="INR", transaction_date=self.today - timedelta(days=days_ago), **fields)
+                                      transaction_date=self.today - timedelta(days=days_ago), **fields)
 
     def test_categorise_files_a_spend_only_after_confirm_and_skips_unclear_merchants(self):
         for days in (40, 50):
@@ -302,6 +303,9 @@ class MoreBotsTests(Fixtures):
         SavingsGoal.objects.create(user=self.user, name="Synthetic far goal", target_amount=Decimal("500"), target_date=self.today + timedelta(days=400))
         for days in (5, 35, 65):
             self.row("Synthetic Stream", "199.00", days, category="subscription")
+            self.row("Synthetic Landlord", "20000.00", days, category="rent")  # recurs, but is not a forgotten subscription
+            self.row("Synthetic Lender EMI", "10000.00", days, category="loan", classification="loan")
+            self.row("Synthetic Legacy Club", "99.00", days, category="subscription", currency=None)
         for days in (5, 35, 65):
             self.row("Synthetic Varying", "100.00" if days != 35 else "300.00", days)
         self.row("Synthetic Twice", "45.00", 2); self.row("Synthetic Twice", "45.00", 2)
@@ -315,7 +319,7 @@ class MoreBotsTests(Fixtures):
         self.assertEqual(len(titles["goal_check"]), 2)
         self.assertIn("Synthetic old goal: target date", titles["goal_check"][0])
         self.assertTrue(titles["goal_check"][1].startswith("Synthetic bike fund: ₹"))
-        self.assertEqual(titles["subscriptions"], ["Synthetic Stream: about ₹199.00 every month"])
+        self.assertEqual(titles["subscriptions"], ["Synthetic Legacy Club: about ₹99.00 every month", "Synthetic Stream: about ₹199.00 every month"])
         self.assertEqual(titles["duplicates"], [f"2 x ₹45.00 at Synthetic Twice on {self.today - timedelta(days=2):%d %b}"])
         self.assertEqual(titles["statements_due"], ["Upload a new statement for Synthetic Savings " + account.masked_account_number])
         self.assertEqual(financial_rows(), before)

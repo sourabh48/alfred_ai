@@ -37,7 +37,8 @@ class BotUnavailable(ActionError):
 
 
 def _amount(value, currency):
-    return f"₹{value:,.2f}" if currency == "INR" else f"{currency} {value:,.2f}" if currency else f"{value:,.2f} (currency not recorded)"
+    # A record that never stored a currency is a legacy rupee amount (the in_rupee_totals convention every page uses).
+    return f"₹{value:,.2f}" if currency in ("INR", None, "") else f"{currency} {value:,.2f}"
 
 
 def _item(key, title, detail, url, action=None):
@@ -207,11 +208,13 @@ def goal_check(user, today):
 
 
 def subscriptions(user, today):
-    """The same merchant charged in three or more different months of the last 120 days, at a steady amount."""
+    """The same merchant charged in three or more different months of the last 120 days, at a steady amount.
+    Rent, utilities, loan EMIs and card payments recur too, but nobody forgets them, so they are not listed."""
     from apps.expenses.models import Expense
     charges = defaultdict(list)
     for row in (Expense.objects.filter(user=user, direction="debit", transaction_date__gte=today - timedelta(days=120))
-                .exclude(merchant="").exclude(classification__in=("transfer", "investment")).order_by("transaction_date", "id")
+                .exclude(merchant="").exclude(classification__in=("transfer", "investment", "loan"))
+                .exclude(category__in=("rent", "utilities", "loan", "credit_card", "investment", "transfer")).order_by("transaction_date", "id")
                 .values("merchant", "currency", "amount", "transaction_date")):
         charges[(row["merchant"].strip().lower(), row["currency"])].append(row)
     items = []
