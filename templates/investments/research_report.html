@@ -34,6 +34,7 @@
     <ol>{% for step in s.steps %}<li><strong>{{ step.role }}:</strong> {{ step.text }}</li>{% endfor %}</ol>
     {% if s.levels %}<p><strong>Example levels:</strong> {{ s.levels.text }}</p>{% endif %}
     {% if s.macro %}<p><strong>Economy:</strong> {% for line in s.macro %}{{ line }} {% endfor %}</p>{% endif %}
+    {% if s.context %}<ul>{% for c in s.context %}<li>{{ c.text }}{% if c.url %} {{ c.url }}{% endif %}</li>{% endfor %}</ul>{% endif %}
     <p><strong>Strongest reason against:</strong> {{ s.against }}</p>
   </article>
   {% empty %}

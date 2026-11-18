@@ -378,3 +378,98 @@ class ResearchExtrasTests(TestCase):
                          (3, "4.3", "-1.0", "67"))
         self.assertEqual(by["sell"]["went_its_way_pct"], "100")
         self.assertIsNone(by["hold"]["went_its_way_pct"])
+
+
+def _reply(payload):
+    return type("Reply", (), {"json": lambda self: payload})()
+
+
+class ResearchSourcesTests(TestCase):
+    """FRED, Alpha Vantage and SEC EDGAR (owner-approved 2026-11-18) only add context; synthetic replies, no network."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        from apps.investments.services import research_sources
+        self.src = research_sources
+
+    def test_fred_needs_a_key_and_drops_stale_series(self):
+        with patch.object(self.src.public_http, "request") as request:
+            self.assertEqual(self.src.fred_lines("us", TODAY), [])
+        request.assert_not_called()
+
+        def reply(method, url, params):
+            self.assertEqual(url, self.src.FRED_URL)  # the key goes as a parameter, never into a logged URL
+            rows = {"FEDFUNDS": [("2025-08-01", "4.33")], "UNRATE": [("2024-01-01", "3.7")],  # stale: left out
+                    "DGS10": [("2025-09-05", "."), ("2025-09-04", "4.17")],
+                    "CPIAUCSL": [("2025-08-01", "323.364")] + [("2025-07-01", "322.0")] * 11 + [("2024-08-01", "314.796")]}
+            return _reply({"observations": [{"date": d, "value": v} for d, v in rows[params["series_id"]]]})
+
+        with patch.dict("os.environ", {"ALFRED_FRED_API_KEY": "synthetic-fred-key"}), \
+                patch.object(self.src.public_http, "request", side_effect=reply):
+            lines = self.src.fred_lines("us", TODAY)
+        self.assertEqual(lines, ["The US Federal Reserve's policy rate was 4.33% in Aug 2025 (FRED).",
+                                 "US consumer prices were 2.7% higher than a year earlier in Aug 2025 (FRED).",
+                                 "The US 10-year Treasury yield was 4.17% in 2025-09-04 (FRED)."])
+        self.assertFalse(any("synthetic-fred-key" in line for line in lines))
+
+    def test_alpha_vantage_reads_earnings_and_market_price_insider_trades_for_us_shares(self):
+        earnings = {"quarterlyEarnings": [{"fiscalDateEnding": "2025-06-30", "reportedDate": "2025-07-23", "reportedEPS": "2.80",
+                                           "estimatedEPS": "2.64"}]}
+        insiders = {"data": [{"transaction_date": "2025-08-20", "acquisition_or_disposal": "D", "share_price": "250.0"},
+                             {"transaction_date": "2025-08-21", "acquisition_or_disposal": "A", "share_price": "0.0"},  # a grant
+                             {"transaction_date": "2025-08-22", "acquisition_or_disposal": "A", "share_price": "240.0"},
+                             {"transaction_date": "2025-01-02", "acquisition_or_disposal": "D", "share_price": "200.0"}]}  # too old
+        replies = lambda method, url, params, max_bytes: _reply(earnings if params["function"] == "EARNINGS" else insiders)
+        with patch.dict("os.environ", {"ALFRED_ALPHA_VANTAGE_API_KEY": "SYNTHETICKEY1234"}):
+            self.assertEqual(self.src.alpha_vantage_lines("INFY.NS", TODAY), [])  # Indian shares are not covered
+            with patch.object(self.src.public_http, "request", side_effect=replies) as request:
+                lines = self.src.alpha_vantage_lines("SYNTH", TODAY)
+                self.src.alpha_vantage_lines("SYNTH", TODAY)
+            self.assertEqual(request.call_count, 2)  # cached: the free key allows 25 requests a day
+            self.assertIn("earnings per share 2.80 against an expected 2.64 (6.1% above)", lines[0]["text"])
+            self.assertIn("1 purchase(s) and 1 sale(s)", lines[1]["text"])
+            cache.clear()
+            with patch.object(self.src.public_http, "request", return_value=_reply({"Information": "rate limit"})):
+                self.assertEqual(self.src.alpha_vantage_lines("SYNTH", TODAY), [])
+
+    def test_sec_edgar_sends_the_account_email_and_links_recent_reports(self):
+        with patch.object(self.src.public_http, "request") as request:
+            self.assertEqual(self.src.sec_filings("SYNTH", ""), [])
+            self.assertEqual(self.src.sec_filings("SYNTH", "not-an-email"), [])
+            self.assertEqual(self.src.sec_filings("INFY.NS", "owner@example.com"), [])
+        request.assert_not_called()
+        recent = {"form": ["4", "8-K", "10-Q", "SC 13G", "10-K"], "filingDate": ["2025-09-01", "2025-08-15", "2025-08-01", "2025-07-01", "2025-02-01"],
+                  "reportDate": ["", "2025-08-14", "2025-06-28", "", "2024-12-31"],
+                  "accessionNumber": ["0000000001-25-000005", "0000000001-25-000004", "0000000001-25-000003", "0000000001-25-000002", "0000000001-25-000001"],
+                  "primaryDocument": ["x.xml", "a8k.htm", "q2.htm", "g.htm", "<script>.htm"]}
+
+        def reply(method, url, headers, max_bytes):
+            self.assertEqual(headers["User-Agent"], "ALFRED research desk owner@example.com")
+            if url == self.src.SEC_TICKERS_URL:
+                return _reply({"0": {"cik_str": 1234, "ticker": "SYNTH", "title": "Synthetic Inc."}})
+            self.assertEqual(url, "https://data.sec.gov/submissions/CIK0000001234.json")
+            return _reply({"filings": {"recent": recent}})
+
+        with patch.object(self.src.public_http, "request", side_effect=reply):
+            lines = self.src.sec_filings("SYNTH", "owner@example.com")
+        self.assertEqual([line["text"] for line in lines], ["8-K filed 2025-08-15 for the period to 2025-08-14 (SEC EDGAR).",
+                                                           "10-Q filed 2025-08-01 for the period to 2025-06-28 (SEC EDGAR)."])
+        self.assertEqual(lines[1]["url"], "https://www.sec.gov/Archives/edgar/data/1234/000000000125000003/q2.htm")
+
+    def test_the_desk_passes_each_account_email_only_to_sec_edgar(self):
+        user = get_user_model().objects.create_user("synthetic-sources", email="owner@example.com", password="Test12345!")
+        research_desk.save_settings(user, watch=[{"symbol": "SYNTH", "name": "Synthetic Inc."}])
+        with patch("apps.investments.services.research_packet.fetch_fundamentals", return_value=_fund(currency="USD")), \
+                patch("apps.investments.services.research_packet.fetch_prices", return_value=_prices(RISING, "USD")), \
+                patch("apps.investments.services.research_packet.timezone.localdate", return_value=TODAY), \
+                patch.object(research_desk, "headlines", return_value=[]), patch.object(research_desk, "benchmark", return_value=None), \
+                patch.object(self.src, "fred_lines", return_value=["US line"]) as fred, \
+                patch.object(self.src, "alpha_vantage_lines", return_value=[{"text": "Earnings", "url": None}]) as alpha, \
+                patch.object(self.src, "sec_filings", return_value=[{"text": "10-Q", "url": "https://www.sec.gov/x"}]) as sec:
+            research_desk.refresh(user, TODAY)
+        card = research_desk.desk(user)["suggestions"][0]
+        self.assertEqual((card["macro"], [c["text"] for c in card["context"]]), (["US line"], ["Earnings", "10-Q"]))
+        fred.assert_called_once_with("us")
+        alpha.assert_called_once_with("SYNTH")
+        sec.assert_called_once_with("SYNTH", "owner@example.com")

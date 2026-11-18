@@ -31,6 +31,10 @@ KEYS = {
                                    "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
     "ALFRED_MICROSOFT_CLIENT_SECRET": ("Sign in with Microsoft (optional): client secret", "Certificates & secrets on the same app registration.",
                                        "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
+    "ALFRED_FRED_API_KEY": ("FRED (St. Louis Fed)", "Investments research desk: interest rates and inflation for India and the US, shown as context on each call.",
+                            "https://fred.stlouisfed.org/docs/api/api_key.html"),
+    "ALFRED_ALPHA_VANTAGE_API_KEY": ("Alpha Vantage", "Investments research desk: the latest earnings against forecasts and insider trading for US shares (free key: 25 requests a day).",
+                                     "https://www.alphavantage.co/support/#api-key"),
 }
 # name: (value written when on, what the switch means). None today: Google is the only travel source (owner decision 2026-11-14).
 SWITCHES = {}

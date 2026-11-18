@@ -51,6 +51,8 @@ window.ResearchDesk = (() => {
                 <p class="small mt-2 mb-1">RSI ${e(ind.rsi14 ?? "n/a")} · 50-day average ${e(ind.sma50 ?? "n/a")} · 200-day average ${e(ind.sma200 ?? "n/a")} · MACD histogram ${e(ind.macd_histogram ?? "n/a")}. ${e(s.valuation)}</p>
                 <div class="row g-2">${list(s.good, "Good signs")}${list(s.bad, "Warning signs")}</div>
                 ${(s.macro || []).length ? `<p class="small mb-2"><span class="fw-semibold">Economy (context only, not scored):</span> ${s.macro.map(e).join(" ")}</p>` : ""}
+                ${(s.context || []).length ? `<div class="small mb-2"><span class="fw-semibold">Company filings and earnings (not scored):</span><ul class="mb-0">${s.context.map(c =>
+                    `<li>${c.url ? `<a href="${e(c.url)}" target="_blank" rel="noopener noreferrer">${e(c.text)}</a>` : e(c.text)}</li>`).join("")}</ul></div>` : ""}
                 ${news}
                 <ul class="small muted mb-1">${s.limits.map(l => `<li>${e(l)}</li>`).join("")}</ul>
                 <a class="small" href="${e(s.source_url)}" target="_blank" rel="noopener noreferrer">Source: Yahoo Finance</a>

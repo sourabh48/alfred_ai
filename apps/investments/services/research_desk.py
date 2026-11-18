@@ -28,6 +28,7 @@ from alfred_ai.services import public_http
 from alfred_ai.services.currency import CURRENCY_CHOICES
 from apps.reports.models import OperationalLog
 from apps.reports.services import operational_logging_service
+from . import research_sources
 from .research_journal import outcome
 from .research_packet import SYMBOL, USER_AGENT, beginner_view, build_packet, price_metrics, research_data
 
@@ -320,7 +321,7 @@ def macro() -> list:
     return lines
 
 
-def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench=None, news=True) -> dict | None:
+def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench=None, news=True, contact=None) -> dict | None:
     data = research_data(symbol)
     prices = data["prices"] or {}
     rated = rate(symbol, data["fundamentals"], prices, holding=holding, portfolio_total=portfolio_total)
@@ -341,7 +342,9 @@ def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench
             "indicators": {key: tech.get(key) for key in ("sma50", "sma200", "rsi14", "macd_histogram")},
             "news": headlines(name) if news and name != symbol else [],
             "levels": levels(prices, decision["rating"], holding is not None, packet["price_currency"]),
-            "macro": macro() if indian else [],
+            "macro": (macro() + research_sources.fred_lines("india")) if indian
+                     else research_sources.fred_lines("us") if research_sources.us_listed(symbol) else [],
+            "context": research_sources.alpha_vantage_lines(symbol) + research_sources.sec_filings(symbol, contact),
             "charts": {"price": tech.get("series"), "results": results_chart(data["fundamentals"], packet["statement_currency"])},
             "latest_period_end": packet["latest_period_end"], "source_url": packet["source_url"],
             "limits": ["Fixed rules of thumb on dated public numbers, not a forecast or licensed advice.",
@@ -405,7 +408,7 @@ def refresh(user, today=None, *, resume=False) -> dict:
             researched += 1
             continue
         try:
-            suggestion = analyse(symbol, name, holding=holding, portfolio_total=total, bench=bench)
+            suggestion = analyse(symbol, name, holding=holding, portfolio_total=total, bench=bench, contact=user.email)
         except FETCH_ERRORS as error:
             logger.warning("Research desk could not read one symbol (%s)", type(error).__name__)
             skipped.append({"name": name, "reason": "No dated data came back from Yahoo Finance."})
