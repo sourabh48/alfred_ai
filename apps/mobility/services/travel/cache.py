@@ -3,7 +3,7 @@ from copy import deepcopy
 from datetime import timedelta
 import hashlib
 import json
-from time import monotonic
+from time import monotonic, sleep
 from uuid import uuid4
 
 import requests
@@ -15,6 +15,10 @@ from django.utils import timezone
 from apps.integrations.models import VerifiedExternalInsight
 from apps.mobility.models import TravelProviderRequest, TravelProviderState
 from .providers.base import ProviderError, ProviderResult
+
+# A call that is only waiting for the provider's pacing (or for one call already in flight) waits this long instead of
+# being refused; a real provider backoff, which is minutes away, is still refused at once.
+PACE_WAIT_SECONDS = 4
 
 
 def _cache_result(record, error=""):
@@ -80,15 +84,23 @@ def query(provider, parameters, *, force=False, cache_only=False):
             return _cache_result(record)
         return unavailable("refresh_not_requested")
 
-    now = timezone.now()
     state, _ = TravelProviderState.objects.get_or_create(provider=provider.name)
     token = str(uuid4())
-    claimed = TravelProviderState.objects.filter(pk=state.pk).filter(
-        Q(lease_until__isnull=True) | Q(lease_until__lte=now)).filter(
-        Q(next_allowed_at__isnull=True) | Q(next_allowed_at__lte=now)).update(
-        lease_token=token, lease_until=now+timedelta(seconds=90))
-    if not claimed:
-        return unavailable("provider_busy_or_backoff")
+    give_up = monotonic() + PACE_WAIT_SECONDS
+    while True:
+        now = timezone.now()
+        claimed = TravelProviderState.objects.filter(pk=state.pk).filter(
+            Q(lease_until__isnull=True) | Q(lease_until__lte=now)).filter(
+            Q(next_allowed_at__isnull=True) | Q(next_allowed_at__lte=now)).update(
+            lease_token=token, lease_until=now+timedelta(seconds=90))
+        if claimed:
+            break
+        state.refresh_from_db(fields=["next_allowed_at"])
+        pause = max((state.next_allowed_at - now).total_seconds(), 0.2) if state.next_allowed_at and state.next_allowed_at > now else 0.2
+        if monotonic() + pause > give_up:
+            return unavailable("provider_busy_or_backoff")
+        sleep(pause)
+    now = timezone.now()
     start = monotonic()
     delay = provider.min_interval
     called = False

@@ -140,6 +140,18 @@ class TravelProviderTests(TestCase):
         self.assertEqual(result.error, "provider_busy_or_backoff")
         self.assertEqual(self.provider.fetch.call_count, 2)
 
+    def test_back_to_back_calls_wait_for_the_pacing_instead_of_being_lost(self):
+        """Owner check 2026-11-19: three Google Routes detours made right after the main route were refused as busy."""
+        from apps.mobility.services.travel import cache
+        self.provider.min_interval = 1
+        results = [query(self.provider, {"latitude": n}) for n in (1, 2, 3)]
+        self.assertTrue(all(result.success for result in results), [result.error for result in results])
+        self.assertEqual(self.provider.fetch.call_count, 3)
+        TravelProviderState.objects.filter(provider="fixture").update(lease_until=timezone.now() + timedelta(seconds=90))
+        with patch.object(cache, "PACE_WAIT_SECONDS", 0.5):  # a call still in flight elsewhere: give up after the short wait
+            self.assertEqual(query(self.provider, {"latitude": 4}).error, "provider_busy_or_backoff")
+        self.assertEqual(self.provider.fetch.call_count, 3)
+
     def test_budget_status_matches_enforcement_in_every_window(self):
         now = timezone.now()
         self.provider.min_interval = 0

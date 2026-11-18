@@ -56,7 +56,7 @@ class GooglePlacePhoto(Provider):
             place, _ = request_json("GET", f"https://places.googleapis.com/v1/places/{p['place_id']}",
                 headers=google_headers("id,photos"), deadline=deadline)
             if place.get("id") != p["place_id"]:
-                raise ProviderError("place_identity_mismatch")
+                raise ProviderError("place_identity_mismatch", retry_after=1)
         else:
             raw, _ = request_json("POST", "https://places.googleapis.com/v1/places:searchText",
                 json={"textQuery": p["name"], "pageSize": 5,
@@ -74,7 +74,7 @@ class GooglePlacePhoto(Provider):
                 if distance <= 20:
                     matches.append((not item.get("photos"), distance, len(matches), item))
             if not matches:
-                raise ProviderError("place_identity_unconfirmed")
+                raise ProviderError("place_identity_unconfirmed", retry_after=1)  # this place only, not a provider fault
             place = min(matches)[3]
         photos = place.get("photos", [])[:MAX_PHOTOS]
         if not photos:

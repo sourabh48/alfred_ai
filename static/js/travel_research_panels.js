@@ -4,7 +4,7 @@ window.TravelResearchPanels = (() => {
     const money = (v, currency="INR") => v == null ? "Not available" : `${esc(currency)} ${esc(Number(v).toLocaleString(undefined,{maximumFractionDigits:2}))}`;
     const stamp = v => v && Number.isFinite(Date.parse(v)) ? new Date(v).toLocaleString() : "Not checked";
     const label = r => `${r?.freshness || "UNKNOWN"}${r?.stale ? " · STALE" : ""}`;
-    let session, selectedName, chosenDestination, map, layers, mapGeometry, mapEnabled = false, google = null, local = null;
+    let session, selectedName, chosenDestination, map, layers, mapGeometry, google = null, local = null;
     const $ = id => document.getElementById(id);
     function link(url, title) {
         try {
@@ -86,7 +86,7 @@ window.TravelResearchPanels = (() => {
         renderMap(d);
     }
     function renderMap(d) {
-        if (!mapEnabled || !window.L) return;
+        if (!window.L) return;
         $("plannerMap").hidden = false;
         if (!map) {
             map = L.map("plannerMap").setView([20,78],5);
@@ -134,7 +134,6 @@ window.TravelResearchPanels = (() => {
         $("plannerEvidence")?.addEventListener("click",async e=>{
             const choice = e.target.closest("[data-research-destination]");
             if (choice) { selectedName=choice.dataset.researchDestination; render(session); }
-            if (e.target.id === "plannerLoadMap") { mapEnabled=true; renderMap(selected()); e.target.hidden=true; }
             if (e.target.id === "plannerLoadQuota") {
                 try {
                     const data = await Alfred.fetchJSON("/api/mobility/planner/providers/");

@@ -453,7 +453,7 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         self.assertIn("Live stay pricing/availability could not be retrieved",self.text("plannerEvidenceBody"))
         self.assertIn("Search link — open to check latest availability.",self.text("plannerEvidenceBody"))
         self.assertTrue(self.browser.execute_script("return [...document.querySelectorAll('#plannerEvidence a[target=\"_blank\"]')].every(a=>a.rel.includes('noopener')&&a.rel.includes('noreferrer')&&a.protocol==='https:')"))
-        self.click("#plannerLoadMap")
+        self.assertFalse(self.browser.find_elements(self.By.ID,"plannerLoadMap"))  # the map opens by itself (owner, 2026-11-19)
         self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#plannerMap .leaflet-overlay-pane path[fill="none"]'))
         self.assertIn("No background map: add a Google Maps key",self.text("plannerMapStatus"))
         self.assertFalse(self.browser.find_elements(self.By.CSS_SELECTOR,"#plannerMap img.leaflet-tile"))
