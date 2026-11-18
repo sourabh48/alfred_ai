@@ -138,3 +138,21 @@ Chrome/Axe, privacy/ownership, financial reconciliation and failure/offline test
 Separate synthetic/local/provider/packaged/real-account results. All unselected
 implementations remain deferred; this matrix adds no acceptance counts or queue jumps.
 Source inspection receipts/pins are cached under ignored `artifacts/sprint-8f505a3/`.
+
+## Upstream gap build — 2026-11-18
+
+Pins inspected at code level: TradingAgents main `9fa1196f`, career-ops main `fe9cb888`, TREK main `2bcfc1bf`.
+Local synthetic tests only; no hosted CI on these commits yet; live accuracy unverified.
+
+| Feature / upstream source at pin | ALFRED equivalent / target IDs | Gap / intended refinement | Disposition | Status, dependencies and validation |
+| --- | --- | --- | --- | --- |
+| Aggressive/conservative/neutral risk debators, debate rounds, reflection; `agents/risk_mgmt/`, `graph/reflection.py` (T) | INV-04, INVEST2-001; `research_debate.py` | Grounded sentences only; reflection appended to settled accepted calls | IMPLEMENT_INDEPENDENTLY | `tests.test_research_desk` PASS; desk browser test PASS |
+| Prediction-market context (T dataflows) | INV-04; `research_sources.prediction_markets` | Polymarket public search, context only, "not a forecast" | IMPLEMENT_INDEPENDENTLY | Owner approval 2026-11-18; live check returned markets |
+| master-profile, expand, discover, gambit, retro modes (C) | CAREER2-001, CAREER-08; `career_tools.py` | Owner ticks each fact; public board JSON only; local model; rules re-validated | PORT_PYTHON | MIT attribution in source; `tests.test_career_tools` PASS; browser test PASS |
+| reply-watch mode (C) | CAREER-05; `reply_watch.py` | IMAP read-only, PEEK, plain rules, no model, Apply only by owner | PORT_PYTHON | Owner approval 2026-11-18 (mailbox read); synthetic IMAP tests PASS |
+| Posting signals 13, 15, 16, 19, 20 (C) | CAREER-02; `evaluation.posting_notes` | Jurisdiction signals 08-12, 14, 17, 22 not ported (no verified law tables) | PORT_PYTHON | `tests.test_career_evaluation` PASS |
+| H-1B sponsor signal (C) | CAREER-02; `h1b_sponsor.py` | Owner-downloaded DOL LCA file read locally; no PERM evidence | PORT_PYTHON | DOL blocks automated access; synthetic xlsx tests PASS |
+| Reservations, GPX tracks, places import (R) | TRAVEL; `trip_tools.py` | Records only, never books; AI fields must appear in the confirmation | IMPLEMENT_INDEPENDENTLY | No AGPL code copied; `tests.test_trip_tools` PASS; browser test PASS |
+| Transit and holiday/vacation planner (R) | TRAVEL; `GoogleTransit`, `NagerHolidays` | Google only for transit; Nager.Date for holidays (no India coverage) | IMPLEMENT_INDEPENDENTLY | Owner approval 2026-11-18; Nager live check PASS; Google transit faked in tests |
+| Collaboration, cost splitting, public share, photo book (R) | none | Out of scope | EXCLUDE | Not approved |
+

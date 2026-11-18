@@ -1,5 +1,38 @@
 # ALFRED execution state
 
+## Upstream gap build: TradingAgents, Career Ops, TREK, phone sync — 2026-11-18
+
+LOCAL_TESTING; not pushed. Branch `work/tracker-items-2026-11-18` after `665816c`: `dd8b28e` research desk, `25daa3c`
+Career, `223beea` Travel, `4b87483` phone sync, `208c2da` Google button always shown, `a4fc288` travel fixes,
+`850bf86` Google holidays. Owner asked what is still missing from TradingAgents (`9fa1196f`),
+career-ops (`fe9cb888`) and TREK (`2bcfc1bf`) at code level, approved the conflict items (mailbox read, Google transit,
+Nager.Date, Polymarket and H-1B data) and all three build groups, then "update ui accordingly" and phone sync through
+Google Calendar + Tasks.
+
+- Research desk: aggressive/conservative/neutral risk analysts, 1-3 debate rounds, local-AI reflection on settled
+  calls, S&P 500 benchmark for US shares, Polymarket odds as context (never scored).
+- Career (`career_tools.py`, `reply_watch.py`, `h1b_sponsor.py`, "More career tools"): master profile from ticked CV
+  lines, GitHub suggestions, Greenhouse/Lever/Ashby company boards and matching roles, gambit proposal, retro rules,
+  posting notes (unpaid, wide pay range, fixed term, AI screening, talent pool), read-only IMAP reply watch with Apply,
+  H-1B history from DOL LCA files the owner downloads into `<data>/imports` (DOL refuses automated downloads; upload cap
+  25 MB unchanged). Career Ops jurisdiction signals (Ontario, California, NYC, EU) not ported: no verified law tables.
+- Travel (`trip_tools.py`, "Trip tools"): bookings record with local-AI confirmation reading (fields kept only when
+  written in the text), GPX plan vs actual with climb, grades and elevation profile, places from KML/GPX/Google Takeout,
+  Google transit (`GoogleTransit`), Nager.Date holidays and long weekends. Nager.Date has no India data.
+- Phone sync (`google_sync.py`, Settings): `calendar.app.created` + Tasks scopes via the existing Google sign-in,
+  encrypted refresh token under `<data>/artifacts/google-sync`, one-way 30-minute Huey sync of trips, bookings,
+  follow-ups and review dates (events) and reminders and packing (tasks); no amounts; disconnect revokes. No live
+  Google Calendar/Tasks/transit call made (needs the owner's sign-in and key).
+- Travel fixes (owner, 2026-11-19): Google Routes now returns the route line, drawn on Google tiles only; weekend
+  ideas skip places already suggested, each activity is on one day, and one spot under two names is listed once; the
+  separate photo gallery is replaced by a photo on top of each suggestion card and weekend idea.
+- Holidays (owner chose Google, 2026-11-19): phone sync's consent adds read-only public calendars; when Nager.Date
+  lacks a country (India), the lookup reads Google's holiday calendar through the connected account, marks restricted
+  days and works out long weekends. Google's calendar name for India is assumed (`en.in`, then `en.indian`); not yet
+  checked live.
+- Not built (not approved): cloud debate models, StockTwits, LLM tool-calling analysts, photo book, TREK
+  collaboration/cost splitting/public share. No migration.
+
 ## Research desk: AI debate, social mood, paper trader, providers — 2026-11-18
 
 LOCAL_TESTING; not pushed. Same worktree, after `cc26e14`. Owner: "AI agents argue in text and the AI decides the

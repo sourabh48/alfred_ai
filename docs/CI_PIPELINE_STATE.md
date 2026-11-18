@@ -2,8 +2,14 @@
 
 ## Upstream gap build — 2026-11-18
 
-LOCAL_TESTING. Same worktree after `665816c`: TradingAgents, Career Ops and TREK gaps the owner approved (see
-EXECUTION_STATE). Not pushed, no hosted CI.
+LOCAL_TESTING. Same worktree after `665816c`: `dd8b28e`, `25daa3c`, `223beea`, `4b87483`, `208c2da`, `a4fc288`,
+`850bf86` (TradingAgents, Career Ops and TREK gaps, Google phone sync, Google button, travel route/duplicate/photo
+fixes, Google holidays; see EXECUTION_STATE). Local gate on `850bf86` (docs-only commit after): backend four shards 3,203 run, OK
+with 14 skips, all "Calendar test parser is not installed"; after installing the CI-pinned ICAL.js 2.2.1 (hash checked)
+the three modules using it (16 tests) pass with 0 skips. Chrome 234 run: 230 OK and 4 calendar skips, which then pass
+(4/4). No single full run with zero skips was made. New backend labels `tests.test_career_tools`,
+`tests.test_trip_tools`, `tests.test_google_sync` are in BACKEND with durations; three new browser tests have
+durations. Not pushed, no hosted CI, no PR. Push needs the owner's OK; the docs delta publishes to Pages.
 
 CI_PASSED on `665816c` (Browser Regression 44334753925 success; pages build and deployment 44334752112 success). Owner:
 "Merge, restart, push" (2026-11-18); origin/master `cc26e14` → `665816c` (fast-forward, owner name only, no secrets in the
