@@ -201,6 +201,8 @@ class ResearchDeskView(APIView):
                 result = research_desk.accept(user, data.get("id"), paper=data.get("paper") is True)
             elif operation == "ai_decides" and isinstance(data.get("enabled"), bool):
                 result = research_desk.save_settings(user, ai_decides=data["enabled"])
+            elif operation == "debate_rounds":
+                result = research_desk.save_settings(user, debate_rounds=data.get("rounds"))
             elif operation == "paper_open":
                 from .services.research_paper import open_account
                 result = open_account(user, data.get("cash"))

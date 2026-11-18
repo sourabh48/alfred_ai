@@ -29,6 +29,7 @@ class ResearchDeskTests(TestCase):
         self.enterContext(patch.object(research_desk, "headlines", return_value=[]))
         self.enterContext(patch.object(research_desk, "macro", return_value=[]))
         self.enterContext(patch.object(research_desk, "benchmark", return_value={"level": "25000.0000", "as_of": "2025-09-05"}))
+        self.enterContext(patch("apps.investments.services.research_sources.prediction_markets", return_value=[]))  # offline
         self.market = {"GOOD.NS": (_fund(), _prices(RISING)), "WEAK.NS": (WEAK, _prices(FALLING))}
         self.enterContext(patch("apps.investments.services.research_packet.fetch_fundamentals", side_effect=lambda s: self.data(s)[0]))
         self.enterContext(patch("apps.investments.services.research_packet.fetch_prices", side_effect=lambda s: self.data(s)[1]))
@@ -493,7 +494,8 @@ class FakeReasoner:
 
 DEBATE = ["Revenue grew 20.0% and the margin is 15.0%. It will double to 500 soon.", "The RSI of 100.0 is stretched.",
           "The bear case is stronger right now.", "Propose Hold until the RSI cools.",
-          "A pullback is the main risk. It is guaranteed to rise anyway.",
+          "Take the full position while the trend is up.", "A pullback is the main risk. It is guaranteed to rise anyway.",
+          "The conservative view fits the stretched RSI better.",
           '{"rating": "hold", "reason": "Wait for the RSI to cool from 100.0."}']
 
 
@@ -517,7 +519,9 @@ class ResearchAgentsTests(TestCase):
         self.assertEqual((call["rating"], call["rules_rating"], call["label"]), ("hold", "overweight", "Wait and watch"))
         steps = {step["role"]: step["text"] for step in call["debate"]["steps"]}
         self.assertEqual(steps["Bull researcher"], "Revenue grew 20.0% and the margin is 15.0%.")  # 500 is not in the evidence
-        self.assertEqual(steps["Risk team"], "A pullback is the main risk.")  # no promises
+        self.assertEqual(steps["Conservative risk analyst"], "A pullback is the main risk.")  # no promises
+        self.assertEqual([step["role"] for step in call["debate"]["steps"]][4:7],
+                         ["Aggressive risk analyst", "Conservative risk analyst", "Neutral risk analyst"])
         self.assertEqual(call["debate"]["dropped"], 2)
         self.assertNotIn("synthetic-desk-owner", json.dumps(reasoner.calls))  # evidence only, no account data
         self.assertEqual(research_debate.debate_due(reasoner=FakeReasoner([]))["debated"], 0)  # not repeated for the same evidence
@@ -529,7 +533,7 @@ class ResearchAgentsTests(TestCase):
     def test_a_bad_final_answer_leaves_the_rules_rating_and_the_switch_stops_debates(self):
         from apps.investments.services import research_debate
         self.open_call()
-        research_debate.debate_due(reasoner=FakeReasoner(["Fine."] * 5 + ["I think buy"] + ["Fine."] * 5 + ['{"rating": "moon"}']))
+        research_debate.debate_due(reasoner=FakeReasoner(["Fine."] * 7 + ["I think buy"] + ["Fine."] * 7 + ['{"rating": "moon"}']))
         call = self.suggestions()["GOOD.NS"]
         self.assertEqual((call["rating"], call["debate"]["status"]), ("overweight", "failed"))
         self.client.post(URL, {"operation": "ai_decides", "enabled": False}, content_type="application/json")
@@ -619,3 +623,77 @@ class ResearchAgentsTests(TestCase):
         response = self.client.post(URL, {"operation": "watch_add", "symbol": "brk-b"}, content_type="application/json")
         self.assertIn("BRK-B", [w["symbol"] for w in response.json()["desk"]["settings"]["watch"]])
         self.assertEqual(self.client.post(URL, {"operation": "watch_add", "symbol": "Infosys Ltd"}, content_type="application/json").status_code, 400)
+
+
+from apps.investments.services.research_sources import prediction_markets as REAL_PREDICTION_MARKETS  # noqa: E402 - before setUp patches it
+
+
+class ResearchGapTests(TestCase):
+    """TradingAgents gaps (owner approval 2026-11-18): debate rounds, settlement reflection, US benchmark, Polymarket odds."""
+
+    setUp = ResearchDeskTests.setUp
+    data = ResearchDeskTests.data
+    suggestions = ResearchDeskTests.suggestions
+
+    def test_the_owner_picks_debate_rounds_and_each_adds_a_bull_and_bear_answer(self):
+        from apps.investments.services import research_debate
+        self.assertEqual(self.client.post(URL, {"operation": "debate_rounds", "rounds": 4}, content_type="application/json").status_code, 400)
+        self.assertEqual(self.client.post(URL, {"operation": "debate_rounds", "rounds": True}, content_type="application/json").status_code, 400)
+        response = self.client.post(URL, {"operation": "debate_rounds", "rounds": 2}, content_type="application/json")
+        self.assertEqual(response.json()["desk"]["settings"]["debate_rounds"], 2)
+        research_desk.refresh(self.user, TODAY)
+        reasoner = FakeReasoner((["Fine."] * 9 + ['{"rating": "hold", "reason": "Wait."}']) * 2)
+        self.assertEqual(research_debate.debate_due(reasoner=reasoner)["debated"], 2)
+        roles = [step["role"] for step in self.suggestions()["GOOD.NS"]["debate"]["steps"]]
+        self.assertEqual((roles.count("Bull researcher"), roles.count("Bear researcher"), len(roles)), (2, 2, 10))
+        self.assertEqual(self.suggestions()["GOOD.NS"]["debate"]["rounds"], 2)
+        self.assertEqual(research_debate.sequence(9)[:6], research_debate.sequence(3)[:6])  # capped at three rounds
+
+    def test_a_settled_call_gets_a_grounded_local_ai_reflection_once(self):
+        from apps.investments.services import research_debate
+        research_desk.refresh(self.user, TODAY)
+        decision = ResearchDecision.objects.get(pk=research_desk.accept(self.user, self.suggestions()["GOOD.NS"]["id"], TODAY)["decision_id"])
+        own = ResearchDecision.objects.create(user=self.user, instrument="GOOD.NS", rating="buy", thesis="Mine", decided_on=TODAY,
+                                              review_on=TODAY, entry_price=Decimal("1"), settled_on=TODAY, exit_price=Decimal("2"),
+                                              lesson="My own lesson.")
+        with patch.object(research_desk, "research_data", return_value={"fundamentals": {}, "prices": _prices(RISING + [250.0] * 100)}), \
+                patch.object(research_desk, "benchmark", return_value={"level": "26000.0000", "as_of": "2025-12-16"}):
+            research_desk.settle_due(TODAY + timedelta(days=95))
+        reasoner = FakeReasoner(["The growth reasons held up against the index. It is guaranteed to rise again. It beat by 99.0%."])
+        self.assertEqual(research_debate.reflect_due(reasoner=reasoner), 1)
+        decision.refresh_from_db()
+        self.assertTrue(decision.lesson.startswith("Checked by ALFRED"))
+        self.assertTrue(decision.lesson.endswith("Local AI reflection: The growth reasons held up against the index."))
+        self.assertNotIn("synthetic-desk-owner", json.dumps(reasoner.calls))
+        self.assertEqual(research_debate.reflect_due(reasoner=FakeReasoner([])), 0)  # written once
+        own.refresh_from_db()
+        self.assertEqual(own.lesson, "My own lesson.")  # the owner's own lesson is never touched
+
+    def test_us_shares_are_measured_against_the_s_and_p_500(self):
+        self.assertEqual([research_desk.index_for(s) for s in ("INFY.NS", "500209.BO", "AAPL", "BRK-B", "VOD.L")],
+                         ["NIFTY 50", "NIFTY 50", "S&P 500", "S&P 500", ""])
+        self.market["AAPL"] = (_fund(), _prices(RISING))
+        with patch.object(research_desk, "benchmark", side_effect=lambda index="NIFTY 50": {"level": "6000.0000", "as_of": "2025-09-05"}
+                          if index == "S&P 500" else None) as bench:
+            call = research_desk.analyse("AAPL", "AAPL")
+        self.assertEqual((call["benchmark"], call["benchmark_level"]), ("S&P 500", "6000.0000"))
+        bench.assert_called_with("S&P 500")
+
+    def test_polymarket_odds_keep_only_open_markets_that_name_the_company(self):
+        from apps.investments.services import research_sources
+        events = {"events": [{"slug": "good-co-q4", "markets": [
+            {"question": "Will Good Co beat Q4 earnings?", "outcomes": '["Yes", "No"]', "outcomePrices": '["0.62", "0.38"]',
+             "volumeNum": 125000.4, "endDate": "2099-01-31T00:00:00Z", "closed": False},
+            {"question": "Will Good Co split its shares?", "outcomes": '["Yes", "No"]', "outcomePrices": '["0.1", "0.9"]',
+             "volumeNum": 900000, "endDate": "2020-01-01T00:00:00Z", "closed": False},
+            {"question": "Will Good Co list in London?", "outcomes": '["Yes", "No"]', "outcomePrices": '["0.5", "0.5"]',
+             "volumeNum": 5, "endDate": "2099-01-01", "closed": True},
+            {"question": "Will the Fed cut rates?", "outcomes": '["Yes", "No"]', "outcomePrices": '["0.7", "0.3"]',
+             "volumeNum": 10**9, "endDate": "2099-01-01", "closed": False}]}]}
+        with patch.object(research_sources.public_http, "request", return_value=_reply(events)) as request:
+            odds = REAL_PREDICTION_MARKETS("Good Co")
+        self.assertEqual(odds, [{"text": 'Polymarket bettors price "Will Good Co beat Q4 earnings?" at 62% for Yes (US$125,000 traded, '
+                                         'resolves 2099-01-31). Betting odds, not a forecast.', "url": "https://polymarket.com/event/good-co-q4"}])
+        self.assertEqual(request.call_args.kwargs["params"]["q"], "Good Co")
+        with patch.object(research_sources.public_http, "request", side_effect=PublicHTTPError("down")):
+            self.assertEqual(REAL_PREDICTION_MARKETS("Other Co"), [])  # unavailable odds are left out

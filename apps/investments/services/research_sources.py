@@ -22,6 +22,7 @@ FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 ALPHA_URL = "https://www.alphavantage.co/query"
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SEC_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
+POLYMARKET_URL = "https://gamma-api.polymarket.com/public-search"  # public, no key (owner approved 2026-11-18)
 EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,24}$")
 STALE_DAYS = 120
 # series: (label, months back to compare for a yearly change, or 0 to show the level)
@@ -235,3 +236,46 @@ def alpha_vantage_prices(symbol: str, *, years: int = 1) -> dict:
         raise ValueError("Alpha Vantage gave no recent daily prices.")
     return {"timestamp": [r[0] for r in rows], "close": [r[1] for r in rows], "high": [r[2] for r in rows],
             "low": [r[3] for r in rows], "currency": currency, "source": "Alpha Vantage"}
+
+
+def _json_list(raw) -> list:
+    """Polymarket sends outcomes and prices as JSON text inside the JSON."""
+    import json
+    try:
+        found = json.loads(raw) if isinstance(raw, str) else raw
+    except ValueError:
+        return []
+    return found if isinstance(found, list) else []
+
+
+def prediction_markets(name: str, limit: int = 3) -> list:
+    """Open Polymarket markets that mention the company, by traded volume: what bettors price, read-only context.
+    Like TradingAgents' Polymarket vendor (pin 9fa1196f), only open markets resolving in the future are kept."""
+    if not name or len(name) < 3:
+        return []
+
+    def fetch():
+        payload = public_http.request("GET", POLYMARKET_URL, params={"q": name, "limit_per_type": 20}, max_bytes=2_000_000).json()
+        now, found = timezone.now(), []
+        for event in payload.get("events") or []:
+            for market in event.get("markets") or []:
+                outcomes, prices = _json_list(market.get("outcomes")), _json_list(market.get("outcomePrices"))
+                end = str(market.get("endDate") or "")[:10]
+                if market.get("closed") or not outcomes or len(outcomes) != len(prices) or not end or end < now.date().isoformat():
+                    continue
+                best = max(range(len(prices)), key=lambda i: _number(prices[i]) or Decimal(0))
+                chance = _number(prices[best])
+                question = str(market.get("question") or "").strip()[:200]
+                if chance is None or not question or name.lower().split()[0] not in question.lower():
+                    continue  # a search hit that does not name the company is not about it
+                volume = _number(market.get("volumeNum")) or Decimal(0)
+                found.append((volume, {"text": f'Polymarket bettors price "{question}" at {(chance * 100).quantize(Decimal("1"))}% '
+                                               f'for {str(outcomes[best])[:40]} (US${volume.quantize(Decimal("1")):,} traded, '
+                                               f'resolves {end}). Betting odds, not a forecast.',
+                                       "url": f"https://polymarket.com/event/{event.get('slug')}" if event.get("slug") else None}))
+        return [item for _volume, item in sorted(found, key=lambda pair: -pair[0])[:limit]]
+
+    try:
+        return _cached(f"research-sources:polymarket:{re.sub(r'\W+', '-', name.lower())}", fetch, 6 * 3600)
+    except (public_http.PublicHTTPError, ValueError, AttributeError, TypeError):
+        return []

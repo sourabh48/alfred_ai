@@ -78,16 +78,18 @@ RESERVE_MONTHS, RUN_HOUR, SNOOZE_DAYS = 6, 13, 7
 def desk_settings(user) -> dict:
     saved = _records(user).filter(event_type=SETTINGS).order_by("-created_at", "-id").first()
     current = {"watch": [{"symbol": symbol, "name": name} for symbol, name in DEFAULT_WATCH.items()], "include_holdings": False,
-               "enabled": True, "discover": False, "ai_decides": True, "profile": {"loss": None, "horizon": None}}
+               "enabled": True, "discover": False, "ai_decides": True, "debate_rounds": 1, "profile": {"loss": None, "horizon": None}}
     if saved:
         current.update({key: saved.payload[key] for key in current if key in saved.payload})
         current["include_holdings"] = bool(current["include_holdings"])
         current["discover"] = current["discover"] is True  # opt-in: ideas read about 45 more companies each week
         current["ai_decides"] = current["ai_decides"] is not False  # owner request 2026-11-18: the local AI debates and decides
+        current["debate_rounds"] = current["debate_rounds"] if current["debate_rounds"] in (1, 2, 3) else 1
     return current
 
 
-def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None, discover=None, ai_decides=None) -> dict:
+def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None, discover=None, ai_decides=None,
+                  debate_rounds=None) -> dict:
     current = desk_settings(user)
     if watch is not None:
         current["watch"] = watch[:WATCH_LIMIT]
@@ -99,6 +101,10 @@ def save_settings(user, *, watch=None, include_holdings=None, enabled=None, prof
         current["discover"] = discover is True
     if ai_decides is not None:
         current["ai_decides"] = ai_decides is True
+    if debate_rounds is not None:
+        if debate_rounds not in (1, 2, 3) or isinstance(debate_rounds, bool):
+            raise ValueError("Choose 1, 2 or 3 bull and bear rounds.")
+        current["debate_rounds"] = debate_rounds
     if profile is not None:
         if not isinstance(profile, dict) or profile.get("loss") not in (*LOSS, None) or profile.get("horizon") not in (*HORIZON, None):
             raise ValueError("Choose one of the listed answers, or leave it blank.")
@@ -206,18 +212,28 @@ def headlines(name: str) -> list:
     return found
 
 
-def benchmark() -> dict | None:
-    """NIFTY 50's last close, to compare a call with the market. None when Yahoo has no level."""
-    found = cache.get("research-desk:nifty")
+INDEXES = {"NIFTY 50": "%5ENSEI", "S&P 500": "%5EGSPC"}
+
+
+def index_for(symbol: str) -> str:
+    """The market a call is measured against: NIFTY 50 for NSE/BSE shares, S&P 500 for bare US tickers, else none."""
+    return "NIFTY 50" if symbol.endswith((".NS", ".BO")) else "S&P 500" if "." not in symbol else ""
+
+
+def benchmark(index: str = "NIFTY 50") -> dict | None:
+    """The index's last close, to compare a call with the market. None when Yahoo has no level."""
+    if index not in INDEXES:
+        return None
+    found = cache.get(f"research-desk:index:{index}")
     if found is None:
         from apps.integrations.services.verified_intelligence import VerifiedIntelligenceService
         try:
-            chart = VerifiedIntelligenceService()._fetch_yahoo_chart("%5ENSEI", range_value="5d", interval="1d")
+            chart = VerifiedIntelligenceService()._fetch_yahoo_chart(INDEXES[index], range_value="5d", interval="1d")
             found = {"level": str(chart["close"][-1].quantize(Decimal("0.0001"))),
                      "as_of": datetime.fromtimestamp(chart["timestamp"][-1], dt_timezone.utc).date().isoformat()}
         except FETCH_ERRORS:
             return None
-        cache.set("research-desk:nifty", found, 6 * 3600)
+        cache.set(f"research-desk:index:{index}", found, 6 * 3600)
     return found
 
 
@@ -328,7 +344,7 @@ def macro() -> list:
     return lines
 
 
-def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench=None, news=True, contact=None) -> dict | None:
+def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, news=True, contact=None) -> dict | None:
     data = research_data(symbol)
     prices = data["prices"] or {}
     rated = rate(symbol, data["fundamentals"], prices, holding=holding, portfolio_total=portfolio_total)
@@ -336,14 +352,15 @@ def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench
         return None
     packet, tech, decision = rated
     price = packet["metrics"]["price"]
-    indian, valuation = symbol.endswith((".NS", ".BO")), packet["valuation"]
+    indian, index, valuation = symbol.endswith((".NS", ".BO")), index_for(symbol), packet["valuation"]
+    bench = benchmark(index) if index else None
     point = lambda item: {"point": item["point"], "as_of": item["as_of"]}
     return {**decision, "symbol": symbol, "name": name, "held": holding is not None,
             "summary": f"{len(packet['bullish'])} good sign(s) against {len(packet['bearish'])} warning sign(s) in the dated numbers.",
             "good": [point(item) for item in packet["bullish"]], "bad": [point(item) for item in packet["bearish"]],
             "price": str(price["last_close"].quantize(Decimal("0.0001"))), "price_as_of": price["as_of"],
-            "currency": packet["price_currency"], "benchmark": "NIFTY 50" if indian and bench else "",
-            "benchmark_level": bench["level"] if indian and bench else None,
+            "currency": packet["price_currency"], "benchmark": index if bench else "",
+            "benchmark_level": bench["level"] if bench else None,
             "valuation": (f"The price is about {valuation['price_to_earnings']} times last year's profit per share."
                           if valuation["status"] == "estimated" else valuation["reason"]),
             "indicators": {key: tech.get(key) for key in ("sma50", "sma200", "rsi14", "macd_histogram")},
@@ -352,11 +369,13 @@ def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench
             "macro": (macro() + research_sources.fred_lines("india")) if indian
                      else research_sources.fred_lines("us") if research_sources.us_listed(symbol) else [],
             "context": research_sources.alpha_vantage_lines(symbol) + research_sources.sec_filings(symbol, contact),
+            "odds": research_sources.prediction_markets(name) if news and name != symbol else [],
             "charts": {"price": tech.get("series"), "results": results_chart(data["fundamentals"], packet["statement_currency"])},
             "latest_period_end": packet["latest_period_end"], "source_url": packet["source_url"],
             "limits": ["Fixed rules of thumb on dated public numbers, not a forecast or licensed advice.",
                        "The screens suit ordinary companies; banks, insurers and lenders can look worse than they are.",
-                       "No social-media sentiment is read. Yahoo data is daily, not a live quote, and is not independently verified.",
+                       "Social mood comes only from Reddit, once you add its keys. Betting-market odds are what traders "
+                       "bet, not a forecast. Yahoo data is daily, not a live quote, and is not independently verified.",
                        "ALFRED never buys or sells. If you agree, place the order yourself with your broker."]}
 
 
@@ -406,7 +425,7 @@ def refresh(user, today=None, *, resume=False) -> dict:
     today = today or timezone.localdate()
     rows, unmatched = universe(user)
     total = Investment.objects.filter(user=user).in_rupee_totals().aggregate(total=Sum("current_value"))["total"] or None
-    bench, researched = benchmark(), 0
+    researched = 0
     skipped = [{"name": name, "reason": "Record this holding's name as its exchange symbol (for example INFY.NS) to include it."}
                for name in unmatched]
     done = set(_records(user).filter(payload__for_date=today.isoformat()).exclude(event_type__in=(SETTINGS, RUN, IDEAS, BACKTEST))
@@ -416,7 +435,7 @@ def refresh(user, today=None, *, resume=False) -> dict:
             researched += 1
             continue
         try:
-            suggestion = analyse(symbol, name, holding=holding, portfolio_total=total, bench=bench, contact=user.email)
+            suggestion = analyse(symbol, name, holding=holding, portfolio_total=total, contact=user.email)
         except FETCH_ERRORS as error:
             logger.warning("Research desk could not read one symbol (%s)", type(error).__name__)
             skipped.append({"name": name, "reason": "No dated data came back from Yahoo Finance."})
@@ -707,7 +726,7 @@ def settle_due(today=None) -> int:
             price = price_metrics(prices.get("close") or [], prices.get("timestamp") or [])
         except FETCH_ERRORS:
             continue
-        bench = benchmark() if decision.benchmark_entry is not None else None
+        bench = benchmark(decision.benchmark or "NIFTY 50") if decision.benchmark_entry is not None else None
         if not price or date.fromisoformat(price["as_of"]) < decision.review_on:
             continue  # no close on or after the check date yet
         if decision.benchmark_entry is not None and (not bench or date.fromisoformat(bench["as_of"]) < decision.review_on):

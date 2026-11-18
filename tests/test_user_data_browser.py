@@ -9267,6 +9267,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch.object(research_desk, 'headlines', return_value=[]))
         self.enterContext(patch.object(research_desk, 'macro', return_value=[]))
         self.enterContext(patch.object(research_desk, 'benchmark', return_value=None))
+        self.enterContext(patch('apps.investments.services.research_sources.prediction_markets', return_value=[
+            {'text': 'Polymarket bettors price "Will Synthetic Co beat estimates?" at 60% for Yes (US$1,000 traded, resolves 2099-01-01). '
+                     'Betting odds, not a forecast.', 'url': 'https://polymarket.com/event/synthetic-co'}]))
         self.browser.get(self.live_server_url + '/investments/')
         self.wait.until(lambda _: 'Not researched yet' in self.text('researchDeskStatus'))
         self.memory_click('#researchDeskRun')
@@ -9280,6 +9283,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Portfolio manager', card.text)
         self.assertIn('Not for you yet', card.text)  # the personal answer leads, not the general research call
         self.assertIn('Strongest reason against', card.text)
+        self.assertIn('Betting markets (Polymarket; what bettors price, not a forecast, not scored)', card.text)
         self.assertIn('Fits you? Not now. Your bank balances cover about', card.text)  # the scenario's own records
         self.capture('research-desk-suggestion')
         self.memory_click('[data-desk-profile]')  # the owner answers the two questions only when asked
@@ -9311,6 +9315,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#researchDeskIdeas')
         self.wait.until(lambda _: 'each week' in self.text('researchDeskFeedback'))
         self.assertTrue(research_desk.desk_settings(owner)['discover'])
+        Select(self.browser.find_element(self.By.ID, 'researchDeskRounds')).select_by_value('2')
+        self.wait.until(lambda _: 'New debates now run 2 bull and bear rounds.' in self.text('researchDeskFeedback'))
+        self.assertEqual(research_desk.desk_settings(owner)['debate_rounds'], 2)
         self.assertTrue(self.browser.find_element(self.By.ID, 'researchDeskReport').get_attribute('href').endswith('/investments/research-report/'))
         self.browser.set_window_size(390, 900)
         try:

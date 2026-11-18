@@ -293,7 +293,10 @@
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskHoldings">
             <label class="form-check-label small" for="researchDeskHoldings">Also research the shares I own that are recorded by exchange symbol (for example INFY.NS). Only the symbols go to Yahoo Finance; amounts stay on this PC.</label></div>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskAi">
-            <label class="form-check-label small" for="researchDeskAi">Let my local AI debate each call (bull, bear, manager, trader, risk team) and decide the rating. It runs on this PC only; the fixed rules' call shows until it finishes and stays visible for comparison.</label></div>
+            <label class="form-check-label small" for="researchDeskAi">Let my local AI debate each call (bull, bear, manager, trader and three risk analysts) and decide the rating. It runs on this PC only; the fixed rules' call shows until it finishes and stays visible for comparison. After a call settles, it also writes what the call taught.</label></div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-1 ms-4"><label class="form-label small mb-0" for="researchDeskRounds">Bull and bear rounds per debate</label>
+            <select class="form-select form-select-sm w-auto" id="researchDeskRounds"><option value="1">1 (quickest)</option><option value="2">2</option><option value="3">3 (most thorough)</option></select>
+            <span class="small muted">Each extra round adds two answers from your local model; applies to new debates.</span></div>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskIdeas">
             <label class="form-check-label small" for="researchDeskIdeas">Each week, also look for ideas among NIFTY 50 companies that are not on my list (NSE's public list; banks and lenders left out). Up to five Buy calls appear above, marked as ideas.</label></div>
         <p class="small mt-1 mb-0"><button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="researchDeskIdeasRun">Look for ideas now</button>
@@ -392,5 +395,5 @@
 {% block extra_js %}
 <script src="/static/js/investments.js?v=2.20.3"></script>
 <script src="/static/js/research_history.js?v=1"></script>
-<script src="/static/js/research_desk.js?v=6"></script>
+<script src="/static/js/research_desk.js?v=7"></script>
 {% endblock %}

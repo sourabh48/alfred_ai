@@ -61,6 +61,8 @@ window.ResearchDesk = (() => {
                 <p class="small mt-2 mb-1">RSI ${e(ind.rsi14 ?? "n/a")} · 50-day average ${e(ind.sma50 ?? "n/a")} · 200-day average ${e(ind.sma200 ?? "n/a")} · MACD histogram ${e(ind.macd_histogram ?? "n/a")}. ${e(s.valuation)}</p>
                 <div class="row g-2">${list(s.good, "Good signs")}${list(s.bad, "Warning signs")}</div>
                 ${(s.macro || []).length ? `<p class="small mb-2"><span class="fw-semibold">Economy (context only, not scored):</span> ${s.macro.map(e).join(" ")}</p>` : ""}
+                ${(s.odds || []).length ? `<div class="small mb-2"><span class="fw-semibold">Betting markets (Polymarket; what bettors price, not a forecast, not scored):</span><ul class="mb-0">${s.odds.map(o =>
+                    `<li>${o.url ? `<a href="${e(o.url)}" target="_blank" rel="noopener noreferrer">${e(o.text)}</a>` : e(o.text)}</li>`).join("")}</ul></div>` : ""}
                 ${(s.context || []).length ? `<div class="small mb-2"><span class="fw-semibold">Company filings and earnings (not scored):</span><ul class="mb-0">${s.context.map(c =>
                     `<li>${c.url ? `<a href="${e(c.url)}" target="_blank" rel="noopener noreferrer">${e(c.text)}</a>` : e(c.text)}</li>`).join("")}</ul></div>` : ""}
                 ${news}
@@ -75,7 +77,7 @@ window.ResearchDesk = (() => {
 
     function decidedBy(s) {
         const rules = (s.held ? HELD_RULE_LABEL : RULE_LABEL)[s.rules_rating || s.rating];
-        if (s.debate?.status === "decided") return `<li><span class="fw-semibold">Decided by:</span> your local AI after a bull, bear, manager, trader and risk debate; the fixed rules said ${e(rules)}.${s.debate.dropped ? ` ${e(s.debate.dropped)} sentence(s) with numbers not in the evidence were dropped.` : ""}</li>`;
+        if (s.debate?.status === "decided") return `<li><span class="fw-semibold">Decided by:</span> your local AI after a bull and bear debate (${e(s.debate.rounds || 1)} round${(s.debate.rounds || 1) > 1 ? "s" : ""}), a research manager, a trader and three risk analysts (aggressive, conservative, neutral); the fixed rules said ${e(rules)}.${s.debate.dropped ? ` ${e(s.debate.dropped)} sentence(s) with numbers not in the evidence were dropped.` : ""}</li>`;
         if (s.debate?.status === "failed") return `<li><span class="fw-semibold">Decided by:</span> the fixed rules. ${e(s.debate.detail)}</li>`;
         return state?.settings.ai_decides ? `<li><span class="fw-semibold">Decided by:</span> the fixed rules for now; your local AI debates this call in the background within a few minutes.</li>` : "";
     }
@@ -150,6 +152,7 @@ window.ResearchDesk = (() => {
         backtest(data.backtest);
         paper(data.paper);
         $("researchDeskAi").checked = data.settings.ai_decides;
+        $("researchDeskRounds").value = String(data.settings.debate_rounds || 1);
         $("researchDeskWatch").innerHTML = data.settings.watch.map(item => `<span class="badge text-bg-light border me-1 mb-1">${e(item.symbol)}
             <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-desk-remove="${e(item.symbol)}" aria-label="Remove ${e(item.symbol)} from the watch list">×</button></span>`).join("")
             || '<span class="small muted">Empty. Add a symbol below.</span>';
@@ -218,6 +221,8 @@ window.ResearchDesk = (() => {
         });
         $("researchDeskAi").addEventListener("change", event => act({ operation: "ai_decides", enabled: event.currentTarget.checked }, null,
             s => s.ai_decides ? "Your local AI now debates and decides each call." : "The fixed rules decide each call; the AI debate is off."));
+        $("researchDeskRounds").addEventListener("change", event => act({ operation: "debate_rounds", rounds: Number(event.currentTarget.value) }, null,
+            s => `New debates now run ${s.debate_rounds} bull and bear round${s.debate_rounds > 1 ? "s" : ""}.`));
         $("researchDeskPaperForm").addEventListener("submit", event => {
             event.preventDefault();
             act({ operation: "paper_open", cash: $("researchDeskPaperCash").value }, event.submitter, () => "Paper account ready. Tick the paper trade box when you accept a call.");
