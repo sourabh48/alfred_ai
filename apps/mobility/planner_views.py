@@ -424,12 +424,13 @@ class TravelProviderUsage(APIView):
     def get(self, request):
         from .services.travel.providers.geocoding import GooglePlaceSearch
         from .services.travel.providers.weather import GoogleWeather
-        from .services.travel.providers.routing import GoogleRoutes
+        from .services.travel.providers.routing import GoogleRoutes, GoogleTransit
+        from .services.travel.providers.holidays import NagerHolidays
         from .services.travel.providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
         from .services.travel.providers.photos import GooglePlacePhoto
         from .services.travel.providers.transport import IndianRailProvider, SkyscannerFlights
         providers = [GooglePlaceSearch(),GoogleWeather(),GoogleRoutes(),GooglePlacesNearby(),GoogleLodging(),GoogleDestinations(),
-                     SkyscannerFlights(),IndianRailProvider(),GooglePlacePhoto()]
+                     SkyscannerFlights(),IndianRailProvider(),GooglePlacePhoto(),GoogleTransit(),NagerHolidays()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 

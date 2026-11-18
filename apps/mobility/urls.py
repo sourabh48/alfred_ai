@@ -29,6 +29,8 @@ from .views import (
     TripPhotoListCreateView,
     TripVideoDetailView,
     TripVideoListCreateView,
+    TripToolsView,
+    TravelLookupView,
 )
 
 urlpatterns = [
@@ -62,6 +64,8 @@ urlpatterns = [
     path("travel-advisor/preview/", TravelAdvisorPreviewView.as_view(), name="travel_advisor_preview"),
     path("travel-plans/", TravelPlanListCreateView.as_view(), name="travel_plan_list"),
     path("travel-plans/<int:pk>/", TravelPlanDetailView.as_view(), name="travel_plan_detail"),
+    path("travel-lookup/", TravelLookupView.as_view(), name="travel_lookup"),
+    path("travel-plans/<int:pk>/tools/", TripToolsView.as_view(), name="trip_tools"),
     path("trip-logs/", TripLogListCreateView.as_view(), name="trip_log_list"),
     path("trip-logs/<int:pk>/", TripLogDetailView.as_view(), name="trip_log_detail"),
     path("trip-photos/", TripPhotoListCreateView.as_view(), name="trip_photo_list"),

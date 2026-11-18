@@ -5308,6 +5308,43 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('travelPlanList').scrollIntoView({block:'start',behavior:'instant'})")
         self.run_axe_light_dark('travel-plan-board-cards')
 
+    def test_trip_tools_bookings_recorded_ride_and_holidays(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from apps.mobility.models import TravelPlan
+        from apps.mobility.services.travel.providers import holidays
+        from tests.test_trip_tools import gpx
+        TravelPlan.objects.create(user=self.scenario['user'], title='Synthetic Delhi trip', destination='Delhi',
+                                  itinerary={'route': {'distance_km_total': 2.0}})
+        replies = {'AvailableCountries': [{'countryCode': 'US'}],
+                   'PublicHolidays': [{'date': '2026-07-03', 'localName': 'Independence Day', 'name': 'Independence Day', 'global': True}],
+                   'LongWeekend': [{'startDate': '2026-07-03', 'endDate': '2026-07-05', 'dayCount': 3, 'bridgeDays': []}]}
+        self.enterContext(patch.object(holidays, 'request_json', side_effect=lambda method, url, **kw: (next(v for k, v in replies.items() if k in url), 'h')))
+        self.login(); self.browser.get(self.live_server_url + '/mobility/')
+        self.browser.execute_script("document.getElementById('tripBookingsTool').open = true")
+        self.wait.until(lambda _: 'No bookings recorded' in self.text('tripBookingsList'))
+        self.browser.find_element(self.By.ID, 'tripBookingTitle').send_keys('AI 864 Pune to Delhi <b>x</b>')
+        self.browser.find_element(self.By.ID, 'tripBookingCode').send_keys('QX7P2L')
+        self.memory_click('#tripBookingForm button[type=submit]')
+        self.wait.until(lambda _: 'Booking saved.' in self.text('tripToolsFeedback'))
+        self.assertIn('AI 864 Pune to Delhi <b>x</b>', self.text('tripBookingsList'))  # shown as text
+        self.browser.execute_script("document.getElementById('tripRideTool').open = true")
+        folder = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (folder / 'ride.gpx').write_bytes(gpx([(18.5, 73.8 + i * 0.001, 500 + i) for i in range(30)]))
+        self.browser.find_element(self.By.ID, 'tripRideFile').send_keys(str(folder / 'ride.gpx'))
+        self.wait.until(lambda _: 'Ride loaded.' in self.text('tripToolsFeedback'))
+        self.assertIn('longer', self.text('tripRideBody'))
+        self.assertTrue(self.browser.find_elements(self.By.ID, 'tripRideChart'))
+        self.browser.execute_script("document.getElementById('tripHolidaysTool').open = true")
+        self.browser.find_element(self.By.ID, 'tripHolidaysCountry').send_keys('US')
+        self.memory_click('#tripHolidaysForm button[type=submit]')
+        self.wait.until(lambda _: 'Independence Day' in self.text('tripHolidaysBody'))
+        self.assertIn('with no leave needed', self.text('tripHolidaysBody'))
+        self.browser.execute_script("document.getElementById('tripToolsSection').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('trip-tools')
+        self.run_axe_light_dark('trip-tools')
+
     def test_online_services_are_switched_on_from_settings_without_editing_files(self):
         from alfred_ai.services import online_services
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-online-browser-synthetic-')))

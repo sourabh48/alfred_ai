@@ -1050,3 +1050,80 @@ class BikeServiceDashboardView(APIView):
             "bike_conditions": BikeConditionSnapshotSerializer(conditions, many=True, context={"request": request}).data,
             "travel_plans": TravelPlanSerializer(travel_plans, many=True, context={"request": request}).data,
         }
+
+
+class TripToolsView(APIView):
+    """Bookings, a recorded ride and imported places for one of the owner's trips (owner approval 2026-11-18)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    def _plan(self, request, pk):
+        return TravelPlan.objects.filter(user=request.user, pk=pk).first()
+
+    def _reply(self, payload, code=status.HTTP_200_OK):
+        response = Response(payload, status=code)
+        response["Cache-Control"] = "no-store, private"
+        return response
+
+    def get(self, request, pk):
+        from .services.travel import trip_tools
+        plan = self._plan(request, pk)
+        if plan is None:
+            return self._reply({"detail": "Trip not found."}, status.HTTP_404_NOT_FOUND)
+        return self._reply(trip_tools.state(request.user, plan))
+
+    def post(self, request, pk):
+        from alfred_ai.services.upload_limits import UploadLimitExceeded, read_upload_bytes
+        from .services.travel import trip_tools
+        plan = self._plan(request, pk)
+        if plan is None:
+            return self._reply({"detail": "Trip not found."}, status.HTTP_404_NOT_FOUND)
+        data, upload = request.data, request.FILES.get("file")
+        operation, result = data.get("operation"), None
+        try:
+            raw = read_upload_bytes(upload) if upload else None
+            if operation == "booking_add":
+                trip_tools.add_booking(request.user, plan, data.get("booking"))
+            elif operation == "booking_remove":
+                trip_tools.remove_booking(request.user, plan, data.get("id"))
+            elif operation == "booking_read":
+                text = data.get("text") or ""
+                if raw is not None:
+                    from alfred_ai.services.document_extraction import extract_document_text
+                    text = extract_document_text(raw, upload.name).text or ""
+                result = trip_tools.read_confirmation(text)
+            elif operation == "ride" and raw is not None:
+                trip_tools.save_ride(request.user, plan, raw, upload.name)
+            elif operation == "places" and raw is not None:
+                result = trip_tools.import_places(request.user, plan, raw, upload.name)
+            elif operation == "place_remove":
+                trip_tools.remove_place(request.user, plan, data.get("id"))
+            else:
+                return self._reply({"detail": "Unknown trip tool, or the file is missing."}, status.HTTP_400_BAD_REQUEST)
+        except UploadLimitExceeded:
+            return self._reply({"detail": "That file is larger than the upload limit."}, status.HTTP_400_BAD_REQUEST)
+        except ValueError as exc:
+            return self._reply({"detail": str(exc)}, status.HTTP_400_BAD_REQUEST)
+        return self._reply({"result": result, **trip_tools.state(request.user, plan)})
+
+
+class TravelLookupView(APIView):
+    """Public transport (Google) and public holidays (Nager.Date) lookups; nothing is stored (owner approval 2026-11-18)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        from .services.travel import trip_tools
+        data = request.data if isinstance(request.data, dict) else {}
+        try:
+            if data.get("operation") == "transit":
+                result = trip_tools.transit(data.get("origin"), data.get("destination"), data.get("departure") or "")
+            elif data.get("operation") == "holidays":
+                result = trip_tools.holidays(data.get("country") or "", data.get("year"))
+            else:
+                return Response({"detail": "Unknown lookup."}, status=status.HTTP_400_BAD_REQUEST)
+        except (ValueError, TypeError) as exc:
+            return Response({"detail": str(exc) if isinstance(exc, ValueError) else "Check the year."}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response(result)
+        response["Cache-Control"] = "no-store, private"
+        return response

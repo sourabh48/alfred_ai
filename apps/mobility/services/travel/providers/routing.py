@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from hashlib import sha256
 import json
 import os
@@ -78,3 +79,70 @@ class GoogleRoutes(Provider):
 
 def routing_chain(mode):
     return [GoogleRoutes()]
+
+
+class GoogleTransit(Provider):
+    """Public transport door to door from the Google Routes API, TRANSIT mode (owner approval 2026-11-18).
+
+    Lines, stops, times and Google's fare estimate when it has one. The owner's two addresses go to Google; nothing else.
+    """
+    name = "google_transit"
+    category = "transit"
+    source_url = "https://www.google.com/maps"
+    attribution = "Powered by Google"
+    ttl = timedelta(minutes=30)  # timetables change; Google limits storing its content
+    limits = {"minute": 5, "hour": 30, "day": 100, "month": 1500}
+    allowed_parameters = {"origin", "destination", "departure"}
+    FIELDS = ("routes.duration,routes.distanceMeters,routes.travelAdvisory.transitFare,routes.legs.steps.travelMode,"
+              "routes.legs.steps.staticDuration,routes.legs.steps.distanceMeters,routes.legs.steps.transitDetails,"
+              "routes.legs.steps.navigationInstruction.instructions")
+
+    def unavailable_reason(self):
+        return "" if os.getenv(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
+
+    def fetch(self, p):
+        body = {"origin": {"address": str(p["origin"])[:200]}, "destination": {"address": str(p["destination"])[:200]},
+                "travelMode": "TRANSIT", "computeAlternativeRoutes": True}
+        if p.get("departure"):
+            body["departureTime"] = p["departure"]
+        return request_json("POST", "https://routes.googleapis.com/directions/v2:computeRoutes", json=body,
+            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY], "X-Goog-FieldMask": self.FIELDS, "Content-Type": "application/json"})
+
+    @staticmethod
+    def _minutes(value):
+        value = str(value or "")
+        return round(number(value[:-1], low=0) / 60) if value.endswith("s") else None
+
+    def normalize(self, raw, p):
+        routes = []
+        for item in (raw.get("routes") or [])[:3]:
+            steps = []
+            for step in (s for leg in item.get("legs") or [] for s in leg.get("steps") or []):
+                transit = step.get("transitDetails") or {}
+                if transit:
+                    line, stops = transit.get("transitLine") or {}, transit.get("stopDetails") or {}
+                    steps.append({"mode": "TRANSIT", "line": str(line.get("nameShort") or line.get("name") or "")[:80],
+                        "vehicle": str(((line.get("vehicle") or {}).get("name") or {}).get("text") or "")[:40],
+                        "agency": str(((line.get("agencies") or [{}])[0]).get("name") or "")[:80],
+                        "headsign": str(transit.get("headsign") or "")[:80],
+                        "from": str((stops.get("departureStop") or {}).get("name") or "")[:120],
+                        "to": str((stops.get("arrivalStop") or {}).get("name") or "")[:120],
+                        "depart": str(stops.get("departureTime") or "")[:30], "arrive": str(stops.get("arrivalTime") or "")[:30],
+                        "stops": int(transit.get("stopCount") or 0), "minutes": self._minutes(step.get("staticDuration"))})
+                elif steps and steps[-1]["mode"] == "WALK":
+                    steps[-1]["minutes"] = (steps[-1]["minutes"] or 0) + (self._minutes(step.get("staticDuration")) or 0)
+                else:
+                    steps.append({"mode": "WALK", "minutes": self._minutes(step.get("staticDuration")),
+                                  "note": str((step.get("navigationInstruction") or {}).get("instructions") or "")[:160]})
+            fare = (item.get("travelAdvisory") or {}).get("transitFare") or {}
+            fare_text = None
+            if fare.get("currencyCode"):
+                amount = Decimal(str(fare.get("units") or 0)) + Decimal(int(fare.get("nanos") or 0)) / Decimal(10 ** 9)
+                fare_text = {"amount": str(amount.quantize(Decimal("0.01"))), "currency": str(fare["currencyCode"])[:3]}
+            if not any(s["mode"] == "TRANSIT" for s in steps):
+                continue  # walking only is not a public-transport answer
+            routes.append({"minutes": self._minutes(item.get("duration")), "distance_km": round(number(item.get("distanceMeters") or 0, low=0) / 1000, 1),
+                           "fare": fare_text, "steps": steps[:30]})
+        if not routes:
+            raise ProviderError("no_route")
+        return {"routes": routes, "note": "Google's timetable and fare estimate. Check the operator before you travel."}
