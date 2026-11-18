@@ -625,6 +625,48 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
         self.assertEqual(errors, [])
 
+    def test_conversation_cards_open_delete_and_the_chat_survives_other_pages_until_the_window_closes(self):
+        from apps.mobility.models import TravelPlanningSession
+        from apps.mobility.services.travel_conversation import new_session, save_plan, send_message
+        old = send_message(new_session(self.user).id, self.user, "Somewhere cool")
+        save_plan(old, draft=True); old.refresh_from_db()
+        def kept(): return int(self.browser.execute_script("return sessionStorage.getItem('alfredTravelSession')") or 0)
+        def loaded(): self.wait.until(lambda _: 'destination is optional' in self.text('plannerMessages') and self.text('plannerPlans').strip() and self.pending == 0)
+        self.browser.execute_script("sessionStorage.clear()")
+        self.browser.get(self.live_server_url+"/mobility/"); loaded()
+        fresh = kept()
+        self.assertNotIn(fresh, (0, old.pk))  # A new window starts a fresh chat, not the last one (owner, 2026-11-19).
+        self.assertNotIn("Somewhere cool", self.text("plannerMessages"))
+        self.assertTrue(self.browser.find_element(self.By.ID, "planDetails").get_attribute("hidden"))
+        self.assertIn(old.title, self.text("plannerPlans"))
+        self.click("#travelPlanner details:has(#plannerSessions) > summary")
+        self.click(f'#plannerSessions [data-session="{old.pk}"]')
+        self.wait.until(lambda _: "Somewhere cool" in self.text("plannerMessages") and self.pending == 0)
+        self.assertEqual(self.browser.execute_script("return [...document.querySelectorAll('#plannerSessions [data-open-now]:not([hidden])')].map(e=>e.closest('article').querySelector('[data-session]').dataset.session)"), [str(old.pk)])
+        self.browser.get(self.live_server_url+"/settings/diagnostics/")
+        self.browser.get(self.live_server_url+"/mobility/")  # Another ALFRED page and back keeps the chat.
+        self.wait.until(lambda _: "Somewhere cool" in self.text("plannerMessages") and self.pending == 0)
+        self.assertEqual(kept(), old.pk)
+        self.browser.execute_script("sessionStorage.clear()")  # As when the window closes.
+        self.browser.get(self.live_server_url+"/mobility/"); loaded()
+        self.assertEqual(kept(), fresh)  # The untouched chat is reused, not piled up.
+        self.assertEqual(TravelPlanningSession.objects.filter(user=self.user).count(), 2)
+        self.click("#travelPlanner details:has(#plannerSessions) > summary")
+        self.browser.execute_script("document.getElementById('plannerSessions').scrollIntoView({block:'center',behavior:'instant'})")
+        self.browser.save_screenshot(str(self.artifacts/"conversation-cards-desktop.png"))
+        self.click(f'[data-delete-session="{old.pk}"]')
+        dialog = self.browser.switch_to.alert
+        self.assertIn("a plan you saved from it stays", dialog.text); dialog.accept()
+        self.wait.until(lambda _: not self.browser.find_elements(self.By.CSS_SELECTOR, f'[data-delete-session="{old.pk}"]') and self.pending == 0)
+        self.assertFalse(TravelPlanningSession.objects.filter(pk=old.pk).exists())
+        self.assertTrue(TravelPlan.objects.filter(pk=old.plan_id, user=self.user).exists())
+        self.assertIn(old.title, self.text("plannerPlans"))
+        self.assertEqual(kept(), fresh)
+        self.browser.set_window_size(390, 1000)
+        self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+        errors = [x for x in self.browser.get_log("browser") if x["level"] == "SEVERE" and ("TypeError" in x["message"] or "SyntaxError" in x["message"])]
+        self.assertEqual(errors, [])
+
     def test_health_run_all_bots_and_one_confirm_files_a_spend(self):
         from apps.expenses.models import Expense
         for days in (40, 50):

@@ -174,6 +174,11 @@ class TravelSessionList(PrivateTravelSessionAPI):
                 if plan.start_date and 0 <= (plan.start_date-timezone.localdate()).days <= 15 and run and run.evidence.filter(valid_until__lt=timezone.now()).exists():
                     queue_research(existing, recheck=True)
                 return Response(session_payload(existing))
+        else:
+            # A fresh window reuses an untouched chat instead of piling up empty conversations.
+            blank = TravelPlanningSession.objects.filter(user=request.user, plan=None).exclude(messages__role="user").first()
+            if blank:
+                return Response(session_payload(blank))
         return Response(session_payload(new_session(request.user, plan)), status=201)
 
 
@@ -228,6 +233,14 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
     def get(self, request, pk):
         session = get_object_or_404(TravelPlanningSession, pk=pk, user=request.user)
         return Response(session_payload(session))
+
+    @transaction.atomic
+    def delete(self, request, pk):
+        session = get_object_or_404(TravelPlanningSession.objects.select_for_update(), pk=pk, user=request.user)
+        if session.research_runs.exclude(status__in=TERMINAL).filter(lease_until__gt=timezone.now()).exists():
+            return Response({"detail": "Research is still running for this conversation. Delete it once it finishes."}, status=409)
+        session.delete()  # A saved plan stays: the link to it is SET_NULL.
+        return Response(status=204)
 
     @transaction.atomic
     def post(self, request, pk):

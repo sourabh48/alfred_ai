@@ -91,11 +91,26 @@ window.TravelPlanner = (() => {
     function sourceMarkup(sources) {
         return (sources || []).map(s => `<div class="travel-source"><strong>${esc(s.data_type)} · ${esc(s.confidence)}${s.stale || (s.valid_until && new Date(s.valid_until) <= new Date()) ? " · STALE" : ""}</strong><div>${esc(s.finding?.summary || s.finding?.assumptions?.join(" ") || "Planning allowance")}</div><div>${link(s.source_url, s.source_name)} · ${s.retrieved_at ? `Checked ${esc(new Date(s.retrieved_at).toLocaleString())}` : "Not live-verified"}</div>${(s.finding?.reports || []).map(r=>`<p>${link(r.link,r.title)}<br>${esc(r.source)} · ${esc(r.published)}</p>`).join("")}</div>`).join("") || "No live evidence yet. Research is pending.";
     }
+    // The tab keeps its chat across reloads and other ALFRED pages; closing the window ends it, so a new window starts fresh.
+    function remember(id) {
+        history.replaceState(null, "", `?session=${id}`);
+        try { sessionStorage.setItem("alfredTravelSession", String(id)); } catch (_) {}
+    }
+    function remembered() {
+        try { return Number(sessionStorage.getItem("alfredTravelSession")) || 0; } catch (_) { return 0; }
+    }
+    const card = (body, buttons) => `<article class="travel-saved-card">${body}<div class="travel-saved-actions">${buttons}</div></article>`;
+    function markCurrent() {
+        document.querySelectorAll("#plannerSessions [data-open-now]").forEach(e => e.hidden = e.closest(".travel-saved-card").querySelector("[data-session]").dataset.session !== String(state.session?.id));
+    }
     async function list() {
         const data = await fetchPlanner(api+"sessions/");
         state.plans = data.plans;
-        Alfred.setHTMLIfChanged("plannerPlans", data.plans.map(p=>`<button class="btn btn-sm btn-outline-primary" data-open-plan="${p.id}"><span class="travel-saved-status">${esc(p.status_label)}</span><strong class="d-block">${esc(p.title)}</strong><span class="small">${money(p.budget)} · ${p.duration_days || "Flexible"} days</span></button>`).join("") || '<p class="small">Save a draft whenever you like. No destination required.</p>');
-        Alfred.setHTMLIfChanged("plannerSessions", data.sessions.map(s => `<button class="btn btn-sm btn-outline-primary" data-session="${s.id}">${esc(s.title)}<span class="d-block small">${esc(s.status.replaceAll("_", " "))}</span></button>`).join("") || "No conversations yet.");
+        Alfred.setHTMLIfChanged("plannerPlans", data.plans.map(p=>card(`<span class="travel-saved-status">${esc(p.status_label)}</span><strong class="d-block">${esc(p.title)}</strong><span class="small">${money(p.budget)} · ${p.duration_days || "Flexible"} days</span>`,
+            `<button type="button" class="btn btn-sm btn-outline-primary" data-open-plan="${p.id}" aria-label="Open ${esc(p.title)}">Open</button>`)).join("") || '<p class="small">Save a draft whenever you like. No destination required.</p>');
+        Alfred.setHTMLIfChanged("plannerSessions", data.sessions.map(s => card(`<span class="travel-saved-status" data-open-now hidden>Open now</span><strong class="d-block">${esc(s.title)}</strong><span class="small">${esc(s.status.replaceAll("_", " "))} · ${esc(new Date(s.updated_at).toLocaleDateString())}${s.plan_id ? " · saved plan" : ""}</span>`,
+            `<button type="button" class="btn btn-sm btn-outline-primary" data-session="${s.id}" aria-label="Open ${esc(s.title)}">Open</button><button type="button" class="btn btn-sm btn-outline-danger" data-delete-session="${s.id}" aria-label="Delete conversation ${esc(s.title)}">Delete</button>`)).join("") || "No conversations yet.");
+        markCurrent();
         syncActionState();
         return data;
     }
@@ -107,7 +122,7 @@ window.TravelPlanner = (() => {
         const next = await fetchPlanner(api+`sessions/${id}/`);
         if (!documentActive || epoch!==documentEpoch) return false;
         state.session = next;
-        history.replaceState(null, "", `?session=${state.session.id}`);
+        remember(state.session.id);
         state.comparison = false;
         render();
         window.TravelSuggestions.load(state.session.id);
@@ -120,7 +135,7 @@ window.TravelPlanner = (() => {
         const data = await fetchPlanner(api+"sessions/", {method:"POST", body:JSON.stringify(planId ? {plan_id: planId} : {})});
         if (!documentActive || epoch!==documentEpoch) return;
         state.session = data;
-        history.replaceState(null, "", `?session=${data.id}`);
+        remember(data.id);
         state.comparison = false;
         render();
         window.TravelSuggestions.load(data.id);
@@ -210,6 +225,7 @@ window.TravelPlanner = (() => {
     }
     function render() {
         const session = state.session;
+        markCurrent();
         $("plannerTitle").textContent = session.title;
         const messages = $("plannerMessages");
         const oldLast = messages.dataset.last;
@@ -345,6 +361,11 @@ window.TravelPlanner = (() => {
                 if (button.id==='plannerPrepareICS')await prepareCalendar();
                 if (button.id==='plannerExportICS')await exportItinerary('ics');
                 if (button.dataset.session) await open(Number(button.dataset.session));
+                if (button.dataset.deleteSession && !state.busy && confirm("Delete this conversation? Its messages go; a plan you saved from it stays under Your Plans.")) {
+                    const id = Number(button.dataset.deleteSession);
+                    await fetchPlanner(api+`sessions/${id}/`, {method: "DELETE"});
+                    if (state.session?.id === id) await create(); else await list();
+                }
                 if (button.dataset.openPlan) await create(Number(button.dataset.openPlan));
                 if (button.dataset.reject) await action({action:"reject",destination:button.dataset.reject});
                 if (button.hasAttribute('data-trip-document-list')) await action({action:'trip_documents',operation:'list'});
@@ -371,7 +392,8 @@ window.TravelPlanner = (() => {
         });
         try {
             const data = await list();
-            const id = Number(new URLSearchParams(location.search).get("session")) || data.sessions[0]?.id;
+            const kept = remembered();
+            const id = Number(new URLSearchParams(location.search).get("session")) || (data.sessions.some(s => s.id === kept) ? kept : 0);
             if (id) await open(id); else await create();
             const [profiles,prefs] = await Promise.all([fetchPlanner("/api/mobility/bikes/"), fetchPlanner(api+"preferences/")]);
             $("plannerVehicle").innerHTML = '<option value="">Choose when relevant</option>'+(profiles.results || profiles).map(p=>`<option value="${p.id}">${esc(p.display_name)}</option>`).join("");

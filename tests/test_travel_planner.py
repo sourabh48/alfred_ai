@@ -332,6 +332,30 @@ class TravelPlannerTests(TestCase):
         self.assertEqual(self.post(url,{"action":"save","draft":True}).status_code,404)
         self.assertEqual(self.client.get("/api/mobility/planner/sessions/").json()["sessions"],[])
 
+    def test_old_conversation_deletes_but_its_saved_plan_stays_and_fresh_windows_reuse_an_untouched_chat(self):
+        s=self.ready();save_plan(s,draft=True)
+        s.refresh_from_db();plan_id=s.plan_id;self.assertTrue(plan_id)
+        url=f"/api/mobility/planner/sessions/{s.id}/"
+        run=s.research_runs.first()
+        TravelResearchSession.objects.filter(pk=run.pk).update(status="weather",lease_until=timezone.now()+timedelta(minutes=2))
+        self.assertEqual(self.client.delete(url).status_code,409)
+        TravelResearchSession.objects.filter(pk=run.pk).update(status="queued",lease_until=None)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.delete(url).status_code,404)
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.delete(url).status_code,204)
+        self.assertFalse(TravelPlanningSession.objects.filter(pk=s.pk).exists())
+        self.assertFalse(TravelResearchSession.objects.filter(pk=run.pk).exists())
+        self.assertTrue(TravelPlan.objects.filter(pk=plan_id,user=self.user).exists())
+        first=self.post("/api/mobility/planner/sessions/",{})
+        self.assertEqual(first.status_code,201)
+        again=self.post("/api/mobility/planner/sessions/",{})
+        self.assertEqual((again.status_code,again.json()["id"]),(200,first.json()["id"]))
+        send_message(first.json()["id"],self.user,"Somewhere cool")
+        self.assertNotEqual(self.post("/api/mobility/planner/sessions/",{}).json()["id"],first.json()["id"])
+        reopened=self.post("/api/mobility/planner/sessions/",{"plan_id":plan_id})
+        self.assertEqual(reopened.json()["plan_id"],plan_id)
+
     def test_post_trip_feedback_and_preference_reset(self):
         plan=TravelPlan.objects.create(user=self.user,title="Past trip",destination="Coorg",start_date=self.today-timedelta(days=5),end_date=self.today-timedelta(days=2),status="completed")
         r=self.post("/api/mobility/planner/feedback/",{"plan_id":plan.id,"rating":"loved","liked":["photography"]})
