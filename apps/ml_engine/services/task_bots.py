@@ -416,6 +416,11 @@ def daily_review(user, today):
     return items
 
 
+def research_desk(user, today):
+    from apps.investments.services.research_desk import notices
+    return notices(user, today)
+
+
 def research_watch(user, today):
     from apps.investments.services.research_searches import review_recent
     return review_recent(user, today)
@@ -423,6 +428,7 @@ def research_watch(user, today):
 
 BOTS = {
     "research_watch": ("Stock research", 1, research_watch, "Refresh up to three recent stock searches daily; never trade."),
+    "research_desk": ("Research desk", 1, research_desk, "New or changed buy, keep or sell calls from the daily research; never trades."),
     "money_review": ("Weekly money review", 7, money_review, "Last 7 days of spending against the week before."),
     "bills_due": ("Bills and EMIs due", 1, bills_due, "Loan instalments due in the next 7 days."),
     "fund_review": ("Fund review", 1, fund_review, "Owned funds that dropped from their recent high (AMFI prices)."),

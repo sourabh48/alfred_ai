@@ -9224,7 +9224,32 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.execute_script(
             "return Object.values(Chart.instances).filter(c => c.canvas.closest('[data-desk-card]')).length") == 2)
         self.assertIn('Portfolio manager', card.text)
+        self.assertIn('Investment candidate', card.text)
+        self.assertIn('Strongest reason against', card.text)
+        self.assertIn('Fits you? Not now. Your bank balances cover about', card.text)  # the scenario's own records
         self.capture('research-desk-suggestion')
+        self.memory_click('[data-desk-profile]')  # the owner answers the two questions only when asked
+        self.assertTrue(self.browser.execute_script("return document.getElementById('researchDeskProfile').open && document.activeElement.id === 'researchDeskLoss'"))
+        from selenium.webdriver.support.ui import Select
+        Select(self.browser.find_element(self.By.ID, 'researchDeskLoss')).select_by_value('high')
+        Select(self.browser.find_element(self.By.ID, 'researchDeskHorizon')).select_by_value('over_5')
+        self.memory_click('#researchDeskProfileForm button[type=submit]')
+        self.wait.until(lambda _: 'Answers saved' in self.text('researchDeskFeedback'))
+        self.assertEqual(research_desk.desk_settings(owner)['profile'], {'loss': 'high', 'horizon': 'over_5'})
+        self.assertEqual(Select(self.browser.find_element(self.By.ID, 'researchDeskLoss')).first_selected_option.get_attribute('value'), 'high')
+        self.memory_click('#researchDeskMonitor')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'researchDeskMonitor').text == 'Resume daily research')
+        self.assertIn('paused', self.text('researchDeskStatus'))
+        self.assertFalse(research_desk.desk_settings(owner)['enabled'])
+        self.memory_click('#researchDeskMonitor')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'researchDeskMonitor').text == 'Pause daily research')
+        self.browser.set_window_size(390, 900)
+        try:
+            self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth + 1"))
+            self.capture('research-desk-phone')
+        finally:
+            self.browser.set_window_size(1440, 1200)
+        self.run_axe_light_dark('research-desk')
         self.memory_click('[data-desk-accept]')
         self.wait.until(lambda _: 'SYNTH.NS' in self.text('researchDecisionList') and 'No open suggestions' in self.text('researchDeskList'))
         decision = ResearchDecision.objects.get(user=owner)

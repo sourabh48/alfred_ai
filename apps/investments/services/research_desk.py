@@ -63,19 +63,35 @@ def listed(text) -> str | None:
 
 # ---- what to research -------------------------------------------------------------------------------------------
 
+# The owner's own answers; ALFRED never guesses them. Single shares can fall a fifth or more in a year.
+LOSS = {"low": "A fall of more than a tenth would worry me", "medium": "I can sit through a fall of about a fifth",
+        "high": "I can sit through a fall of a third or more"}
+HORIZON = {"under_3": "Within 3 years", "3_to_5": "In 3 to 5 years", "over_5": "After 5 years or more"}
+RESERVE_MONTHS, RUN_HOUR, SNOOZE_DAYS = 6, 13, 7
+
+
 def desk_settings(user) -> dict:
     saved = _records(user).filter(event_type=SETTINGS).order_by("-created_at", "-id").first()
+    current = {"watch": [{"symbol": symbol, "name": name} for symbol, name in DEFAULT_WATCH.items()], "include_holdings": False,
+               "enabled": True, "profile": {"loss": None, "horizon": None}}
     if saved:
-        return {"watch": saved.payload["watch"], "include_holdings": bool(saved.payload["include_holdings"])}
-    return {"watch": [{"symbol": symbol, "name": name} for symbol, name in DEFAULT_WATCH.items()], "include_holdings": False}
+        current.update({key: saved.payload[key] for key in current if key in saved.payload})
+        current["include_holdings"] = bool(current["include_holdings"])
+    return current
 
 
-def save_settings(user, *, watch=None, include_holdings=None) -> dict:
+def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None) -> dict:
     current = desk_settings(user)
     if watch is not None:
         current["watch"] = watch[:WATCH_LIMIT]
     if include_holdings is not None:
         current["include_holdings"] = include_holdings is True
+    if enabled is not None:
+        current["enabled"] = enabled is True
+    if profile is not None:
+        if not isinstance(profile, dict) or profile.get("loss") not in (*LOSS, None) or profile.get("horizon") not in (*HORIZON, None):
+            raise ValueError("Choose one of the listed answers, or leave it blank.")
+        current["profile"] = {"loss": profile.get("loss"), "horizon": profile.get("horizon")}
     _log(user, SETTINGS, "Research desk settings saved.", current, category="api")
     return current
 
@@ -99,7 +115,7 @@ def watch_remove(user, symbol) -> dict:
 
 
 def universe(user) -> tuple[list, list]:
-    """([(symbol, name, holding or None)], [owned shares without a symbol]): your shares (if allowed), recent searches, the watch list."""
+    """([(symbol, name, holding or None, why)], [owned shares without a symbol]): your shares (if allowed), recent searches, the watch list."""
     from apps.investments.models import Investment, ResearchSearch
 
     current, rows, unmatched = desk_settings(user), {}, []
@@ -107,14 +123,14 @@ def universe(user) -> tuple[list, list]:
         for holding in Investment.objects.filter(user=user, asset_type="equity").order_by("-current_value", "id"):
             symbol = listed(holding.asset_name)
             if symbol and holding.asset_name.strip().upper() == symbol:  # the packet's own rule for a matching holding
-                rows.setdefault(symbol, (symbol, symbol, holding))
+                rows.setdefault(symbol, (symbol, symbol, holding, "You own it."))
             else:
                 unmatched.append(holding.asset_name)
     for symbol in ResearchSearch.objects.filter(user=user).values_list("symbol", flat=True)[:10]:
         if listed(symbol):
-            rows.setdefault(symbol, (symbol, symbol, None))
+            rows.setdefault(symbol, (symbol, symbol, None, "You looked it up recently."))
     for item in current["watch"]:
-        rows.setdefault(item["symbol"], (item["symbol"], item["name"], None))
+        rows.setdefault(item["symbol"], (item["symbol"], item["name"], None, "It is on your watch list."))
     return list(rows.values())[:UNIVERSE_LIMIT], unmatched
 
 
@@ -279,12 +295,21 @@ def _fingerprint(suggestion):
 
 @transaction.atomic
 def _store(user, suggestion, today):
-    suggestion = {**suggestion, "fingerprint": _fingerprint(suggestion), "for_date": today.isoformat()}
+    suggestion = {**suggestion, "fingerprint": _fingerprint(suggestion), "for_date": today.isoformat(), "first_seen": today.isoformat()}
+    previous = _records(user).filter(payload__symbol=suggestion["symbol"]).exclude(event_type__in=(SETTINGS, RUN)) \
+        .exclude(payload__fingerprint=suggestion["fingerprint"]).order_by("-created_at", "-id").first()
+    if previous:  # what changed since the last call on this share
+        old = previous.payload
+        suggestion["changed_from"] = old["label"]
+        suggestion["change"] = (f"Changed from {old['label']} ({old['for_date']}): good signs {len(old['good'])} to {len(suggestion['good'])}, "
+                                f"warning signs {len(old['bad'])} to {len(suggestion['bad'])}"
+                                + (", with newer company results." if old.get("latest_period_end") != suggestion["latest_period_end"] else "."))
     same = None
     for record in _records(user).select_for_update().filter(event_type=PENDING, payload__symbol=suggestion["symbol"]):
         if same is None and record.payload["fingerprint"] == suggestion["fingerprint"]:
             same = record
-            record.payload = {**suggestion, "id": record.payload["id"]}  # the same call with fresher numbers
+            kept = {key: record.payload[key] for key in ("id", "snoozed_until", "changed_from", "change", "first_seen") if key in record.payload}
+            record.payload = {**suggestion, **kept}  # the same call with fresher numbers
             record.save(update_fields=["payload"])
         else:
             record.event_type = SUPERSEDED
@@ -305,7 +330,7 @@ def refresh(user, today=None) -> dict:
     bench, researched = benchmark(), 0
     skipped = [{"name": name, "reason": "Record this holding's name as its exchange symbol (for example INFY.NS) to include it."}
                for name in unmatched]
-    for symbol, name, holding in rows:
+    for symbol, name, holding, why in rows:
         try:
             suggestion = analyse(symbol, name, holding=holding, portfolio_total=total, bench=bench)
         except FETCH_ERRORS as error:
@@ -315,7 +340,7 @@ def refresh(user, today=None) -> dict:
         if suggestion is None:
             skipped.append({"name": name, "reason": "Too little recent dated data to rate it."})
             continue
-        _store(user, suggestion, today)
+        _store(user, {**suggestion, "why": why}, today)
         researched += 1
     _records(user).filter(event_type=PENDING).exclude(payload__symbol__in=[row[0] for row in rows]).update(event_type=SUPERSEDED)
     run = {"researched": researched, "skipped": skipped, "at": timezone.now().isoformat()}
@@ -323,26 +348,138 @@ def refresh(user, today=None) -> dict:
     return run
 
 
-def run_now(user) -> dict:
-    """Owner pressed Research now; one run at a time per owner."""
+def run_now(user, today=None) -> dict:
+    """Owner pressed Research now, or the daily job ran; one run at a time per owner."""
     lock = f"research-desk:running:{user.pk}"
     if not cache.add(lock, 1, RUN_LOCK_SECONDS):
         raise ValueError("Research is already running. Wait a minute.")
     try:
-        return refresh(user)
+        return refresh(user, today)
     finally:
         cache.delete(lock)
 
 
-def desk(user) -> dict:
-    """What the page shows; reading it fetches nothing."""
+def personal_fit(user, settings, today) -> dict:
+    """Whether putting more money into one share suits the owner now. Fixed rules on local records; never an amount.
+    Missing answers or records make it unknown, never a yes."""
+    from apps.budgets.models import SavingsGoal
+    from apps.expenses.services.financial_intelligence import resolve_canonical_financial_baseline
+
+    profile, missing, against = settings["profile"], [], []
+    if not profile.get("loss"):
+        missing.append("how big a fall you could sit through")
+    if not profile.get("horizon"):
+        missing.append("when you may need this money")
+    baseline, months = resolve_canonical_financial_baseline(user), None
+    if baseline.get("metric_states", {}).get("liquid_runway_months", {}).get("status") == "derived":
+        try:
+            exact = baseline["decimal_amounts"]
+            months = (Decimal(exact["liquid_cash"]) / Decimal(exact["essential_monthly_outflow"])).quantize(Decimal("0.1"))
+        except (KeyError, TypeError, ArithmeticError):
+            months = None
+    if months is None:
+        missing.append("your current bank balances and monthly spending (add a recent statement)")
+    elif months < RESERVE_MONTHS:
+        against.append(f"Your bank balances cover about {months} months of essential spending and loan payments; "
+                       f"keep at least {RESERVE_MONTHS} months aside before buying single shares.")
+    if profile.get("loss") == "low":
+        against.append("You said a fall of more than a tenth would worry you; single shares often fall a fifth or more in a year.")
+    if profile.get("horizon") == "under_3":
+        against.append("You may need this money within 3 years; a single share can stay down for longer than that.")
+    goals = [goal.name for goal in SavingsGoal.objects.filter(user=user, target_date__isnull=False, target_date__gte=today,
+                                                              target_date__lte=today + timedelta(days=3 * 365))
+             if goal.saved_amount < goal.target_amount]
+    if goals:
+        against.append(f"{len(goals)} savings goal(s) due within 3 years still need money ({', '.join(goals[:2])}); fund them first.")
+    if against:
+        return {"state": "does_not_fit", "reasons": against, "missing": missing}
+    if missing:
+        return {"state": "unknown", "reasons": ["ALFRED needs " + "; ".join(missing) + " to check this."], "missing": missing}
+    return {"state": "fits", "missing": [], "reasons": [
+        f"Your bank balances cover about {months} months of essentials, no savings goal is due within 3 years, "
+        f"and you said: {LOSS[profile['loss']].lower()}; money needed {HORIZON[profile['horizon']].lower()}."]}
+
+
+CHANGE_IF = {
+    "buy": "A close below the 200-day average, or the next yearly results showing lower revenue or profit.",
+    "overweight": "The risk flags clearing would make it a Buy; a close below the 200-day average or weaker results would make it Wait.",
+    "hold": "Two more good signs and the price above both averages would make it a candidate; more warning signs would make it Avoid.",
+    "underweight": "Revenue and profit growing again with the price back above its 200-day average.",
+    "sell": "Revenue and profit growing again with the price back above its 200-day average.",
+}
+
+
+def _status(s):
+    if s["rating"] in ("buy", "overweight"):
+        return "Investment candidate"
+    if s["rating"] == "hold":
+        return "Watch"
+    return "Review" if s["held"] else "Avoid"
+
+
+def _open(user, today):
+    """Pending calls the owner has not put off."""
+    rows = [record.payload for record in _records(user).filter(event_type=PENDING).order_by("-created_at", "-id")[:UNIVERSE_LIMIT]]
+    return [s for s in rows if s.get("snoozed_until", "") <= today.isoformat()], [s for s in rows if s.get("snoozed_until", "") > today.isoformat()]
+
+
+def next_run(settings, last, now=None) -> str | None:
+    """When the daily job next runs (13:00 local), or None while paused. A missed run is caught up at the next start."""
+    if not settings["enabled"]:
+        return None
+    now = timezone.localtime(now)
+    slot = now.replace(hour=RUN_HOUR, minute=0, second=0, microsecond=0)
+    ran_today = last is not None and timezone.localtime(last.created_at).date() == now.date()
+    if ran_today:
+        slot += timedelta(days=1)
+    elif now >= slot:
+        return now.isoformat()  # due now: the background worker catches it up
+    return slot.isoformat()
+
+
+def notices(user, today):
+    """New or changed calls that ask for the owner's decision, for the Home review list. Routine Wait calls stay quiet."""
+    from apps.ml_engine.services.task_bots import _item
+
+    open_calls, _ = _open(user, today)
+    return [_item(f"desk:{s['fingerprint']}", f"{s['symbol']}: {s['label']}" + (f" (was {s['changed_from']})" if s.get("changed_from") else " (new)"),
+                  f"{s.get('why', '')} {s['summary']} Accept or reject it on Investments; ALFRED never buys or sells.",
+                  "/investments/#researchDeskSection")
+            for s in open_calls if s["rating"] != "hold" or s.get("changed_from")]
+
+
+@transaction.atomic
+def later(user, identity, today=None) -> dict:
+    """Put a call off for a week; it comes back sooner only if the evidence changes."""
+    today, record = today or timezone.localdate(), _pending(user, identity)
+    until = (today + timedelta(days=SNOOZE_DAYS)).isoformat()
+    record.payload = {**record.payload, "snoozed_until": until}
+    record.save(update_fields=["payload"])
+    return {"message": f"Put off until {until}. It comes back sooner if its evidence changes."}
+
+
+def desk(user, today=None) -> dict:
+    """What the page shows; reading it fetches nothing online."""
+    today, settings = today or timezone.localdate(), desk_settings(user)
     last = _records(user).filter(event_type=RUN).order_by("-created_at", "-id").first()
-    suggestions = [record.payload for record in _records(user).filter(event_type=PENDING).order_by("-created_at", "-id")[:UNIVERSE_LIMIT]]
+    suggestions, snoozed = _open(user, today)
+    fit = None
+    for s in suggestions:
+        s["status"] = _status(s)
+        s["against"] = (s["risks"] or [item["point"] for item in s["bad"]] or
+                        ["No warning sign in the numbers ALFRED reads; that does not mean there is no risk."])[0]
+        s["change_if"] = CHANGE_IF[s["rating"]]
+        if s["rating"] in ("buy", "overweight"):
+            fit = fit or personal_fit(user, settings, today)
+            s["fit"] = fit
+        else:
+            s["fit"] = {"state": "not_needed", "reasons": [], "missing": []}
     suggestions.sort(key=lambda s: (s["rating"] == "hold", -abs(s["score"]), s["symbol"]))
     answered = [{"symbol": r.payload["symbol"], "label": r.payload["label"], "state": "accepted" if r.event_type == ACCEPTED else "rejected",
                  "decided_at": r.payload.get("decided_at")}
                 for r in _records(user).filter(event_type__in=(ACCEPTED, REJECTED)).order_by("-created_at", "-id")[:10]]
-    return {"settings": desk_settings(user), "watch_limit": WATCH_LIMIT, "answered": answered,
+    return {"settings": settings, "watch_limit": WATCH_LIMIT, "answered": answered, "snoozed": len(snoozed),
+            "loss_choices": LOSS, "horizon_choices": HORIZON, "next_run": next_run(settings, last),
             "last_run": {key: last.payload[key] for key in ("researched", "skipped", "at")} if last else None, "suggestions": suggestions}
 
 
@@ -425,8 +562,10 @@ def run_scheduled(today=None) -> dict:
 
     ran = failed = 0
     for user in get_user_model().objects.filter(is_active=True).order_by("id"):
+        if not desk_settings(user)["enabled"]:
+            continue  # paused by the owner
         try:
-            refresh(user, today)
+            run_now(user, today)
             ran += 1
         except Exception as error:
             failed += 1

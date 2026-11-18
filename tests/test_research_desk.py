@@ -146,3 +146,86 @@ class ResearchDeskTests(TestCase):
             result = native_tasks.DAILY_JOBS["research-desk"]()
         self.assertEqual((result["processed"], result["failed"]), (2, 0))
         self.assertEqual(len(self.suggestions()), 2)
+
+    def test_personal_fit_is_unknown_without_answers_and_blocks_on_a_thin_reserve_or_near_goal(self):
+        from apps.budgets.models import SavingsGoal
+        from apps.expenses.models import BankAccount
+
+        research_desk.refresh(self.user, TODAY)
+        good = self.suggestions_on(TODAY)["GOOD.NS"]
+        self.assertEqual((good["status"], good["fit"]["state"]), ("Investment candidate", "unknown"))
+        self.assertIn("how big a fall", " ".join(good["fit"]["missing"]))
+        self.assertNotIn("amount", good)  # ALFRED never proposes a sum
+        self.assertEqual(self.suggestions_on(TODAY)["WEAK.NS"]["fit"]["state"], "not_needed")
+        research_desk.save_settings(self.user, profile={"loss": "high", "horizon": "over_5"})
+        baseline = {"metric_states": {"liquid_runway_months": {"status": "derived"}},
+                    "decimal_amounts": {"liquid_cash": "30000.00", "essential_monthly_outflow": "10000.00"}}
+        with patch("apps.expenses.services.financial_intelligence.resolve_canonical_financial_baseline", return_value=baseline):
+            fit = self.suggestions_on(TODAY)["GOOD.NS"]["fit"]
+            self.assertEqual(fit["state"], "does_not_fit")
+            self.assertIn("about 3.0 months", fit["reasons"][0])
+            baseline["decimal_amounts"]["liquid_cash"] = "90000.00"
+            self.assertEqual(self.suggestions_on(TODAY)["GOOD.NS"]["fit"]["state"], "fits")
+            SavingsGoal.objects.create(user=self.user, name="Synthetic deposit", target_amount=Decimal("500000"),
+                                       saved_amount=Decimal("1000"), target_date=TODAY + timedelta(days=400))
+            self.assertIn("Synthetic deposit", self.suggestions_on(TODAY)["GOOD.NS"]["fit"]["reasons"][0])
+        with self.assertRaises(ValueError):
+            research_desk.save_settings(self.user, profile={"loss": "reckless", "horizon": None})
+        self.assertFalse(BankAccount.objects.filter(user=self.user).exists())  # nothing was written to the owner's money
+
+    def suggestions_on(self, day):
+        return {s["symbol"]: s for s in research_desk.desk(self.user, day)["suggestions"]}
+
+    def test_card_explains_why_now_against_and_change_and_tracks_a_changed_call(self):
+        research_desk.refresh(self.user, TODAY)
+        weak = self.suggestions_on(TODAY)["WEAK.NS"]
+        self.assertEqual((weak["status"], weak["why"]), ("Avoid", "It is on your watch list."))
+        self.assertTrue(weak["against"]); self.assertIn("200-day average", weak["change_if"])
+        self.assertNotIn("changed_from", weak)
+        self.market["WEAK.NS"] = (_fund(), _prices(RISING))  # the company's numbers and price turn around
+        cache.clear()  # past the 15-minute data cache
+        research_desk.refresh(self.user, TODAY)
+        changed = self.suggestions_on(TODAY)["WEAK.NS"]
+        self.assertEqual(changed["changed_from"], "Avoid")
+        self.assertIn("Changed from Avoid", changed["change"])
+        self.assertEqual(len(research_desk.desk(self.user, TODAY)["suggestions"]), 2)  # one open call per share
+        research_desk.refresh(self.user, TODAY + timedelta(days=1))
+        again = self.suggestions_on(TODAY + timedelta(days=1))["WEAK.NS"]
+        self.assertEqual((again["first_seen"], again["for_date"], again["changed_from"]), (TODAY.isoformat(), (TODAY + timedelta(days=1)).isoformat(), "Avoid"))
+
+    def test_later_hides_a_call_for_a_week_and_home_notices_skip_routine_and_repeat(self):
+        from apps.ml_engine.services import task_bots
+
+        research_desk.refresh(self.user, TODAY)
+        with patch("apps.ml_engine.services.task_bots.timezone.localdate", return_value=TODAY), \
+                patch("apps.investments.services.research_desk.timezone.localdate", return_value=TODAY):
+            first = task_bots.run(self.user, "research_desk", TODAY)
+            self.assertEqual(sorted(item["title"] for item in first["items"]), ["GOOD.NS: Buy a little (new)", "WEAK.NS: Avoid (new)"])
+            self.assertEqual(task_bots.run(self.user, "research_desk", TODAY)["proposal_id"], first["proposal_id"])  # no duplicate
+            research_desk.refresh(self.user, TODAY)  # unchanged evidence
+            self.assertEqual(task_bots.run(self.user, "research_desk", TODAY)["proposal_id"], first["proposal_id"])
+        weak = self.suggestions_on(TODAY)["WEAK.NS"]
+        research_desk.later(self.user, weak["id"], TODAY)
+        self.assertNotIn("WEAK.NS", self.suggestions_on(TODAY))
+        self.assertEqual(research_desk.desk(self.user, TODAY)["snoozed"], 1)
+        research_desk.refresh(self.user, TODAY)  # unchanged evidence keeps the snooze
+        self.assertNotIn("WEAK.NS", self.suggestions_on(TODAY + timedelta(days=6)))
+        self.assertIn("WEAK.NS", self.suggestions_on(TODAY + timedelta(days=7)))
+
+    def test_pause_stops_the_daily_job_and_a_second_run_waits_for_the_first(self):
+        get_user_model().objects.filter(pk=self.other.pk).update(is_active=False)
+        research_desk.save_settings(self.user, enabled=False)
+        self.assertIsNone(research_desk.desk(self.user, TODAY)["next_run"])
+        self.assertEqual(research_desk.run_scheduled(TODAY)["processed"], 0)
+        self.assertFalse(research_desk.desk(self.user, TODAY)["suggestions"])
+        research_desk.save_settings(self.user, enabled=True)
+        cache.add(f"research-desk:running:{self.user.pk}", 1, 60)
+        result = research_desk.run_scheduled(TODAY)
+        self.assertEqual((result["processed"], result["failed"]), (0, 1))  # the running one is not doubled
+        cache.clear()
+        self.assertEqual(research_desk.run_scheduled(TODAY)["processed"], 1)
+        self.assertTrue(research_desk.desk(self.user, TODAY)["next_run"])
+        response = self.client.post(URL, {"operation": "monitor", "enabled": "no"}, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        response = self.client.post(URL, {"operation": "monitor", "enabled": False}, content_type="application/json")
+        self.assertFalse(response.json()["desk"]["settings"]["enabled"])

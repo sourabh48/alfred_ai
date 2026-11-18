@@ -207,6 +207,12 @@ class ResearchDeskView(APIView):
                 result = research_desk.watch_remove(user, str(data.get("symbol") or ""))
             elif operation == "holdings" and isinstance(data.get("include"), bool):
                 result = research_desk.save_settings(user, include_holdings=data["include"])
+            elif operation == "monitor" and isinstance(data.get("enabled"), bool):
+                result = research_desk.save_settings(user, enabled=data["enabled"])
+            elif operation == "profile":
+                result = research_desk.save_settings(user, profile=data.get("profile"))
+            elif operation == "later":
+                result = research_desk.later(user, data.get("id"))
             else:
                 return Response({"detail": "Choose an action."}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError as exc:

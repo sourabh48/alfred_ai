@@ -258,12 +258,25 @@
         <div><h2 id="researchDeskTitle" class="page-section-title mb-1">Research desk</h2>
             <p class="page-section-copy mb-1">ALFRED researches these shares by itself every day and suggests what to buy, keep or sell. You only accept or reject. ALFRED never buys or sells: if you agree, place the order with your broker.</p>
             <p class="small muted mb-2" id="researchDeskStatus" role="status">Loading.</p></div>
-        <button type="button" class="btn btn-outline-primary btn-sm" id="researchDeskRun">Research now</button>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="researchDeskRun">Research now</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="researchDeskMonitor" aria-pressed="false">Pause daily research</button>
+        </div>
     </div>
     <div id="researchDeskFeedback" class="alert small mb-3" role="status" aria-live="polite" hidden></div>
     <div class="chart-box mb-3" hidden><canvas id="researchDeskOverview"></canvas></div>
     <div id="researchDeskList" class="data-stack" aria-live="polite"></div>
     <details class="mt-2" id="researchDeskSkipped" hidden></details>
+    <details class="mt-3" id="researchDeskProfile"><summary class="small">Check personal fit (two questions, optional)</summary>
+        <p class="small mt-2 mb-2">Research above is general. To say whether a candidate suits you, ALFRED also reads your bank balances, monthly spending, loan payments and savings goals on this PC, and needs your own answers below. It never guesses them and never suggests an amount.</p>
+        <form id="researchDeskProfileForm" class="d-flex flex-wrap gap-2 align-items-end" data-live-refresh-hold="true">
+            <div><label class="form-label small mb-1" for="researchDeskLoss">If this share fell, how much could you sit through?</label>
+                <select class="form-select form-select-sm" id="researchDeskLoss"></select></div>
+            <div><label class="form-label small mb-1" for="researchDeskHorizon">When might you need this money?</label>
+                <select class="form-select form-select-sm" id="researchDeskHorizon"></select></div>
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Save answers</button>
+        </form>
+    </details>
     <details class="mt-3"><summary class="small">What ALFRED researches</summary>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskHoldings">
             <label class="form-check-label small" for="researchDeskHoldings">Also research the shares I own that are recorded by exchange symbol (for example INFY.NS). Only the symbols go to Yahoo Finance; amounts stay on this PC.</label></div>
@@ -361,5 +374,5 @@
 {% block extra_js %}
 <script src="/static/js/investments.js?v=2.20.3"></script>
 <script src="/static/js/research_history.js?v=1"></script>
-<script src="/static/js/research_desk.js?v=1"></script>
+<script src="/static/js/research_desk.js?v=2"></script>
 {% endblock %}
