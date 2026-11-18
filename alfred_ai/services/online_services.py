@@ -35,9 +35,13 @@ KEYS = {
                             "https://fred.stlouisfed.org/docs/api/api_key.html"),
     "ALFRED_ALPHA_VANTAGE_API_KEY": ("Alpha Vantage", "Investments research desk: the latest earnings against forecasts and insider trading for US shares (free key: 25 requests a day).",
                                      "https://www.alphavantage.co/support/#api-key"),
+    "ALFRED_REDDIT_CLIENT_ID": ("Reddit app: client ID", "Investments research desk: the mood of Reddit's investing communities about each share. "
+                                "Create a 'script' app at reddit.com/prefs/apps (free for personal use).", "https://www.reddit.com/prefs/apps"),
+    "ALFRED_REDDIT_CLIENT_SECRET": ("Reddit app: secret", "Shown with the client ID on the same Reddit app page.", "https://www.reddit.com/prefs/apps"),
 }
-# name: (value written when on, what the switch means). None today: Google is the only travel source (owner decision 2026-11-14).
-SWITCHES = {}
+# name: (value written when on, what the switch means). Google is the only travel source (owner decision 2026-11-14).
+SWITCHES = {"ALFRED_PRICES_ALPHA_VANTAGE_FIRST": ("true", "Research desk: read daily share prices from Alpha Vantage first, and Yahoo Finance "
+                                                          "only if that fails (needs the Alpha Vantage key; 25 requests a day on the free key).")}
 # Mail for Career emails you approve one at a time: an address and an app password; the server is filled in for known providers.
 MAIL_PROVIDERS = {"gmail.com": ("smtp.gmail.com", 587, False), "googlemail.com": ("smtp.gmail.com", 587, False),
                   "yahoo.com": ("smtp.mail.yahoo.com", 465, True), "yahoo.co.in": ("smtp.mail.yahoo.com", 465, True),

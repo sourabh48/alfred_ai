@@ -170,6 +170,13 @@ def native_research_desk():
     return _run_daily("research-desk")
 
 
+@db_periodic_task(crontab(minute="*/5"))
+def native_research_debate():
+    """The local AI debates new research calls in the background, a few minutes at a time (owner request 2026-11-18)."""
+    from apps.investments.services.research_debate import debate_due
+    return debate_due()
+
+
 @db_periodic_task(crontab(minute="30"))  # every hour; see task_bots.NETWORK_BOTS for what stays daily
 def native_task_bots():
     return _run_daily("task-bots")

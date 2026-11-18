@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
@@ -29,6 +30,7 @@ from alfred_ai.services.currency import CURRENCY_CHOICES
 from apps.reports.models import OperationalLog
 from apps.reports.services import operational_logging_service
 from . import research_sources
+from .research_debate import apply as debate_apply
 from .research_journal import outcome
 from .research_packet import SYMBOL, USER_AGENT, beginner_view, build_packet, price_metrics, research_data
 
@@ -76,15 +78,16 @@ RESERVE_MONTHS, RUN_HOUR, SNOOZE_DAYS = 6, 13, 7
 def desk_settings(user) -> dict:
     saved = _records(user).filter(event_type=SETTINGS).order_by("-created_at", "-id").first()
     current = {"watch": [{"symbol": symbol, "name": name} for symbol, name in DEFAULT_WATCH.items()], "include_holdings": False,
-               "enabled": True, "discover": False, "profile": {"loss": None, "horizon": None}}
+               "enabled": True, "discover": False, "ai_decides": True, "profile": {"loss": None, "horizon": None}}
     if saved:
         current.update({key: saved.payload[key] for key in current if key in saved.payload})
         current["include_holdings"] = bool(current["include_holdings"])
         current["discover"] = current["discover"] is True  # opt-in: ideas read about 45 more companies each week
+        current["ai_decides"] = current["ai_decides"] is not False  # owner request 2026-11-18: the local AI debates and decides
     return current
 
 
-def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None, discover=None) -> dict:
+def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None, discover=None, ai_decides=None) -> dict:
     current = desk_settings(user)
     if watch is not None:
         current["watch"] = watch[:WATCH_LIMIT]
@@ -94,6 +97,8 @@ def save_settings(user, *, watch=None, include_holdings=None, enabled=None, prof
         current["enabled"] = enabled is True
     if discover is not None:
         current["discover"] = discover is True
+    if ai_decides is not None:
+        current["ai_decides"] = ai_decides is True
     if profile is not None:
         if not isinstance(profile, dict) or profile.get("loss") not in (*LOSS, None) or profile.get("horizon") not in (*HORIZON, None):
             raise ValueError("Choose one of the listed answers, or leave it blank.")
@@ -103,9 +108,11 @@ def save_settings(user, *, watch=None, include_holdings=None, enabled=None, prof
 
 
 def watch_add(user, text) -> dict:
-    symbol = listed(text)
+    typed = str(text or "").strip().upper()
+    # A bare ticker is a US share only when typed into the watch list; holdings recorded by name never match this way.
+    symbol = listed(typed) or (typed if re.fullmatch(r"[A-Z]{1,5}(?:-[A-Z])?", typed) else None)
     if not symbol:
-        raise ValueError("Enter an exchange symbol such as INFY.NS (NSE) or 500209.BO (BSE). Look a company up below to find it.")
+        raise ValueError("Enter an exchange symbol such as INFY.NS (NSE), 500209.BO (BSE) or AAPL (US). Look a company up below to find it.")
     current = desk_settings(user)
     if symbol in {item["symbol"] for item in current["watch"]}:
         return current
@@ -375,8 +382,9 @@ def _store(user, suggestion, today):
     for record in _records(user).select_for_update().filter(event_type=PENDING, payload__symbol=suggestion["symbol"]):
         if same is None and record.payload["fingerprint"] == suggestion["fingerprint"]:
             same = record
-            kept = {key: record.payload[key] for key in ("id", "snoozed_until", "changed_from", "change", "first_seen") if key in record.payload}
-            record.payload = {**suggestion, **kept}  # the same call with fresher numbers
+            kept = {key: record.payload[key] for key in ("id", "snoozed_until", "changed_from", "change", "first_seen", "debate")
+                    if key in record.payload}
+            record.payload = debate_apply({**suggestion, **kept})  # the same call with fresher numbers; its AI debate still holds
             record.save(update_fields=["payload"])
         else:
             record.event_type = SUPERSEDED
@@ -625,6 +633,9 @@ def desk(user, today=None) -> dict:
                 s["status"] = "Not for you yet"  # the personal answer outranks a general research call for someone deciding alone
         else:
             s["fit"] = {"state": "not_needed", "reasons": [], "missing": []}
+    from .research_paper import portfolio, proposal
+    for s in suggestions:
+        s["paper"] = proposal(user, s)
     suggestions.sort(key=lambda s: (s["rating"] == "hold", -abs(s["score"]), s["symbol"]))
     answered = [{"symbol": r.payload["symbol"], "label": r.payload["label"], "state": "accepted" if r.event_type == ACCEPTED else "rejected",
                  "decided_at": r.payload.get("decided_at")}
@@ -634,7 +645,7 @@ def desk(user, today=None) -> dict:
     return {"settings": settings, "watch_limit": WATCH_LIMIT, "answered": answered, "snoozed": len(snoozed),
             "loss_choices": LOSS, "horizon_choices": HORIZON, "next_run": next_run(settings, last),
             "last_run": {key: last.payload[key] for key in ("researched", "skipped", "at")} if last else None, "suggestions": suggestions,
-            "last_ideas": ideas.payload if ideas else None, "backtest": tested.payload if tested else None}
+            "last_ideas": ideas.payload if ideas else None, "backtest": tested.payload if tested else None, "paper": portfolio(user)}
 
 
 def _pending(user, identity):
@@ -646,9 +657,11 @@ def _pending(user, identity):
 
 
 @transaction.atomic
-def accept(user, identity, today=None) -> dict:
-    """The owner agrees: the call goes into the research journal to be checked later. Holdings are never touched."""
+def accept(user, identity, today=None, *, paper=False) -> dict:
+    """The owner agrees: the call goes into the research journal to be checked later. Holdings are never touched.
+    paper: also hand the call to the paper trader (pretend money only), in the same transaction."""
     from apps.investments.models import ResearchDecision
+    from .research_paper import place
 
     today, record = today or timezone.localdate(), _pending(user, identity)
     s = record.payload
@@ -660,10 +673,13 @@ def accept(user, identity, today=None) -> dict:
         thesis=f"ALFRED research desk: {s['label']}. {s['summary']} {reasons}"[:4000],
         currency=s["currency"] if s["currency"] in dict(CURRENCY_CHOICES) else None, entry_price=Decimal(s["price"]),
         benchmark=s["benchmark"], benchmark_entry=Decimal(s["benchmark_level"]) if s["benchmark_level"] else None)
-    record.event_type, record.payload = ACCEPTED, {**s, "decision_id": decision.pk, "decided_at": timezone.now().isoformat()}
+    trade = place(user, s, today) if paper else None  # raises before anything is saved when the paper order cannot be placed
+    record.event_type, record.payload = ACCEPTED, {**s, "decision_id": decision.pk, "decided_at": timezone.now().isoformat(),
+                                                   "paper_trade": trade}
     record.save(update_fields=["event_type", "payload"])
+    paper_note = f" Paper trader: {trade['side']} {trade['quantity']} share(s) with pretend money." if trade else ""
     return {"decision_id": decision.pk, "review_on": decision.review_on.isoformat(),
-            "message": f"Saved to your journal. ALFRED checks it against the price on {decision.review_on.isoformat()}. Nothing was bought or sold."}
+            "message": f"Saved to your journal. ALFRED checks it against the price on {decision.review_on.isoformat()}.{paper_note} Nothing real was bought or sold."}
 
 
 @transaction.atomic

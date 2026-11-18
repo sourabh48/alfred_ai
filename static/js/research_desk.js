@@ -30,6 +30,8 @@ window.ResearchDesk = (() => {
                 <li><span class="fw-semibold">Why now:</span> ${e(s.why || "")} ${e(s.change || (s.first_seen && s.first_seen < s.for_date ? `Same call since ${s.first_seen}; the evidence has not changed.` : "First look at this share."))}</li>
                 <li><span class="fw-semibold">Strongest reason against:</span> ${e(s.against)}</li>
                 ${s.levels ? `<li><span class="fw-semibold">Example levels:</span> ${e(s.levels.text)}</li>` : ""}
+                ${decidedBy(s)}
+                ${s.social_mood?.text ? `<li><span class="fw-semibold">Social mood:</span> ${e(s.social_mood.text)}</li>` : ""}
                 <li><span class="fw-semibold">What would change this:</span> ${e(s.change_if)}</li>
                 <li><span class="fw-semibold">Next check:</span> ${e(nextCheck())}. Company results up to ${e(s.latest_period_end || "unknown")}.</li>
             </ul>
@@ -37,11 +39,19 @@ window.ResearchDesk = (() => {
                 <button type="button" class="btn btn-sm btn-primary" data-desk-accept="${e(s.id)}" aria-label="Accept and save to my journal: ${e(s.label)} ${e(s.symbol)}">Accept</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-desk-reject="${e(s.id)}" aria-label="Reject: ${e(s.label)} ${e(s.symbol)}">Reject</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-desk-later="${e(s.id)}" aria-label="Remind me in a week about ${e(s.symbol)}">Remind me in a week</button>
+                ${s.paper ? (s.paper.possible ? `<div class="form-check small align-self-center mb-0"><input class="form-check-input" type="checkbox" id="deskPaper-${e(s.id)}" data-desk-paper="${e(s.id)}">
+                    <label class="form-check-label" for="deskPaper-${e(s.id)}">On accept, also paper trade it: ${e(s.paper.text)}</label></div>`
+                    : `<span class="small muted align-self-center">${e(s.paper.text)}</span>`) : ""}
                 ${(s.why === "You looked it up recently." || s.idea) && !(state?.settings.watch || []).some(w => w.symbol === s.symbol)
                     ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-desk-watch="${e(s.symbol)}">Add to watch list</button>` : ""}
             </div>
             <details class="mt-2" data-desk-details="${e(s.id)}"><summary class="small">Why, with charts</summary>
+                ${s.debate?.status === "decided" ? `<div class="small fw-semibold mt-2">AI debate on your local model (${e(s.debate.model)})</div>
+                    <ol class="small mb-2">${s.debate.steps.map(step => `<li><span class="fw-semibold">${e(step.role)}:</span> ${e(step.text)}</li>`).join("")}</ol>
+                    <div class="small fw-semibold">Fixed rules, for comparison</div>` : ""}
                 <ol class="small mt-2 mb-2">${s.steps.map(step => `<li><span class="fw-semibold">${e(step.role)}:</span> ${e(step.text)}</li>`).join("")}</ol>
+                ${(s.social_mood?.examples || []).length ? `<div class="small mb-2"><span class="fw-semibold">Reddit posts (not checked, not advice):</span><ul class="mb-0">${s.social_mood.examples.map(p =>
+                    `<li><a href="${e(p.url)}" target="_blank" rel="noopener noreferrer">${e(p.title)}</a> <span class="muted">r/${e(p.subreddit)} ${e(p.on)} · ${e(p.mood)}</span></li>`).join("")}</ul></div>` : ""}
                 <div class="row g-2">
                     <div class="col-lg-7"><div class="small fw-semibold">Price over the past year, with its 50 and 200-day averages (${e(s.currency || "currency not recorded")})</div>
                         <div class="chart-box"><canvas id="deskPrice-${e(s.id)}" aria-label="${e(s.symbol)} price and averages chart"></canvas></div></div>
@@ -58,6 +68,27 @@ window.ResearchDesk = (() => {
                 <a class="small" href="${e(s.source_url)}" target="_blank" rel="noopener noreferrer">Source: Yahoo Finance</a>
             </details>
         </article>`;
+    }
+
+    const RULE_LABEL = { buy: "Buy", overweight: "Buy a little", hold: "Wait and watch", underweight: "Avoid", sell: "Avoid" };
+    const HELD_RULE_LABEL = { buy: "Buy more", overweight: "Add a little", hold: "Keep", underweight: "Reduce", sell: "Sell" };
+
+    function decidedBy(s) {
+        const rules = (s.held ? HELD_RULE_LABEL : RULE_LABEL)[s.rules_rating || s.rating];
+        if (s.debate?.status === "decided") return `<li><span class="fw-semibold">Decided by:</span> your local AI after a bull, bear, manager, trader and risk debate; the fixed rules said ${e(rules)}.${s.debate.dropped ? ` ${e(s.debate.dropped)} sentence(s) with numbers not in the evidence were dropped.` : ""}</li>`;
+        if (s.debate?.status === "failed") return `<li><span class="fw-semibold">Decided by:</span> the fixed rules. ${e(s.debate.detail)}</li>`;
+        return state?.settings.ai_decides ? `<li><span class="fw-semibold">Decided by:</span> the fixed rules for now; your local AI debates this call in the background within a few minutes.</li>` : "";
+    }
+
+    function paper(p) {
+        const box = $("researchDeskPaperBody");
+        if (!p) { box.innerHTML = '<p class="small mb-2">No paper account yet. Start one with pretend money to see how ALFRED\'s calls would have done.</p>'; return; }
+        box.innerHTML = `<p class="small mb-2">Started with ${e(Alfred.formatNumber(p.start_cash, 2))} pretend rupees; now worth ${e(Alfred.formatNumber(p.value, 2))} (${e(p.change_pct)}%), of which ${e(Alfred.formatNumber(p.cash, 2))} is cash.</p>
+            ${p.positions.length ? `<div class="table-responsive"><table class="table table-sm small mb-2"><caption class="visually-hidden">Paper positions</caption>
+                <thead><tr><th scope="col">Share</th><th scope="col">Shares</th><th scope="col">Cost</th><th scope="col">Value</th></tr></thead>
+                <tbody>${p.positions.map(r => `<tr><td>${e(r.symbol)}</td><td>${e(r.quantity)}</td><td>${e(Alfred.formatNumber(r.cost, 2))}</td><td>${r.value ? `${e(Alfred.formatNumber(r.value, 2))} <span class="muted">(${e(r.price_as_of)})</span>` : "n/a"}</td></tr>`).join("")}</tbody></table></div>` : ""}
+            ${p.trades.length ? `<ul class="small mb-2">${p.trades.slice(0, 5).map(t => `<li>${e(t.on)}: ${t.side === "buy" ? "bought" : "sold"} ${e(t.quantity)} ${e(t.symbol)} at ${e(t.price)}</li>`).join("")}</ul>` : ""}
+            <ul class="small muted mb-2">${p.limits.map(l => `<li>${e(l)}</li>`).join("")}</ul>`;
     }
 
     function fit(s) {
@@ -117,6 +148,8 @@ window.ResearchDesk = (() => {
         const ideas = data.last_ideas;
         $("researchDeskIdeasStatus").textContent = ideas ? `Last looked ${Alfred.formatDateTime(ideas.at)}: ${ideas.checked} companies checked, ${ideas.found} idea(s).` : "Not looked yet.";
         backtest(data.backtest);
+        paper(data.paper);
+        $("researchDeskAi").checked = data.settings.ai_decides;
         $("researchDeskWatch").innerHTML = data.settings.watch.map(item => `<span class="badge text-bg-light border me-1 mb-1">${e(item.symbol)}
             <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-desk-remove="${e(item.symbol)}" aria-label="Remove ${e(item.symbol)} from the watch list">×</button></span>`).join("")
             || '<span class="small muted">Empty. Add a symbol below.</span>';
@@ -183,6 +216,12 @@ window.ResearchDesk = (() => {
             act({ operation: "backtest" }, event.currentTarget, r => { $("researchDeskBacktest").open = true;
                 return r.calls ? `Replayed ${r.calls} past call(s). See How these rules did on past data.` : "Too little dated history to replay any call."; });
         });
+        $("researchDeskAi").addEventListener("change", event => act({ operation: "ai_decides", enabled: event.currentTarget.checked }, null,
+            s => s.ai_decides ? "Your local AI now debates and decides each call." : "The fixed rules decide each call; the AI debate is off."));
+        $("researchDeskPaperForm").addEventListener("submit", event => {
+            event.preventDefault();
+            act({ operation: "paper_open", cash: $("researchDeskPaperCash").value }, event.submitter, () => "Paper account ready. Tick the paper trade box when you accept a call.");
+        });
         $("researchDeskIdeas").addEventListener("change", event => act({ operation: "discover", enabled: event.currentTarget.checked }, null,
             s => s.discover ? "ALFRED looks for ideas among NIFTY 50 companies each week." : "Weekly ideas switched off. Open ideas stay until you answer them."));
         $("researchDeskIdeasRun").addEventListener("click", event => {
@@ -202,7 +241,8 @@ window.ResearchDesk = (() => {
             if (later) act({ operation: "later", id: later.dataset.deskLater }, later, r => r.message);
             if (watch) act({ operation: "watch_add", symbol: watch.dataset.deskWatch }, watch, () => "Added to the watch list.");
             if (profile) { $("researchDeskProfile").open = true; $("researchDeskLoss").focus(); }
-            if (accept) act({ operation: "accept", id: accept.dataset.deskAccept }, accept, r => r.message);
+            if (accept) act({ operation: "accept", id: accept.dataset.deskAccept,
+                paper: !!document.querySelector(`[data-desk-paper="${CSS.escape(accept.dataset.deskAccept)}"]`)?.checked }, accept, r => r.message);
             if (reject) act({ operation: "reject", id: reject.dataset.deskReject }, reject, r => r.message);
             if (remove) act({ operation: "watch_remove", symbol: remove.dataset.deskRemove }, remove, () => "Removed from the watch list.");
         });

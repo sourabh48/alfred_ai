@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
 from django.core.cache import cache
@@ -202,3 +202,36 @@ def sec_filings(symbol: str, email: str) -> list:
         return lines
 
     return _cached(f"research-sources:sec:{symbol}", fetch, 86400)
+
+
+def alpha_vantage_prices(symbol: str, *, years: int = 1) -> dict:
+    """Daily closes, highs and lows from Alpha Vantage, shaped like the Yahoo chart. Indian shares are read on BSE
+    (Alpha Vantage lists RELIANCE.BSE, not NSE), so their closes can differ slightly from NSE's. Raises when unavailable."""
+    from datetime import datetime as dt
+
+    api_key = _key("ALFRED_ALPHA_VANTAGE_API_KEY")
+    if not api_key:
+        raise ValueError("No Alpha Vantage key is saved.")
+    if symbol.endswith((".NS", ".BO")):
+        query, currency = symbol.rsplit(".", 1)[0] + ".BSE", "INR"
+    elif us_listed(symbol):
+        query, currency = symbol, "USD"
+    else:
+        raise ValueError("Alpha Vantage is used here only for Indian and US shares.")
+    payload = public_http.request("GET", ALPHA_URL, params={"function": "TIME_SERIES_DAILY", "symbol": query, "apikey": api_key,
+                                                             "outputsize": "full" if years > 1 else "compact"}, max_bytes=12_000_000).json()
+    series = payload.get("Time Series (Daily)") if isinstance(payload, dict) else None
+    if not isinstance(series, dict) or not series:
+        raise ValueError("Alpha Vantage gave no daily prices (daily limit, unknown symbol or bad key).")
+    since = timezone.localdate() - timedelta(days=366 * years)
+    rows = []
+    for day, bar in sorted(series.items()):
+        when = date.fromisoformat(day)
+        close, high, low = (_number(bar.get(k)) for k in ("4. close", "2. high", "3. low"))
+        if when >= since and close is not None and close > 0:
+            rows.append((int(dt(when.year, when.month, when.day, tzinfo=dt_timezone.utc).timestamp()), close,
+                         high if high and high > 0 else None, low if low and low > 0 else None))
+    if not rows:
+        raise ValueError("Alpha Vantage gave no recent daily prices.")
+    return {"timestamp": [r[0] for r in rows], "close": [r[1] for r in rows], "high": [r[2] for r in rows],
+            "low": [r[3] for r in rows], "currency": currency, "source": "Alpha Vantage"}

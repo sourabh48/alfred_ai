@@ -1,5 +1,35 @@
 # ALFRED execution state
 
+## Research desk: AI debate, social mood, paper trader, providers — 2026-11-18
+
+LOCAL_TESTING; not pushed. Same worktree, after `cc26e14`. Owner: "AI agents argue in text and the AI decides the
+rating", "Social-media mood: alfred can also read it", "Alfred can feed a simulated trader on aprooval along with
+suggession", "Alfred can switch between several data providers", "Train Alfred model with Trading-R1 to 100%" and "use
+best model supported by my system". Also approved FRED and Alpha Vantage keys (owner pastes them in Settings) and the
+account email as SEC EDGAR's contact address.
+
+- `research_sources.py`: FRED rates and inflation (India and US), Alpha Vantage earnings surprise and market-price
+  insider trades (US), SEC EDGAR latest 10-K/10-Q/8-K links (US, account email as contact), Alpha Vantage daily prices.
+  Context only; never scored. US tickers (AAPL, BRK-B) may now be added to the watch list.
+- `research_debate.py`: bull, bear, research manager, trader, risk team and portfolio manager on the local model; the
+  portfolio manager's rating replaces the rules' rating on the card (rules shown for comparison). Sentences with numbers
+  not in the evidence, and promises of profit, are dropped. Background job every five minutes; re-runs only when a
+  call's evidence changes. Reads lessons from settled calls on the same share. Live checks on a synthetic share:
+  qwen3.5:9b 38 s (Underweight), qwen3.5:35b-a3b 166 s (Hold, more balanced); 0 sentences dropped on either.
+- `research_social.py`: Reddit official API with the owner's app keys; the local model labels post titles.
+- `research_paper.py`: pretend-money account; on accept with the box ticked, buys 10%/5% of paper cash (Buy/Buy a
+  little) or sells all/half (Sell/Reduce) at the last close, rupees only; real holdings untouched.
+- Prices: Yahoo first, or Alpha Vantage first by a Settings switch, falling back to the other.
+- Trading-R1: no public weights (its model is a hosted Tauric API; the Apache-2.0 repo is a terminal), so nothing to
+  train from; no model is 100% accurate.
+- Local model benchmark (RX 6700 XT 12 GB, 16 GB RAM): qwen3.5:4b 76 tok/s, qwen3.5:9b 50 tok/s (fully on GPU),
+  gpt-oss:20b 19, gemma4 26b 15, qwen3.5:35b-a3b 14 (reading 4 tok/s on a short prompt), qwen3.8:27b 3.
+- GPU/CPU split for qwen3.5:35b-a3b (40 layers, 1,273-token prompt, warm): Ollama's automatic split (98% on the GPU,
+  the rest and sampling on the CPU) writes 18 tok/s and reads 36; 28 layers on the GPU 12.5/30; CPU only 0.9/3.4; all
+  40 on the GPU fails to load. Context 4K-32K and batch 128-2048 change little. So no forced-split model: the owner's
+  runtime `config/local.env` now sets `ALFRED_MEMORY_OLLAMA_MODEL='qwen3.5:35b-a3b'` (owner: "use this if all pass";
+  backup `local.env.bak-20261118`). Full local backend shards on the working tree: 3,173 OK, 14 skipped.
+
 ## Research desk: TradingAgents gaps — 2026-11-18
 
 LOCAL_TESTING; not pushed. Same worktree and branch, on `654996d`. Owner asked how ALFRED's research desk compares with

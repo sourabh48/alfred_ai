@@ -198,7 +198,12 @@ class ResearchDeskView(APIView):
             if operation == "run":
                 result = research_desk.run_now(user)
             elif operation == "accept":
-                result = research_desk.accept(user, data.get("id"))
+                result = research_desk.accept(user, data.get("id"), paper=data.get("paper") is True)
+            elif operation == "ai_decides" and isinstance(data.get("enabled"), bool):
+                result = research_desk.save_settings(user, ai_decides=data["enabled"])
+            elif operation == "paper_open":
+                from .services.research_paper import open_account
+                result = open_account(user, data.get("cash"))
             elif operation == "reject":
                 result = research_desk.reject(user, data.get("id"))
             elif operation == "watch_add":

@@ -60,11 +60,32 @@ def fetch_fundamentals(symbol: str) -> dict:
     return series
 
 
-def fetch_prices(symbol: str, *, years: int = 1) -> dict:
-    """Daily closes, highs and lows; more than one year only for backtesting (about 252 sessions a year)."""
+def _yahoo_prices(symbol: str, *, years: int = 1) -> dict:
     from apps.integrations.services.verified_intelligence import VerifiedIntelligenceService
-    return VerifiedIntelligenceService()._fetch_yahoo_chart(symbol, range_value=f"{years}y", interval="1d",
-                                                            max_points=400 if years == 1 else 260 * years + 20)
+    return {**VerifiedIntelligenceService()._fetch_yahoo_chart(symbol, range_value=f"{years}y", interval="1d",
+                                                               max_points=400 if years == 1 else 260 * years + 20), "source": "Yahoo Finance"}
+
+
+def fetch_prices(symbol: str, *, years: int = 1) -> dict:
+    """Daily closes, highs and lows; more than one year only for backtesting (about 252 sessions a year).
+
+    Yahoo Finance first, or Alpha Vantage first when the owner switched it on in Settings; if the first fails the other
+    is tried, when its key is saved. The result names its source."""
+    import os
+    from alfred_ai.services.public_http import PublicHTTPError
+    from .research_sources import alpha_vantage_prices
+
+    sources = [_yahoo_prices, alpha_vantage_prices]
+    if os.environ.get("ALFRED_PRICES_ALPHA_VANTAGE_FIRST") == "true":
+        sources.reverse()
+    if not os.environ.get("ALFRED_ALPHA_VANTAGE_API_KEY", "").strip():
+        sources = [_yahoo_prices]
+    for index, source in enumerate(sources):
+        try:
+            return source(symbol, years=years)
+        except (PublicHTTPError, ValueError, KeyError, TypeError, OSError):
+            if index == len(sources) - 1:
+                raise
 
 
 def price_metrics(closes: list, stamps: list) -> dict:

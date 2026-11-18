@@ -1,5 +1,15 @@
 # Development CI and integration pipeline
 
+## Research desk agents branch — 2026-11-18
+
+LOCAL_TESTING. Branch `work/tracker-items-2026-11-18` after `cc26e14`: AI debate, Reddit mood, paper trader, price
+providers and FRED/Alpha Vantage/SEC sources. Full local backend shards on the working tree: 3,173 tests OK (14
+skipped); the Settings and desk browser tests pass. Not pushed, no hosted CI, no PR. Push needs the owner's OK; the
+docs delta publishes to Pages.
+
+CI_PASSED on `cc26e14` (Browser Regression 44317493103 success; pages build and deployment 44317492539 success). A
+green result applies to `cc26e14` only.
+
 ## Master `654996d` CI failure and repair — 2026-11-18
 
 CI_FAILED on `654996d` (Browser Regression 44309938264): selenium shards 0-2 failed, and so did the aggregate selenium

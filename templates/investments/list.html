@@ -256,7 +256,7 @@
 <section class="surface-card mb-4" id="researchDeskSection" aria-labelledby="researchDeskTitle">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
         <div><h2 id="researchDeskTitle" class="page-section-title mb-1">Research desk</h2>
-            <p class="page-section-copy mb-1">ALFRED researches these shares by itself every day and suggests what to buy, keep or sell. You only accept or reject. ALFRED never buys or sells: if you agree, place the order with your broker.</p>
+            <p class="page-section-copy mb-1">ALFRED researches these shares by itself every day; your local AI debates each call and decides what to buy, keep or sell. You only accept or reject. ALFRED never buys or sells real shares: if you agree, place the order with your broker, or try it first with pretend money in the paper account below.</p>
             <p class="small muted mb-2" id="researchDeskStatus" role="status">Loading.</p></div>
         <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-outline-primary btn-sm" id="researchDeskRun">Research now</button>
@@ -270,6 +270,15 @@
     <div id="researchDeskList" class="data-stack" aria-live="polite"></div>
     <details class="mt-2" id="researchDeskSkipped" hidden></details>
     <details class="mt-2" id="researchDeskBacktest" hidden></details>
+    <details class="mt-2" id="researchDeskPaper"><summary class="small">Paper trading (pretend money)</summary>
+        <div id="researchDeskPaperBody" class="mt-2"></div>
+        <form id="researchDeskPaperForm" class="d-flex flex-wrap gap-2 align-items-end" data-live-refresh-hold="true">
+            <div><label class="form-label small mb-1" for="researchDeskPaperCash">Pretend money to start with (rupees)</label>
+                <input class="form-control form-control-sm" style="max-width:12rem" id="researchDeskPaperCash" inputmode="decimal" placeholder="e.g. 100000" required></div>
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Start paper account</button>
+            <span class="small muted">Starting again closes the old paper trades.</span>
+        </form>
+    </details>
     <details class="mt-3" id="researchDeskProfile"><summary class="small">Check personal fit (two questions, optional)</summary>
         <p class="small mt-2 mb-2">Research above is general. To say whether a candidate suits you, ALFRED also reads your bank balances, monthly spending, loan payments and savings goals on this PC, and needs your own answers below. It never guesses them and never suggests an amount.</p>
         <form id="researchDeskProfileForm" class="d-flex flex-wrap gap-2 align-items-end" data-live-refresh-hold="true">
@@ -283,6 +292,8 @@
     <details class="mt-3"><summary class="small">What ALFRED researches</summary>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskHoldings">
             <label class="form-check-label small" for="researchDeskHoldings">Also research the shares I own that are recorded by exchange symbol (for example INFY.NS). Only the symbols go to Yahoo Finance; amounts stay on this PC.</label></div>
+        <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskAi">
+            <label class="form-check-label small" for="researchDeskAi">Let my local AI debate each call (bull, bear, manager, trader, risk team) and decide the rating. It runs on this PC only; the fixed rules' call shows until it finishes and stays visible for comparison.</label></div>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="researchDeskIdeas">
             <label class="form-check-label small" for="researchDeskIdeas">Each week, also look for ideas among NIFTY 50 companies that are not on my list (NSE's public list; banks and lenders left out). Up to five Buy calls appear above, marked as ideas.</label></div>
         <p class="small mt-1 mb-0"><button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="researchDeskIdeasRun">Look for ideas now</button>
@@ -381,5 +392,5 @@
 {% block extra_js %}
 <script src="/static/js/investments.js?v=2.20.3"></script>
 <script src="/static/js/research_history.js?v=1"></script>
-<script src="/static/js/research_desk.js?v=5"></script>
+<script src="/static/js/research_desk.js?v=6"></script>
 {% endblock %}
