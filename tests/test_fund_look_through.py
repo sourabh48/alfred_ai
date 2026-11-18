@@ -40,13 +40,15 @@ def workbook(sheets, shared=("Synthetic Alpha Flexi Cap Fund",), doctype=False):
     head = '<?xml version="1.0"?>' + ('<!DOCTYPE x [<!ENTITY a "a">]>' if doctype else "")
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("xl/workbook.xml", f'<workbook xmlns="{MAIN}" xmlns:r="{RELS}"><sheets>' + "".join(
+        # A fixed entry date keeps the bytes, and so the saved-file digest, identical across seconds.
+        put = lambda name, data: archive.writestr(zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0)), data)
+        put("xl/workbook.xml", f'<workbook xmlns="{MAIN}" xmlns:r="{RELS}"><sheets>' + "".join(
             f'<sheet name={quoteattr(name)} sheetId="{n}" r:id="rId{n}"/>' for n, name in enumerate(sheets, 1)) + "</sheets></workbook>")
-        archive.writestr("xl/_rels/workbook.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + "".join(
+        put("xl/_rels/workbook.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + "".join(
             f'<Relationship Id="rId{n}" Target="worksheets/sheet{n}.xml"/>' for n in range(1, len(sheets) + 1)) + "</Relationships>")
         for n, rows in enumerate(sheets.values(), 1):
-            archive.writestr(f"xl/worksheets/sheet{n}.xml", f'{head}<worksheet xmlns="{MAIN}"><sheetData>{body(rows)}</sheetData></worksheet>')
-        archive.writestr("xl/sharedStrings.xml", f'<sst xmlns="{MAIN}">' + "".join(f"<si><t>{escape(s)}</t></si>" for s in strings) + "</sst>")
+            put(f"xl/worksheets/sheet{n}.xml", f'{head}<worksheet xmlns="{MAIN}"><sheetData>{body(rows)}</sheetData></worksheet>')
+        put("xl/sharedStrings.xml", f'<sst xmlns="{MAIN}">' + "".join(f"<si><t>{escape(s)}</t></si>" for s in strings) + "</sst>")
     return buffer.getvalue()
 
 
