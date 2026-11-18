@@ -5,14 +5,13 @@ Location-based budget suggestions, daily expenditure calculator, and smart forec
 from __future__ import annotations
 
 import calendar
-import re
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List
 from django.utils import timezone
 
-from alfred_ai.services.currency import counts_in_rupees
+from alfred_ai.services.currency import counts_in_rupees, rupee_text as _inr
 
 from apps.budgets.models import Budget
 from apps.budgets.money import allocate_budget
@@ -64,13 +63,6 @@ def budget_spent(plan, *, today=None):
     today = today or timezone.localdate()
     end = min(start.replace(day=calendar.monthrange(start.year, start.month)[1]), today)
     return sum(plan_spend_by_category(plan.user, plan.currency, start, end).values(), Decimal("0"))
-
-
-
-def _inr(value):
-    """Whole rupees in Indian digit grouping (2,32,000), as the pages show them."""
-    text = f"{abs(round(value)):d}"
-    return ("-" if round(value) < 0 else "") + "₹" + re.sub(r"(\d)(?=(\d\d)*\d{3}$)", r"\1,", text)
 
 
 class BudgetIntelligenceService:

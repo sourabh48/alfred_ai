@@ -1,5 +1,6 @@
 """How rupee amounts are written. Recognising one never converts it to another currency."""
 import hashlib
+import re
 from decimal import Decimal
 
 from django.db import models
@@ -39,6 +40,12 @@ def currency_status(code) -> str:
 def counts_in_rupees(code) -> bool:
     """Not recorded keeps the legacy INR convention; any other recorded code stays out of rupee maths."""
     return not code or code == RUPEE
+
+
+def rupee_text(value):
+    """Whole rupees in Indian digit grouping, as the pages write them: 2,32,000."""
+    whole = round(value)
+    return ("-" if whole < 0 else "") + "₹" + re.sub(r"(\d)(?=(\d\d)*\d{3}$)", r"\1,", str(abs(whole)))
 
 
 def rupee_amount(amount, code):

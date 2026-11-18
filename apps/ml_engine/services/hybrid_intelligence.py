@@ -331,6 +331,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             or (scope!='financial_document' and selected_records is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
     style, output_limit = answer_budget(query, scope, answer_style)
+    if provider=='local' and not cloud_consent and not web_search and scope in ('general','finance'):
+        # "Can I afford X?" gets a fixed sum from the canonical baseline: model arithmetic about money is not reliable.
+        from .affordability import affordability_answer
+        affordable=affordability_answer(user,query)
+        if affordable: return affordable
     if scope in ('bank_statements','financial_records','financial_document','career') and cloud_consent:
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied('This private evidence is local only.')
