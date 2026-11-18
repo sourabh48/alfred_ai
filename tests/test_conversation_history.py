@@ -583,10 +583,11 @@ print('BASELINE_VAULT_ROLLBACK_PASS')
         local = Mock(); local.reason.return_value = 'Your balance is USD 999.'
         result = hybrid_answer(self.store, self.alice, 'Explain current finances', scope='finance', local=local)
         self.assertEqual(result['provider'],'local_evidence'); local.reason.assert_not_called()
-        get_user_model().objects.filter(pk=self.alice.pk).update(monthly_income='1234.56')
+        get_user_model().objects.filter(pk=self.alice.pk).update(monthly_income='1234.56', country='India')
         result = hybrid_answer(self.store, self.alice, 'Explain current finances', scope='finance', local=local)
         self.assertTrue(result['narrative_withheld']); self.assertFalse(result['financial_authority'])
-        self.assertIsNone(result['sources'][0]['data']['amounts']['monthly_income']['currency'])
+        income = result['sources'][0]['data']['amounts']['monthly_income']  # unlabelled income, read in the home currency
+        self.assertEqual((income['currency'], income['currency_status']), ('INR', 'assumed_home'))
         self.assertNotIn('history', local.reason.call_args.args[0])
 
     def test_history_lifecycle_preserves_financial_rows_and_canonical_decimal_baseline(self):

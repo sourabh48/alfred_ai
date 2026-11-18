@@ -520,7 +520,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 reference.append(link,document.createTextNode(` · ${item.verification.replaceAll('_',' ')} · ${item.freshness.replaceAll('_',' ')}`)); evidence.append(reference);
             });
             if (!historical && source.data) Object.entries(source.data).forEach(([key, value]) => {
-                if (["metric_states","amounts","document_sources","document_selection","applied_payment_source"].includes(key) || Object.hasOwn(source.data.amounts || {},key)) return;
+                if (["metric_states","amounts","document_sources","document_selection","applied_payment_source","other_currencies"].includes(key) || Object.hasOwn(source.data.amounts || {},key)) return;
                 const fact = document.createElement("p");
                 if (['limitations','progress','recent_opportunities'].includes(key) && Array.isArray(value) && value.every(item => typeof item === 'string')) {
                     fact.textContent = `${key.replaceAll('_',' ')}: ${value.length ? '' : 'None recorded'}`;

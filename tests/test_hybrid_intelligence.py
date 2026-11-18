@@ -214,9 +214,15 @@ class HybridIntelligenceTests(TestCase):
         FamilyAccountLink.objects.create(created_by=self.alice,linked_user=self.bob,status='accepted',invite_code_hash='a'*64,
             invite_code_hint='SYN',expires_at=timezone.now()+timedelta(days=1),share_financial_summary=False)
         self.local.reason.return_value='Synthetic hypothesis: a fabricated balance of 999999.'
-        result=self.answer('finance',scope='finance')
+        with override_settings(TIME_ZONE='UTC'):  # no country and an unknown zone: the unlabelled balance is withheld
+            result=self.answer('finance',scope='finance')
         facts=result['sources'][0]['data']; self.assertIsNone(facts['liquid_cash'])
         self.assertEqual(facts['amounts']['liquid_cash']['evidence_status'],'unavailable')
+        # Based in India: Alice's unlabelled balance counts as rupees; Bob's linked account never does.
+        get_user_model().objects.filter(pk=self.alice.pk).update(country='India')
+        with override_settings(TIME_ZONE='UTC'):
+            facts=self.answer('finance',scope='finance')['sources'][0]['data']
+        self.assertEqual((facts['liquid_cash'],facts['amounts']['liquid_cash']['currency_status']),(1234.0,'assumed_home'))
         self.assertIn('metric_states',facts); self.assertFalse(result['financial_authority'])
         self.assertEqual(BankAccount.objects.get(user=self.alice).current_balance,1234)
         self.assertNotIn('9000',str(self.local.reason.call_args))

@@ -5083,6 +5083,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         rows, local = self.canonical_grounding_fixture()
         local.reason.side_effect = EmbeddingUnavailable('Synthetic unavailable local model')
         owner = self.scenario['user']
+        type(owner).objects.filter(pk=owner.pk).update(country='Germany')  # based outside India: unlabelled amounts stay unrecorded
         self.login(); self.browser.get(self.live_server_url+'/ai/insights/?scope=finance')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceScope').get_property('value') == 'finance')
         self.wait.until(lambda _: self.text('conversationHistoryStatus') in ('Off','On · local only','Switched off on this PC'))
@@ -5104,6 +5105,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertNotIn('limitations: [', evidence.text)
         self.assertTrue(evidence.find_elements(self.By.CSS_SELECTOR,'.recorded-amount'))
         self.assertIn('Currency not recorded', evidence.text)
+        self.assertNotIn('other currencies', evidence.text)  # explained in words under limitations, never raw data
         self.assertIn('<img src=x onerror=', evidence.text)
         self.assertFalse(evidence.find_elements(self.By.TAG_NAME,'img'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.sourceCardLeak)'))
