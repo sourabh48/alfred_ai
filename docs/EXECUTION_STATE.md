@@ -41,7 +41,14 @@ Display only: records, rupee totals and calculations never change.
 
 Not fixed: a "Back up now" button (the backup notice still points at `config/local.env`); general money questions
 other than affordability still need the finance scope; pages' no-currency rule above.
-Backend on `8680b05`: 4 shards, 0 failures (shard 3 skipped=6, shard 2 skipped=8). Final-tip results below.
+Backend on `8680b05`: 4 shards, 0 failures. On `22beb8d`: 3,146 tests, 2 failures (old legacy-currency assertions),
+fixed in `8d368f4` and re-run with 8 affected modules (174 tests) in this PC's zone and in UTC, all OK. Chrome on
+`22beb8d`: 230 tests, 2 failures and 1 error; the source-card one was real (raw other-currency data, fixed), the other
+two passed when re-run alone (timing). Skips: shard 2 skipped=8, shard 3 skipped=6, Chrome skipped=4.
+MERGED locally (owner "merge and restart - ok"): database copied first with the SQLite backup API to
+`F:/ALFRED/restored-runtime/backups/before-migrations-investments0011-20261118` (integrity ok, 78 tables, at
+investments 0009); master fast-forwarded to `8d368f4`; app restarted, investments 0010/0011 applied, health ready.
+Not pushed; no hosted CI on this tip. Owner checks still open: docs/OWNER_CHECKS_2026-11-18.md.
 
 ## Research desk and investment audit — 2026-11-18
 
