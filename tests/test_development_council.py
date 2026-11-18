@@ -35,11 +35,11 @@ class DevelopmentCouncilTests(SimpleTestCase):
 
     def git(self,*args): return release.git(self.repo,*args)
 
-    def plan(self,profile='backend'):
-        return self.council.plan(['apps/sample.py'],['tests.test_council_fixture'],profile)
+    def plan(self,profile='backend',improvement=False):
+        return self.council.plan(['apps/sample.py'],['tests.test_council_fixture'],profile,improvement=improvement)
 
-    def reviewed(self,profile='backend'):
-        task=self.plan(profile); (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8')
+    def reviewed(self,profile='backend',improvement=False):
+        task=self.plan(profile,improvement); (self.repo/'apps/sample.py').write_text('VALUE = 2\n',encoding='utf-8')
         source=self.council.snapshot(task)[0]
         for role in ('architect','developer','reviewer','security'): task=self.council.record(task['id'],role,'PASS',source,actor='synthetic_'+role)
         return task
@@ -49,8 +49,8 @@ class DevelopmentCouncilTests(SimpleTestCase):
         with patch('scripts.development_council.run',return_value=dict(status='PASS',code='suite_exit',tests=1,skips=0)):
             return self.council.test(task['id'])
 
-    def recovery_experiment(self):
-        task = self.reviewed()
+    def recovery_experiment(self, improvement=False):
+        task = self.reviewed(improvement=improvement)
         def execute(repo, command, env, out, name, timeout):
             number = self.council._read(task['id'])['attempts']
             log = out/'tests.log'; log.write_text('synthetic run '+str(number), encoding='utf-8')
@@ -120,6 +120,26 @@ class DevelopmentCouncilTests(SimpleTestCase):
             self.assertEqual(main(['evaluate', '--repo', str(self.repo), '--task', identity]), 0)
         self.assertEqual(json.loads(output.getvalue())['status'], 'RECOVERY_OBSERVED')
         self.assertEqual(self.git('log', '-1', '--format=%s'), 'synthetic regression fixture')
+
+    def test_improvement_task_is_committed_only_after_an_observed_recovery(self):
+        task = self.reviewed(improvement=True)  # COUNCIL-03: claims to fix failing tests
+        with patch('scripts.development_council.run', return_value=dict(status='PASS', code='suite_exit', tests=1, skips=0)):
+            self.council.test(task['id'])
+        self.git('add', 'apps/sample.py'); self.git('commit', '-m', 'synthetic improvement without a failing run')
+        with self.assertRaisesRegex(CouncilError, 'test_recovery_required'):
+            self.council.complete(task['id'], self.git('rev-parse', 'HEAD'), 'synthetic-user-approval')
+        self.assertEqual(self.council._read(task['id'])['stage'], 'READY_FOR_AUTHORIZED_COMMIT')
+
+    def test_improvement_task_with_a_recovery_completes_and_keeps_the_comparison(self):
+        identity = self.recovery_experiment(improvement=True)
+        self.git('add', 'apps/sample.py'); self.git('commit', '-m', 'synthetic reviewed fix')
+        done = self.council.complete(identity, self.git('rev-parse', 'HEAD'), 'synthetic-user-approval')
+        self.assertEqual(done['stage'], 'COMPLETE')
+        self.assertEqual((done['recovery']['status'], done['recovery']['code']), ('RECOVERY_OBSERVED', 'same_tests_failed_then_passed'))
+        self.assertFalse(done['recovery']['production_authorized'])
+        self.assertFalse(done['roles']['release_guardian']['production_authorized'])
+        with self.assertRaisesRegex(CouncilError, 'duplicate_objective_scope_changed'):
+            self.plan(improvement=False)  # the same objective cannot drop the recovery requirement later
 
     def test_improvement_does_not_promote_one_passing_run(self):
         task = self.passing()

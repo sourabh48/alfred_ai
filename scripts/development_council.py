@@ -131,7 +131,9 @@ class Council:
             raise CouncilError('unsafe_or_approval_sensitive_scope')
         return self.repo / path
 
-    def plan(self, paths, labels, profile='backend', feature=None):
+    def plan(self, paths, labels, profile='backend', feature=None, improvement=False):
+        """improvement=True (COUNCIL-03): the change claims to fix failing tests, so complete() also needs an observed
+        recovery from evaluate(): the same unchanged tests failed on the old source and pass on the reviewed one."""
         if release.git(self.repo, 'status', '--porcelain', '--untracked-files=all'):
             raise CouncilError('plan_requires_clean_worktree')
         queue = feature_queue((self.repo / 'docs/PROJECT_STATUS.md').read_text(encoding='utf-8'))
@@ -152,12 +154,12 @@ class Council:
             stage='AWAITING_DEVELOPER', revision=0, attempts=0, created=int(time.time()), source=None, contract_version=3,
             budgets=dict(context_bytes=4096, reserved_tokens=8192, output_tokens=256, iterations=2, seconds=600),
             reserved_tokens=0, roles={role:dict(status='NOT_RUN') for role in CURRENT_ROLES},
-            selection=dict(provider='deterministic',code='reviewed_master_queue'))
+            selection=dict(provider='deterministic',code='reviewed_master_queue'), improvement=bool(improvement))
         with closing(sqlite3.connect(self.database)) as db, db:
             old = db.execute('SELECT body FROM tasks WHERE identity=?', (identity,)).fetchone()
             if old:
                 previous=json.loads(old[0])
-                if any(previous[key]!=task[key] for key in ('paths','labels','profile')):
+                if any(previous.get(key, False if key == 'improvement' else None)!=task[key] for key in ('paths','labels','profile','improvement')):
                     raise CouncilError('duplicate_objective_scope_changed')
                 return previous
             db.execute('INSERT INTO tasks VALUES(?,?,?)', (task['id'], identity, json.dumps(task, sort_keys=True)))
@@ -387,8 +389,9 @@ class Council:
         paths.update('/'.join(label.split('.')[:2])+'.py' for label in task['labels'])
         return sha256(json.dumps({path: release.sha256(self._path(path)) for path in sorted(paths)}, sort_keys=True).encode()).hexdigest()
 
-    def evaluate(self, identity):
-        """Compare actual test receipts; advice and a recovery never grant write authority."""
+    def evaluate(self, identity, commit=None):
+        """Compare actual test receipts; advice and a recovery never grant write authority. commit: read the reviewed
+        source from the host's commit instead of the working tree (used by complete())."""
         task = self._read(identity)
         result = dict(status='INCONCLUSIVE', code='two_comparable_runs_required', task=identity,
                       automatic_execution=False, production_authorized=False)
@@ -397,7 +400,7 @@ class Council:
         before, after = history[-2:]
         result.update(before_source=before.get('source'), after_source=after.get('source'))
         try:
-            source, _ = self.snapshot(task, commit=task.get('commit'))
+            source, _ = self.snapshot(task, commit=commit or task.get('commit'))
             if source != after.get('source') or not self._reviews_valid(task, source):
                 raise CouncilError('current_host_reviews_required')
             definition = self._test_definition(task)
@@ -494,9 +497,15 @@ class Council:
         """Verify a legitimate host's approved commit; this tool never edits or stages source."""
         if not re.fullmatch(r'[A-Za-z0-9_-]{8,80}', authorization or ''): raise CouncilError('development_commit_authorization_required')
         release.exact_commit(self.repo,commit)
-        attempt_id=uuid4().hex; claimed=[]
+        attempt_id=uuid4().hex; claimed=[]; recovery=[]
+        current=self._read(identity)
+        if current.get('improvement') and not (current['stage']=='COMPLETE' and current.get('commit')==commit):
+            verdict=self.evaluate(identity, commit)  # read-only comparison of retained receipts; grants no write authority
+            if verdict['status']!='RECOVERY_OBSERVED': raise CouncilError('test_recovery_required')
+            recovery.append(verdict)
         def accept(task):
             task.update(stage='COMPLETE',commit=commit,authorization=authorization)
+            if recovery: task['recovery']=recovery[0]
             task['roles']['coordinator']=dict(status='PASS',provider='deterministic',code='verified_authorized_host_commit')
         def prepare(task):
             if task['stage']=='COMPLETE' and task.get('commit')==commit: return
@@ -610,14 +619,14 @@ def main(argv=None):
     parser.add_argument('--feature'); parser.add_argument('--profile',default='backend'); parser.add_argument('--role')
     parser.add_argument('--status',choices=('PASS','FAIL','BLOCKED')); parser.add_argument('--source')
     parser.add_argument('--authorization-reference'); parser.add_argument('--confirm-worker-stopped',action='store_true')
-    parser.add_argument('--commit')
+    parser.add_argument('--commit'); parser.add_argument('--improvement',action='store_true')
     parser.add_argument('--actor'); parser.add_argument('--retry-advice',action='store_true')
     parser.add_argument('--reason-code',action='append')
     args=parser.parse_args(argv)
     blocked_advisory=False
     try:
         council=Council(args.repo)
-        if args.command=='plan': result=council.plan(args.path,args.label,args.profile,args.feature)
+        if args.command=='plan': result=council.plan(args.path,args.label,args.profile,args.feature,args.improvement)
         elif args.command=='handoff': result=council.handoff(args.task)
         elif args.command=='inspect': result={'source':council.snapshot(council._read(args.task))[0]}
         elif args.command=='record':
