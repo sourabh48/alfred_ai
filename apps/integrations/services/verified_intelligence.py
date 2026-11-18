@@ -1467,7 +1467,7 @@ class VerifiedIntelligenceService:
             },
         }, summary, "Yahoo observations expire within seven calendar days or the fetch TTL, whichever is earlier. Volatility uses observation returns on a 252-observation scale, not a forecast."
 
-    def _fetch_yahoo_chart(self, symbol: str, range_value: str, interval: str) -> dict:
+    def _fetch_yahoo_chart(self, symbol: str, range_value: str, interval: str, max_points: int = 400) -> dict:
         response = public_http.request("GET",
             f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
             params={"range": range_value, "interval": interval},
@@ -1481,8 +1481,9 @@ class VerifiedIntelligenceService:
             if result["meta"]["symbol"] != unquote(symbol):
                 raise ValueError("Yahoo instrument identity mismatch.")
             timestamps = result["timestamp"]
-            prices = result["indicators"]["quote"][0]["close"]
-            if not isinstance(timestamps, list) or not isinstance(prices, list) or not 1 <= len(timestamps) <= 400 or len(prices) != len(timestamps):
+            quote = result["indicators"]["quote"][0]
+            prices = quote["close"]
+            if not isinstance(timestamps, list) or not isinstance(prices, list) or not 1 <= len(timestamps) <= max_points or len(prices) != len(timestamps):
                 raise ValueError("Yahoo observation arrays are invalid.")
             observations = {}
             for stamp, raw in zip(timestamps, prices):
@@ -1503,7 +1504,24 @@ class VerifiedIntelligenceService:
             if datetime.fromtimestamp(dates[-1], datetime_timezone.utc) > timezone.now():
                 raise ValueError("Yahoo observation timestamp is invalid.")
             valid = [(stamp, observations[stamp]) for stamp in dates if observations[stamp] is not None]
+
+            def side(name):
+                """The day's high or low, aligned with the closes; a missing or invalid value stays None."""
+                raw = quote.get(name)
+                if not isinstance(raw, list) or len(raw) != len(timestamps):
+                    return None
+                by_stamp, out = dict(zip(timestamps, raw)), []
+                for stamp, _ in valid:
+                    value = by_stamp.get(stamp)
+                    try:
+                        value = None if value is None or isinstance(value, bool) else Decimal(str(value))
+                    except InvalidOperation:
+                        value = None
+                    out.append(value if value is not None and value.is_finite() and value > 0 else None)
+                return out
+
             return {"close": [value for _, value in valid], "timestamp": [stamp for stamp, _ in valid],
+                    "high": side("high"), "low": side("low"),
                     "currency": str(result["meta"].get("currency") or "").upper()[:3] or None}
         except (KeyError, TypeError, AttributeError, IndexError, InvalidOperation, OverflowError, OSError) as exc:
             raise ValueError("Yahoo chart evidence is malformed.") from exc

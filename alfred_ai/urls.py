@@ -46,6 +46,7 @@ from .views import (
 )
 
 from apps.career.views import career_tailored_cv_print
+from apps.investments.research_views import research_desk_report
 
 urlpatterns = [
     path("media/<path:path>", private_media, name="private_media"),
@@ -96,6 +97,7 @@ urlpatterns = [
     path("budgets/", budgets_view, name="budgets"),
     path("loans/", loans_view, name="loans"),
     path("investments/", investments_view, name="investments"),
+    path("investments/research-report/", research_desk_report, name="research_desk_report"),
     path("family/", family_view, name="family"),
     path("career/", career_view, name="career"),
     path("career/job-analyses/<int:pk>/tailored-cv/", career_tailored_cv_print, name="career_tailored_cv_print"),

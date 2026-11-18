@@ -9263,6 +9263,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=fund))
         self.enterContext(patch('apps.investments.services.research_packet.fetch_prices', return_value=prices))
         self.enterContext(patch.object(research_desk, 'headlines', return_value=[]))
+        self.enterContext(patch.object(research_desk, 'macro', return_value=[]))
         self.enterContext(patch.object(research_desk, 'benchmark', return_value=None))
         self.browser.get(self.live_server_url + '/investments/')
         self.wait.until(lambda _: 'Not researched yet' in self.text('researchDeskStatus'))
@@ -9294,6 +9295,21 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertFalse(research_desk.desk_settings(owner)['enabled'])
         self.memory_click('#researchDeskMonitor')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'researchDeskMonitor').text == 'Pause daily research')
+        from apps.investments.services import research_backtest
+        past = {'at': timezone.now().isoformat(), 'calls': 12, 'shares': 1, 'from': '2023-01-01', 'to': '2025-06-01', 'went_its_way_pct': '58',
+                'by_rating': [{'rating': 'buy', 'label': 'Buy / Add more', 'calls': 12, 'average_move_pct': '3.1', 'average_vs_nifty_pct': '0.4',
+                               'went_its_way_pct': '58'}], 'skipped': [], 'recent': [], 'limits': ['Overlapping calls are not independent.']}
+        with patch.object(research_backtest, 'replay_all', return_value=past):
+            self.memory_click('#researchDeskBacktestRun')
+            self.wait.until(lambda _: 'Replayed 12 past call(s)' in self.text('researchDeskFeedback'))
+        self.assertIn('Buy / Add more', self.text('researchDeskBacktest'))
+        self.assertIn('58% went their way', self.text('researchDeskBacktest'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'researchDeskIdeas').is_selected())  # ideas are opt-in
+        self.browser.execute_script("document.getElementById('researchDeskIdeas').closest('details').open = true")
+        self.memory_click('#researchDeskIdeas')
+        self.wait.until(lambda _: 'each week' in self.text('researchDeskFeedback'))
+        self.assertTrue(research_desk.desk_settings(owner)['discover'])
+        self.assertTrue(self.browser.find_element(self.By.ID, 'researchDeskReport').get_attribute('href').endswith('/investments/research-report/'))
         self.browser.set_window_size(390, 900)
         try:
             self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth + 1"))

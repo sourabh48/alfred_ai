@@ -10,7 +10,8 @@ from django.test import TestCase
 from alfred_ai import native_tasks
 from alfred_ai.services.public_http import PublicHTTPError
 from apps.investments.models import Investment, ResearchDecision
-from apps.investments.services import research_desk
+from apps.investments.services import research_backtest, research_desk
+from apps.investments.services.research_packet import build_packet
 from tests.test_research_packet import RISING, Y1, Y2, D, _fund, _prices
 
 TODAY = date(2025, 9, 8)  # the fixture prices end on 2025-09-07
@@ -25,6 +26,7 @@ class ResearchDeskTests(TestCase):
         cache.clear()
         self.enterContext(patch("apps.investments.services.research_packet.timezone.localdate", return_value=TODAY))
         self.enterContext(patch.object(research_desk, "headlines", return_value=[]))
+        self.enterContext(patch.object(research_desk, "macro", return_value=[]))
         self.enterContext(patch.object(research_desk, "benchmark", return_value={"level": "25000.0000", "as_of": "2025-09-05"}))
         self.market = {"GOOD.NS": (_fund(), _prices(RISING)), "WEAK.NS": (WEAK, _prices(FALLING))}
         self.enterContext(patch("apps.investments.services.research_packet.fetch_fundamentals", side_effect=lambda s: self.data(s)[0]))
@@ -231,3 +233,148 @@ class ResearchDeskTests(TestCase):
         self.assertEqual(response.status_code, 400)
         response = self.client.post(URL, {"operation": "monitor", "enabled": False}, content_type="application/json")
         self.assertFalse(response.json()["desk"]["settings"]["enabled"])
+
+    def test_ideas_are_opt_in_weekly_and_survive_the_daily_cleanup(self):
+        self.market["IDEA.NS"] = (_fund(), _prices(RISING))
+        self.market["POOR.NS"] = (WEAK, _prices(FALLING))
+        companies = [("GOOD.NS", "Good"), ("IDEA.NS", "Idea Co"), ("POOR.NS", "Poor Co"), ("MISSING.NS", "Missing Co")]
+        self.enterContext(patch.object(research_desk, "nifty50", return_value=companies))
+        self.assertIsNone(research_desk.discover(self.user, TODAY))  # off until the owner switches it on
+        self.client.post(URL, {"operation": "discover", "enabled": True}, content_type="application/json")
+        run = research_desk.discover(self.user, TODAY)
+        self.assertEqual((run["checked"], run["found"]), (2, 1))  # own share skipped, failed fetch not counted, Avoid not kept
+        idea = self.suggestions()["IDEA.NS"]
+        self.assertTrue(idea["idea"])
+        self.assertIn("not on your list", idea["why"])
+        self.assertNotIn("POOR.NS", self.suggestions())
+        self.assertIsNone(research_desk.discover(self.user, TODAY + timedelta(days=3)))  # weekly
+        research_desk.refresh(self.user, TODAY)
+        self.assertIn("IDEA.NS", self.suggestions())  # the daily cleanup leaves ideas alone
+        self.assertIn("GOOD.NS", self.suggestions())
+        self.assertEqual(research_desk.desk(self.user)["last_ideas"]["found"], 1)
+        self.market["IDEA.NS"] = (WEAK, _prices(FALLING))
+        cache.clear()  # research data is cached per symbol
+        research_desk.discover(self.user, TODAY, force=True)
+        self.assertNotIn("IDEA.NS", self.suggestions())  # no longer a Buy: the idea is withdrawn
+        with patch.object(research_desk, "nifty50", side_effect=PublicHTTPError("upstream_status")):
+            response = self.client.post(URL, {"operation": "ideas"}, content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("NIFTY 50", response.json()["detail"])
+
+    def test_a_resumed_daily_run_skips_shares_already_researched_today(self):
+        research_desk.refresh(self.user, TODAY)
+        with patch.object(research_desk, "analyse", wraps=research_desk.analyse) as analyse:
+            run = research_desk.refresh(self.user, TODAY, resume=True)
+            self.assertEqual((run["researched"], analyse.call_count), (2, 0))
+            research_desk.refresh(self.user, TODAY)
+            self.assertEqual(analyse.call_count, 2)  # Research now reads every share again
+        self.assertEqual(len(self.suggestions()), 2)
+
+    def test_nse_list_keeps_equities_and_leaves_out_lenders(self):
+        csv = ("Company Name,Industry,Symbol,Series,ISIN Code\r\nSynthetic Motors Ltd.,Automobile,SYNMOT,EQ,X\r\n"
+               "Synthetic Bank Ltd.,Financial Services,SYNBANK,EQ,X\r\nOdd Ltd.,Power,ODD,BE,X\r\nBad Ltd.,Power,../x,EQ,X\r\n")
+        response = type("Response", (), {"content": ("\ufeff" + csv).encode()})()
+        with patch.object(research_desk.public_http, "request", return_value=response) as request:
+            self.assertEqual(research_desk.nifty50(), [("SYNMOT.NS", "Synthetic Motors Ltd.")])
+            research_desk.nifty50()
+        self.assertEqual(request.call_count, 1)  # cached for a week
+        self.assertEqual(request.call_args.args[1], research_desk.NIFTY50_URL)
+
+    def test_past_calls_check_is_logged_one_at_a_time_and_shown(self):
+        result = {"at": "2025-09-08T10:00:00+00:00", "calls": 3, "shares": 2, "by_rating": [], "skipped": [], "limits": ["x"],
+                  "went_its_way_pct": "67", "from": "2023-01-01", "to": "2025-05-01", "recent": []}
+        with patch.object(research_backtest, "replay_all", return_value=result) as replay:
+            response = self.client.post(URL, {"operation": "backtest"}, content_type="application/json")
+            self.assertEqual(response.json()["result"]["calls"], 3)
+            self.assertEqual({symbol for symbol, _ in replay.call_args.args[0]}, {"GOOD.NS", "WEAK.NS"})
+            cache.add(f"research-desk:backtest:{self.user.pk}", 1, 60)
+            self.assertEqual(self.client.post(URL, {"operation": "backtest"}, content_type="application/json").status_code, 400)
+        self.assertEqual(research_desk.desk(self.user)["backtest"]["calls"], 3)
+        self.assertIsNone(research_desk.desk(self.other)["backtest"])
+
+    def test_printable_report_is_owner_only_and_escaped(self):
+        research_desk.save_settings(self.user, watch=[{"symbol": "GOOD.NS", "name": "<i>Good</i>"}])
+        research_desk.refresh(self.user, TODAY)
+        response = self.client.get("/investments/research-report/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store, private")
+        self.assertContains(response, "GOOD.NS")
+        self.assertNotContains(response, "<i>Good</i>")
+        self.assertContains(response, "Strongest reason against")
+        self.client.force_login(self.other)
+        self.assertNotContains(self.client.get("/investments/research-report/"), "GOOD.NS")
+        self.client.logout()
+        self.assertEqual(self.client.get("/investments/research-report/").status_code, 302)
+
+
+def _series(count, start=1672531200, high=True):  # daily from 2023-01-01, rising one unit a day
+    closes = [D(100 + i) for i in range(count)]
+    prices = {"close": closes, "timestamp": [start + 86400 * i for i in range(count)], "currency": "INR"}
+    if high:
+        prices.update(high=[c + 2 for c in closes], low=[c - 2 for c in closes])
+    return prices
+
+
+class ResearchExtrasTests(TestCase):
+    def test_example_levels_use_the_average_range_and_need_highs_and_lows(self):
+        prices = _series(30)
+        buy = research_desk.levels(prices, "buy", False, "INR")
+        self.assertEqual((buy["atr14"], buy["stop"], buy["support"], buy["resistance"]), ("4.00", "121.00", "108.00", "131.00"))
+        self.assertIn("stop-loss", buy["text"])
+        self.assertIn("never places orders", buy["text"])
+        self.assertIn("sell if it closes below INR 121.00", research_desk.levels(prices, "sell", True, "INR")["text"])
+        self.assertIn("traded between", research_desk.levels(prices, "hold", False, "INR")["text"])
+        self.assertIsNone(research_desk.levels(_series(30, high=False), "buy", False, "INR"))
+        broken = _series(30)
+        broken["low"][-3] = None
+        self.assertIsNone(research_desk.levels(broken, "buy", False, "INR"))
+
+    def test_macro_lines_come_from_the_world_bank_and_fail_quietly(self):
+        from apps.integrations.services.verified_intelligence import verified_intelligence
+
+        result = type("Result", (), {"payload": {"latest_value": 4.953, "latest_year": "2024"}})()
+        with patch.object(verified_intelligence, "world_bank_indicator", return_value=result):
+            self.assertEqual(research_desk.macro()[0], "India's inflation was 5.0% in 2024 (World Bank, yearly).")
+        with patch.object(verified_intelligence, "world_bank_indicator", side_effect=PublicHTTPError("offline")):
+            self.assertEqual(research_desk.macro(), [])
+
+    def test_quarterly_revenue_compares_the_same_quarter_a_year_earlier(self):
+        quarters = [(date(2024, 6, 30), D(100)), (date(2024, 9, 30), D(110)), (date(2024, 12, 31), D(120)),
+                    (date(2025, 3, 31), D(130)), (date(2025, 6, 30), D(90))]
+        with patch("apps.investments.services.research_packet.timezone.localdate", return_value=TODAY):
+            packet = build_packet("SYNTH.NS", _fund(QuarterlyRevenue=quarters), _prices(RISING))
+            self.assertEqual(packet["metrics"]["quarterly_revenue_growth_pct"], {"value": D("-10.0"), "as_of": "2025-06-30"})
+            self.assertTrue(any("fell 10.0% on the same quarter" in item["point"] for item in packet["bearish"]))
+            gap = build_packet("SYNTH.NS", _fund(QuarterlyRevenue=quarters[:1] + [(date(2025, 9, 30), D(1))] * 4), _prices(RISING))
+            self.assertNotIn("quarterly_revenue_growth_pct", gap["metrics"])
+
+    def test_backtest_never_sees_later_prices_or_results_than_its_day(self):
+        prices, seen = _series(900), []
+        fundamentals = {"TotalRevenue": [(date(2023, 3, 31), D(1), "INR"), (date(2024, 3, 31), D(2), "INR"), (date(2025, 3, 31), D(3), "INR")]}
+
+        def fake_rate(symbol, known, window, today):
+            seen.append((today, known, window))
+            return None, None, {"rating": "buy"}
+
+        with patch.object(research_backtest, "rate", side_effect=fake_rate):
+            cells = research_backtest.replay("SYNTH.NS", fundamentals, prices, prices, until=date(2026, 1, 1))
+        self.assertTrue(cells)
+        for day, known, window in seen:
+            self.assertTrue(all(row[0] + timedelta(days=90) <= day for row in known["TotalRevenue"]))
+            self.assertLessEqual(len(window["close"]), research_backtest.WINDOW)
+            self.assertLessEqual(research_backtest._days(window)[-1], day)
+        first = cells[0]  # day 252 to day 343: 443 / 352
+        self.assertEqual((first["return_pct"], first["benchmark_pct"], first["alpha_pct"]), (D("25.9"), D("25.9"), D("0.0")))
+        last_exit = date.fromisoformat(cells[-1]["day"]) + timedelta(days=91)
+        self.assertLessEqual(last_exit, research_backtest._days(prices)[-1])  # every cell was scored on a real later close
+
+    def test_backtest_summary_counts_by_rating_and_judges_against_nifty(self):
+        cell = lambda rating, move, alpha: {"rating": rating, "return_pct": D(move), "alpha_pct": None if alpha is None else D(alpha)}
+        rows = research_backtest.summarise([cell("buy", "10", "4"), cell("buy", "-2", "-6"), cell("buy", "5", None),
+                                            cell("sell", "-8", "-3"), cell("hold", "1", "0")])
+        by = {row["rating"]: row for row in rows}
+        self.assertEqual(list(by), ["buy", "hold", "sell"])
+        self.assertEqual((by["buy"]["calls"], by["buy"]["average_move_pct"], by["buy"]["average_vs_nifty_pct"], by["buy"]["went_its_way_pct"]),
+                         (3, "4.3", "-1.0", "67"))
+        self.assertEqual(by["sell"]["went_its_way_pct"], "100")
+        self.assertIsNone(by["hold"]["went_its_way_pct"])

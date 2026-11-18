@@ -213,6 +213,12 @@ class ResearchDeskView(APIView):
                 result = research_desk.save_settings(user, profile=data.get("profile"))
             elif operation == "later":
                 result = research_desk.later(user, data.get("id"))
+            elif operation == "discover" and isinstance(data.get("enabled"), bool):
+                result = research_desk.save_settings(user, discover=data["enabled"])
+            elif operation == "ideas":
+                result = research_desk.discover(user, force=True)
+            elif operation == "backtest":
+                result = research_desk.backtest(user)
             else:
                 return Response({"detail": "Choose an action."}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError as exc:
@@ -220,6 +226,19 @@ class ResearchDeskView(APIView):
         except public_http.PublicHTTPError as exc:
             return Response({"detail": f"Yahoo data is unavailable right now ({exc.code}). Try again later."}, status=status.HTTP_502_BAD_GATEWAY)
         return Response({"result": result, "desk": research_desk.desk(user)}, headers={"Cache-Control": "no-store, private"})
+
+
+def research_desk_report(request):
+    """A printable record of the open calls, each role's steps, example levels and the last past-calls check (owner only)."""
+    from django.contrib.auth.views import redirect_to_login
+    from django.shortcuts import render
+    from .services.research_desk import desk
+
+    if not request.user.is_authenticated:
+        return redirect_to_login(request.get_full_path())
+    response = render(request, "investments/research_report.html", {"desk": desk(request.user), "now": timezone.now()})
+    response["Cache-Control"] = "no-store, private"
+    return response
 
 
 class ResearchSearchHistoryView(APIView):

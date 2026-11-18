@@ -74,6 +74,19 @@ class YahooMarketAcceptanceTests(TestCase):
         self.assertIn(self.transport.end.isoformat(), result.evidence["summary"])
         self.assertIn("not independently verified exchange closing prices", result.evidence["summary"])
 
+    def test_highs_and_lows_stay_aligned_with_the_kept_closes(self):
+        quote = self.chart()["indicators"]["quote"][0]
+        quote["close"][10] = None
+        quote["high"] = [value + 1 for value in quote["close"][:10]] + [5.0] + [value + 1 for value in quote["close"][11:]]
+        quote["low"] = [None] + [-1] + [1.0] * 38
+        result = self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d")
+        self.assertEqual((len(result["high"]), result["high"][10]), (39, Decimal(1012)))  # the dropped day's 5.0 is gone too
+        self.assertEqual(result["low"][:3], [None, None, Decimal(1)])  # missing and invalid stay None
+        del quote["high"]
+        self.assertIsNone(self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d")["high"])
+        with self.assertRaises(ValueError):
+            self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d", max_points=39)
+
     def test_missing_interior_close_keeps_timestamp_pairing(self):
         self.chart()["indicators"]["quote"][0]["close"][10] = None
         result = self.service._fetch_yahoo_chart("%5ENSEI", "3mo", "1d")

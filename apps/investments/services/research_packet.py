@@ -39,12 +39,13 @@ def fetch_fundamentals(symbol: str) -> dict:
     """{type: [(period_end, Decimal value, currency)]} oldest first; undated, future-dated or non-numeric rows are dropped."""
     now, today = int(timezone.now().timestamp()), timezone.localdate()
     response = public_http.request("GET", f"https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{symbol}",
-        params={"type": ",".join("annual" + name for name in TYPES), "period1": now - 6 * 366 * 86400, "period2": now},
+        params={"type": ",".join(["annual" + name for name in TYPES] + ["quarterlyTotalRevenue"]), "period1": now - 6 * 366 * 86400, "period2": now},
         headers={"User-Agent": USER_AGENT})
     series = {}
     for item in (response.json().get("timeseries") or {}).get("result") or []:
         kind = ((item.get("meta") or {}).get("type") or [""])[0]
-        if not kind.startswith("annual") or kind[6:] not in TYPES:
+        name = "QuarterlyRevenue" if kind == "quarterlyTotalRevenue" else kind[6:] if kind.startswith("annual") else ""
+        if name not in (*TYPES, "QuarterlyRevenue"):
             continue
         rows = []
         for row in item.get(kind) or []:
@@ -55,13 +56,15 @@ def fetch_fundamentals(symbol: str) -> dict:
                 continue
         rows = [row for row in rows if row[0] <= today]  # a reported period cannot end in the future
         if rows:
-            series[kind[6:]] = sorted({row[0]: row for row in rows if row[1].is_finite()}.values())
+            series[name] = sorted({row[0]: row for row in rows if row[1].is_finite()}.values())
     return series
 
 
-def fetch_prices(symbol: str) -> dict:
+def fetch_prices(symbol: str, *, years: int = 1) -> dict:
+    """Daily closes, highs and lows; more than one year only for backtesting (about 252 sessions a year)."""
     from apps.integrations.services.verified_intelligence import VerifiedIntelligenceService
-    return VerifiedIntelligenceService()._fetch_yahoo_chart(symbol, range_value="1y", interval="1d")
+    return VerifiedIntelligenceService()._fetch_yahoo_chart(symbol, range_value=f"{years}y", interval="1d",
+                                                            max_points=400 if years == 1 else 260 * years + 20)
 
 
 def price_metrics(closes: list, stamps: list) -> dict:
@@ -144,10 +147,10 @@ def beginner_view(bullish: list, bearish: list, portfolio: dict) -> dict:
             "note": "Counted from the signs below by fixed rules. Not a forecast or financial advice; nothing is bought or sold."}
 
 
-def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None, portfolio_total=None) -> dict:
+def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None, portfolio_total=None, today=None) -> dict:
     point = lambda text, metric, value, as_of: {"point": text, "metric": metric, "value": value, "as_of": as_of}
     bullish, bearish, changes, missing, metrics = [], [], [], [], {}
-    today = timezone.localdate()
+    today = today or timezone.localdate()  # a past day when backtesting: nothing dated later is used
     fundamentals = {name: [r for r in rows if r[0] <= today and r[1].is_finite()] for name, rows in fundamentals.items()}
     currencies = sorted((r[0], r[2]) for rows in fundamentals.values() for r in rows if r[2])
     main_series = fundamentals.get("TotalRevenue") or fundamentals.get("NetIncome") or []
@@ -167,6 +170,13 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
         changes.append("Annual revenue falls year on year." if growth > 0 else "Annual revenue returns to growth.")
     else:
         missing.append("Two years of dated revenue")
+    quarters = fundamentals.get("QuarterlyRevenue") or []
+    if len(quarters) >= 5 and quarters[-1][0] - quarters[-5][0] <= timedelta(days=380) and quarters[-5][1]:
+        end, quarter = quarters[-1][0].isoformat(), _pct((quarters[-1][1] - quarters[-5][1]) / abs(quarters[-5][1]))
+        metrics["quarterly_revenue_growth_pct"] = {"value": quarter, "as_of": end}
+        (bullish if quarter > 0 else bearish).append(point(
+            f"Revenue in the latest quarter {'rose' if quarter > 0 else 'fell'} {abs(quarter)}% on the same quarter a year earlier.",
+            "quarterly_revenue_growth_pct", quarter, end))
     period, previous = _common_period(fundamentals, "NetIncome", "TotalRevenue"), _common_period(fundamentals, "NetIncome", "TotalRevenue", back=1)
     margin, margin_before = _pct(_ratio(at("NetIncome", period), at("TotalRevenue", period))), _pct(_ratio(at("NetIncome", previous), at("TotalRevenue", previous)))
     if margin is not None:
@@ -261,7 +271,7 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
         portfolio = {"status": "held", "holding_id": holding.pk, "weight_pct": weight,
                      "detail": f"This holding is {weight}% of your holdings recorded in the same currency."}
         if weight > 20:
-            bearish.append(point(f"It is already {weight}% of your holdings, above the 20% concentration screen.", "portfolio_weight_pct", weight, timezone.localdate().isoformat()))
+            bearish.append(point(f"It is already {weight}% of your holdings, above the 20% concentration screen.", "portfolio_weight_pct", weight, today.isoformat()))
 
     missing += ["News and management commentary", "Sector and competitor comparison", "Filing dates (statements are dated by period end)"]
     latest_period = max((rows[-1][0] for rows in fundamentals.values() if rows), default=None)

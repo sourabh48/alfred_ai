@@ -16,7 +16,7 @@ import hashlib
 import json
 import logging
 from datetime import date, datetime, timedelta, timezone as dt_timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
 
 from django.core.cache import cache
@@ -29,12 +29,14 @@ from alfred_ai.services.currency import CURRENCY_CHOICES
 from apps.reports.models import OperationalLog
 from apps.reports.services import operational_logging_service
 from .research_journal import outcome
-from .research_packet import SYMBOL, beginner_view, build_packet, price_metrics, research_data
+from .research_packet import SYMBOL, USER_AGENT, beginner_view, build_packet, price_metrics, research_data
 
 logger = logging.getLogger(__name__)
 SCOPE = "research_desk"
 PENDING, ACCEPTED, REJECTED, SUPERSEDED = (f"research_suggestion_{state}" for state in ("pending", "accepted", "rejected", "superseded"))
-SETTINGS, RUN = "research_desk_settings", "research_desk_run"
+SETTINGS, RUN, IDEAS, BACKTEST = "research_desk_settings", "research_desk_run", "research_desk_ideas", "research_desk_backtest"
+NIFTY50_URL = "https://archives.nseindia.com/content/indices/ind_nifty50list.csv"
+IDEA_DAYS, IDEA_LIMIT = 7, 5
 # A starting list so there is something to compare, not a recommendation. No banks or lenders: they carry debt by
 # design, so the packet's debt and cash screens would misjudge them.
 DEFAULT_WATCH = {"RELIANCE.NS": "Reliance Industries", "TCS.NS": "Tata Consultancy Services", "INFY.NS": "Infosys",
@@ -73,14 +75,15 @@ RESERVE_MONTHS, RUN_HOUR, SNOOZE_DAYS = 6, 13, 7
 def desk_settings(user) -> dict:
     saved = _records(user).filter(event_type=SETTINGS).order_by("-created_at", "-id").first()
     current = {"watch": [{"symbol": symbol, "name": name} for symbol, name in DEFAULT_WATCH.items()], "include_holdings": False,
-               "enabled": True, "profile": {"loss": None, "horizon": None}}
+               "enabled": True, "discover": False, "profile": {"loss": None, "horizon": None}}
     if saved:
         current.update({key: saved.payload[key] for key in current if key in saved.payload})
         current["include_holdings"] = bool(current["include_holdings"])
+        current["discover"] = current["discover"] is True  # opt-in: ideas read about 45 more companies each week
     return current
 
 
-def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None) -> dict:
+def save_settings(user, *, watch=None, include_holdings=None, enabled=None, profile=None, discover=None) -> dict:
     current = desk_settings(user)
     if watch is not None:
         current["watch"] = watch[:WATCH_LIMIT]
@@ -88,6 +91,8 @@ def save_settings(user, *, watch=None, include_holdings=None, enabled=None, prof
         current["include_holdings"] = include_holdings is True
     if enabled is not None:
         current["enabled"] = enabled is True
+    if discover is not None:
+        current["discover"] = discover is True
     if profile is not None:
         if not isinstance(profile, dict) or profile.get("loss") not in (*LOSS, None) or profile.get("horizon") not in (*HORIZON, None):
             raise ValueError("Choose one of the listed answers, or leave it blank.")
@@ -248,10 +253,12 @@ def decide(packet: dict, tech: dict, held: bool) -> dict | None:
             "steps": [{"role": role, "text": text} for role, text in steps]}
 
 
-def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench=None) -> dict | None:
-    data = research_data(symbol)
-    prices = data["prices"] or {}
-    packet = build_packet(symbol, data["fundamentals"], prices, holding=holding, portfolio_total=portfolio_total)
+def rate(symbol: str, fundamentals: dict, prices: dict, *, holding=None, portfolio_total=None, today=None):
+    """Analysts to portfolio manager on one day's data: (packet, tech, decision), or None when it cannot be rated.
+
+    The live desk and the backtest both call this, so a past call is made by exactly the rules used today.
+    """
+    packet = build_packet(symbol, fundamentals, prices, holding=holding, portfolio_total=portfolio_total, today=today)
     fresh = packet["freshness"]["price_status"] == "recent_close" and packet["freshness"]["statement_status"] == "recent"
     tech = technical(prices.get("close") or [], prices.get("timestamp") or [])
     price = packet["metrics"].get("price") or {}
@@ -264,8 +271,63 @@ def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench
             "metric": "trend", "value": up, "as_of": price["as_of"]})
         packet["beginner"] = beginner_view(packet["bullish"], packet["bearish"], packet["portfolio"])
     decision = decide(packet, tech, holding is not None)
-    if decision is None:
+    return None if decision is None else (packet, tech, decision)
+
+
+def levels(prices: dict, rating: str, held: bool, currency) -> dict | None:
+    """Trader's example levels, grounded like TradingAgents' Trader in the average daily range (ATR) and recent support and
+    resistance. A common rule of thumb shown for reference: not advice, not an order, never placed by ALFRED."""
+    closes, highs, lows = prices.get("close") or [], prices.get("high") or [], prices.get("low") or []
+    if len(closes) < 21 or len(highs) != len(closes) or len(lows) != len(closes):
         return None
+    recent = list(zip(highs[-21:], lows[-21:], closes[-21:]))
+    if any(high is None or low is None for high, low, _ in recent):
+        return None
+    ranges = [max(high - low, abs(high - before), abs(low - before)) for (high, low, _), (_, _, before) in zip(recent[-14:], recent[-15:-1])]
+    cent = Decimal("0.01")
+    atr, last = sum(ranges) / len(ranges), closes[-1]
+    support, resistance = min(low for _, low, _ in recent[-20:]), max(high for high, _, _ in recent[-20:])
+    stop = last - 2 * atr
+    if stop <= 0:
+        return None
+    money = lambda value: f"{currency or ''} {value.quantize(cent, ROUND_HALF_UP):,}".strip()
+    drop = ((stop / last - 1) * 100).quantize(Decimal("0.1"), ROUND_HALF_UP)
+    if rating in ("buy", "overweight"):
+        text = (f"Near the last close of {money(last)}. A common stop-loss rule, twice the average daily range (ATR {money(atr)}) below "
+                f"the close, is {money(stop)} ({drop}%). Recent support {money(support)}, resistance {money(resistance)}.")
+    elif held and rating in ("sell", "underweight"):
+        text = f"If you keep it for now, a common rule is to sell if it closes below {money(stop)} ({drop}%), twice the average daily range below the last close."
+    else:
+        text = f"Over the last 20 sessions it traded between {money(support)} and {money(resistance)}."
+    return {"atr14": str(atr.quantize(cent, ROUND_HALF_UP)), "stop": str(stop.quantize(cent, ROUND_HALF_UP)), "stop_pct": str(drop),
+            "support": str(support.quantize(cent, ROUND_HALF_UP)), "resistance": str(resistance.quantize(cent, ROUND_HALF_UP)),
+            "text": text + " An example from a common rule, not advice; ALFRED never places orders."}
+
+
+def macro() -> list:
+    """Macro analyst: India's latest annual inflation and GDP growth from the World Bank, as context only (no rating change)."""
+    from apps.integrations.services.verified_intelligence import verified_intelligence
+
+    lines = []
+    for code, label in (("FP.CPI.TOTL.ZG", "inflation"), ("NY.GDP.MKTP.KD.ZG", "economic growth")):
+        try:
+            payload = verified_intelligence.world_bank_indicator(code, f"India {label}").payload or {}
+        except Exception:  # offline or the World Bank is down: the call is made without macro context
+            continue
+        if payload.get("latest_value") is not None and payload.get("latest_year"):
+            value, year = round(float(payload["latest_value"]), 1), payload["latest_year"]
+            lines.append(f"India's {label} was {value}% in {year} (World Bank, yearly).")
+    return lines
+
+
+def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench=None, news=True) -> dict | None:
+    data = research_data(symbol)
+    prices = data["prices"] or {}
+    rated = rate(symbol, data["fundamentals"], prices, holding=holding, portfolio_total=portfolio_total)
+    if rated is None:
+        return None
+    packet, tech, decision = rated
+    price = packet["metrics"]["price"]
     indian, valuation = symbol.endswith((".NS", ".BO")), packet["valuation"]
     point = lambda item: {"point": item["point"], "as_of": item["as_of"]}
     return {**decision, "symbol": symbol, "name": name, "held": holding is not None,
@@ -277,7 +339,9 @@ def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, bench
             "valuation": (f"The price is about {valuation['price_to_earnings']} times last year's profit per share."
                           if valuation["status"] == "estimated" else valuation["reason"]),
             "indicators": {key: tech.get(key) for key in ("sma50", "sma200", "rsi14", "macd_histogram")},
-            "news": headlines(name) if name != symbol else [],
+            "news": headlines(name) if news and name != symbol else [],
+            "levels": levels(prices, decision["rating"], holding is not None, packet["price_currency"]),
+            "macro": macro() if indian else [],
             "charts": {"price": tech.get("series"), "results": results_chart(data["fundamentals"], packet["statement_currency"])},
             "latest_period_end": packet["latest_period_end"], "source_url": packet["source_url"],
             "limits": ["Fixed rules of thumb on dated public numbers, not a forecast or licensed advice.",
@@ -320,8 +384,12 @@ def _store(user, suggestion, today):
              {**suggestion, "id": uuid4().hex})
 
 
-def refresh(user, today=None) -> dict:
-    """Research every share in the owner's list once. One share that fails never stops the rest."""
+def refresh(user, today=None, *, resume=False) -> dict:
+    """Research every share in the owner's list once. One share that fails never stops the rest.
+
+    resume: the scheduled run skips shares already researched today, so a run cut short by a restart continues
+    where it stopped instead of fetching everything again. Research now always reads every share.
+    """
     from apps.investments.models import Investment
 
     today = today or timezone.localdate()
@@ -330,7 +398,12 @@ def refresh(user, today=None) -> dict:
     bench, researched = benchmark(), 0
     skipped = [{"name": name, "reason": "Record this holding's name as its exchange symbol (for example INFY.NS) to include it."}
                for name in unmatched]
+    done = set(_records(user).filter(payload__for_date=today.isoformat()).exclude(event_type__in=(SETTINGS, RUN, IDEAS, BACKTEST))
+               .values_list("payload__symbol", flat=True)) if resume else set()
     for symbol, name, holding, why in rows:
+        if symbol in done:
+            researched += 1
+            continue
         try:
             suggestion = analyse(symbol, name, holding=holding, portfolio_total=total, bench=bench)
         except FETCH_ERRORS as error:
@@ -342,21 +415,91 @@ def refresh(user, today=None) -> dict:
             continue
         _store(user, {**suggestion, "why": why}, today)
         researched += 1
-    _records(user).filter(event_type=PENDING).exclude(payload__symbol__in=[row[0] for row in rows]).update(event_type=SUPERSEDED)
+    _records(user).filter(event_type=PENDING).exclude(payload__symbol__in=[row[0] for row in rows]).exclude(payload__idea=True) \
+        .update(event_type=SUPERSEDED)
     run = {"researched": researched, "skipped": skipped, "at": timezone.now().isoformat()}
     _log(user, RUN, f"Research desk read {researched} share(s).", run)
     return run
 
 
-def run_now(user, today=None) -> dict:
+def run_now(user, today=None, *, resume=False) -> dict:
     """Owner pressed Research now, or the daily job ran; one run at a time per owner."""
     lock = f"research-desk:running:{user.pk}"
     if not cache.add(lock, 1, RUN_LOCK_SECONDS):
         raise ValueError("Research is already running. Wait a minute.")
     try:
-        return refresh(user, today)
+        return refresh(user, today, resume=resume)
     finally:
         cache.delete(lock)
+
+
+def nifty50() -> list:
+    """[(symbol, company)] in NIFTY 50 from NSE's public list, without banks, lenders and insurers (the screens misjudge them)."""
+    import csv
+    import io
+
+    found = cache.get("research-desk:nifty50")
+    if found is None:
+        text = public_http.request("GET", NIFTY50_URL, headers={"User-Agent": USER_AGENT}, content_types=("text/csv",),
+                                   max_bytes=50_000).content.decode("utf-8-sig")
+        found = [(row["Symbol"].strip().upper() + ".NS", row["Company Name"].strip()[:120]) for row in csv.DictReader(io.StringIO(text))
+                 if row.get("Series", "").strip() == "EQ" and row.get("Industry", "").strip() != "Financial Services"
+                 and SYMBOL.fullmatch(row.get("Symbol", "").strip().upper() + ".NS")]
+        if not found:
+            raise ValueError("NSE's NIFTY 50 list came back empty.")
+        cache.set("research-desk:nifty50", found, 7 * 86400)
+    return found
+
+
+def discover(user, today=None, *, force=False) -> dict | None:
+    """Ideas beyond the owner's list: rate the NIFTY 50 companies not on it and keep up to five Buy calls to accept,
+    reject or watch. Weekly unless forced; only public symbols go online. None when not due or switched off."""
+    today = today or timezone.localdate()
+    last = _records(user).filter(event_type=IDEAS).order_by("-created_at", "-id").first()
+    if not force and (not desk_settings(user)["discover"] or (last and (today - timezone.localtime(last.created_at).date()).days < IDEA_DAYS)):
+        return None
+    try:
+        companies = nifty50()
+    except FETCH_ERRORS as error:
+        raise ValueError("NSE's public NIFTY 50 list could not be read. Try again later.") from error
+    own, found, checked = {row[0] for row in universe(user)[0]}, [], 0
+    for symbol, name in companies:
+        if symbol in own:
+            continue
+        try:
+            suggestion = analyse(symbol, name, news=False)
+        except FETCH_ERRORS:
+            continue
+        checked += 1
+        if suggestion and suggestion["rating"] in ("buy", "overweight"):
+            found.append(suggestion)
+    found.sort(key=lambda s: (-s["score"], s["symbol"]))
+    keep = found[:IDEA_LIMIT]
+    bench = benchmark()
+    for s in keep:
+        _store(user, {**s, "news": headlines(s["name"]), "idea": True, "benchmark": "NIFTY 50" if bench else "",
+                      "benchmark_level": bench["level"] if bench else None,
+                      "why": "A NIFTY 50 company ALFRED found by itself; it is not on your list."}, today)
+    _records(user).filter(event_type=PENDING, payload__idea=True).exclude(payload__symbol__in=[s["symbol"] for s in keep]) \
+        .update(event_type=SUPERSEDED)
+    run = {"checked": checked, "found": len(keep), "at": timezone.now().isoformat()}
+    _log(user, IDEAS, f"Research desk checked {checked} NIFTY 50 companies for ideas.", run)
+    return run
+
+
+def backtest(user, today=None) -> dict:
+    """Owner pressed Check past calls: replay the rules on past days for every share on the list (see research_backtest)."""
+    from .research_backtest import replay_all
+
+    lock = f"research-desk:backtest:{user.pk}"
+    if not cache.add(lock, 1, 600):
+        raise ValueError("The past-calls check is already running. Wait a few minutes.")
+    try:
+        result = replay_all([(symbol, name) for symbol, name, _, _ in universe(user)[0]], today or timezone.localdate())
+    finally:
+        cache.delete(lock)
+    _log(user, BACKTEST, f"Research desk replayed {result['calls']} past call(s).", result, category="api")
+    return result
 
 
 def personal_fit(user, settings, today) -> dict:
@@ -483,9 +626,12 @@ def desk(user, today=None) -> dict:
     answered = [{"symbol": r.payload["symbol"], "label": r.payload["label"], "state": "accepted" if r.event_type == ACCEPTED else "rejected",
                  "decided_at": r.payload.get("decided_at")}
                 for r in _records(user).filter(event_type__in=(ACCEPTED, REJECTED)).order_by("-created_at", "-id")[:10]]
+    ideas = _records(user).filter(event_type=IDEAS).order_by("-created_at", "-id").first()
+    tested = _records(user).filter(event_type=BACKTEST).order_by("-created_at", "-id").first()
     return {"settings": settings, "watch_limit": WATCH_LIMIT, "answered": answered, "snoozed": len(snoozed),
             "loss_choices": LOSS, "horizon_choices": HORIZON, "next_run": next_run(settings, last),
-            "last_run": {key: last.payload[key] for key in ("researched", "skipped", "at")} if last else None, "suggestions": suggestions}
+            "last_run": {key: last.payload[key] for key in ("researched", "skipped", "at")} if last else None, "suggestions": suggestions,
+            "last_ideas": ideas.payload if ideas else None, "backtest": tested.payload if tested else None}
 
 
 def _pending(user, identity):
@@ -570,9 +716,13 @@ def run_scheduled(today=None) -> dict:
         if not desk_settings(user)["enabled"]:
             continue  # paused by the owner
         try:
-            run_now(user, today)
+            run_now(user, today, resume=True)
             ran += 1
         except Exception as error:
             failed += 1
             logger.warning("Research desk failed for one account (%s)", type(error).__name__)
+        try:
+            discover(user, today)  # weekly; off when the owner switches ideas off
+        except Exception as error:
+            logger.warning("Research desk ideas failed for one account (%s)", type(error).__name__)
     return {"status": "completed", "processed": ran, "failed": failed, "settled": settle_due(today)}

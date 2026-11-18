@@ -21,7 +21,7 @@ window.ResearchDesk = (() => {
             `<li><a href="${e(n.url)}" target="_blank" rel="noopener noreferrer">${e(n.title)}</a> <span class="muted">${e(n.source)} ${e(n.published)}</span></li>`).join("")}</ul></div>` : "";
         return `<article class="mini-card" data-desk-card="${e(s.id)}">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-                <div><div class="fw-semibold">${e(s.symbol)}${s.name !== s.symbol ? ` · ${e(s.name)}` : ""}${s.held ? ' <span class="muted small">(you own it)</span>' : ""}</div>
+                <div><div class="fw-semibold">${e(s.symbol)}${s.name !== s.symbol ? ` · ${e(s.name)}` : ""}${s.held ? ' <span class="muted small">(you own it)</span>' : ""}${s.idea ? ' <span class="badge text-bg-light border">Idea</span>' : ""}</div>
                     <div class="small muted">Research call: <span data-desk-label>${e(s.label)}</span>. ${e(s.summary)} Last daily close ${e(s.currency || "")} ${e(Alfred.formatNumber(s.price, 2))} on ${e(s.price_as_of)} (not a live quote).</div></div>
                 <span class="status-pill ${s.status === "Not for you yet" ? "status-warn" : tone(s.rating)}" data-desk-status>${e(s.status)}</span>
             </div>
@@ -29,6 +29,7 @@ window.ResearchDesk = (() => {
                 ${fit(s)}
                 <li><span class="fw-semibold">Why now:</span> ${e(s.why || "")} ${e(s.change || (s.first_seen && s.first_seen < s.for_date ? `Same call since ${s.first_seen}; the evidence has not changed.` : "First look at this share."))}</li>
                 <li><span class="fw-semibold">Strongest reason against:</span> ${e(s.against)}</li>
+                ${s.levels ? `<li><span class="fw-semibold">Example levels:</span> ${e(s.levels.text)}</li>` : ""}
                 <li><span class="fw-semibold">What would change this:</span> ${e(s.change_if)}</li>
                 <li><span class="fw-semibold">Next check:</span> ${e(nextCheck())}. Company results up to ${e(s.latest_period_end || "unknown")}.</li>
             </ul>
@@ -36,7 +37,7 @@ window.ResearchDesk = (() => {
                 <button type="button" class="btn btn-sm btn-primary" data-desk-accept="${e(s.id)}" aria-label="Accept and save to my journal: ${e(s.label)} ${e(s.symbol)}">Accept</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-desk-reject="${e(s.id)}" aria-label="Reject: ${e(s.label)} ${e(s.symbol)}">Reject</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-desk-later="${e(s.id)}" aria-label="Remind me in a week about ${e(s.symbol)}">Remind me in a week</button>
-                ${s.why === "You looked it up recently." && !(state?.settings.watch || []).some(w => w.symbol === s.symbol)
+                ${(s.why === "You looked it up recently." || s.idea) && !(state?.settings.watch || []).some(w => w.symbol === s.symbol)
                     ? `<button type="button" class="btn btn-sm btn-outline-secondary" data-desk-watch="${e(s.symbol)}">Add to watch list</button>` : ""}
             </div>
             <details class="mt-2" data-desk-details="${e(s.id)}"><summary class="small">Why, with charts</summary>
@@ -49,6 +50,7 @@ window.ResearchDesk = (() => {
                 </div>
                 <p class="small mt-2 mb-1">RSI ${e(ind.rsi14 ?? "n/a")} · 50-day average ${e(ind.sma50 ?? "n/a")} · 200-day average ${e(ind.sma200 ?? "n/a")} · MACD histogram ${e(ind.macd_histogram ?? "n/a")}. ${e(s.valuation)}</p>
                 <div class="row g-2">${list(s.good, "Good signs")}${list(s.bad, "Warning signs")}</div>
+                ${(s.macro || []).length ? `<p class="small mb-2"><span class="fw-semibold">Economy (context only, not scored):</span> ${s.macro.map(e).join(" ")}</p>` : ""}
                 ${news}
                 <ul class="small muted mb-1">${s.limits.map(l => `<li>${e(l)}</li>`).join("")}</ul>
                 <a class="small" href="${e(s.source_url)}" target="_blank" rel="noopener noreferrer">Source: Yahoo Finance</a>
@@ -109,6 +111,10 @@ window.ResearchDesk = (() => {
             `<li>${e(item.name)}: ${e(item.reason)}</li>`).join("")}</ul>` : "";
         $("researchDeskSkipped").hidden = !(run && run.skipped.length);
         $("researchDeskHoldings").checked = data.settings.include_holdings;
+        $("researchDeskIdeas").checked = data.settings.discover;
+        const ideas = data.last_ideas;
+        $("researchDeskIdeasStatus").textContent = ideas ? `Last looked ${Alfred.formatDateTime(ideas.at)}: ${ideas.checked} companies checked, ${ideas.found} idea(s).` : "Not looked yet.";
+        backtest(data.backtest);
         $("researchDeskWatch").innerHTML = data.settings.watch.map(item => `<span class="badge text-bg-light border me-1 mb-1">${e(item.symbol)}
             <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-desk-remove="${e(item.symbol)}" aria-label="Remove ${e(item.symbol)} from the watch list">×</button></span>`).join("")
             || '<span class="small muted">Empty. Add a symbol below.</span>';
@@ -120,6 +126,21 @@ window.ResearchDesk = (() => {
             data: { labels: suggestions.map(s => `${s.symbol}: ${s.label}`), datasets: [
                 { label: "Good signs", data: suggestions.map(s => s.good.length) }, { label: "Warning signs", data: suggestions.map(s => s.bad.length) }] },
             options: { indexAxis: "y", scales: { x: { ticks: { precision: 0 } } } } });
+    }
+
+    function backtest(b) {
+        const box = $("researchDeskBacktest");
+        box.hidden = !b;
+        if (!b) return;
+        const was = box.open, pct = value => value == null ? "n/a" : `${e(value)}%`;
+        box.innerHTML = `<summary class="small">How these rules did on past data: ${b.calls ? `${e(b.calls)} past call(s)${b.went_its_way_pct != null ? `, ${e(b.went_its_way_pct)}% went their way` : ""}` : "not enough history"} (checked ${e(Alfred.formatDateTime(b.at))})</summary>
+            ${b.calls ? `<p class="small mt-2 mb-1">Each past month from ${e(b.from)} to ${e(b.to)}, ALFRED re-ran today's rules on the prices and results known then, and checked the share 91 days later against NIFTY 50.</p>
+            <div class="table-responsive"><table class="table table-sm small mb-2"><caption class="visually-hidden">Past calls by rating</caption>
+                <thead><tr><th scope="col">Call</th><th scope="col">Calls</th><th scope="col">Average move</th><th scope="col">Against NIFTY 50</th><th scope="col">Went its way</th></tr></thead>
+                <tbody>${b.by_rating.map(r => `<tr><td>${e(r.label)}</td><td>${e(r.calls)}</td><td>${pct(r.average_move_pct)}</td><td>${pct(r.average_vs_nifty_pct)}</td><td>${r.went_its_way_pct == null ? "not judged" : pct(r.went_its_way_pct)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+            ${b.skipped.length ? `<p class="small mb-1">Not replayed: ${b.skipped.map(item => `${e(item.name)} (${e(item.reason)})`).join("; ")}</p>` : ""}
+            <ul class="small muted mb-0">${b.limits.map(l => `<li>${e(l)}</li>`).join("")}</ul>`;
+        box.open = was;
     }
 
     async function load() {
@@ -154,6 +175,17 @@ window.ResearchDesk = (() => {
             event.preventDefault();
             act({ operation: "profile", profile: { loss: $("researchDeskLoss").value || null, horizon: $("researchDeskHorizon").value || null } },
                 event.submitter, () => "Answers saved. Personal fit uses them from now on.");
+        });
+        $("researchDeskBacktestRun").addEventListener("click", event => {
+            say("Checking past calls. Fetching several years of prices takes a minute or two.", "info");
+            act({ operation: "backtest" }, event.currentTarget, r => { $("researchDeskBacktest").open = true;
+                return r.calls ? `Replayed ${r.calls} past call(s). See How these rules did on past data.` : "Too little dated history to replay any call."; });
+        });
+        $("researchDeskIdeas").addEventListener("change", event => act({ operation: "discover", enabled: event.currentTarget.checked }, null,
+            s => s.discover ? "ALFRED looks for ideas among NIFTY 50 companies each week." : "Weekly ideas switched off. Open ideas stay until you answer them."));
+        $("researchDeskIdeasRun").addEventListener("click", event => {
+            say("Looking for ideas among NIFTY 50 companies. This takes a minute or two.", "info");
+            act({ operation: "ideas" }, event.currentTarget, r => `Checked ${r.checked} companies; ${r.found} idea(s) added above.`);
         });
         $("researchDeskHoldings").addEventListener("change", event => act({ operation: "holdings", include: event.currentTarget.checked }, null,
             s => s.include_holdings ? "Your shares recorded by symbol are included from the next research." : "Your shares are left out from the next research."));

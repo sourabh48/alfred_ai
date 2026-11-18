@@ -1,5 +1,29 @@
 # ALFRED execution state
 
+## Research desk: TradingAgents gaps — 2026-11-18
+
+LOCAL_TESTING; not pushed. Same worktree and branch, on `654996d`. Owner asked how ALFRED's research desk compares with
+TradingAgents (upstream main still `9fa1196f`) and said "all" to the missing pieces. Built, independently (no upstream
+code; Apache-2.0 role copy approved 2026-11-12):
+
+- Backtest ("Check past calls"): `research_backtest.py` replays today's rules on each share once a month over four years
+  of Yahoo prices, using only closes up to that day (a 252-session window) and statements whose period ended at least 90
+  days earlier, then scores each call 91 days later against NIFTY 50. Per-rating counts, average move, move against
+  NIFTY and how often the call went its way, with its limits (revisions, overlap, survivorship, no costs). The live
+  desk and the replay share one `rate()` so a past call uses exactly today's rules.
+- Trader levels: example stop at twice the 14-day average range (ATR) below the close, 20-session support and
+  resistance, from Yahoo daily highs and lows; labelled a common rule, not advice; nothing is ever placed.
+- Macro analyst: India's latest inflation and GDP growth from the World Bank as context only (not scored).
+- Quarterly revenue against the same quarter a year earlier joins the analysts' points.
+- Finding new stocks (opt-in, off by default): weekly, ALFRED rates NIFTY 50 companies from NSE's public CSV (banks
+  and lenders left out) that are not on the owner's list and keeps up to five Buy calls marked "Idea".
+- Resumable runs: the daily job skips shares already researched that day. Printable report at
+  `/investments/research-report/` (owner only, no-store; Ctrl+P to PDF).
+
+Not built, needs the owner: SEC EDGAR (asks for a contact e-mail in every request), FRED and Alpha Vantage (free API
+keys), Trading-R1 (a model download), NSE/BSE filings (sites block automated reading). Polymarket left out (little use
+for Indian shares); social sentiment and LLM-decided ratings stay out by design.
+
 ## Non-finance user walk-through — 2026-11-18
 
 LOCAL_TESTING; not pushed. Branch `work/tracker-items-2026-11-18`, worktree `F:/ALFRED_DEV/tracker-items-1118`, on
