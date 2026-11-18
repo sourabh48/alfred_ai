@@ -13,6 +13,7 @@ cover related workflows without inventing additional roadmap IDs.
 | T | [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents), main | [e8f5503e9b86d5c2710b0c76b1f686703968c9df](https://github.com/TauricResearch/TradingAgents/tree/e8f5503e9b86d5c2710b0c76b1f686703968c9df) | Apache-2.0; Python >=3.11, LangGraph/LangChain | Compatible Python engine reuse first through thin adapters |
 | R | [liketrek/TREK](https://github.com/liketrek/TREK), main | [d4da05bbc93bcfa9668e7a8f4e5384b788452418](https://github.com/liketrek/TREK/tree/d4da05bbc93bcfa9668e7a8f4e5384b788452418) | AGPL-3.0; Node/React/Nest ecosystem | Product inspiration; independent Django implementation only |
 | C | [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops), main | [4df3d0525a0a466f6b08928a7c3bd23946cb410f](https://github.com/career-ops-hq/career-ops/tree/4df3d0525a0a466f6b08928a7c3bd23946cb410f) | MIT; Node ^22.13 or >=23.4, optional Go dashboard | Incremental native Python/Django business-workflow port |
+| S | [D4Vinci/Scrapling](https://github.com/D4Vinci/Scrapling), main | [v0.5.1 = 3a4bb5b0a008233c85269a0a38a6d08edd4ce329](https://github.com/D4Vinci/Scrapling/tree/3a4bb5b0a008233c85269a0a38a6d08edd4ce329) | BSD-3-Clause; Python >=3.10; PyPI "4 - Beta" | Core HTML parser only, on bytes ALFRED already fetched; fetcher/stealth/AI extras rejected |
 
 Repository API/default refs, LICENSE text, README and recursive path inventories
 were inspected at these pins. Component/dependency licenses must be rechecked
@@ -111,6 +112,22 @@ reason to replace ALFRED's Django-owned canonical database.
 | Patterns/calibrate/retro and advisory learning; catalog (C) | CAREER-08, AI-14/16, existing reviewed learning | Outcome-supported calibration and reviewed proposals only | PORT_PYTHON | Partly ported: patterns report ported 2026-11-12 (5-sent floor, no recommended threshold); calibrate ported 2026-11-12 (calibrate.mjs bands, per-band floor 5, separating/flat/inverted/insufficient, advisory only); retro EXCLUDED: it turns agent-session corrections into rule files, which has no ALFRED equivalent. Remaining: no automatic scoring/model/code changes; genuine outcomes/consent prerequisites  |
 | Agent-inbox/session continuation | Existing EXECUTION_STATE/queue and bounded job recovery | Preserve ALFRED continuation contract rather than duplicate a CLI inbox | EXCLUDE | Infrastructure-only upstream workflow; no user feature discarded |
 | CLI installers/updater/system-layer tooling, separate Node/Go dashboards, wholesale translations/layout ecosystem | Existing Django desktop architecture | No unrelated platform conversion | EXCLUDE | Infrastructure-only; user data and useful business modes stay mapped above |
+
+## Web Intelligence (AWIE) — S
+
+Reviewed 2026-11-11 for the owner's ALFRED 2.0 brief (section 11). Inspection level **S** for
+`scrapling/__init__.py` and `scrapling/parser.py` imports/storage at the pin; other modules **C**.
+PyPI and GitHub list no security advisories for 0.5.1 (released 2026-11-04). Nothing installed or copied.
+
+| Feature / upstream source at S pin | ALFRED equivalent / target | Gap / intended refinement | Disposition | Status, dependencies and validation |
+| --- | --- | --- | --- | --- |
+| `Selector` CSS/XPath/text parsing on lxml; `scrapling/parser.py` (S) | BeautifulSoup + JSON-LD extraction in `apps/career/services/job_intelligence.py` | Faster lxml parsing; same selectors. Core deps lxml (already pinned 6.1.3), cssselect, orjson, tld, w3lib, typing_extensions | ADAPT_ALFRED | Deferred pilot. Feed only bytes returned by `alfred_ai/services/public_http.py` (HTTPS, no redirects, cookies, proxy or credentials). Owner approved the core `scrapling==0.5.1` dependency (no extras) for this Career pilot on 2026-11-11; add it no earlier than 2026-11-18 (14 days after release), with the CI reviewed-source pin move |
+| Adaptive element relocation after layout change; `parser.py` `adaptive`, `core/storage.py` `SQLiteStorageSystem` (S/C) | Layout-change detection required by brief 11.7 | Default store is `elements_storage.db` inside the installed package: outside private storage, read-only when packaged. Use only with an ALFRED-owned store under the private data dir, or keep disabled. A relocated match is a candidate, never a silent replacement of verified data | ADAPT_ALFRED | Deferred; acceptance needs saved synthetic before/after layout fixtures showing correct relocation and fail-closed mismatch, compared with the BeautifulSoup baseline |
+| `Fetcher`, `AsyncFetcher`, `StealthyFetcher`, `[fetchers]` extra: curl_cffi impersonation, playwright/patchright, browserforge, apify-fingerprint-datapoints (C) | `public_http.py` secure boundary | Browser/TLS fingerprint spoofing and stealth automation conflict with brief 11.4 (no stealth, identity rotation or bot-detection evasion) and bypass the SSRF/redirect/size boundary | REJECT | Never installed. Any later JavaScript rendering needs its own reviewed, policy-enforced isolated adapter (brief 11.14) |
+| `[ai]` MCP server, `[shell]`, spiders/crawl engine (C) | Read-only tools USE-04; queue/Huey | Arbitrary model-driven fetching and unbounded crawling are outside the permission model | REJECT | Use ALFRED's own allowlisted tools, quotas and Huey jobs instead |
+
+Pilot order once approved: one permitted public source, Career job-page parsing behind a side-by-side
+comparison with the current parser on synthetic fixtures; adopt only on measured improvement with no regression.
 
 ## Validation and adoption rule
 
