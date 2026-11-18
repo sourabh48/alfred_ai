@@ -1,6 +1,6 @@
 from django.urls import path
 from .history_review_api import CareerHistoryReviewAPI
-from .views import CareerApplicationKitView, CareerPlanCheckView, CareerPracticeFeedbackView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerMatchRecheckView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
+from .views import CareerApplicationKitView, CareerToolsView, CareerPlanCheckView, CareerPracticeFeedbackView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerMatchRecheckView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
 
 urlpatterns = [
     path('job-analyses/<int:pk>/history-review/', CareerHistoryReviewAPI.as_view()),
@@ -31,4 +31,5 @@ urlpatterns = [
     path("job-analyses/<int:pk>/practice-feedback/", CareerPracticeFeedbackView.as_view(), name="career_practice_feedback"),
     path("job-analyses/<int:pk>/interview-notes/", CareerInterviewNotesView.as_view(), name="career_job_interview_notes"),
     path("stories/", career_story_bank, name="career_story_bank"),
+    path("tools/", CareerToolsView.as_view(), name="career_tools"),
 ]

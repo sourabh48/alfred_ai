@@ -43,7 +43,7 @@ BACKEND = tuple("tests." + name for name in (
     # Added 2026-11-13: these files existed but were never in CI. Files that need a live Ollama,
     # a signing tool or a browser stay outside this list (see BACKEND_NOT_IN_CI).
     "test_advisory_evidence_freshness", "test_ai_emotion_api", "test_application_smoke", "test_audit_project", "test_behavioral_linkage", "test_bike_profile_and_invoice_review",
-    "test_budget_acceptance", "test_calculation_risk_snapshot", "test_career_adaptive_intelligence", "test_career_application_kit", "test_career_bullet_rewrite", "test_career_evaluation",
+    "test_budget_acceptance", "test_calculation_risk_snapshot", "test_career_adaptive_intelligence", "test_career_application_kit", "test_career_bullet_rewrite", "test_career_evaluation", "test_career_tools",
     "test_career_interview_notes", "test_career_layout_pilot", "test_career_outcome_workflow", "test_career_projection_confidence", "test_career_projection_simulation", "test_career_salary_evidence",
     "test_career_send", "test_cashflow_forecast_acceptance", "test_celery_startup", "test_chatgpt_imports", "test_credit_score_drop_migration", "test_development_council",
     "test_document_layouts", "test_durable_queue", "test_expense_chart_granularity", "test_expense_money_migration", "test_expense_money_rehearsal", "test_expense_timeline_window",

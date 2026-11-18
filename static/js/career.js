@@ -876,7 +876,7 @@ function renderCareerEvaluation(report) {
         ${report.E.lead_with.length ? `<p>Lead with: ${e(report.E.lead_with.join(", "))}</p>` : ""}${list(report.E.achievements.map(line => `Put first: ${line}`))}
         ${report.E.add_only_if_true.length ? `<p>Asked for but not on your CV (add only if true): ${e(report.E.add_only_if_true.join(", "))}</p>` : ""}
         <h5 class="h6">F) ${e(report.F.title)}</h5>${report.F.stories.length ? list(report.F.stories.map(story => `${story.prompt} Start from: ${story.seed}`)) : "<p>No critical or high requirement to prepare for.</p>"}
-        <h5 class="h6">G) ${e(report.G.title)}</h5><p>Assessment: ${e(report.G.assessment)}.</p>${list([...report.G.signals, ...report.G.concerns.map(line => `Concern: ${line}`)])}
+        <h5 class="h6">G) ${e(report.G.title)}</h5><p>Assessment: ${e(report.G.assessment)}.</p>${list([...report.G.signals, ...report.G.concerns.map(line => `Concern: ${line}`), ...(report.G.notes || []).map(line => `Good to know: ${line}`)])}
         <button class="btn btn-outline-secondary btn-sm" type="button" id="careerEvaluationDownload">Download report (.md)</button>
     </article>`;
     document.getElementById("careerEvaluationDownload").addEventListener("click", () => {

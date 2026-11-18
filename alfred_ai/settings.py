@@ -560,6 +560,8 @@ ALFRED_SMTP_SSL = env.bool('ALFRED_SMTP_SSL', default=False)
 ALFRED_SMTP_USER = env('ALFRED_SMTP_USER', default='')
 ALFRED_SMTP_PASSWORD = env('ALFRED_SMTP_PASSWORD', default='')
 ALFRED_SMTP_FROM = env('ALFRED_SMTP_FROM', default='')
+# Career reply watch reads the same mailbox read-only; blank derives it from the SMTP host (Gmail, Outlook, Yahoo, Zoho).
+ALFRED_IMAP_HOST = env('ALFRED_IMAP_HOST', default='')
 ALFRED_SMTP_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
 ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)

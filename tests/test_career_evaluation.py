@@ -82,6 +82,24 @@ class ReportTests(SimpleTestCase):
         self.assertTrue(any("Asks for money" in line for line in report["G"]["concerns"]))
         self.assertTrue(all(row["match"] == "missing" for row in report["B"]["rows"]))
 
+    def test_posting_signals_flag_unpaid_work_and_note_wide_pay_fixed_terms_ai_screening_and_talent_pools(self):
+        """Career Ops posting signals 13, 15, 16, 19, 20 and 21 (pin fe9cb888, MIT): presence and arithmetic only."""
+        jd = (JD + " This is a 6-month contract. Applications pass automated screening first. We are building a talent pool "
+              "for future openings. The first month is an unpaid trial. Please buy your own laptop.")
+        payload = {"job_snapshot": {"title": "Senior Backend Engineer", "salary_min": 600000, "salary_max": 1500000,
+                                    "salary_currency": "INR", "salary_period": "year"}}
+        report = evaluation.evaluation_report(analysis(extracted_text=jd, payload=payload), resume(), None, today=TODAY)
+        g = report["G"]
+        self.assertTrue(any('Says the work is unpaid: "unpaid trial"' in line for line in g["concerns"]))
+        self.assertTrue(any('Asks for money: "buy your own laptop"' in line for line in g["concerns"]))
+        self.assertEqual([line.split(":")[0] for line in g["notes"]],
+                         ["The pay range is wide", "A time-limited role", "Applications are screened with automated or AI tools",
+                          "This may not be a current opening"])
+        self.assertIn("600,000 to 1,500,000", g["notes"][0])
+        self.assertIn("- Good to know: A time-limited role", report["markdown"])
+        plain = evaluation.evaluation_report(job(), resume(), None, today=TODAY)["G"]  # 2.4M-3.0M is not wide; none of the words
+        self.assertEqual(plain["notes"], [])
+
     def test_without_a_posting_it_abstains(self):
         report = evaluation.evaluation_report(analysis(extracted_text="", extracted_payload={}), resume(), None, today=TODAY)
         self.assertFalse(report["available"])

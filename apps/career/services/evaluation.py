@@ -19,7 +19,38 @@ PREFERRED_RE = re.compile(r"\b(preferred|nice to have|nice-to-have|bonus|a plus|
 SENIORITY = (("intern", "Intern", 0), ("graduate", "Entry", 0), ("junior", "Junior", 1), ("associate", "Junior", 1),
              ("principal", "Principal", 5), ("staff", "Staff", 4), ("director", "Director", 5), ("head", "Head", 5),
              ("lead", "Lead", 3), ("senior", "Senior", 3), ("sr", "Senior", 3), ("manager", "Manager", 3))
-FEE_RE = re.compile(r"\b(registration fee|training fee|security deposit|pay (a|the) fee|processing fee|refundable deposit)\b", re.I)
+FEE_RE = re.compile(r"\b(registration fee|training fee|security deposit|pay (a|the) fee|processing fee|refundable deposit|"
+                    r"onboarding fee|joining fee|background[- ]check fee|verification fee|(?:buy|purchase) (?:your |the )?"
+                    r"(?:own )?(?:laptop|equipment|uniform|starter kit))\b", re.I)
+# Career Ops posting signals 13, 15, 16, 19 and 20 (pin fe9cb888, MIT), the parts that need no law table. The upstream
+# jurisdiction checks (Ontario, California, NYC, EU) are not ported: ALFRED keeps no verified legal tables for them.
+AI_SCREEN_RE = re.compile(r"\b(AI[- ]powered (?:assessment|screening|interview)|automated (?:screening|assessment|decision)|"
+                          r"algorithmic (?:screening|evaluation|assessment)|video interview (?:analy[sz]ed|scored)|HireVue|"
+                          r"artificial intelligence (?:to|will) (?:screen|assess|evaluate))\b", re.I)
+FIXED_TERM_RE = re.compile(r"\b(\d{1,2}[- ]month contract|\d[- ]year contract|fixed[- ]term|temporary (?:position|role|assignment)|"
+                           r"term position|contract(?:ual)? role for \d{1,2} months)\b", re.I)
+VACANCY_RE = re.compile(r"\b(talent (?:pool|community|pipeline)|future (?:openings|opportunities|vacancies)|evergreen (?:role|posting|requisition)|"
+                        r"not (?:a|an) (?:current|existing) (?:opening|vacancy))\b", re.I)
+UNPAID_RE = re.compile(r"\b(unpaid (?:internship|role|position|trial|training)|volunteer (?:position|role)|no (?:salary|stipend|pay)|"
+                       r"without (?:pay|stipend|salary))\b", re.I)
+
+
+def posting_notes(jd: str, posted) -> tuple[list, list]:
+    """(concerns, things to know) the posting's own words or numbers show. Presence only: nothing is looked up."""
+    concerns, notes = [], []
+    if UNPAID_RE.search(jd):
+        concerns.append(f'Says the work is unpaid: "{_quote(UNPAID_RE.search(jd).group(0))}". Check the pay before you spend time on it.')
+    if posted and posted["min"] > 0 and posted["max"] - posted["min"] > posted["min"] / 2:
+        notes.append(f"The pay range is wide: {posted['min']:,.0f} to {posted['max']:,.0f}, more than half its lower end. "
+                     "Wide ranges often mean several levels in one posting; ask which level this is.")
+    if FIXED_TERM_RE.search(jd):
+        notes.append(f'A time-limited role: "{_quote(FIXED_TERM_RE.search(jd).group(0))}". Ask about extension or conversion.')
+    if AI_SCREEN_RE.search(jd):
+        notes.append(f'Applications are screened with automated or AI tools: "{_quote(AI_SCREEN_RE.search(jd).group(0))}". '
+                     "Use the job's own words for skills you really have.")
+    if VACANCY_RE.search(jd):
+        notes.append(f'This may not be a current opening: "{_quote(VACANCY_RE.search(jd).group(0))}". Ask whether the role is open now.')
+    return concerns, notes
 API_SOURCES = ("Greenhouse", "Lever", "Ashby")
 
 
@@ -194,6 +225,8 @@ def evaluation_report(analysis, resume, profile, *, today: date) -> dict:
     injected = INJECTION_RE.search(jd)
     if injected:
         concerns.append(f'Contains text aimed at automated tools ("{injected.group(0)}"). ALFRED ignored it.')
+    more, notes = posting_notes(jd, posted)
+    concerns += more
     legitimacy = "caution" if concerns else "no concerns found" if signals else "not enough information"
 
     verdict = ({"score": triage.get("score"), "verdict": triage.get("verdict"), "reason": triage.get("reason")}
@@ -207,7 +240,7 @@ def evaluation_report(analysis, resume, profile, *, today: date) -> dict:
         "D": {"title": "Pay", "lines": pay_lines},
         "E": {"title": "CV changes for this job", **block_e},
         "F": {"title": "Interview plan", "stories": stories},
-        "G": {"title": "Posting legitimacy", "assessment": legitimacy, "signals": signals, "concerns": concerns},
+        "G": {"title": "Posting legitimacy", "assessment": legitimacy, "signals": signals, "concerns": concerns, "notes": notes},
         "basis": "Career Ops A-G evaluation, built from the saved posting, your CV and your triage. No AI wrote it; "
                  "nothing was looked up online. Importance comes from the posting alone, before your CV is read.",
     }
@@ -251,5 +284,6 @@ def to_markdown(report: dict) -> str:
     out += [f"- {s['prompt']} Start from: {s['seed']}" for s in report["F"]["stories"]] or ["- No critical or high requirement to prepare for."]
     g = report["G"]
     out += ["", "## G) Posting legitimacy", "", f"Assessment: {g['assessment']}."]
-    out += [f"- {line}" for line in g["signals"]] + [f"- Concern: {line}" for line in g["concerns"]]
+    out += [f"- {line}" for line in g["signals"]] + [f"- Concern: {line}" for line in g["concerns"]] + \
+        [f"- Good to know: {line}" for line in g.get("notes") or []]
     return "\n".join(out) + "\n"

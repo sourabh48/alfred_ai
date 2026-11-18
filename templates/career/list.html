@@ -252,6 +252,72 @@
     </div>
 </section>
 
+<section class="mb-4" aria-labelledby="careerToolsTitle">
+    <div class="surface-card">
+        <h2 class="page-section-title" id="careerToolsTitle">More career tools</h2>
+        <p class="page-section-copy mb-2">Each tool works from your CV and your own words. ALFRED saves nothing until you confirm, and sends nothing.</p>
+        <div id="careerToolsFeedback" class="d-none alert" role="status" aria-live="polite"></div>
+        <details class="mt-2" id="careerProfileTool"><summary>Master profile: the facts your CV supports</summary>
+            <p class="small muted mt-2 mb-2">Facts copied from your CV, each with where it came from. Keep the ones that are true; drop the rest.</p>
+            <div id="careerProfileBody"></div>
+            <form id="careerGithubForm" class="d-flex flex-wrap gap-2 align-items-end mt-3">
+                <div><label class="form-label small mb-1" for="careerGithubUser">Your GitHub username</label>
+                    <input class="form-control form-control-sm" id="careerGithubUser" autocomplete="username" maxlength="39" required></div>
+                <button class="btn btn-outline-secondary btn-sm" type="submit">Find skills and projects not in my CV</button>
+            </form>
+            <div id="careerGithubBody" class="mt-2"></div>
+        </details>
+        <details class="mt-2" id="careerCompaniesTool"><summary>Companies to watch</summary>
+            <p class="small muted mt-2 mb-2">ALFRED finds each company's public job board (Greenhouse, Lever or Ashby) and lists open roles that match your target roles.</p>
+            <form id="careerCompaniesForm" class="d-flex flex-wrap gap-2 align-items-end">
+                <div class="flex-grow-1"><label class="form-label small mb-1" for="careerCompanyNames">Company names, separated by commas</label>
+                    <input class="form-control form-control-sm" id="careerCompanyNames" maxlength="1000" required></div>
+                <button class="btn btn-outline-secondary btn-sm" type="submit">Find their job boards</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="careerOpenRoles">Show open roles</button>
+            </form>
+            <div id="careerCompaniesBody" class="mt-2"></div>
+        </details>
+        <details class="mt-2" id="careerGambitTool"><summary>Pitch a role nobody has posted</summary>
+            <p class="small muted mt-2 mb-2">Your local AI proposes a role from what you know about the company and from your CV. Lines with numbers you did not give are dropped. Takes up to a minute.</p>
+            <form id="careerGambitForm" class="soft-grid">
+                <div><label class="form-label small mb-1" for="careerGambitCompany">Company</label>
+                    <input class="form-control form-control-sm" id="careerGambitCompany" maxlength="100" required></div>
+                <div><label class="form-label small mb-1" for="careerGambitRole">Role idea (optional)</label>
+                    <input class="form-control form-control-sm" id="careerGambitRole" maxlength="100"></div>
+                <div><label class="form-label small mb-1" for="careerGambitNotes">What you know about them and the problems they have</label>
+                    <textarea class="form-control form-control-sm" id="careerGambitNotes" rows="3" minlength="40" maxlength="4000" required></textarea></div>
+                <div><button class="btn btn-outline-secondary btn-sm" type="submit">Propose a role</button></div>
+            </form>
+            <div id="careerGambitBody" class="mt-2"></div>
+        </details>
+        <details class="mt-2" id="careerRepliesTool"><summary>Employer replies in my inbox</summary>
+            <p class="small muted mt-2 mb-2">ALFRED reads your last 30 days of mail read-only, with the login Career uses for sending, and matches replies to your saved opportunities. Nothing is marked read or kept, and no AI reads your mail.</p>
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="careerRepliesCheck">Check my inbox</button>
+            <div id="careerRepliesBody" class="mt-2"></div>
+        </details>
+        <details class="mt-2" id="careerSponsorTool"><summary>US visa sponsor history (H-1B)</summary>
+            <p class="small muted mt-2 mb-2">The US Department of Labor blocks automated downloads, so download an LCA disclosure file yourself from <a href="https://www.dol.gov/agencies/eta/foreign-labor/performance" target="_blank" rel="noopener noreferrer">the DOL performance data page</a> and put it in the folder below. ALFRED reads it on this PC. Past filings are evidence, not a promise to sponsor you, and this is not legal advice.</p>
+            <div id="careerSponsorStatus" class="small mb-2"></div>
+            <button class="btn btn-outline-secondary btn-sm mb-2" type="button" id="careerSponsorImport">Read the files in the folder</button>
+            <form id="careerSponsorForm" class="row g-2 align-items-end">
+                <div class="col-sm-8"><label class="form-label small mb-1" for="careerSponsorCompany">Company</label>
+                    <input class="form-control form-control-sm" id="careerSponsorCompany" maxlength="160" required></div>
+                <div class="col-sm-4"><button class="btn btn-outline-secondary btn-sm w-100" type="submit">Check history</button></div>
+            </form>
+            <div id="careerSponsorBody" class="mt-2"></div>
+        </details>
+        <details class="mt-2" id="careerRetroTool"><summary>Teach ALFRED from your corrections</summary>
+            <p class="small muted mt-2 mb-2">Tell ALFRED what it got wrong. Your local AI turns it into up to five changes to your triage brief; only the ones you tick are applied.</p>
+            <form id="careerRetroForm">
+                <label class="form-label small mb-1" for="careerRetroText">Your corrections</label>
+                <textarea class="form-control form-control-sm mb-2" id="careerRetroText" rows="3" minlength="10" maxlength="3000" required placeholder="e.g. Stop suggesting jobs in Bangalore. I want Data Engineer roles, not analyst roles."></textarea>
+                <button class="btn btn-outline-secondary btn-sm" type="submit">Suggest rules</button>
+            </form>
+            <div id="careerRetroBody" class="mt-2"></div>
+        </details>
+    </div>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-4">
         <div class="surface-card h-100">
@@ -330,5 +396,6 @@
 
 {% block extra_js %}
 <script src="/static/js/voice.js?v=1"></script>
-<script src="/static/js/career.js?v=3.21.3"></script>
+<script src="/static/js/career.js?v=3.21.4"></script>
+<script src="/static/js/career_tools.js?v=3"></script>
 {% endblock %}

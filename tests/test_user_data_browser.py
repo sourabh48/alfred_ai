@@ -5647,6 +5647,62 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Save as PDF', self.browser.execute_script('return document.body.innerText'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.kitInjected)'))
 
+    def test_career_tools_profile_companies_and_retro_need_the_owners_ok(self):
+        from unittest.mock import patch
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from alfred_ai.services.public_http import PublicHTTPError
+        from apps.career.models import CareerResume
+        from apps.career.services import career_tools
+        from tests.test_career_application_kit import CV
+        from tests.test_career_matching_acceptance import offline_career
+        from tests.test_career_tools import FakeReasoner, _reply
+        offline_career(self)
+        import tempfile
+        self.enterContext(patch.dict('os.environ', {'ALFRED_DATA_DIR': self.enterContext(tempfile.TemporaryDirectory())}))
+        owner = self.scenario['user']
+        resume = CareerResume.objects.create(user=owner, uploaded_file=SimpleUploadedFile('tools-cv.pdf', b'%PDF-synthetic'), file_name='tools-cv.pdf',
+            parser_status='parsed', extracted_text=CV.replace('Mentored three junior engineers', 'Mentored <img src=x onerror="window.toolsInjected=true"> engineers'),
+            extracted_payload={'role': 'Backend Engineer', 'experience_years': 5, 'skills': ['Python', 'Django']})
+        board = {'jobs': [{'title': 'Senior Backend Engineer', 'absolute_url': 'https://boards.greenhouse.io/syntheticpay/jobs/1', 'location': {'name': 'Pune'}}]}
+
+        def reply(method, url, **kwargs):
+            if url.startswith('https://boards-api.greenhouse.io/v1/boards/syntheticpay/'):
+                return _reply(board)
+            raise PublicHTTPError('upstream_status')
+        self.enterContext(patch.object(career_tools.public_http, 'request', side_effect=reply))
+        rules = '{"rules": [{"field": "target_roles", "action": "add", "value": "Backend Engineer", "why": "You asked for it."}]}'
+        self.enterContext(patch.object(career_tools, '_reasoner', return_value=FakeReasoner([rules])))
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.browser.execute_script("document.getElementById('careerProfileTool').open = true")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-profile-new]'))
+        self.assertIn('Mentored <img', self.text('careerProfileBody'))  # shown as text, never run
+        self.assertFalse(self.browser.execute_script('return window.toolsInjected === true'))
+        first = self.browser.find_element(self.By.CSS_SELECTOR, '[data-profile-new]').get_attribute('id')
+        self.memory_click(f'#{first}')
+        self.memory_click('#careerProfileSave')
+        self.wait.until(lambda _: 'Profile saved.' in self.text('careerToolsFeedback'))
+        self.assertEqual(len(career_tools.master_profile(owner, resume)['facts']), 1)
+        self.browser.execute_script("document.getElementById('careerCompaniesTool').open = true")
+        self.browser.find_element(self.By.ID, 'careerCompanyNames').send_keys('SyntheticPay')
+        self.memory_click('#careerCompaniesForm button[type=submit]')
+        self.wait.until(lambda _: 'Job boards found.' in self.text('careerToolsFeedback'))
+        self.browser.execute_script("document.getElementById('careerRetroTool').open = true")
+        self.browser.find_element(self.By.ID, 'careerRetroText').send_keys('I want Backend Engineer roles only.')
+        self.memory_click('#careerRetroForm button[type=submit]')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRetroApply'))
+        self.memory_click('#careerRetroApply')
+        self.wait.until(lambda _: 'Applied 1 rule(s)' in self.text('careerToolsFeedback'))
+        self.memory_click('#careerOpenRoles')
+        self.wait.until(lambda _: 'Senior Backend Engineer' in self.text('careerCompaniesBody'))
+        self.memory_click('[data-role-check]')
+        self.assertEqual(self.browser.find_element(self.By.ID, 'careerJobUrl').get_attribute('value'), 'https://boards.greenhouse.io/syntheticpay/jobs/1')
+        self.browser.execute_script("document.getElementById('careerSponsorTool').open = true")
+        self.assertIn('No file read yet.', self.text('careerSponsorStatus'))
+        self.memory_click('#careerSponsorImport')  # nothing is downloaded for the owner: ALFRED says where to put the file
+        self.wait.until(lambda _: 'No LCA file found' in self.text('careerToolsFeedback'))
+        self.capture('career-tools')
+        self.run_axe_light_dark('career-tools')
+
     def test_career_evaluation_batch_triage_and_reviewed_send(self):
         from django.core import mail
         from django.test import override_settings

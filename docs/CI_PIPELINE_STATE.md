@@ -1,8 +1,17 @@
 # Development CI and integration pipeline
 
+## Upstream gap build — 2026-11-18
+
+LOCAL_TESTING. Same worktree after `665816c`: TradingAgents, Career Ops and TREK gaps the owner approved (see
+EXECUTION_STATE). Not pushed, no hosted CI.
+
+CI_PASSED on `665816c` (Browser Regression 44334753925 success; pages build and deployment 44334752112 success). Owner:
+"Merge, restart, push" (2026-11-18); origin/master `cc26e14` → `665816c` (fast-forward, owner name only, no secrets in the
+diff). A green result applies to `665816c` only.
+
 ## Research desk agents branch — 2026-11-18
 
-LOCAL_TESTING. Branch `work/tracker-items-2026-11-18` after `cc26e14`: AI debate, Reddit mood, paper trader, price
+MERGED as `665816c`. Was LOCAL_TESTING. Branch `work/tracker-items-2026-11-18` after `cc26e14`: AI debate, Reddit mood, paper trader, price
 providers and FRED/Alpha Vantage/SEC sources. Full local backend shards on the working tree: 3,173 tests OK (14
 skipped); the Settings and desk browser tests pass. Not pushed, no hosted CI, no PR. Push needs the owner's OK; the
 docs delta publishes to Pages.

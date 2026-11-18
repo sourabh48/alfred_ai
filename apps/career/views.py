@@ -1096,12 +1096,10 @@ class CareerBatchTriageView(APIView):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def career_triage_brief(request):
-    """The brief used for the owner's most recent triage, so the form starts from it."""
-    for analysis in CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]:
-        triage = analysis.extracted_payload.get("triage") if isinstance(analysis.extracted_payload, dict) else None
-        if isinstance(triage, dict) and isinstance(triage.get("brief"), dict):
-            return Response({"brief": triage["brief"]})
-    return Response({"brief": None})
+    """The brief retro saved, else the one used for the owner's most recent triage, so the form starts from it."""
+    from .services import career_tools
+    analyses = CareerJobAnalysis.objects.filter(user=request.user).order_by("-updated_at", "-id")[:300]
+    return Response({"brief": career_tools.saved_brief(request.user, analyses)})
 
 
 class CareerApplicationKitView(APIView):
@@ -1346,3 +1344,65 @@ def career_tailored_cv_print(request, pk):
     styled = request.GET.get("style") == "styled"
     return render(request, "career/tailored_cv_print.html", {"cv": cv, "analysis": analysis, "styled": styled,
                                                              "blocks": application_kit.cv_blocks(cv.get("text", "")) if styled else []})
+
+
+class CareerToolsView(APIView):
+    """More Career Ops modes: master profile, GitHub expand, company discover, gambit and retro (owner approval 2026-11-18)."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def _state(self, user, resume):
+        from .services import career_tools
+        from .services import h1b_sponsor, reply_watch
+        return {"profile": career_tools.master_profile(user, resume), "companies": career_tools.watched(user),
+                "github": career_tools.github_username(resume), "replies_ready": reply_watch.configured(),
+                "sponsor": h1b_sponsor.status()}
+
+    def get(self, request):
+        resume, _ = _draft_sources(request.user)
+        response = Response(self._state(request.user, resume))
+        response["Cache-Control"] = "no-store, private"
+        return response
+
+    def post(self, request):
+        from .services import career_tools
+        user, data = request.user, request.data if isinstance(request.data, dict) else {}
+        resume, profile = _draft_sources(user)
+        analyses = CareerJobAnalysis.objects.filter(user=user).order_by("-updated_at", "-id")[:300]
+        operation = data.get("operation")
+        try:
+            if operation == "profile_save":
+                extra = career_tools.github_suggestions(data["username"], resume) if data.get("username") else []
+                result = career_tools.save_profile(user, resume, data.get("keep") or [], data.get("drop") or [], extra=extra)
+            elif operation == "github":
+                result = {"suggestions": career_tools.github_suggestions(data.get("username"), resume)}
+            elif operation == "companies_add":
+                result = career_tools.add_companies(user, data.get("names"))
+            elif operation == "company_remove":
+                result = career_tools.remove_company(user, data.get("name"))
+            elif operation == "open_roles":
+                brief = career_tools.saved_brief(user, analyses) or {}
+                role = getattr(profile, "role", "") or ""
+                targets = brief.get("target_roles") or ([role] if role and role.casefold() != "profile pending" else [])
+                result = career_tools.open_roles(user, targets)
+            elif operation == "gambit":
+                result = career_tools.gambit(resume, company=data.get("company"), notes=data.get("notes"), role=data.get("role"))
+            elif operation == "retro":
+                result = career_tools.retro(user, data.get("corrections"), analyses=analyses)
+            elif operation == "replies":
+                from .services import reply_watch
+                result = reply_watch.check(user)
+            elif operation in {"sponsor_import", "sponsor_check"}:
+                from .services import h1b_sponsor
+                result = h1b_sponsor.build_index() if operation == "sponsor_import" else h1b_sponsor.check(data.get("company"))
+            elif operation == "retro_apply":
+                result = career_tools.apply_rules(user, data.get("corrections"), data.get("rules"), analyses=analyses)
+            else:
+                return Response({"detail": "Unknown career tool."}, status=status.HTTP_400_BAD_REQUEST)
+        except (ValueError, KeyError) as exc:
+            return Response({"detail": str(exc) if isinstance(exc, ValueError) else "Missing field."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:  # a public board or GitHub being down, or the local model failing
+            return _career_error_response(exc, "That source could not be read right now. Try again later.")
+        response = Response({"result": result, **self._state(user, resume)})
+        response["Cache-Control"] = "no-store, private"
+        return response
