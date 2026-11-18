@@ -1,7 +1,7 @@
 """Offline country maps: one country's vector tiles cut from the free Protomaps OpenStreetMap build.
 
-Two steps, both started by the owner in Settings. Checking the size reads only the build's tile
-index. The map itself downloads only after the owner confirmed that exact size. Each country is
+The owner presses Download in Settings (owner decision 2026-11-19): ALFRED reads the build's tile index to
+learn the size, then downloads straight away; Pause keeps what arrived, Cancel deletes it. Each country is
 one SQLite file under ALFRED_DATA_DIR/maps; removing a country deletes only its file. Requests
 carry byte ranges of the public build, never anything about the owner or their trips.
 """
@@ -15,6 +15,7 @@ import sqlite3
 import struct
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from bisect import bisect_right
 from datetime import datetime, timezone as dt_timezone
 from functools import lru_cache
@@ -29,6 +30,8 @@ BUILDS = "https://build-metadata.protomaps.dev/builds.json"
 BUILD = "https://build.protomaps.com/"
 MAX_ZOOM = 14  # the build goes to 15; the map overzooms 14, so streets stay readable at about half the size
 CHUNK = 4_000_000  # one public_http request must finish within its 20 seconds
+GAP = 262_144  # fetching a gap this small between wanted tiles is cheaper than another request
+WORKERS = 4  # byte ranges fetched at once from the public build
 ATTRIBUTION = "© OpenStreetMap contributors, Protomaps"
 COUNTRIES = Path(__file__).with_name("country_boxes.json")
 _lock = threading.Lock()
@@ -292,6 +295,9 @@ def _start(code, job, work):
             if _jobs.get(code, {}).get("cancel"):
                 _file(code, part=True).unlink(missing_ok=True)
                 _jobs.pop(code, None)
+            elif _jobs.get(code, {}).get("pause"):
+                job = _jobs.get(code, {})
+                _jobs[code] = {"state": "paused", **{k: job[k] for k in ("bytes", "done", "build") if k in job}}
             else:
                 _jobs[code] = {**_jobs.get(code, {}), "state": "failed",
                                "error": exc.code if isinstance(exc, PublicHTTPError) else "failed"}
@@ -301,8 +307,8 @@ def _start(code, job, work):
     threading.Thread(target=go, daemon=True, name=f"offline-map-{code}").start()
 
 
-def check_size(code, fetch=None):
-    """Step one: read the index and record the exact download size. No map data is downloaded."""
+def check_size(code, fetch=None, then_download=False):
+    """Read the index and record the exact download size; with then_download, carry straight on (resuming)."""
     boxes = countries()[_file(code).stem]["boxes"]
 
     def work():
@@ -325,7 +331,32 @@ def check_size(code, fetch=None):
         finally:
             db.close()
         _jobs[code] = {"state": "ready", "bytes": size, "build": p["build"]}
+        if then_download:
+            _jobs[code] = {"state": "downloading", "bytes": size, "build": p["build"], "done": 0}
+            _store(code, lambda done: _jobs[code].update(done=done), fetch or _fetch)
     _start(code, {"state": "sizing"}, work)
+
+
+def pause(code):
+    """Stop a running download but keep what arrived; Download again resumes it."""
+    _file(code)
+    with _lock:
+        if code not in _running:
+            raise ValueError("This map is not downloading.")
+        _jobs.setdefault(code, {})["pause"] = True
+    return "pausing"
+
+
+def _groups(spans):
+    """Neighbouring tiles share one request, across small gaps, up to CHUNK bytes."""
+    group = []
+    for span in spans:
+        if group and (span[0] - (group[-1][0] + group[-1][1]) > GAP or span[0] + span[1] - group[0][0] > CHUNK):
+            yield group
+            group = []
+        group.append(span)
+    if group:
+        yield group
 
 
 def download(code, build, size, fetch=None):
@@ -343,29 +374,34 @@ def _store(code, progress, fetch):
         build, data_offset = _meta(db, "build"), int(_meta(db, "data_offset"))
         done = db.execute("SELECT COALESCE(SUM(length(data)),0) FROM blobs").fetchone()[0]  # resume what an earlier try saved
         after = -1
-        while True:
-            spans = db.execute("SELECT DISTINCT offset, length FROM tiles WHERE offset>? AND offset NOT IN (SELECT offset FROM blobs) "
-                               "ORDER BY offset LIMIT 5000", (after,)).fetchall()
-            if not spans:
-                break
-            after = spans[-1][0]
-            group = []
-            for span in spans + [None]:
-                if group and (span is None or span[0] != group[-1][0] + group[-1][1] or span[0] + span[1] - group[0][0] > CHUNK):
-                    if _jobs.get(code, {}).get("cancel"):
-                        raise PublicHTTPError("cancelled")
-                    start = group[0][0]
-                    raw = _retry(lambda: fetch(build, data_offset + start, group[-1][0] + group[-1][1] - start))
-                    rows = [(o, raw[o - start:o - start + n]) for o, n in group]
-                    if any(data[:2] != b"\x1f\x8b" for _, data in rows):
-                        raise PublicHTTPError("unexpected_build")
-                    with db:
-                        db.executemany("INSERT OR REPLACE INTO blobs VALUES(?,?)", rows)
-                    done += sum(n for _, n in group)
-                    progress(done)
-                    group = []
-                if span:
-                    group.append(span)
+
+        def get(group):
+            start = group[0][0]
+            raw = _retry(lambda: fetch(build, data_offset + start, group[-1][0] + group[-1][1] - start))
+            return [(o, raw[o - start:o - start + n]) for o, n in group]
+        pool = ThreadPoolExecutor(WORKERS) if WORKERS > 1 else None
+        try:
+            while True:
+                spans = db.execute("SELECT DISTINCT offset, length FROM tiles WHERE offset>? AND offset NOT IN (SELECT offset FROM blobs) "
+                                   "ORDER BY offset LIMIT 5000", (after,)).fetchall()
+                if not spans:
+                    break
+                after = spans[-1][0]
+                groups = list(_groups(spans))
+                for window in range(0, len(groups), WORKERS * 4):  # bounded memory; results stay in order
+                    for rows in (pool.map if pool else map)(get, groups[window:window + WORKERS * 4]):
+                        if any(data[:2] != b"\x1f\x8b" for _, data in rows):
+                            raise PublicHTTPError("unexpected_build")
+                        with db:
+                            db.executemany("INSERT OR REPLACE INTO blobs VALUES(?,?)", rows)
+                        done += sum(len(data) for _, data in rows)
+                        progress(done)
+                        job = _jobs.get(code, {})  # checked after saving, so a pause keeps what arrived
+                        if job.get("cancel") or job.get("pause"):
+                            raise PublicHTTPError("cancelled")
+        finally:
+            if pool:
+                pool.shutdown(wait=True, cancel_futures=True)
         with db:
             db.execute("INSERT OR REPLACE INTO meta VALUES('finished',?)", (datetime.now(dt_timezone.utc).isoformat(),))
     finally:

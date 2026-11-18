@@ -5386,6 +5386,42 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.find_element(self.By.ID, 'offlineMapsCountry').is_displayed())
         self.run_axe_light_dark('settings-online-services')
 
+    def test_offline_map_one_press_download_with_spinner_pause_resume_and_cancel(self):
+        """Owner check 2026-11-19: one Download press, a spinning circle while the size is worked out, then Pause,
+        Resume and Cancel."""
+        from apps.mobility.services.travel import offline_maps as om
+        maps, calls = [], []
+        def row(state, **extra):
+            return {"code": "BT", "name": "Bhutan", "installed_bytes": 0, "state": state, **extra}
+        def status():
+            return {"countries": [{"code": "BT", "name": "Bhutan"}], "home": "BT", "maps": list(maps), "attribution": om.ATTRIBUTION, "max_zoom": om.MAX_ZOOM}
+        def check_size(code, fetch=None, then_download=False):
+            calls.append(("get", code, then_download)); maps[:] = [row("sizing")]
+        def pause(code):
+            calls.append(("pause", code)); maps[:] = [row("paused", bytes=8_000_000, done=2_000_000)]
+            return "pausing"
+        for name, fake in (("status", status), ("check_size", check_size), ("pause", pause)):
+            self.enterContext(patch.object(om, name, fake))
+        owner = self.scenario['user']; owner.is_superuser = True; owner.save(update_fields=['is_superuser'])
+        self.login(); self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: 'No offline maps yet.' in self.text('offlineMapsStatus'))
+        submit = self.browser.find_element(self.By.CSS_SELECTOR, '#offlineMapsForm button[type=submit]')
+        self.assertEqual(submit.text, 'Download map')
+        submit.click()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#offlineMapsList .spinner-border'))
+        self.assertEqual(calls, [("get", "BT", True)])
+        maps[:] = [row("downloading", bytes=8_000_000, done=2_000_000)]
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#offlineMapsList [data-pause="BT"]'))  # polled
+        self.assertIn('25%', self.text('offlineMapsList'))
+        self.browser.execute_script("document.getElementById('settingsOfflineMaps').scrollIntoView({block:'center'})")
+        self.browser.save_screenshot(str(self.artifacts / 'offline-maps-downloading.png'))
+        self.run_axe_light_dark('settings-offline-maps')
+        self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR, '#offlineMapsList [data-remove="BT"]'))
+        self.browser.find_element(self.By.CSS_SELECTOR, '[data-pause="BT"]').click()
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '#offlineMapsList [data-get="BT"]'))
+        self.assertIn('Paused at 2.0 MB of 8.0 MB', self.text('offlineMapsList'))
+        self.assertEqual(calls[-1], ("pause", "BT"))
+
     def run_axe_light_dark(self, name):
         self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
         for theme in ('light', 'dark'):

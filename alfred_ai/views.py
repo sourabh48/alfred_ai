@@ -771,7 +771,7 @@ def map_tile_status_view(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def offline_maps_api_view(request):
-    """Settings > Offline maps: check a country's size, download it only after the owner confirms, or remove it."""
+    """Settings > Offline maps: download a country (size first, then the map), pause, resume or remove it."""
     from apps.mobility.services.travel import offline_maps
     from .services.online_services import can_manage
     if request.method == "POST":
@@ -781,7 +781,11 @@ def offline_maps_api_view(request):
         try:
             data = json.loads(request.body or b"{}")
             code, action = str(data.get("country", "")), data.get("action")
-            if action == "size":
+            if action == "get":  # one press: size, then the download, resuming what a pause kept
+                offline_maps.check_size(code, then_download=True)
+            elif action == "pause":
+                result = offline_maps.pause(code)
+            elif action == "size":
                 offline_maps.check_size(code)
             elif action == "download":
                 offline_maps.download(code, str(data.get("build", "")), data.get("bytes"))

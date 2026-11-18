@@ -57,6 +57,9 @@ def archive():
     return bytes(head) + root + leaf + data, blobs, target
 
 
+REAL_THREAD = __import__('threading').Thread
+
+
 class Now:
     """Runs the worker at once so the test sees its result."""
     def __init__(self, target, daemon, name):
@@ -72,7 +75,8 @@ class OfflineMapTests(TestCase):
         self.addCleanup(self.folder.cleanup)
         for p in (patch.dict(os.environ, {"ALFRED_DATA_DIR": self.folder.name}), patch.object(om, "countries", return_value=BOX),
                   patch.object(om, "MAX_ZOOM", 2), patch.object(om.threading, "Thread", Now),
-                  patch.object(om, "latest_build", return_value="20990101.pmtiles"), patch.object(om.time, "sleep")):
+                  patch.object(om, "latest_build", return_value="20990101.pmtiles"), patch.object(om.time, "sleep"),
+                  patch.object(om, "WORKERS", 1)):
             p.start()
             self.addCleanup(p.stop)
         om._jobs.clear()
@@ -127,6 +131,39 @@ class OfflineMapTests(TestCase):
             self.calls.clear()
             om.download("XX", job["build"], job["bytes"], fetch=self.fetch)
         self.assertEqual(len(self.calls), 2, "only the two tiles that had not arrived are fetched again")
+        self.assertEqual(om.installed(), ["XX"])
+
+    def test_one_press_sizes_then_downloads_in_parallel_with_fewer_requests(self):
+        """Owner 2026-11-19: Download starts at once and is faster: nearby tiles share a request, four fetch at a time."""
+        om.check_size("XX", fetch=self.fetch, then_download=True)
+        self.assertEqual(om.installed(), ["XX"])
+        data_offset = om.header(self.raw)["data_offset"]
+        self.assertEqual(len([s for s, _ in self.calls if s >= data_offset]), 1, "the three nearby tiles come in one request")
+        om.remove("XX")
+        self.calls.clear()
+        om.check_size("XX", fetch=self.fetch)
+        with patch.object(om.threading, "Thread", REAL_THREAD), patch.object(om, "WORKERS", 4), patch.object(om, "GAP", 0):
+            om._store("XX", lambda done: None, self.fetch)  # real worker threads, one request per tile
+        self.assertEqual(len([s for s, _ in self.calls if s >= data_offset]), 3)
+        self.assertEqual(gzip.decompress(om.tile(2, 2, 1)), f"tile-{self.target}".encode())
+
+    def test_pause_keeps_what_arrived_and_download_resumes_it(self):
+        om.check_size("XX", fetch=self.fetch)
+        data_offset = om.header(self.raw)["data_offset"]
+        def pausing(build, start, length):
+            if start >= data_offset:
+                om._jobs["XX"]["pause"] = True  # the owner pressed Pause while this piece was arriving
+            return self.fetch(build, start, length)
+        with patch.object(om, "CHUNK", 1), patch.object(om, "GAP", 0):
+            om._start("XX", {"state": "downloading", "bytes": 1, "build": "20990101.pmtiles", "done": 0},
+                      lambda: om._store("XX", lambda done: om._jobs["XX"].update(done=done), pausing))
+            self.assertEqual(om.status()["maps"][0]["state"], "paused")
+            self.assertTrue((om.folder() / "XX.part.sqlite").exists())
+            with self.assertRaisesRegex(ValueError, "not downloading"):
+                om.pause("XX")
+            self.calls.clear()
+            om.check_size("XX", fetch=self.fetch, then_download=True)
+        self.assertEqual(len([s for s, _ in self.calls if s >= data_offset]), 2, "only the two tiles that had not arrived")
         self.assertEqual(om.installed(), ["XX"])
 
     def test_removing_one_country_keeps_the_others(self):

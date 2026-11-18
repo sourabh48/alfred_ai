@@ -193,3 +193,19 @@ html[data-theme="dark"] .progress { --bs-progress-bg: #2b4462; }
 @media (max-width: 991.98px) { .auth-shell-grid > .auth-panel { order: -1; } }
 @media (max-width: 575.98px) { .dashboard-health-card { width: 100%; } }
 html[data-theme="dark"] .panel-eyebrow { color: #8db8ff; }
+
+/* Settings > Offline maps: one row per country with a progress ring (owner, 2026-11-19). */
+.offline-map-list { display: grid; gap: .6rem; }
+.offline-map { display: flex; align-items: center; gap: 1rem; padding: .75rem 1rem; border: 1px solid var(--alfred-stroke); border-radius: 16px; background: var(--alfred-surface-strong); }
+.offline-map-body { flex: 1 1 12rem; display: flex; flex-direction: column; min-width: 0; }
+.offline-map-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.offline-map-ring { --pct: 0; --ring: var(--alfred-primary); flex: none; width: 3.25rem; height: 3.25rem; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--ring) calc(var(--pct) * 1%), var(--alfred-primary-soft) 0); }
+.offline-map-ring > span:not(.spinner-border) { width: 2.5rem; height: 2.5rem; border-radius: 50%; display: grid; place-items: center; font-size: .75rem; font-weight: 700; color: var(--alfred-ink); background: var(--alfred-surface-strong); }
+.offline-map-ring .spinner-border { width: 3.25rem; height: 3.25rem; color: var(--alfred-primary); }
+.offline-map-ring.is-done { --ring: var(--alfred-good); }
+.offline-map-ring.is-paused { --ring: var(--alfred-muted); }
+.offline-map-ring.is-failed { --ring: var(--alfred-warn); }
+.offline-map-add .form-select { flex: 1 1 14rem; max-width: 24rem; }
+html[data-theme="dark"] .offline-map, html[data-theme="dark"] .offline-map-ring > span:not(.spinner-border) { background: #182b44; }
+@media (max-width: 575px) { .offline-map { flex-wrap: wrap; } .offline-map-actions { width: 100%; } }

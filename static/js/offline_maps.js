@@ -1,4 +1,4 @@
-// Settings > Offline maps: check a country's size, download only after the owner confirms that size, remove any time.
+// Settings > Offline maps: one Download press sizes then downloads; Pause keeps what arrived, Cancel deletes it.
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("offlineMapsForm");
     if (!form) return;
@@ -10,27 +10,45 @@ document.addEventListener("DOMContentLoaded", () => {
         quota_exhausted: "the map server is busy", incomplete_response: "the connection dropped", cancelled: "it was stopped" };
     let timer = null, canManage = false;
 
+    // One row per country: a progress ring, the name and its size line, then the actions (owner, 2026-11-19).
+    function ring(kind, pct, label) {
+        if (kind === "busy") return `<div class="offline-map-ring"><span class="spinner-border" role="status" aria-label="${label}"></span></div>`;
+        const inner = kind === "done" ? "✓" : kind === "failed" ? "!" : `${pct}%`;
+        return `<div class="offline-map-ring is-${kind}" style="--pct:${pct}" role="progressbar" aria-label="${label}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span>${inner}</span></div>`;
+    }
+    const button = (kind, attr, code, label) => `<button type="button" class="btn btn-sm btn-${kind}" data-${attr}="${e(code)}">${label}</button>`;
+
     function row(m) {
-        const name = e(m.name), buttons = [];
-        let text;
-        if (m.state === "sizing") text = `${name}: checking the size…`;
-        else if (m.state === "ready") {
-            text = `${name}: <strong>${size(m.bytes)}</strong> to download. Download it now?`;
-            buttons.push(`<button type="button" class="btn btn-primary btn-sm" data-download="${e(m.code)}" data-build="${e(m.build)}" data-bytes="${Number(m.bytes)}">Download ${size(m.bytes)}</button>`,
-                         `<button type="button" class="btn btn-outline-secondary btn-sm" data-remove="${e(m.code)}">Not now</button>`);
+        const name = e(m.name), code = m.code, pct = m.bytes ? Math.min(100, Math.floor(100 * (m.done || 0) / m.bytes)) : 0;
+        let graphic, detail, buttons;
+        if (m.state === "sizing") {
+            graphic = ring("busy", 0, `Checking the size of the ${name} map`);
+            detail = "Working out the size; the download starts by itself.";
+            buttons = [button("outline-danger", "remove", code, "Cancel")];
+        } else if (m.state === "ready") {
+            graphic = ring("paused", 0, `${name} map not downloaded`);
+            detail = `${size(m.bytes)} to download.`;
+            buttons = [`<button type="button" class="btn btn-sm btn-primary" data-download="${e(code)}" data-build="${e(m.build)}" data-bytes="${Number(m.bytes)}">Download</button>`,
+                       button("outline-secondary", "remove", code, "Not now")];
         } else if (m.state === "downloading") {
-            const pct = m.bytes ? Math.floor(100 * (m.done || 0) / m.bytes) : 0;
-            text = `${name}: downloading ${size(m.done || 0)} of ${size(m.bytes)}<div class="progress mt-1" role="progressbar" aria-label="${name} map download" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width:${pct}%">${pct}%</div></div>`;
-            buttons.push(`<button type="button" class="btn btn-outline-danger btn-sm" data-remove="${e(m.code)}">Stop and remove</button>`);
+            graphic = ring("active", pct, `${name} map download`);
+            detail = `Downloading ${size(m.done || 0)} of ${size(m.bytes)}`;
+            buttons = [button("outline-secondary", "pause", code, "Pause"), button("outline-danger", "remove", code, "Cancel")];
+        } else if (m.state === "paused") {
+            graphic = ring("paused", pct, `${name} map download, paused`);
+            detail = `Paused at ${size(m.done || 0)} of ${size(m.bytes || 0)}. What arrived is kept.`;
+            buttons = [button("primary", "get", code, "Resume"), button("outline-danger", "remove", code, "Cancel")];
         } else if (m.state === "failed") {
-            text = `${name}: not finished because ${e(problems[m.error] || "the map could not be fetched")}. What was downloaded is kept; check the size again to continue.`;
-            buttons.push(`<button type="button" class="btn btn-outline-primary btn-sm" data-size="${e(m.code)}">Check size again</button>`,
-                         `<button type="button" class="btn btn-outline-danger btn-sm" data-remove="${e(m.code)}">Remove</button>`);
+            graphic = ring("failed", pct, `${name} map download stopped`);
+            detail = `Not finished because ${e(problems[m.error] || "the map could not be fetched")}. What arrived is kept.`;
+            buttons = [button("primary", "get", code, "Resume"), button("outline-danger", "remove", code, "Remove")];
         } else {
-            text = `${name}: on this PC (${size(m.installed_bytes)}).`;
-            buttons.push(`<button type="button" class="btn btn-outline-danger btn-sm" data-remove="${e(m.code)}">Remove</button>`);
+            graphic = ring("done", 100, `${name} map on this PC`);
+            detail = `On this PC · ${size(m.installed_bytes)}`;
+            buttons = [button("outline-danger", "remove", code, "Remove")];
         }
-        return `<div class="d-flex flex-wrap align-items-center gap-2"><div class="flex-grow-1 small">${text}</div>${canManage ? buttons.join("") : ""}</div>`;
+        return `<div class="offline-map">${graphic}<div class="offline-map-body"><strong>${name}</strong><span class="small muted">${detail}</span></div>`
+            + `<div class="offline-map-actions">${canManage ? buttons.join("") : ""}</div></div>`;
     }
 
     function render(data) {
@@ -59,20 +77,22 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const data = await Alfred.fetchJSON(url, { method: "POST", body: JSON.stringify(body) });
             render(data);
-            feedback.textContent = data.result === "stopping" ? "Stopping. The partial map is deleted when it stops." : done;
+            feedback.textContent = data.result === "stopping" ? "Cancelling. The partial map is deleted when it stops." : done;
         }
         catch (error) { feedback.textContent = error.message || "Nothing was changed."; }
     }
 
     form.addEventListener("submit", event => {
         event.preventDefault();
-        send({ action: "size", country: select.value }, "Checking the size. Nothing downloads until you confirm.");
+        send({ action: "get", country: select.value }, "Working out the size, then downloading. You can keep using ALFRED.");
     });
     list.addEventListener("click", event => {
         const b = event.target.closest("button");
         if (!b) return;
         if (b.dataset.download) send({ action: "download", country: b.dataset.download, build: b.dataset.build, bytes: Number(b.dataset.bytes) }, "Downloading. You can keep using ALFRED.");
         else if (b.dataset.size) send({ action: "size", country: b.dataset.size }, "Checking the size again.");
+        else if (b.dataset.get) send({ action: "get", country: b.dataset.get }, "Resuming. What arrived before is kept.");
+        else if (b.dataset.pause) send({ action: "pause", country: b.dataset.pause }, "Pausing. What arrived is kept.");
         else if (b.dataset.remove) send({ action: "remove", country: b.dataset.remove }, "Removed from this PC.");
     });
     load();
