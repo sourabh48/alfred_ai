@@ -5,6 +5,7 @@ Location-based budget suggestions, daily expenditure calculator, and smart forec
 from __future__ import annotations
 
 import calendar
+import re
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
@@ -63,6 +64,13 @@ def budget_spent(plan, *, today=None):
     today = today or timezone.localdate()
     end = min(start.replace(day=calendar.monthrange(start.year, start.month)[1]), today)
     return sum(plan_spend_by_category(plan.user, plan.currency, start, end).values(), Decimal("0"))
+
+
+
+def _inr(value):
+    """Whole rupees in Indian digit grouping (2,32,000), as the pages show them."""
+    text = f"{abs(round(value)):d}"
+    return ("-" if round(value) < 0 else "") + "₹" + re.sub(r"(\d)(?=(\d\d)*\d{3}$)", r"\1,", text)
 
 
 class BudgetIntelligenceService:
@@ -387,16 +395,22 @@ class BudgetIntelligenceService:
         # Savings recommendation
         ideal_savings = monthly_income * 0.2
         recommendations.append(
-            f"Aim to save at least ₹{ideal_savings:,.0f}/month (20% of income) for financial security."
+            f"Aim to save at least {_inr(ideal_savings)} a month (20% of income) for financial security."
         )
 
         # Emergency fund
         months_of_expenses = 6
         baseline = resolve_canonical_financial_baseline(user)
         emergency_fund_target = float(baseline.get("essential_monthly_outflow", 0) or 0) * months_of_expenses
-        recommendations.append(
-            f"Build an emergency fund of ₹{emergency_fund_target:,.0f} (6 months of expenses)."
-        )
+        cash_known = (baseline.get("metric_states", {}).get("liquid_cash") or {}).get("status", "unavailable") != "unavailable"
+        cash = float(baseline.get("liquid_cash", 0) or 0)
+        if not cash_known:
+            recommendations.append(f"Build an emergency fund of {_inr(emergency_fund_target)} (6 months of essential costs).")
+        elif cash >= emergency_fund_target:
+            recommendations.append(f"Your bank balance of {_inr(cash)} already covers 6 months of essential costs ({_inr(emergency_fund_target)}).")
+        else:
+            recommendations.append(f"A safety cushion of 6 months' essential costs is about {_inr(emergency_fund_target)}. "
+                                   f"You hold {_inr(cash)} in the bank, so about {_inr(emergency_fund_target - cash)} to go.")
 
         return recommendations
 

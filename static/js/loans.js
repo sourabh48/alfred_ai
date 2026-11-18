@@ -69,12 +69,12 @@ function renderLoanSummary(payload) {
             caption: "Sum of configured monthly EMI commitments.",
         },
         {
-            kicker: "Detected Repayments",
+            kicker: "Repayments found in statements",
             value: Alfred.formatCurrency(summary.detected_repayment_total),
             caption: `${summary.projected_payoff_months} estimated months to repay registered loans.`,
         },
         {
-            kicker: "Foreclosure Watch",
+            kicker: "Loans being closed early",
             value: summary.foreclosure_pending_count,
             caption: `${summary.reconciled_foreclosures} closure payment match${summary.reconciled_foreclosures === 1 ? "" : "es"} confirmed from statements.`,
         },
@@ -233,6 +233,7 @@ function renderLoanTable(loans) {
                 <td class="text-end">${item.months_remaining}</td>
                 <td class="small">
                     ${confirmed ? `<div>${money(item.recommended_prepayment)}</div>
+                    <div class="muted">An example, not advice: check it in Prepayment what-if, which also shows the cash it leaves you.</div>
                     <div class="muted">Projected end: ${Alfred.formatDate(item.projected_end_date)}</div>` : "Review loan terms first"}
                 </td>
                 <td class="text-end">

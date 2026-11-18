@@ -10,7 +10,7 @@
             <p class="alfred-hero-copy">Your loans and the repayments ALFRED found in your statements, with when each could be paid off and whether paying early helps.</p>
         </div>
         <div class="surface-card" style="min-width: 260px;">
-            <p class="metric-kicker">Debt Service Ratio</p>
+            <p class="metric-kicker">Share of income going to debt</p>
             <div class="metric-value" id="loanDebtRatio">0%</div>
             <p class="metric-caption mb-0">Loan and card payments as a share of income across all recorded months.</p>
         </div>
@@ -39,7 +39,7 @@
                     <th class="text-end">EMI</th>
                     <th class="text-end">Balance</th>
                     <th class="text-end">Months Left</th>
-                    <th>Prepay Hint</th>
+                    <th>Extra payment to try</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -312,5 +312,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/loans.js?v=2.15.2"></script>
+<script src="/static/js/loans.js?v=2.15.3"></script>
 {% endblock %}

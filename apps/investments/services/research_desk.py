@@ -442,7 +442,10 @@ def notices(user, today):
     from apps.ml_engine.services.task_bots import _item
 
     open_calls, _ = _open(user, today)
-    return [_item(f"desk:{s['fingerprint']}", f"{s['symbol']}: {s['label']}" + (f" (was {s['changed_from']})" if s.get("changed_from") else " (new)"),
+    buys = [s for s in open_calls if s["rating"] in ("buy", "overweight")]
+    not_now = bool(buys) and personal_fit(user, desk_settings(user), today)["state"] == "does_not_fit"
+    return [_item(f"desk:{s['fingerprint']}", f"{s['symbol']}: {s['label']}" + (f" (was {s['changed_from']})" if s.get("changed_from") else " (new)")
+                  + (", but not for you yet" if not_now and s in buys else ""),
                   f"{s.get('why', '')} {s['summary']} Accept or reject it on Investments; ALFRED never buys or sells.",
                   "/investments/#researchDeskSection")
             for s in open_calls if s["rating"] != "hold" or s.get("changed_from")]
@@ -472,6 +475,8 @@ def desk(user, today=None) -> dict:
         if s["rating"] in ("buy", "overweight"):
             fit = fit or personal_fit(user, settings, today)
             s["fit"] = fit
+            if fit["state"] == "does_not_fit":
+                s["status"] = "Not for you yet"  # the personal answer outranks a general research call for someone deciding alone
         else:
             s["fit"] = {"state": "not_needed", "reasons": [], "missing": []}
     suggestions.sort(key=lambda s: (s["rating"] == "hold", -abs(s["score"]), s["symbol"]))

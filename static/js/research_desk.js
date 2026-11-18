@@ -23,14 +23,14 @@ window.ResearchDesk = (() => {
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                 <div><div class="fw-semibold">${e(s.symbol)}${s.name !== s.symbol ? ` · ${e(s.name)}` : ""}${s.held ? ' <span class="muted small">(you own it)</span>' : ""}</div>
                     <div class="small muted">Research call: <span data-desk-label>${e(s.label)}</span>. ${e(s.summary)} Last daily close ${e(s.currency || "")} ${e(Alfred.formatNumber(s.price, 2))} on ${e(s.price_as_of)} (not a live quote).</div></div>
-                <span class="status-pill ${tone(s.rating)}" data-desk-status>${e(s.status)}</span>
+                <span class="status-pill ${s.status === "Not for you yet" ? "status-warn" : tone(s.rating)}" data-desk-status>${e(s.status)}</span>
             </div>
             <ul class="small mb-0 mt-2 desk-facts">
+                ${fit(s)}
                 <li><span class="fw-semibold">Why now:</span> ${e(s.why || "")} ${e(s.change || (s.first_seen && s.first_seen < s.for_date ? `Same call since ${s.first_seen}; the evidence has not changed.` : "First look at this share."))}</li>
                 <li><span class="fw-semibold">Strongest reason against:</span> ${e(s.against)}</li>
-                ${fit(s)}
                 <li><span class="fw-semibold">What would change this:</span> ${e(s.change_if)}</li>
-                <li><span class="fw-semibold">Next check:</span> ${e(nextCheck())} Company results up to ${e(s.latest_period_end || "unknown")}.</li>
+                <li><span class="fw-semibold">Next check:</span> ${e(nextCheck())}. Company results up to ${e(s.latest_period_end || "unknown")}.</li>
             </ul>
             <div class="d-flex flex-wrap gap-2 mt-2">
                 <button type="button" class="btn btn-sm btn-primary" data-desk-accept="${e(s.id)}" aria-label="Accept and save to my journal: ${e(s.label)} ${e(s.symbol)}">Accept</button>
@@ -66,9 +66,8 @@ window.ResearchDesk = (() => {
     }
 
     function nextCheck() {
-        if (!state?.settings.enabled) return "Daily research is paused; press Research now to check.";
-        const at = state.next_run ? Alfred.formatDateTime(state.next_run) : "";
-        return `${at || "Daily"}, after the market closes, while ALFRED is running; a missed check runs at the next start. The call changes only if the evidence does.`;
+        if (!state?.settings.enabled) return "Paused; press Research now to check";
+        return state.next_run ? Alfred.formatDateTime(state.next_run) : "Daily";
     }
 
     function draw(id, canvasId, config) {
@@ -104,7 +103,7 @@ window.ResearchDesk = (() => {
         const run = data.last_run, suggestions = data.suggestions || [];
         $("researchDeskStatus").textContent = (run ? `Last researched ${Alfred.formatDateTime(run.at)}: ${run.researched} share(s) rated, ${run.skipped.length} skipped.`
             : "Not researched yet. ALFRED researches by itself once a day after markets close; press Research now to start.")
-            + (enabled ? (data.next_run ? ` Next automatic check: ${Alfred.formatDateTime(data.next_run)}.` : "") : " Daily research is paused.")
+            + (enabled ? (data.next_run ? ` Next automatic check: ${Alfred.formatDateTime(data.next_run)}, after the market closes, while ALFRED is running (a missed check runs at the next start). A call changes only when its evidence does.` : "") : " Daily research is paused.")
             + (data.snoozed ? ` ${data.snoozed} call(s) put off for now.` : "");
         $("researchDeskSkipped").innerHTML = run && run.skipped.length ? `<summary class="small">Skipped (${run.skipped.length})</summary><ul class="small mb-0">${run.skipped.map(item =>
             `<li>${e(item.name)}: ${e(item.reason)}</li>`).join("")}</ul>` : "";

@@ -161,8 +161,10 @@ class ResearchDeskTests(TestCase):
         baseline = {"metric_states": {"liquid_runway_months": {"status": "derived"}},
                     "decimal_amounts": {"liquid_cash": "30000.00", "essential_monthly_outflow": "10000.00"}}
         with patch("apps.expenses.services.financial_intelligence.resolve_canonical_financial_baseline", return_value=baseline):
-            fit = self.suggestions_on(TODAY)["GOOD.NS"]["fit"]
-            self.assertEqual(fit["state"], "does_not_fit")
+            good = self.suggestions_on(TODAY)["GOOD.NS"]
+            fit = good["fit"]
+            self.assertEqual((fit["state"], good["status"]), ("does_not_fit", "Not for you yet"))
+            self.assertIn("GOOD.NS: Buy a little (new), but not for you yet", [item["title"] for item in research_desk.notices(self.user, TODAY)])
             self.assertIn("about 3.0 months", fit["reasons"][0])
             baseline["decimal_amounts"]["liquid_cash"] = "90000.00"
             self.assertEqual(self.suggestions_on(TODAY)["GOOD.NS"]["fit"]["state"], "fits")

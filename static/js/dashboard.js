@@ -76,7 +76,7 @@ function renderFocusStrip(summary, loanPortfolio, behavior) {
         },
         {
             label: "Spending Pattern",
-            value: behavior.personality || "Calibrating",
+            value: Number(summary.history_review_required || 0) > 0 ? "After your review" : behavior.personality || "Calibrating",
             meta: "Estimated from your recorded history",
             tone: "accent",
         },
@@ -114,7 +114,7 @@ function renderHero(summary, behavior) {
         link.href = REVIEW_LINK; link.className = "text-reset"; link.textContent = "Review transactions first";
         pill.replaceChildren(link);
     } else pill.textContent = summary.transactions ? `${summary.risk_level} estimated risk` : "No data";
-    document.getElementById("dashboardPersonality").textContent = behavior.personality;
+    document.getElementById("dashboardPersonality").textContent = needsReview ? "Your spending pattern shows after that review." : behavior.personality;
     document.getElementById("dashboardReferenceMonth").textContent = summary.reference_month;
     document.getElementById("dashboardPeriodNote").textContent = summary.transactions
         ? `Showing ${summary.reference_month}, the latest month with recorded transactions. Rates below cover all recorded months.`

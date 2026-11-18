@@ -177,7 +177,15 @@ def _build_budget_dashboard_payload(request) -> dict:
     category_suggestions = suggestions.get("category_budgets", {})
     categories = set(category_suggestions.keys()) | set(spent_by_category.keys())
     hidden_categories = {"income", "transfer", "loan", "credit_card", "investment"}
-    limits = allocate_budget(plan_limit, {key: item.get("suggested", 0) or 0 for key, item in category_suggestions.items() if key not in hidden_categories})
+    weights = {key: item.get("suggested", 0) or 0 for key, item in category_suggestions.items() if key not in hidden_categories}
+    usual = {key: Decimal(str(category_suggestions[key].get("historical_avg", 0) or 0)) for key in weights}
+    floor = sum(usual.values(), Decimal("0"))
+    if 0 < floor <= plan_limit:
+        # A category's usual spend is its floor, so a plan the owner keeps never shows groceries "over" while unused travel holds a share.
+        extra = allocate_budget(plan_limit - floor, weights)
+        limits = {key: usual[key] + extra[key] for key in weights}
+    else:
+        limits = allocate_budget(plan_limit, weights)
     budget_data = []
     for category in categories:
         if category in hidden_categories:

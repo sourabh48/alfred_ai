@@ -48,6 +48,30 @@ class BudgetAcceptanceTests(TestCase):
         self.assertEqual(sum(limits.values()), Decimal("0.05"))
         self.assertEqual(limits, {"food": Decimal("0.02"), "groceries": Decimal("0.02"), "travel": Decimal("0.01")})
 
+    def test_usual_spending_is_each_category_floor_and_the_plan_still_conserves(self):
+        self.plan("30000")
+        suggestions = {"disposable_income": 90000, "category_budgets": {
+            "groceries": {"suggested": 1, "historical_avg": 5333.33}, "utilities": {"suggested": 1, "historical_avg": 3333.33},
+            **{key: {"suggested": 3, "historical_avg": 0} for key in ("travel", "shopping", "fuel")}}}
+        with patch.object(budget_intelligence_service, "suggest_budget", return_value=suggestions):
+            limits = {r["category"]: Decimal(str(r["limit"])) for r in self.dashboard()["budgets"]}
+        self.assertEqual(sum(limits.values()), Decimal("30000"))
+        self.assertGreaterEqual(limits["groceries"], Decimal("5333.33"))  # the old split gave groceries less than they usually cost
+        self.assertGreaterEqual(limits["utilities"], Decimal("3333.33"))
+
+    def test_emergency_fund_advice_counts_the_cash_already_held_and_says_unknown_plainly(self):
+        target = "apps.budgets.services.budget_intelligence.resolve_canonical_financial_baseline"
+        advice = lambda: [line for line in budget_intelligence_service._generate_budget_recommendations(
+            self.owner, 80000, 30000, 50000, {}) if "6 months" in line][0]
+        held = {"essential_monthly_outflow": 38666.67, "liquid_cash": 150000, "metric_states": {"liquid_cash": {"status": "observed"}}}
+        with patch(target, return_value=held):
+            self.assertEqual(advice(), "A safety cushion of 6 months' essential costs is about ₹2,32,000. "
+                                           "You hold ₹1,50,000 in the bank, so about ₹82,000 to go.")
+        with patch(target, return_value={**held, "liquid_cash": 300000}):
+            self.assertIn("already covers", advice())
+        with patch(target, return_value={**held, "metric_states": {}}):
+            self.assertEqual(advice(), "Build an emergency fund of ₹2,32,000 (6 months of essential costs).")
+
     def test_unknown_income_abstains_without_a_plan_and_qualifies_an_explicit_plan(self):
         self.client.force_login(self.other)
         guide = self.dashboard()["daily_affordability"]

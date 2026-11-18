@@ -159,9 +159,9 @@ def _home_context(user):
         dict(label="What you owe", amount=base["total_liabilities"] if known("total_liabilities") else None,
              note="Loans, card balances and overdrafts", missing="Add a loan or card", url="/loans/"),
         dict(label=f"Spent in {base['reference_month']}", amount=base["current_month_variable_spend"] if spent else None,
-             note="Day-to-day spending; EMIs are counted separately", missing="Add or import transactions", url="/expenses/"),
-        dict(label="Left this month", amount=base["savings_capacity"] if known("savings_capacity") else None,
-             note="Income minus EMIs and this month's spending", missing="Add your monthly income", url="/settings/"),
+             note="Day-to-day spending; rent and EMIs are counted separately", missing="Add or import transactions", url="/expenses/"),
+        dict(label="Left in a usual month", amount=base["savings_capacity"] if known("savings_capacity") else None,
+             note="Income minus rent, EMIs and your average day-to-day spending of the last 3 months", missing="Add your monthly income", url="/settings/"),
     ]
     setup = data_sources_snapshot(user)
     steps = [dict(label=source["label"], done=source["has_data"] and not source.get("next_action"),

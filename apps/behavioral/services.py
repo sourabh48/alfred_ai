@@ -510,8 +510,8 @@ def _derive_fingerprint(*, summary: dict, behavior: dict, stress_level: float | 
     if income_known and float(summary.get("stability_score") or 0) >= 75 and float(summary.get("savings_rate") or 0) >= 18:
         return "Steady Builder"
     if linked["linked_data"]["transactions"] >= 8:
-        return behavior.get("personality") or "Adaptive Balancer"
-    return "Adaptive Balancer"
+        return behavior.get("personality") or "A mix of spending and saving"
+    return "A mix of spending and saving"
 
 
 def _derive_spending_pattern(*, summary: dict, linked: dict, income_known: bool) -> str:

@@ -152,11 +152,11 @@ def _build_unwanted_expenses(expenses: list[Expense], monthly_window: dict) -> d
                 "category_label": category_labels.get(expense.category, expense.category.replace("_", " ").title()),
                 "model_confidence": round(float(expense.model_confidence or 0), 3),
                 "signal": (
-                    "Emotional + discretionary"
+                    "Impulse buy on an extra"
                     if expense.is_emotional and expense.category in DISCRETIONARY_CATEGORIES
-                    else "Emotional-spend signal"
+                    else "Impulse buy"
                     if expense.is_emotional
-                    else "Discretionary lifestyle spend"
+                    else "An extra, not an essential"
                 ),
             }
             for expense in sorted(flagged, key=lambda item: (item.transaction_date, item.id), reverse=True)[:8]

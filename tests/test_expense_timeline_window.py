@@ -96,7 +96,7 @@ class ExpenseTimelineWindowTests(TestCase):
         self.assertEqual(payload["unwanted_expenses"]["discretionary_total"], 5000.0)
         self.assertEqual(payload["unwanted_expenses"]["top_categories"][0]["label"], "Shopping")
         self.assertEqual(payload["unwanted_expenses"]["items"][0]["merchant"], "Myntra")
-        self.assertEqual(payload["unwanted_expenses"]["items"][0]["signal"], "Emotional + discretionary")
+        self.assertEqual(payload["unwanted_expenses"]["items"][0]["signal"], "Impulse buy on an extra")
         self.assertEqual(payload["timeline_meta"]["total_matching_count"], 4)
         self.assertEqual(payload["timeline_meta"]["visible_count"], 4)
         self.assertEqual(payload["timeline_meta"]["filtered_expense_total"], 5000.0)
@@ -233,3 +233,11 @@ class ExpenseTimelineWindowTests(TestCase):
         self.assertEqual(current["bank_debit_total"], 127500.0)
         self.assertEqual(current["outflow_total"], 37500.0)
         self.assertEqual(current["net_total"], -12500.0)
+
+    def test_groceries_are_essential_not_spending_you_could_cut(self):
+        Expense.objects.create(user=self.user, amount=3000, classification="expense", category="groceries", payment_mode="UPI",
+                               merchant="Synthetic Grocer", description="Weekly groceries", transaction_date=date(2026, 3, 12),
+                               direction="debit", source="manual")
+        unwanted = self.client.get("/api/expenses/timeline/").json()["unwanted_expenses"]
+        self.assertEqual((unwanted["overall_total"], unwanted["count"]), (5000.0, 2))
+        self.assertNotIn("Synthetic Grocer", [item["merchant"] for item in unwanted["items"]])

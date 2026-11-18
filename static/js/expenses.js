@@ -173,11 +173,11 @@ function renderSummary(summary) {
     }
 
     const cards = [
-        { key: "expense", label: "Direct Spend", value: summary.expense_total, tone: "primary" },
+        { key: "expense", label: "Spending", value: summary.expense_total, tone: "primary" },
         { key: "loan", label: "Loan Payments", value: summary.loan_total, tone: "danger" },
-        { key: "other", label: "Other Cashflow", value: summary.other_total, tone: "secondary" },
-        { key: "income", label: "Verified Income", value: summary.income_total, tone: "success", meta: `${formatCurrency(summary.transfer_in_total || 0)} transfer credits excluded` },
-        { key: "unwanted", label: "Potential Unwanted", value: summary.unwanted_total, tone: "warning", meta: `${summary.unwanted_count || 0} flagged entries` },
+        { key: "other", label: "Other money out", value: summary.other_total, tone: "secondary" },
+        { key: "income", label: "Money received", value: summary.income_total, tone: "success", meta: `Not counted: ${formatCurrency(summary.transfer_in_total || 0)} moved between your own accounts` },
+        { key: "unwanted", label: "Spending you could cut", value: summary.unwanted_total, tone: "warning", meta: `${summary.unwanted_count || 0} extras or impulse buys` },
     ];
 
     ensureSummaryCards(target, cards);
@@ -241,9 +241,9 @@ function renderMonthlyWindow(windowData) {
 
     Alfred.setHTMLIfChanged(summaryTarget, [
         {
-            label: "Cash-flow outflow",
+            label: "Money out",
             value: formatCurrency(currentOutflow),
-            meta: `${formatCurrency(current.bank_debit_total || 0)} raw bank debits`,
+            meta: `${formatCurrency(current.bank_debit_total || 0)} left the bank in all, counting own-account transfers and payments to review`,
         },
         {
             label: "Previous month",
@@ -251,14 +251,14 @@ function renderMonthlyWindow(windowData) {
             meta: windowData.previous_month || "Previous month",
         },
         {
-            label: "Delta",
+            label: "Change from last month",
             value: `${delta >= 0 ? "+" : ""}${formatCurrency(delta)}`,
             meta: delta >= 0 ? "Above previous month" : "Below previous month",
         },
         {
-            label: "Net flow",
+            label: "Money left",
             value: formatCurrency(current.net_total || 0),
-            meta: `${formatCurrency(current.income_total || 0)} verified income this month`,
+            meta: `Money received this month (${formatCurrency(current.income_total || 0)}) minus money out`,
         },
     ].map(item => `
         <div class="hero-signal">
@@ -287,14 +287,14 @@ function renderMonthlyWindow(windowData) {
                     <span class="status-pill ${itemNet >= 0 ? "status-low" : "status-high"}">${itemNet >= 0 ? "Positive" : "Tight"}</span>
                 </div>
                 <div class="window-card-value">${formatCurrency(itemNet)}</div>
-                <div class="window-card-meta">Net flow | ${Alfred.formatNumber(Number(item.transaction_count || 0), 0)} transactions</div>
+                <div class="window-card-meta">Money left | ${Alfred.formatNumber(Number(item.transaction_count || 0), 0)} transactions</div>
                 <div class="window-card-strip mt-3">
                     <div class="window-card-fill" style="width: ${unwantedShare}%;"></div>
                 </div>
                 <div class="window-card-detail mt-3">
                     <span>Income ${formatCurrency(itemIncome)}</span>
                     <span>Outflow ${formatCurrency(itemOutflow)}</span>
-                    <span>Unwanted ${formatCurrency(itemUnwanted)}</span>
+                    <span>Could cut ${formatCurrency(itemUnwanted)}</span>
                 </div>
             </article>
         `;
@@ -324,14 +324,14 @@ function renderUnwantedExpenses(unwanted) {
             meta: `${Alfred.formatNumber(Number(unwanted.count || 0), 0)} entries tracked`,
         },
         {
-            label: "Emotional",
+            label: "Impulse buys",
             value: formatCurrency(unwanted.emotional_total || 0),
-            meta: "Behavior-led signal",
+            meta: "Purchases marked as made on impulse",
         },
         {
-            label: "Discretionary",
+            label: "Extras",
             value: formatCurrency(unwanted.discretionary_total || 0),
-            meta: "Lifestyle-led spend",
+            meta: "Eating out, shopping, trips, subscriptions, entertainment",
         },
     ].map(item => `
         <div class="insight-stat">

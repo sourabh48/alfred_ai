@@ -970,6 +970,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         before = [list(model.objects.values()) for model in models]
         empty = get_user_model().objects.create_user("synthetic_forecast_empty", password=PASSWORD)
         self.login(); self.browser.get(self.live_server_url + "/budgets/")
+        self.wait.until(lambda _: "rough guide" in self.text("budgetForecastEvidence"))
+        self.memory_click('#budgetForecastEvidence summary')  # the method and its limits sit one click away, in plain view of anyone who asks
         self.wait.until(lambda _: "Walk-forward spending error (MAE)" in self.text("budgetForecastEvidence"))
         evidence = self.text("budgetForecastEvidence")
         self.assertIn("not a prediction interval", evidence)
@@ -980,7 +982,6 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(data["forecast_evidence"]["backtest"]["samples"], 2)
         self.assertIn(f"contained the actual month in {data['forecast_evidence']['backtest']['range_hits']} of 2", evidence)
         self.assertTrue(self.browser.find_element(self.By.ID,"budgetForecastChart").is_displayed())
-        self.memory_click('#budgetForecastEvidence summary')
         self.assertNotIn(month_start(1).strftime("%Y-%m"), self.text("budgetForecastEvidence"))
         self.browser.execute_async_script("loadBudgetDashboard({live:true}).then(arguments[0]);")
         # The live refresh can replace the panel between finding it and reading it; the open state must still survive.
@@ -994,7 +995,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture("cashflow-forecast-evidence-mobile")
         self.login(empty.username); self.browser.get(self.live_server_url + "/budgets/")
         self.wait.until(lambda _: "Forecast unavailable" in self.text("budgetForecastEvidence"))
-        self.assertIn("Chronological backtest unavailable", self.text("budgetForecastEvidence"))
+        self.memory_click('#budgetForecastEvidence summary')
+        self.wait.until(lambda _: "Chronological backtest unavailable" in self.text("budgetForecastEvidence"))
         self.assertFalse(self.browser.find_element(self.By.ID,"budgetForecastChart").is_displayed())
         self.assertEqual(before, [list(model.objects.values()) for model in models])
         self.browser.execute_script("document.getElementById('budgetForecastEvidence').scrollIntoView({behavior:'instant',block:'start'});")
@@ -9224,7 +9226,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.execute_script(
             "return Object.values(Chart.instances).filter(c => c.canvas.closest('[data-desk-card]')).length") == 2)
         self.assertIn('Portfolio manager', card.text)
-        self.assertIn('Investment candidate', card.text)
+        self.assertIn('Not for you yet', card.text)  # the personal answer leads, not the general research call
         self.assertIn('Strongest reason against', card.text)
         self.assertIn('Fits you? Not now. Your bank balances cover about', card.text)  # the scenario's own records
         self.capture('research-desk-suggestion')

@@ -28,9 +28,9 @@ from .financial_relationships import build_financial_relationships
 from .transaction_intelligence import _normalize_account_number
 
 
+# Groceries are essential, not "spending you could cut" (same set as transaction_intelligence).
 DISCRETIONARY_CATEGORIES = {
     "food",
-    "groceries",
     "shopping",
     "travel",
     "subscription",
@@ -1659,12 +1659,12 @@ def _build_minute_details(
 
 def _behavior_personality(savings_rate: float, loan_ratio: float, discretionary_ratio: float, stability_score: float) -> str:
     if savings_rate >= 0.25 and stability_score >= 75:
-        return "Strategic Accumulator"
+        return "Saving a good share"
     if loan_ratio >= 0.25:
-        return "Debt-Weighted Planner"
+        return "Loan payments take a big share"
     if discretionary_ratio >= 0.38:
-        return "Experience-Led Spender"
-    return "Adaptive Balancer"
+        return "Spending a lot on extras"
+    return "A mix of spending and saving"
 
 
 def _risk_level(stress_score: float) -> str:

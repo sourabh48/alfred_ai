@@ -442,7 +442,7 @@ class BehavioralIncomeGateTests(TestCase):
         self.row(500000, category="other", classification="other", days_ago=0)
         fingerprint = self.get("/api/behavioral/fingerprint/")
         self.assertEqual((fingerprint["fingerprint"], fingerprint["spending_pattern"], fingerprint["decision_style"]),
-                         ("Adaptive Balancer", "Mixed", "Balanced"))
+                         ("A mix of spending and saving", "Mixed", "Balanced"))
         self.assertIsNone(fingerprint["coach_tone"])
         texts = fingerprint["insights"] + self.get("/api/behavioral/stress/")["recommendations"]
         self.assertFalse([text for text in texts if text.startswith("All systems normal")])
