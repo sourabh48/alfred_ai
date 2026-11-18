@@ -104,3 +104,17 @@ class SocialLoginTests(TestCase):
         self.client.logout()
         self.sign_in("github")
         self.assertEqual((self.users.count(), EmailIdentity.objects.count()), (1, 2))
+
+
+class GoogleButtonTests(TestCase):
+    def test_login_and_signup_always_show_google_greyed_out_until_it_is_set_up(self):
+        empty = {k: "" for k in KEYS}
+        for page in ("/login/", "/signup/"):
+            with patch.dict(os.environ, empty):
+                html = self.client.get(page).content.decode()
+            self.assertIn("Continue with Google</button>", html)
+            self.assertIn("Google sign-in is not set up yet", html)
+            with patch.dict(os.environ, KEYS):
+                html = self.client.get(page).content.decode()
+            self.assertIn('href="/auth/google/start/"', html)
+            self.assertNotIn("not set up yet", html)

@@ -311,8 +311,9 @@ def signup_view(request):
 
 def _sign_in_context(request, next_url=""):
     from .services import social_login
-    return {"sign_in_providers": social_login.configured(), "sign_in_error": request.session.pop("alfred_sign_in_error", ""),
-            "next": next_url}
+    providers = social_login.configured()
+    return {"sign_in_providers": providers, "google_sign_in_ready": any(p["id"] == "google" for p in providers),
+            "sign_in_error": request.session.pop("alfred_sign_in_error", ""), "next": next_url}
 
 
 def _safe_next(request, value):
