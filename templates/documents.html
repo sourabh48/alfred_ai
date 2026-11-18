@@ -30,7 +30,7 @@
 
 <section class="surface-card mb-4" aria-labelledby="documentSourcesTitle" data-live-refresh-hold="true">
     <h2 id="documentSourcesTitle" class="page-section-title">Check what ALFRED read</h2>
-    <p>Browse your bank, loan and investment files, then review their linked records. Only current owner-reviewed structured fields can ground local answers. Other documents and full-document Q&amp;A are unsupported. Confirmation does not authenticate a bank or broker, and no currency is inferred.</p>
+    <p>Browse your bank, loan and investment files and check the records ALFRED made from them. Ask ALFRED answers only from records you have checked. Checking a record does not prove the bank or broker sent it, and ALFRED never guesses a currency.</p>
     <label class="form-label" for="documentSourcesKind">Document type</label>
     <select id="documentSourcesKind" class="form-select mb-2">
         <option value="expense">Bank statements</option><option value="loan">Loan imports</option><option value="investment">Investment imports</option>
@@ -45,7 +45,7 @@
             <div class="col-md-3"><label class="form-label" for="documentSourcesTo">Uploaded through (UTC)</label>
                 <input id="documentSourcesTo" type="date" class="form-control" aria-describedby="documentSourcesFilterHelp"></div>
         </div>
-        <p id="documentSourcesFilterHelp" class="small my-2">Dates include the whole UTC day. Search matches displayed filenames, not document contents or storage paths. Apply filters to the document list before opening reviewed records. Filters stay on this page only; narrow the date range if the bounded catalog is too large.</p>
+        <p id="documentSourcesFilterHelp" class="small my-2">Dates cover whole days (UTC). This search looks at file names, not what is inside the files. If the list is too long, pick a shorter date range.</p>
         <div class="list-actions"><button id="documentSourcesApply" type="submit" class="btn btn-outline-primary">Apply filters</button>
             <button id="documentSourcesClear" type="button" class="btn btn-outline-secondary">Clear filters</button></div>
     </form>
@@ -78,12 +78,12 @@
 
 <section class="surface-card mb-4" aria-labelledby="documentCorpusTitle" data-live-refresh-hold="true">
     <h2 id="documentCorpusTitle" class="page-section-title">Documents ALFRED can search</h2>
-    <p>Search all your encrypted copies with whole keywords, or select the copies to search. Excerpts link to your original files; current corrected financial records remain authoritative. This is document retrieval, not an inferred answer or independent verification.</p>
+    <p>Search the private copies you stored by whole words, or pick which copies to search. Each excerpt links to your original file. Your corrected records always win over what a file says. This finds text; it does not interpret or verify it.</p>
     <form id="documentCorpusUpload" method="post" enctype="multipart/form-data" class="mb-3" autocomplete="off">
         {% csrf_token %}
         <fieldset>
             <legend class="h6">Add another private document</legend>
-            <p class="small">PDF text layers or UTF-8 .txt files, within the size, index and storage limits shown below (set in config/local.env). No OCR or model is used. The original and searchable copy are retained together, encrypted for this Windows user, and removed together on deletion, expiry or reset. Uploading never creates financial records or verifies the text.</p>
+            <p class="small">PDFs with selectable text, or plain .txt files, up to the limits shown below. Scanned pictures of pages are not read. The original and its searchable copy are stored encrypted for your Windows account and deleted together. Storing a file never changes your money records or checks the text.</p>
             <label for="documentCorpusFile" class="form-label">Private PDF or text file</label>
             <input id="documentCorpusFile" name="file" type="file" class="form-control mb-2" accept=".pdf,.txt,application/pdf,text/plain" required>
             <label for="documentCorpusUploadDays" class="form-label">Keep for days (up to the limit shown below, or your shorter Memory retention)</label>
@@ -107,10 +107,10 @@
             <option value="keywords">Keyword excerpts</option>
             <option value="full_extraction">Whole retained extraction (bounded)</option>
         </select>
-        <p id="documentCorpusContextHelp" class="small">Keyword mode uses the search words above. Whole-extraction mode supplies all selected retained extracted text or abstains if it cannot fit; keywords are not used. Extraction may omit original pages or scanned text.</p>
+        <p id="documentCorpusContextHelp" class="small">Keyword mode uses only the parts that match your search words. Whole-file mode uses all the text of the copies you picked, or says no if it is too long. Some pages or scanned text may be missing.</p>
         <label for="documentCorpusQuestion" class="form-label">Question about the selected documents (local AI)</label>
         <input id="documentCorpusQuestion" type="text" class="form-control mb-2" maxlength="512" required autocomplete="off">
-        <p class="small">The fixed local model can select exact quotations or abstain; it cannot author financial figures, reconcile conflicting documents or override corrected records. Original authenticity, extraction completeness and answer accuracy are not established. The 30-second AI deadline applies; no cloud fallback or saved question/history.</p>
+        <p class="small">The local AI can only quote exact sentences from your files or say it cannot answer. It never makes up figures, settles conflicts between files or overrides your corrected records, and it cannot prove a file is genuine or complete. It stops after 30 seconds, never uses the cloud and saves nothing.</p>
         <button id="documentCorpusAsk" type="button" class="btn btn-outline-primary">Ask using selected context locally</button>
     </div>
     <p id="documentCorpusStatus" role="status" aria-live="polite" class="mt-2"></p>
@@ -221,7 +221,7 @@
     <div class="col-12">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Career Files</h2>
-            <p class="page-section-copy mb-3">Resume uploads stay available here too, so document intake remains centralized even though the career module keeps its own page.</p>
+            <p class="page-section-copy mb-3">You can upload your CV here too; the Career page uses it.</p>
             <form id="documentResumeForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-12">
@@ -240,7 +240,7 @@
     <div class="col-xl-7">
         <div class="surface-card h-100">
             <h2 class="page-section-title" id="docChats">Import your ChatGPT chats</h2>
-            <p class="page-section-copy mb-3">Bring an existing ChatGPT dashboard, chat transcript, or exported conversation into ALFRED as reviewable context before mapping it into live records.</p>
+            <p class="page-section-copy mb-3">Paste an old ChatGPT chat or dashboard so ALFRED can use it as background. Nothing goes into your records until you review it.</p>
             <form id="documentChatGPTImportForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-md-5">
@@ -281,7 +281,7 @@
     <div class="col-12">
         <div class="surface-card h-100">
             <h2 class="page-section-title" id="docReview">Waiting for your review</h2>
-            <p class="page-section-copy mb-3">Low-confidence documents stay here until Alfred retries them or you accept a correction. Accepted corrections are fed back into parser learning for future uploads.</p>
+            <p class="page-section-copy mb-3">Files ALFRED was unsure about wait here until it tries again or you correct them. Your corrections help it read similar files better next time.</p>
             <div id="documentReviewQueue" class="data-stack stack-scroll"></div>
         </div>
     </div>
@@ -291,7 +291,7 @@
     <div class="col-12">
         <div class="surface-card h-100">
             <h2 class="page-section-title">Import log</h2>
-            <p class="page-section-copy mb-3">These logs explain why data did not populate, why a parser stayed in review, or why a document or visualization failed.</p>
+            <p class="page-section-copy mb-3">If something did not show up, these logs say why: a file ALFRED could not read, one still waiting for review, or a chart that failed.</p>
             <div id="documentDiagnosticsList" class="data-stack stack-scroll"></div>
         </div>
     </div>
