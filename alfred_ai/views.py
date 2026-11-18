@@ -324,10 +324,11 @@ def _safe_next(request, value):
 def social_start_view(request, provider):
     from .services import social_login
     connect = request.user.is_authenticated and request.GET.get("connect") == "1"
-    back = "/settings/#settingsSignIn" if connect else "/login/"
+    purpose = "sync" if request.user.is_authenticated and request.GET.get("purpose") == "sync" else ""
+    back = "/settings/#settingsGoogleSync" if purpose else "/settings/#settingsSignIn" if connect else "/login/"
     try:
         url = social_login.start(request.session, provider, request.build_absolute_uri(social_login.callback_path(provider)),
-                                 _safe_next(request, request.GET.get("next")), connect)
+                                 _safe_next(request, request.GET.get("next")), connect, purpose)
     except social_login.SignInError as exc:
         request.session["alfred_sign_in_error"] = str(exc)
         return redirect(back)
@@ -337,7 +338,16 @@ def social_start_view(request, provider):
 @require_http_methods(["GET"])
 def social_callback_view(request, provider):
     from .services import social_login
-    connect = bool((request.session.get(social_login.SESSION_KEY) or {}).get("connect")) and request.user.is_authenticated
+    started = request.session.get(social_login.SESSION_KEY) or {}
+    connect = bool(started.get("connect")) and request.user.is_authenticated
+    if started.get("purpose") == "sync" and request.user.is_authenticated:
+        from .services import google_sync
+        try:
+            identity, pending = social_login.finish(request.session, provider, request.GET)
+            google_sync.connect(request.user, identity, pending.get("refresh_token"), pending.get("granted", ""))
+        except (social_login.SignInError, google_sync.SyncError) as exc:
+            request.session["alfred_google_sync_error"] = str(exc)
+        return redirect("/settings/#settingsGoogleSync")
     try:
         identity, pending = social_login.finish(request.session, provider, request.GET)
         user = social_login.user_for(identity, request.user if connect else None)
@@ -802,3 +812,26 @@ def offline_tile_view(request, z, x, y):
 @login_required
 def bike_service_view(request):
     return render(request, "mobility/bike_service_dashboard.html")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def google_sync_api_view(request):
+    """Settings > Phone calendar and tasks: sync now or disconnect. Connecting goes through /auth/google/start/?purpose=sync."""
+    from .services import google_sync
+    if request.method == "POST":
+        try:
+            action = json.loads(request.body or b"{}").get("action")
+            if action == "sync":
+                google_sync.sync(request.user)
+            elif action == "disconnect":
+                google_sync.disconnect(request.user)
+            else:
+                raise ValueError("Choose to sync now or disconnect.")
+        except google_sync.SyncError as exc:
+            return JsonResponse({"detail": str(exc), **google_sync.status(request.user)}, status=502)
+        except (ValueError, AttributeError) as exc:
+            return JsonResponse({"detail": str(exc) if type(exc) is ValueError else "Send the choice as JSON."}, status=400)
+    response = JsonResponse({**google_sync.status(request.user), "error": request.session.pop("alfred_google_sync_error", "")})
+    response["Cache-Control"] = "no-store, private"
+    return response

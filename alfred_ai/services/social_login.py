@@ -46,19 +46,27 @@ def callback_path(provider) -> str:
     return f"/auth/{provider}/callback/"
 
 
-def start(session, provider, redirect_uri, next_url="/", connect=False) -> str:
-    """The provider's sign-in page; the state and PKCE verifier stay in this browser's session."""
+def start(session, provider, redirect_uri, next_url="/", connect=False, purpose="") -> str:
+    """The provider's sign-in page; the state and PKCE verifier stay in this browser's session.
+
+    purpose="sync" (Google only) also asks for the phone-sync permissions and lasting (offline) access; see google_sync.
+    """
     if provider not in PROVIDERS or not all(_client(provider)):
         raise SignInError("That sign-in is not set up. Add its client id and secret in Settings first.")
+    if purpose and (purpose != "sync" or provider != "google"):
+        raise SignInError("Phone sync works with Google only.")
     state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(64)
     session[SESSION_KEY] = {"provider": provider, "state": state, "verifier": verifier, "next": next_url,
-                            "connect": connect, "redirect_uri": redirect_uri}
+                            "connect": connect, "redirect_uri": redirect_uri, "purpose": purpose}
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     _label, authorize, _token, scope = PROVIDERS[provider]
     query = {"client_id": _client(provider)[0], "redirect_uri": redirect_uri, "response_type": "code", "scope": scope,
              "state": state, "code_challenge": challenge, "code_challenge_method": "S256"}
     if provider == "google":
         query["prompt"] = "select_account"
+    if purpose == "sync":
+        from .google_sync import SCOPES
+        query.update(scope=f"{scope} {SCOPES}", access_type="offline", prompt="consent select_account")
     return f"{authorize}?{urlencode(query)}"
 
 
@@ -79,6 +87,8 @@ def finish(session, provider, params) -> tuple[dict, dict]:
         if not access:
             raise SignInError(f"{PROVIDERS[provider][0]} did not accept the sign-in. Check its client id and secret in Settings.")
         identity = _identity(provider, {"Authorization": f"Bearer {access}", "Accept": "application/json"})
+        if pending.get("purpose") == "sync":  # handed to google_sync, never kept in the session
+            pending = {**pending, "refresh_token": token.get("refresh_token"), "granted": token.get("scope", "")}
     except PublicHTTPError as exc:
         if exc.code in ("authorization_failed", "api_error"):  # a wrong secret or an expired code
             raise SignInError(f"{PROVIDERS[provider][0]} did not accept the sign-in. Try again, or check its client id and secret in Settings.") from None

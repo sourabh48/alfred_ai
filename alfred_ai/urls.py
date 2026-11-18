@@ -42,6 +42,7 @@ from .views import (
     signup_view,
     social_start_view,
     social_callback_view,
+    google_sync_api_view,
     AlfredLoginView,
 )
 
@@ -83,6 +84,7 @@ urlpatterns = [
     path("api/session/ping/", session_ping_api_view, name="session_ping_api"),
     path("api/settings/online-services/", online_services_api_view, name="online_services_api"),
     path("api/settings/offline-maps/", offline_maps_api_view, name="offline_maps_api"),
+    path("api/settings/google-sync/", google_sync_api_view, name="google_sync_api"),
     path("api/session/data-version/", data_version_api_view, name="data_version_api"),
     path("api/operational/logs/client/", client_operational_log_api_view, name="client_operational_log_api"),
     path("settings/", account_settings_view, name="account_settings"),

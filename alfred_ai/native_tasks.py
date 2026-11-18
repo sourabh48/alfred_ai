@@ -180,3 +180,13 @@ def native_research_debate():
 @db_periodic_task(crontab(minute="30"))  # every hour; see task_bots.NETWORK_BOTS for what stays daily
 def native_task_bots():
     return _run_daily("task-bots")
+
+
+@db_periodic_task(crontab(minute="*/30"))
+def native_google_sync():
+    """Phone sync to Google Calendar and Tasks for owners who connected it (owner decision 2026-11-18)."""
+    from alfred_ai.services.google_sync import sync_everyone
+    try:
+        sync_everyone()
+    except Exception:  # never let one bad run stop the scheduler; each owner's error is kept for Settings
+        logging.getLogger(__name__).warning("Google phone sync run failed.", exc_info=True)

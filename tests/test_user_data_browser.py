@@ -5308,6 +5308,20 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('travelPlanList').scrollIntoView({block:'start',behavior:'instant'})")
         self.run_axe_light_dark('travel-plan-board-cards')
 
+    def test_settings_google_phone_sync_section(self):
+        import os
+        from unittest.mock import patch
+        self.enterContext(patch.dict(os.environ, {'ALFRED_GOOGLE_CLIENT_ID': 'x-id', 'ALFRED_GOOGLE_CLIENT_SECRET': 'x-secret'}))
+        self.login(); self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: 'Not connected.' in self.text('googleSyncStatus'))
+        link = self.browser.find_element(self.By.ID, 'googleSyncConnect')
+        self.assertTrue(link.is_displayed())
+        self.assertTrue(link.get_attribute('href').endswith('/auth/google/start/?purpose=sync'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'googleSyncNow').is_displayed())
+        self.browser.execute_script("document.getElementById('settingsGoogleSync').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('settings-google-sync')
+        self.run_axe_light_dark('settings-google-sync')
+
     def test_trip_tools_bookings_recorded_ride_and_holidays(self):
         import tempfile
         from pathlib import Path

@@ -206,6 +206,7 @@
  "tests.test_career_outcome_workflow": 1.4,
  "tests.test_career_tools": 8.1,
  "tests.test_trip_tools": 15.0,
+ "tests.test_google_sync": 6.0,
  "tests.test_career_projection_confidence": 3.31,
  "tests.test_career_projection_simulation": 2.36,
  "tests.test_career_salary_evidence": 0.01,

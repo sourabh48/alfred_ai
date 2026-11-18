@@ -11,6 +11,7 @@
                 <a href="#settingsProfile">Your details and income</a>
                 <a href="#settingsFamily">Family sharing</a>
                 <a href="#settingsSignIn">Email and sign-in</a>
+                <a href="#settingsGoogleSync">Phone calendar and tasks</a>
                 <a href="#travelPreferences">Travel style</a>
                 <a href="#privateMemoryPanel">Privacy & memory</a>
                 <a href="#settingsAccountData">Delete my data</a>
@@ -168,6 +169,7 @@
 </section>
 
 {% include "settings/sign_in.html" %}
+{% include "settings/google_sync.html" %}
 {% include "mobility/preferences.html" %}
 {% include "settings/online.html" %}
 {% include "settings/offline_maps.html" %}
@@ -184,6 +186,7 @@
 <script src="/static/js/memory.js?v=8"></script>
 <script src="/static/js/online_services.js?v=2"></script>
 <script src="/static/js/offline_maps.js?v=1"></script>
+<script src="/static/js/google_sync.js?v=1"></script>
 <link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
 <script src="/static/js/travel_preferences.js?v=workflow-2"></script>
 {% endblock %}
