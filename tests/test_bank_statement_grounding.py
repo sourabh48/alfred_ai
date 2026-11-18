@@ -552,7 +552,7 @@ class BankStatementGroundingTests(TestCase):
         self.assertEqual(warning['sources'][0]['data']['amounts'],{}); self.local.reason.assert_not_called()
         self.confirm(); result=self.answer()
         self.assertEqual(result['sources'][0]['data']['amounts']['amount']['amount'],'7.77')
-        self.assertNotIn('2.68',str(self.local.reason.call_args))
+        self.assertNotIn('2.68',str(self.local.reason.call_args.args))  # not the deadline kwarg, a clock value
         self.assertEqual(StatementTransactionEvidence.objects.get(expense=self.row).source_values,original)
 
     def test_missing_balance_is_unavailable_and_new_conflicting_records_abstain(self):

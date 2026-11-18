@@ -225,7 +225,7 @@ class HybridIntelligenceTests(TestCase):
         self.assertEqual((facts['liquid_cash'],facts['amounts']['liquid_cash']['currency_status']),(1234.0,'assumed_home'))
         self.assertIn('metric_states',facts); self.assertFalse(result['financial_authority'])
         self.assertEqual(BankAccount.objects.get(user=self.alice).current_balance,1234)
-        self.assertNotIn('9000',str(self.local.reason.call_args))
+        self.assertNotIn('9000',str(self.local.reason.call_args.args))  # not the deadline kwarg, a clock value
 
     def test_document_evidence_requires_owner_verification_and_never_exposes_raw_ocr(self):
         from apps.loans.models import Loan, LoanClosureDocument
