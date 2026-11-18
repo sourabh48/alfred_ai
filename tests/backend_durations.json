@@ -270,5 +270,6 @@
  "tests.test_research_searches": 0.981,
  "tests.test_research_desk": 3.0,
  "tests.test_investment_audit_regressions": 1.0,
+ "tests.test_affordability_answer": 1.6,
  "tests.test_travel_photos": 0.331
 }
