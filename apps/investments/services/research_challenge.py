@@ -18,7 +18,8 @@ from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
 SECONDS = 120  # measured 2026-11-07: the CPU-only local model writes about 3 tokens a second here
 TEXT = 300
 TRADE_LANGUAGE = re.compile(r"\b(?:buy|sell|hold|accumulate|overweight|underweight|target price|price target)\b", re.I)
-QUANTITY_LANGUAGE = re.compile(r"\b(?:trillion|lakhs?|lacs?|crores?|half|quarters?|percent|per cent|basis points?)\b", re.I)
+QUANTITY_LANGUAGE = re.compile(r"\b(?:trillion|lakhs?|lacs?|crores?|half|quarters?|percent|per cent|basis points?|"
+                               r"doubles?|doubled|triples?|tripled|multibagger|guaranteed?|risk[- ]free|sure[- ]shot|all your)\b", re.I)
 JSON_OBJECT = re.compile(r"\{.*\}", re.S)
 
 

@@ -40,6 +40,8 @@ def _claim_due(user):
     due = owned.filter(
         Q(last_attempt_at__isnull=True) | Q(last_attempt_at__lte=cutoff),
         Q(checked_at__isnull=True) | Q(checked_at__lte=cutoff),
+    ).exclude(  # shortcut: a failing symbol waits three days whatever its failure count; add a counter if outages vary a lot
+        ~Q(error=""), last_attempt_at__gt=now - timedelta(days=3),
     ).order_by(Coalesce("last_attempt_at", "checked_at").asc(nulls_first=True), "id")
     rows = list(due[:slots])
     owned.filter(pk__in=[row.pk for row in rows]).update(last_attempt_at=now)

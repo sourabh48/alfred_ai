@@ -121,7 +121,7 @@ class ResearchSearchTests(TestCase):
         def newer_search(symbol):
             remember(self.user, self.packet)
             raise RuntimeError("old request failed after the new search succeeded")
-        ResearchSearch.objects.filter(pk=row.pk).update(last_attempt_at=old_check)
+        ResearchSearch.objects.filter(pk=row.pk).update(last_attempt_at=old_check-timedelta(days=2))  # past the failure back-off
         with patch("apps.investments.services.research_searches.research_packet", side_effect=newer_search) as fetch:
             self.assertEqual(review_recent(self.user, timezone.localdate()), [])
             fetch.assert_called_once()
@@ -150,6 +150,31 @@ class ResearchSearchTests(TestCase):
             self.assertEqual(provider.call_args_list[3].args[0], "S3.NS")
         untouched.refresh_from_db()
         self.assertIsNone(untouched.last_attempt_at)
+
+    def test_failing_symbols_back_off_so_healthy_ones_keep_their_daily_slot(self):
+        now = timezone.now()
+        with patch("apps.investments.services.research_searches.timezone.now", return_value=now-timedelta(days=5)):
+            for i in range(4):
+                remember(self.user, {**self.packet, "symbol": f"S{i}.NS"})
+        ResearchSearch.objects.filter(user=self.user).update(checked_at=now-timedelta(days=5))
+        good = {"S3.NS"}
+
+        def fetch(symbol):
+            if symbol not in good:
+                raise RuntimeError("synthetic outage")
+            return self.packet
+
+        calls = []
+        with patch("apps.investments.services.research_searches.research_packet", side_effect=lambda s: calls.append(s) or fetch(s)):
+            for day in range(5):
+                with patch("apps.investments.services.research_searches.timezone.now", return_value=now+timedelta(days=day)):
+                    review_recent(self.user, timezone.localdate())
+        failing = [s for s in calls if s != "S3.NS"]
+        self.assertEqual(calls.count("S3.NS"), 3)  # days 1, 2 and 4: oldest attempt first, so day 3 retries the failing ones
+        self.assertEqual(sorted(failing), ["S0.NS", "S0.NS", "S1.NS", "S1.NS", "S2.NS", "S2.NS"])  # day 0, then day 3 only
+        row = ResearchSearch.objects.get(user=self.user, symbol="S0.NS")
+        self.assertEqual(row.checked_at, now-timedelta(days=5))  # the last good evidence keeps its own time
+        self.assertTrue(row.error)
 
     def test_stock_review_acknowledgment_never_repeats_the_provider_call(self):
         row = remember(self.user, self.packet)

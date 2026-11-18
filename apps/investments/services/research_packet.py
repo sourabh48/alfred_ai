@@ -36,8 +36,8 @@ def _ratio(top, bottom):
 
 
 def fetch_fundamentals(symbol: str) -> dict:
-    """{type: [(period_end, Decimal value, currency)]} oldest first; undated or non-numeric rows are dropped."""
-    now = int(timezone.now().timestamp())
+    """{type: [(period_end, Decimal value, currency)]} oldest first; undated, future-dated or non-numeric rows are dropped."""
+    now, today = int(timezone.now().timestamp()), timezone.localdate()
     response = public_http.request("GET", f"https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{symbol}",
         params={"type": ",".join("annual" + name for name in TYPES), "period1": now - 6 * 366 * 86400, "period2": now},
         headers={"User-Agent": USER_AGENT})
@@ -53,6 +53,7 @@ def fetch_fundamentals(symbol: str) -> dict:
                              str(row.get("currencyCode") or "").upper()[:3] or None))
             except (KeyError, TypeError, ValueError, ArithmeticError):
                 continue
+        rows = [row for row in rows if row[0] <= today]  # a reported period cannot end in the future
         if rows:
             series[kind[6:]] = sorted({row[0]: row for row in rows if row[1].is_finite()}.values())
     return series
