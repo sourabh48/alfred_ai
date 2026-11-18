@@ -152,7 +152,7 @@ class TravelPlacePhotoView(PrivateTravelSessionAPI):
             "local_quota_exhausted": "Today's photo allowance has been reached. You can keep planning without photos.",
             "provider_busy_or_backoff": "Photos are temporarily busy. Try again shortly.",
         }
-        return Response({"status": "unavailable", "place": place["name"], "count": 0,
+        return Response({"status": "unavailable", "place": place["name"], "count": 0, "busy": result.error == "provider_busy_or_backoff",
                          "message": messages.get(result.error, "Photos could not load. Try again; your itinerary is unchanged.")})
 
 
@@ -455,7 +455,9 @@ class TravelSuggestionsView(APIView):
             shown = [c["name"] for c in session.candidates or []] + [value(session.state, "selected_destination") or ""]
         else:
             steps, shown = upcoming_steps(request.user), []
-        response = Response({"next_steps": steps, "trip_ideas": trip_ideas(request.user, exclude=[n for n in shown if n])})
+        # Once the open trip shows its own places, weekend ideas would only repeat that list (owner, 2026-11-19).
+        ideas = {"free_dates": None, "ideas": [], "note": ""} if any(shown) else trip_ideas(request.user)
+        response = Response({"next_steps": steps, "trip_ideas": ideas})
         response["Cache-Control"] = "no-store, private"
         return response
 

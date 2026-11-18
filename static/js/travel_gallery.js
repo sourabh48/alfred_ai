@@ -2,6 +2,8 @@
 window.TravelPhotos = (() => {
     const esc = value => Alfred.escapeHtml(String(value ?? ""));
     const cache = new Map();  // "session|place" -> {status, image, credit}
+    let queue = Promise.resolve();  // Google photos are fetched one at a time: the provider turns away a second call in flight.
+    const wait = ms => new Promise(done => setTimeout(done, ms));
 
     function html(id, name) {
         const entry = cache.get(id);
@@ -22,7 +24,9 @@ window.TravelPhotos = (() => {
         if (!cache.has(id)) {
             cache.set(id, {status: "loading"});
             const query = place.key ? `place=${encodeURIComponent(place.key)}` : `name=${encodeURIComponent(place.name)}`;
-            Alfred.fetchJSON(`/api/mobility/planner/sessions/${sessionId}/photos/?${query}&index=0`)
+            const url = `/api/mobility/planner/sessions/${sessionId}/photos/?${query}&index=0`;
+            queue = queue.then(() => Alfred.fetchJSON(url))
+                .then(data => data.busy ? wait(3000).then(() => Alfred.fetchJSON(url)) : data)
                 .then(data => cache.set(id, data.status === "ready" && /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(data.image || "")
                     ? {status: "ready", image: data.image, credit: (data.authors || []).map(a => window.TravelResearchPanels.link(a.url, a.name)).join(" · ") || "Google Maps"}
                     : {status: "none"}))

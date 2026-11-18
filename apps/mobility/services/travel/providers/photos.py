@@ -62,14 +62,20 @@ class GooglePlacePhoto(Provider):
                 json={"textQuery": p["name"], "pageSize": 5,
                       "locationBias": {"circle": {"center": {"latitude": p["latitude"], "longitude": p["longitude"]}, "radius": 20000}}},
                 headers=google_headers("places.id,places.displayName,places.location,places.photos"), deadline=deadline)
-            matches = [item for item in raw.get("places", [])
-                       if (item.get("displayName", {}).get("text") or "").casefold() == p["name"].casefold()
-                       and km_between((p["latitude"], p["longitude"]),
+            # A town often comes back with a same-named station or taluk nearby: use the nearest same-named place
+            # that has photos, rather than showing none.
+            matches = []
+            for item in raw.get("places", []):
+                if (item.get("displayName", {}).get("text") or "").casefold() != p["name"].casefold():
+                    continue
+                distance = km_between((p["latitude"], p["longitude"]),
                                       (number(item["location"]["latitude"], low=-90, high=90),
-                                       number(item["location"]["longitude"], low=-180, high=180))) <= 20]
-            if len(matches) != 1:
+                                       number(item["location"]["longitude"], low=-180, high=180)))
+                if distance <= 20:
+                    matches.append((not item.get("photos"), distance, len(matches), item))
+            if not matches:
                 raise ProviderError("place_identity_unconfirmed")
-            place = matches[0]
+            place = min(matches)[3]
         photos = place.get("photos", [])[:MAX_PHOTOS]
         if not photos:
             return {"count": 0, "index": 0}, ""

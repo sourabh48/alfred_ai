@@ -145,8 +145,8 @@ window.TravelPlanner = (() => {
             await list();
             if (state.session?.id!==identity) return accepted;
             if (state.session.plan_id) populateDetails(state.session.plan_id);
+            window.TravelSuggestions.load(identity);  // once the reply shows places, weekend ideas step aside
             if (payload.action === "save") {
-                window.TravelSuggestions.load(identity);
                 await loadMobilityDashboard();
                 alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your Plans below.");
             } else if(payload.action==='itinerary_edit')alert('Itinerary updated. Route and cost estimates may need recalculation.');

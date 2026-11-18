@@ -100,8 +100,12 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def test_automatic_shortlist_photo_on_each_card_and_mobile_review(self):
         image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
+        turned_away = []
         def photo(provider, parameters, **kwargs):
             if provider.category == "photos":
+                if not turned_away:  # owner check 2026-11-19: a photo turned away while another loads is retried, not lost
+                    turned_away.append(parameters)
+                    return ProviderResult(provider.name, "photos", error="provider_busy_or_backoff")
                 return ProviderResult(provider.name, "photos", success=True, payload={"count": 2, "index": parameters["index"], "image": image, "authors": [{"name": "Synthetic photo credit", "url": "https://example.com/credit"}]})
             return query(provider, parameters, **kwargs)
         with patch("apps.mobility.planner_views.query", side_effect=photo):
@@ -114,7 +118,10 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
             self.wait.until(lambda _: self.browser.execute_script(
                 "const cards = [...document.querySelectorAll('.travel-candidate')];"
                 "return cards.length > 0 && cards.every(c => c.querySelector(':scope > .travel-card-photo:first-child img'));"))
-            first = self.browser.find_element(self.By.CSS_SELECTOR, '.travel-candidate .travel-card-photo')
+            self.assertEqual(len(turned_away), 1)
+            # Weekend ideas would only repeat the trip's own cards, so they step aside (owner, 2026-11-19).
+            self.wait.until(lambda _: 'Ideas for your free weekend' not in self.text('plannerSuggestions'))
+            first = self.browser.find_element(self.By.CSS_SELECTOR, '#plannerCandidates .travel-candidate .travel-card-photo')
             self.assertIn('Synthetic photo credit', first.text)
             self.assertTrue(first.find_element(self.By.TAG_NAME, 'img').get_attribute('alt'))
             self.browser.execute_script("document.querySelector('.travel-candidate').scrollIntoView()")
@@ -607,6 +614,8 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
         policy = TravelPlan.objects.get(pk=session.plan_id).planning_state[reminders.KEY]
         self.assertEqual([(r["local_time"], r["status"]) for r in policy["reminders"]], [(f"{start-timedelta(days=1)}T18:00", "scheduled")])
         self.wait.until(lambda _: "Add a reminder for the evening before" not in self.text("plannerSuggestions") and self.pending == 0)
+        # Weekend ideas use the same card as the trip's places, photo slot first (owner, 2026-11-19).
+        self.assertTrue(self.browser.execute_script("const c=[...document.querySelectorAll('#plannerSuggestions .travel-candidate')];return c.length>0&&c.every(a=>a.querySelector('[data-suggestion-idea]')&&a.querySelector('h3'))"))
         self.click("[data-suggestion-idea]")
         self.assertTrue(self.browser.find_element(self.By.ID, "plannerInput").get_attribute("value").startswith("Plan a 2-day trip to "))
         self.assertIn("not checked yet", self.text("plannerSuggestions"))

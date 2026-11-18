@@ -89,6 +89,16 @@ class ProactiveTravelTests(Fixtures):
         self.assertIn("not checked", result["note"])
         self.assertEqual(proactive.trip_ideas(self.other, self.today)["ideas"], [])  # no home city, no guess
 
+    def test_weekend_ideas_step_aside_once_the_open_trip_shows_its_own_places(self):
+        """Owner check 2026-11-19: the same place appeared in "Suggested for you" and in the trip's own cards."""
+        from apps.mobility.services.travel_conversation import new_session
+        session = new_session(self.user)
+        path = f"/api/mobility/planner/suggestions/?session={session.pk}"
+        self.assertTrue(self.client.get(path).json()["trip_ideas"]["ideas"])
+        session.candidates = [{"name": "Synthetic shortlist place"}]
+        session.save(update_fields=["candidates"])
+        self.assertEqual(self.client.get(path).json()["trip_ideas"]["ideas"], [])
+
     def test_suggestions_endpoint_is_owner_only_and_not_cached(self):
         plan = self.trip(days=5)
         response = self.client.get(f"/api/mobility/planner/suggestions/?session={plan.planning_session.pk}")

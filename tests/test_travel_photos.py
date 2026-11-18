@@ -68,6 +68,33 @@ class TravelPhotoTests(TestCase):
         session.refresh_from_db()
         self.assertNotIn("photos", str(session.candidates))
 
+    def test_name_lookup_uses_the_nearest_same_named_place_that_has_photos(self):
+        """Owner check 2026-11-19: Sakleshpur showed no photo because Google returned more than one place with that name."""
+        def place(identity, name, km, photos=True):
+            return {"id": identity, "displayName": {"text": name}, "location": {"latitude": 12.944 + km / 111, "longitude": 75.788},
+                    **({"photos": [{"name": f"places/{identity}/photos/ref", "authorAttributions": []}]} if photos else {})}
+        found = [place("station", "Sakleshpur", 1, photos=False), place("town", "Sakleshpur", 3), place("far", "Sakleshpur", 60),
+                 place("stand", "Sakleshpur Bus Stand", 0.5), place("other", "SAKLESHPUR", 8)]
+        self.api.side_effect = [({"places": found}, ""), ({"photoUri": "https://lh3.googleusercontent.com/photo"}, "")]
+        payload, _ = GooglePlacePhoto().fetch({"name": "Sakleshpur", "latitude": 12.944, "longitude": 75.788, "index": 0})
+        self.assertEqual(payload["count"], 1)
+        self.assertIn("places/town/photos/ref", str(self.api.call_args_list[1]))
+        for places in ([place("far", "Sakleshpur", 60)], [place("stand", "Sakleshpur Bus Stand", 0.5)], []):
+            self.api.side_effect = [({"places": places}, "")]
+            with self.subTest(places=[p["displayName"]["text"] for p in places]), self.assertRaisesRegex(ProviderError, "place_identity_unconfirmed"):
+                GooglePlacePhoto().fetch({"name": "Sakleshpur", "latitude": 12.944, "longitude": 75.788, "index": 0})
+
+    def test_a_photo_turned_away_while_another_loads_says_busy_so_the_page_retries(self):
+        from apps.mobility.services.travel.providers.base import ProviderResult
+        owner = get_user_model().objects.create_user("photo-busy-owner")
+        session = TravelPlanningSession.objects.create(user=owner, candidates=[{"id": "google:p1", "name": "Synthetic place", "lat": 12, "lon": 77}])
+        self.client.force_login(owner)
+        path, key = f"/api/mobility/planner/sessions/{session.pk}/photos/", gallery_places(session)[0][0]
+        for error, busy in (("provider_busy_or_backoff", True), ("local_quota_exhausted", False)):
+            with self.subTest(error=error), patch("apps.mobility.planner_views.query", return_value=ProviderResult("google_place_photos", "photos", error=error)):
+                data = self.client.get(path, {"place": key}).json()
+            self.assertEqual((data["status"], data["busy"]), ("unavailable", busy))
+
     def test_weekend_idea_photo_looks_up_only_offline_guide_places(self):
         from apps.mobility.services.travel_catalog import DESTINATIONS
         owner = get_user_model().objects.create_user("photo-guide-owner")

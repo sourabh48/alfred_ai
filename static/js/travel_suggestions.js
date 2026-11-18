@@ -26,8 +26,9 @@ window.TravelSuggestions = (() => {
         Alfred.setHTMLIfChanged(target, `<h2 class="h5" id="plannerSuggestionsTitle">Suggested for you</h2>`
             + (data.next_steps.length ? `<h3 class="h6">Next steps for your trip</h3><ul class="travel-suggestion-list">${data.next_steps.map(step).join("")}</ul>` : "")
             + `<p role="status" aria-live="polite" id="plannerSuggestionsStatus">${esc(status)}</p>`
-            + (ideas.ideas.length ? `<h3 class="h6">Ideas for your free weekend, ${esc(ideas.free_dates.start)} to ${esc(ideas.free_dates.end)}</h3><ul class="travel-suggestion-list">${ideas.ideas.map(i =>
-                `<li>${window.TravelPhotos.markup(sessionId, {name: i.name})}<strong>${esc(i.name)}</strong> · ${esc(i.fit)}<br>${esc((i.why || []).join(" "))}<br><span class="small">${esc(i.distance_basis || "")}</span><br><button type="button" class="btn btn-sm btn-outline-primary mt-1" data-suggestion-idea="${esc(`Plan a 2-day trip to ${i.name} from ${ideas.free_dates.start} to ${ideas.free_dates.end}`)}">Plan this</button></li>`).join("")}</ul><p class="small">${esc(ideas.note)}</p>` : ""));
+            + (ideas.ideas.length ? `<h3 class="h6">Ideas for your free weekend, ${esc(ideas.free_dates.start)} to ${esc(ideas.free_dates.end)}</h3><div class="travel-candidates">${ideas.ideas.map((i, n) =>
+                // Same card as "Places that fit your escape" (owner, 2026-11-19).
+                `<article class="travel-candidate">${window.TravelPhotos.markup(sessionId, {name: i.name})}<header><span class="travel-fit">Idea ${n + 1} / ${esc(i.fit)}</span><h3 class="mt-2 mb-0">${esc(i.name)}</h3></header><div class="travel-candidate-body"><dl>${i.distance_km ? `<dt>Travel from ${esc(ideas.origin || "home")}</dt><dd>~${esc(i.distance_km)} km one way<br><small>${esc(i.distance_basis || "")}</small></dd>` : ""}</dl><strong>Why it fits</strong><ul>${(i.why || []).map(w => `<li>${esc(w)}</li>`).join("")}</ul><div class="travel-actions"><button type="button" class="btn btn-sm btn-outline-primary" data-suggestion-idea="${esc(`Plan a 2-day trip to ${i.name} from ${ideas.free_dates.start} to ${ideas.free_dates.end}`)}">Plan this</button></div></div></article>`).join("")}</div><p class="small">${esc(ideas.note)}</p>` : ""));
     }
 
     async function load(id) {
