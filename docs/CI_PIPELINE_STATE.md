@@ -2,7 +2,8 @@
 
 ## Non-finance walk-through branch — 2026-11-18
 
-COMMITTED_PUSHED → CI_PENDING. Owner: "Push master" (2026-11-18), answering a question that said the push also
+CI_PASSED on `abef168` (Browser Regression 44280903928: all 13 jobs success, including native-windows 0-3 and
+native, selenium 0-2, linux-secure-failure; pages build and deployment 44280902157 success). Was CI_PENDING. Owner: "Push master" (2026-11-18), answering a question that said the push also
 publishes the docs to Pages. origin/master `1377eff` → `abef168` (fast-forward, 31 commits, owner name only, no
 secrets found in the diff). Runs on `abef168`: Browser Regression 44280903928 in progress; pages build and deployment
 44280902157 queued. Owner app already runs `abef168` with investments 0010/0011. No PR. A green result applies to
