@@ -1,5 +1,15 @@
 # Development CI and integration pipeline
 
+## Master `654996d` CI failure and repair — 2026-11-18
+
+CI_FAILED on `654996d` (Browser Regression 44309938264): selenium shards 0-2 failed, and so did the aggregate selenium
+coverage check that depends on them. Backend shards 0-3, native and linux-secure-failure passed. Pages deployment
+44309936626 succeeded. Cause: the new browser test
+`test_career_mock_interview_discards_late_voice_and_feedback` had no entry in `tests/browser_durations.json`, so the
+shard planner (`scripts/browser_test_plan.py`) refused every shard. Repair: add its measured local duration (8.063 s)
+and a backend test (`BrowserDurationManifestTests`) that fails when any browser test lacks a duration; it fails on the
+`654996d` manifest and passes after the repair. Not pushed; a push to fix CI needs the owner's OK.
+
 ## Non-finance walk-through branch — 2026-11-18
 
 CI_PASSED on `abef168` (Browser Regression 44280903928: all 13 jobs success, including native-windows 0-3 and

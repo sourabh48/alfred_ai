@@ -155,3 +155,20 @@ class BrowserTestRunnerTests(SimpleTestCase):
             self.assertTrue(report['complete']);self.assertEqual(len(report['tests']),1)
             actual.extend(row['id'] for row in report['tests'])
         self.assertEqual(sorted(actual),sorted(case.id() for case in cases))
+
+
+class BrowserDurationManifestTests(SimpleTestCase):
+    def test_every_browser_test_has_a_measured_duration(self):
+        """CI plans the browser shards from this manifest and fails every shard when a test has no duration."""
+        import ast
+
+        durations = json.loads(Path('tests/browser_durations.json').read_text(encoding='utf-8'))['durations']
+        missing = []
+        for module in sorted({name.rsplit('.', 2)[0] for name in durations}):
+            tree = ast.parse(Path(module.replace('.', '/') + '.py').read_text(encoding='utf-8'))
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    missing += [f'{module}.{node.name}.{item.name}' for item in node.body
+                                if isinstance(item, ast.FunctionDef) and item.name.startswith('test_')
+                                and f'{module}.{node.name}.{item.name}' not in durations]
+        self.assertEqual(missing, [])
