@@ -1,5 +1,13 @@
 # Development CI and integration pipeline
 
+## Research desk branch — 2026-11-18
+
+LOCAL_TESTING. Branch `work/research-desk-2026-11-18` on base `45c3d89` (contains CI-verified `0dbad2a`); not pushed, no
+hosted CI, no PR. New backend labels `tests.test_research_desk` and `tests.test_investment_audit_regressions` and the
+measured browser test are wired into the existing release lists. Full local backend shards and the full Chrome suite
+results for the final commit are recorded in EXECUTION_STATE when complete; a green result here would apply only to that
+exact commit. Push to master needs the owner's OK; docs changes publish to Pages and need separate approval.
+
 ## Audit repair sprint — 2026-11-18
 
 LOCAL_ACCEPTED / BLOCKED_APPROVAL. Verified application source is `0dbad2afc4253204cd7cb41c69bdb87bea07d12e`, pushed only to `work/audit-sprint-browser-fix-2026-11-17`. Master remains `1377eff37191d61ea190b9d5f261c36f89987ab2`. This checkpoint changes documentation only and does not reassign CI results to its newer commit.

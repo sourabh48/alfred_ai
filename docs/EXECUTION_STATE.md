@@ -1,5 +1,37 @@
 # ALFRED execution state
 
+## Research desk and investment audit — 2026-11-18
+
+LOCAL_ACCEPTED (bounded); not pushed. Branch `work/research-desk-2026-11-18`, worktree `F:/ALFRED_DEV/research-desk-1118`,
+based on Codex's verified `45c3d89` (contains `0dbad2a`). Commits: `d3e5a3b` UI repeats, `74f5e7c` seven notice bots,
+`330f868` App health error, `a214ca0` Scrapling notes, `f3cf4fc` research desk, `f878e34` audit regressions and stock
+review back-off, `0915368` desk workflow. Master is still `1377eff`; nothing here is on master or in an installer.
+
+Owner 2026-11-18 asked for automatic research that suggests what to buy or sell, TradingAgents-style, with the owner
+only accepting or rejecting, more charts, then the Investment 2.0 brief (audit 2026-11-16) and the ALFRED 2.0 continuation.
+
+- Audit: the ten probes are now `tests/test_investment_audit_regressions.py` asserting corrected behaviour. Already fixed
+  on this base: stale or conflicting NAV, unit edits, sparse NAV history, stale packets, mixed currencies, leap day, fund
+  exposure (unknown, neutral), malformed model JSON (controlled unavailable path). Fixed here: future-dated statements
+  dropped at the parser; promise words (double, guaranteed, risk-free, all your) dropped from model prose.
+- Stock-search reviews: a failing symbol waits three days, so healthy ones keep their daily slots; its last good evidence
+  and time are kept; Health already counts failures.
+- Research desk (Investments): daily 13:00 job with catch-up, Research now, pause/resume, next-check time, one run per
+  owner. Watch list + recent searches + opt-in holdings by symbol: monitoring, not discovery of new shares. Roles and the
+  five-tier rating follow TradingAgents as fixed rules; stale or thin data is skipped with a reason. Cards: status,
+  why now, what changed, strongest reason against, personal fit, what would change it, next check, charts. Personal fit
+  is a separate fixed-rule check on local records (six months' reserve, no unfunded goal within three years) and the
+  owner's own loss and horizon answers; unknown is never yes; no amount is ever suggested. Accept saves a journal view
+  checked against the price and NIFTY after 91 days; Reject and Remind me in a week; nothing is traded or written to
+  holdings. A Research desk notice bot lists new or changed calls on Home without repeats.
+
+Not done (blockers or later work): discovery over a source-backed Indian stock/fund universe; candidate comparison;
+asset-type/horizon/risk filters; fund (AMFI) candidates in the desk; news is shown unscored; amounts; travel follow-up
+editing and Nuitée hotel offers (no provider account); installer rebuild and isolated install/upgrade/uninstall; hosted
+CI on this source; Pages approval; owner-runtime migration 0010/0011. Branches not merged on purpose: Wikivoyage stays
+`6f33b6d` (superseded by the Google-only travel decision), AWS guidance `357360e` (conflicts with local-only rules),
+WIP manifest `8fa63b9`. Ratings are rules over public data, not advice or tested accuracy.
+
 ## Audit repair sprint — 2026-11-18
 
 LOCAL_ACCEPTED / BLOCKED_APPROVAL. Verified application source is `0dbad2afc4253204cd7cb41c69bdb87bea07d12e`, pushed only to `work/audit-sprint-browser-fix-2026-11-17`. Master remains `1377eff37191d61ea190b9d5f261c36f89987ab2`. This checkpoint changes documentation only and does not reassign CI results to its newer commit.
