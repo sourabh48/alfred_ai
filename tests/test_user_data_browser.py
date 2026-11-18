@@ -5507,7 +5507,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             const practice = {round_type:'technical', questions:[
                 {question:'First synthetic question?',origin:'practice'},
                 {question:'Second synthetic question?',origin:'practice'}]};
-            let stopped = 0, spoken = [], resolveStatus, resolveFeedback, resolveVoice;
+            let stopped = 0, spoken = [], resolveStatus, resolveFeedback, resolveVoice, listenSignal;
             const tick = () => new Promise(resolve => setTimeout(resolve, 0));
             const start = () => runCareerMockInterview({id:1}, practice, form, () => {});
             (async () => {
@@ -5520,11 +5520,10 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 const afterEnd = spoken.length;
                 AlfredVoice.status = async () => ({speak:false, listen:true});
                 start(); await tick();
-                AlfredVoice.listen = () => new Promise(resolve => { resolveVoice = resolve; });
+                AlfredVoice.listen = (stage, signal) => new Promise(resolve => { resolveVoice = resolve; listenSignal = signal; });
                 document.getElementById('careerMockSpeak').click();
-                const beforeSkip = stopped;
                 document.getElementById('careerMockSkip').click();
-                const stoppedOnSkip = stopped > beforeSkip;
+                const stoppedOnSkip = Boolean(listenSignal && listenSignal.aborted);  // Skip cancels this question's capture
                 resolveVoice('Late answer for first question'); await tick();
                 const nextAnswer = document.getElementById('careerMockAnswer').value;
                 Alfred.fetchJSON = () => new Promise(resolve => { resolveFeedback = resolve; });
@@ -5542,6 +5541,104 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             });
         """)
         self.assertEqual(result, dict(afterEnd=0, stoppedOnSkip=True, nextAnswer='', voiceDisabled=True, lateSpeech=0))
+
+    def test_career_practice_reply_after_job_switch_or_newer_request_is_ignored(self):
+        """Audit P1: a mock/practice reply that lands after the job changed, or after a newer request, must not render."""
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRoot'))
+        result = self.browser.execute_async_script("""
+            const done = arguments[0], fetch = Alfred.fetchJSON, host = document.createElement('div');
+            document.body.append(host);
+            const pending = [];
+            const practice = label => ({practice: {round_type: 'technical', basis: 'synthetic', stated_priorities: [],
+                questions: [{question: label + ' question?', origin: 'practice'}]}});
+            const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+            (async () => {
+                Alfred.fetchJSON = url => new Promise(resolve => pending.push({url, resolve}));
+                renderCareerInterviewNotes({id: 101}, host);
+                document.getElementById('careerMockStart').click();          // job 101 mock, still loading
+                renderCareerInterviewNotes({id: 202}, host);                  // owner switches to job 202
+                pending[0].resolve(practice('Job one')); await tick();
+                const afterSwitch = document.getElementById('careerPracticeForm').textContent;
+                document.getElementById('careerPracticeStart').click();       // job 202: all questions...
+                document.getElementById('careerMockStart').click();           // ...then a mock interview
+                pending[2].resolve(practice('Mock two')); await tick();
+                pending[1].resolve(practice('List two')); await tick();       // the older reply lands last
+                const latest = document.getElementById('careerPracticeForm').textContent;
+                done({switchedToJob: pending[1].url.includes('/202/'), afterSwitch, mockShown: latest.includes('Mock two'),
+                      olderShown: latest.includes('List two')});
+            })().catch(error => done({error: String(error)})).finally(() => {
+                stopCareerMockInterview(); Alfred.fetchJSON = fetch; host.remove();
+            });
+        """)
+        self.assertEqual(result, dict(switchedToJob=True, afterSwitch='', mockShown=True, olderShown=False))
+
+    def test_career_mock_voice_capture_belongs_to_its_question(self):
+        """Audit P2: Skip cancels only that question's capture (also while the microphone prompt is open); a late Q1
+        callback never stops Q2; Done waits for speech that is still being turned into text."""
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRoot'))
+        result = self.browser.execute_async_script("""
+            const done = arguments[0], original = {...AlfredVoice}, fetch = Alfred.fetchJSON;
+            const form = document.createElement('form'); document.body.append(form);
+            const practice = {round_type: 'technical', questions: [
+                {question: 'First synthetic question?', origin: 'practice'}, {question: 'Second synthetic question?', origin: 'practice'},
+                {question: 'Third synthetic question?', origin: 'practice'}]};
+            const captures = [], tick = () => new Promise(resolve => setTimeout(resolve, 0));
+            let globalStops = 0, posted = 0;
+            (async () => {
+                AlfredVoice.stop = () => { globalStops++; };
+                AlfredVoice.stopSpeaking = () => {};
+                AlfredVoice.speak = async () => {};
+                AlfredVoice.status = async () => ({speak: false, listen: true});
+                AlfredVoice.listen = (onStage, signal) => new Promise(resolve => captures.push({onStage, signal, resolve}));
+                Alfred.fetchJSON = () => { posted++; return new Promise(() => {}); };
+                runCareerMockInterview({id: 1}, practice, form, () => {}); await tick();
+                document.getElementById('careerMockSpeak').click();            // Q1 capture (microphone prompt still open)
+                document.getElementById('careerMockSkip').click(); await tick();
+                const q1CancelledOnSkip = Boolean(captures[0].signal && captures[0].signal.aborted);
+                document.getElementById('careerMockSpeak').click();            // Q2 capture
+                captures[0].onStage('transcribing');                           // late Q1 callback
+                captures[0].resolve('Late first answer'); await tick();
+                const q2StillListening = Boolean(captures[1].signal) && !captures[1].signal.aborted && globalStops === 0;
+                const q2Answer = document.getElementById('careerMockAnswer').value;
+                document.getElementById('careerMockAnswer').value = 'Typed part';
+                document.getElementById('careerMockNext').click(); await tick(); // Done while Q2 speech is in flight
+                const doneWaited = posted === 0 && Boolean(captures[1].signal) && !captures[1].signal.aborted;
+                captures[1].onStage('transcribing');
+                captures[1].resolve('spoken part'); await tick();
+                const kept = document.getElementById('careerMockAnswer').value;
+                document.getElementById('careerMockNext').click(); await tick();
+                done({q1CancelledOnSkip, q2StillListening, q2Answer, doneWaited, kept, posted});
+            })().catch(error => done({error: String(error)})).finally(() => {
+                stopCareerMockInterview();
+                for (const key of ['status', 'stop', 'stopSpeaking', 'speak', 'listen']) AlfredVoice[key] = original[key];
+                Alfred.fetchJSON = fetch; form.remove();
+            });
+        """)
+        self.assertEqual(result, dict(q1CancelledOnSkip=True, q2StillListening=True, q2Answer='', doneWaited=True,
+                                      kept='Typed part spoken part', posted=1))
+
+    def test_voice_listen_cancelled_while_microphone_prompt_is_open_never_records(self):
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRoot'))
+        result = self.browser.execute_async_script("""
+            const done = arguments[0], media = navigator.mediaDevices.getUserMedia;
+            let grant, trackStops = 0, stages = [];
+            navigator.mediaDevices.getUserMedia = () => new Promise(resolve => { grant = resolve; });
+            const controller = new AbortController();
+            const heard = AlfredVoice.listen(stage => stages.push(stage), controller.signal);
+            controller.abort();                                                // question left before the prompt was answered
+            grant({getTracks: () => [{stop() { trackStops++; }}]});
+            heard.then(text => done({text, trackStops, stages, listening: AlfredVoice.listening}))
+                 .catch(error => done({error: String(error)}))
+                 .finally(() => { navigator.mediaDevices.getUserMedia = media; });
+        """)
+        self.assertEqual(result, dict(text='', trackStops=1, stages=[], listening=False))
 
     def test_career_application_kit_triage_drafts_and_offer_reading(self):
         from selenium.webdriver.support.ui import Select

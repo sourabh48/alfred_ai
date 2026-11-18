@@ -1,5 +1,8 @@
 let salaryChart;
 let stopCareerMockInterview = () => {};
+// Each practice or mock request gets a ticket; a reply whose ticket is no longer the newest, or whose form left the page
+// (the owner opened another job), is dropped so it can never show or save another job's questions.
+let careerPracticeTicket = 0;
 window.addEventListener("pagehide", () => stopCareerMockInterview());
 let careerSimulationBaseline = null;
 let careerOpeningFilters = { country: "", state: "" };
@@ -1254,16 +1257,18 @@ function renderCareerInterviewNotes(item, host) {
         document.getElementById("careerResearchPrompt").innerHTML = `<label class="form-label small" for="careerResearchPromptText">Paste this into the search or assistant you choose. It names only the company and role.</label>
             <textarea class="form-control form-control-sm" rows="7" id="careerResearchPromptText" readonly>${Alfred.escapeHtml(data.research_prompt)}</textarea>`;
     }).catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger")));
-    document.getElementById("careerMockStart").addEventListener("click", () => {
-        Alfred.fetchJSON(`${guideUrl}?round=${encodeURIComponent(value("careerPracticeRound"))}`)
-            .then(data => runCareerMockInterview(item, data.practice, document.getElementById("careerPracticeForm"), send))
-            .catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger"));
-    });
-    document.getElementById("careerPracticeStart").addEventListener("click", () => {
+    const practiceRequest = () => {
         stopCareerMockInterview();
-        const round = value("careerPracticeRound");
-        Alfred.fetchJSON(`${guideUrl}?round=${encodeURIComponent(round)}`).then(data => {
-            const practice = data.practice, form = document.getElementById("careerPracticeForm");
+        const ticket = ++careerPracticeTicket, form = document.getElementById("careerPracticeForm");
+        const fresh = () => ticket === careerPracticeTicket && form.isConnected;
+        const reply = Alfred.fetchJSON(`${guideUrl}?round=${encodeURIComponent(value("careerPracticeRound"))}`)
+            .catch(error => { if (fresh()) showCareerFeedback("careerNotesFeedback", error.message, "danger"); throw error; });
+        return then => reply.then(data => { if (fresh()) then(data.practice, form); }, () => {});
+    };
+    document.getElementById("careerMockStart").addEventListener("click", () =>
+        practiceRequest()((practice, form) => runCareerMockInterview(item, practice, form, send)));
+    document.getElementById("careerPracticeStart").addEventListener("click", () => {
+        practiceRequest()((practice, form) => {
             form.innerHTML = `<p class="small muted">${Alfred.escapeHtml(practice.basis)}</p>
                 ${practice.stated_priorities.length ? `<p class="small"><strong>What they said the role needs:</strong> ${practice.stated_priorities.map(row => `"${Alfred.escapeHtml(row.quote)}"`).join("; ")}</p>` : ""}
                 ${practice.questions.map((row, index) => `<div class="mb-2" data-practice-turn="${index}"><label class="form-label small" for="careerPracticeAnswer${index}"><strong>${index + 1}. ${Alfred.escapeHtml(row.question)}</strong> <span class="muted">(${Alfred.escapeHtml(row.origin)})</span></label>
@@ -1291,7 +1296,7 @@ function renderCareerInterviewNotes(item, host) {
                 if (!turns.length) { showCareerFeedback("careerNotesFeedback", "Answer at least one question first.", "danger"); return; }
                 send({action: "add", kind: "practice", item: {round_type: practice.round_type, turns}});
             };
-        }).catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger"));
+        });
     });
     host.querySelectorAll("[data-notes-remove]").forEach(button => button.addEventListener("click", () =>
         send({action: "remove", kind: button.dataset.notesRemove, index: Number(button.dataset.index)})));
@@ -1302,8 +1307,8 @@ function runCareerMockInterview(item, practice, form, send) {
     stopCareerMockInterview();
     if (!form?.isConnected) return;
     const e = Alfred.escapeHtml, turns = [], total = practice.questions.length;
-    let index = 0, active = true;
-    const stopVoice = () => { AlfredVoice.stop(); AlfredVoice.stopSpeaking(); };
+    let index = 0, active = true, capture = null;  // capture: the AbortController of the current question's voice answer
+    const stopVoice = () => { capture?.abort(); capture = null; AlfredVoice.stopSpeaking(); };
     stopCareerMockInterview = () => { active = false; stopVoice(); };
     stopVoice();
     form.onsubmit = event => event.preventDefault();
@@ -1340,24 +1345,28 @@ function runCareerMockInterview(item, practice, form, send) {
         });
         voice.addEventListener("click", async () => {
             if (!current() || answer.readOnly) return;
-            if (AlfredVoice.listening) { AlfredVoice.stop(); return; }
+            if (capture) { AlfredVoice.stop(); return; }  // the owner's own Stop: what was said is still turned into text
+            const mine = capture = new AbortController(), live = () => !mine.signal.aborted && current();
             voice.textContent = "Stop listening"; voice.setAttribute("aria-pressed", "true");
             try {
                 const text = await AlfredVoice.listen(stage => {
-                    if (!current() || answer.readOnly) { AlfredVoice.stop(); return; }
-                    out.textContent = stage === "listening" ? "Listening. Answer as you would in the room; ALFRED stops when you pause." : "Turning your speech into text on this PC.";
-                });
-                if (!current() || answer.readOnly) return;
+                    if (live()) out.textContent = stage === "listening" ? "Listening. Answer as you would in the room; ALFRED stops when you pause." : "Turning your speech into text on this PC.";
+                }, mine.signal);
+                if (!live()) return;
                 if (text) answer.value = [answer.value.trim(), text].filter(Boolean).join(" ");
                 out.textContent = text ? "Check the text, then press Done." : "No speech was heard.";
             } catch (error) {
-                if (!current() || answer.readOnly) return;
+                if (!live()) return;
                 out.textContent = error.name === "NotAllowedError" ? "Microphone access was not allowed." : error instanceof DOMException ? "The microphone could not start." : error.message;
-            } finally { voice.textContent = "Answer by voice"; voice.setAttribute("aria-pressed", "false"); }
+            } finally {
+                if (capture === mine) capture = null;
+                if (current()) { voice.textContent = "Answer by voice"; voice.setAttribute("aria-pressed", "false"); }
+            }
         });
         document.getElementById("careerMockSkip").addEventListener("click", () => { index++; show(); });
         document.getElementById("careerMockEnd").addEventListener("click", finish);
         next.onclick = () => {
+            if (capture) { out.textContent = "Your spoken answer is still being turned into text. Press Done again when it appears."; return; }
             const text = answer.value.trim();
             if (!text) { out.textContent = "Answer first, or press Skip."; return; }
             turns.push({question: row.question, answer: text, rating: ""});

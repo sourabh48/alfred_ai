@@ -68,11 +68,13 @@ window.AlfredVoice = (() => {
     }
 
     // Records until a pause after speech, stop(), or the time limit, then returns the words ("" when nothing was said).
-    // onStage("listening" | "transcribing") lets the page show what is happening.
-    async function listen(onStage = () => {}) {
+    // onStage("listening" | "transcribing") lets the page show what is happening. An aborted signal cancels this capture
+    // only (also while the microphone prompt is still open): nothing more is recorded or transcribed and "" is returned.
+    async function listen(onStage = () => {}, signal = null) {
         stopSpeaking();
         // The browser's own free noise suppression and echo cancellation clean the voice before Whisper hears it.
         const stream = await navigator.mediaDevices.getUserMedia({audio: {channelCount: 1, noiseSuppression: true, echoCancellation: true, autoGainControl: true}});
+        if (signal?.aborted) { stream.getTracks().forEach(track => track.stop()); return ""; }
         // A 16 kHz context lets the browser resample with filtering; naive downsampling garbled words.
         let context; try { context = new AudioContext({sampleRate: 16000}); } catch { context = new AudioContext(); }
         const source = context.createMediaStreamSource(stream), processor = context.createScriptProcessor(CHUNK, 1, 1), chunks = [];
@@ -86,6 +88,7 @@ window.AlfredVoice = (() => {
         };
         source.connect(processor); processor.connect(context.destination); await context.resume();
         const current = recording = {finish};
+        signal?.addEventListener("abort", () => finish("cancelled"), {once: true});
         const limits = [setTimeout(() => finish("limit"), MAX_MS), setTimeout(() => { if (!heard) finish("silence"); }, NOTHING_HEARD_MS)];
         onStage("listening");
         const reason = await done;
@@ -93,7 +96,7 @@ window.AlfredVoice = (() => {
         if (recording === current) recording = null;
         stream.getTracks().forEach(track => track.stop());
         const rate = context.sampleRate; await context.close();
-        if (reason === "silence") return "";
+        if (reason === "silence" || reason === "cancelled") return "";
         onStage("transcribing");
         const result = await Alfred.fetchJSON("/api/ai/speech/transcribe/", {method: "POST", headers: {"Content-Type": "audio/wav"}, body: wav16k(chunks, rate)});
         return (result.text || "").trim();
