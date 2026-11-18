@@ -680,12 +680,17 @@ def accept(user, identity, today=None, *, paper=False) -> dict:
     """The owner agrees: the call goes into the research journal to be checked later. Holdings are never touched.
     paper: also hand the call to the paper trader (pretend money only), in the same transaction."""
     from apps.investments.models import ResearchDecision
-    from .research_paper import place
+    from .research_paper import _price, place
 
     today, record = today or timezone.localdate(), _pending(user, identity)
     s = record.payload
-    if (today - date.fromisoformat(s["price_as_of"])).days > STALE_DAYS:
+    age = (today - date.fromisoformat(s["price_as_of"])).days
+    if age > STALE_DAYS:
         raise ValueError("This research is more than a week old. Press Research now, then decide.")
+    if age < 0:
+        raise ValueError("This research is dated after today, so its price cannot be trusted. Press Research now, then decide.")
+    if _price(s.get("price")) is None:
+        raise ValueError("This call has no usable price, so it cannot be checked later. Press Research now, then decide.")
     reasons = " ".join(item["point"] for item in (s["good"] if s["rating"] in ("buy", "overweight", "hold") else s["bad"])[:3])
     decision = ResearchDecision.objects.create(
         user=user, instrument=s["symbol"], rating=s["rating"], decided_on=today, review_on=today + timedelta(days=REVIEW_DAYS),

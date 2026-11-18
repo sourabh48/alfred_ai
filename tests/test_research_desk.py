@@ -567,6 +567,65 @@ class ResearchAgentsTests(TestCase):
         self.assertIsNone(research_paper.proposal(self.user, {**sell, "symbol": "NONE.NS"}))  # nothing held to sell
         self.assertFalse(research_paper.proposal(self.user, {**call, "currency": "USD"})["possible"])
 
+    def test_paper_trader_refuses_bad_and_future_prices_and_a_changed_account(self):
+        """Audit sprint 2026-11-19: zero, negative and NaN closes never fill; a future-dated quote cannot be accepted; a
+        reset or a second order in between can never attach a trade to another account or spend the same cash twice."""
+        from apps.investments.services import research_paper
+        call = self.open_call()
+        self.client.post(URL, {"operation": "paper_open", "cash": "100000"}, content_type="application/json")
+        for bad in ("0", "-5", "NaN", "Infinity", "", None):
+            with self.subTest(price=bad):
+                self.assertFalse(research_paper.proposal(self.user, {**call, "price": bad})["possible"])
+                self.assertFalse(research_paper.proposal(self.user, {**call, "price": bad, "rating": "sell"})["possible"])
+        pending = research_desk._records(self.user).get(event_type=research_desk.PENDING, payload__id=call["id"])
+        original = dict(pending.payload)
+        for payload, message in ((dict(original, price="NaN"), "no usable price"),
+                                 (dict(original, price_as_of=(TODAY + timedelta(days=1)).isoformat()), "dated after today")):
+            pending.payload = payload
+            pending.save(update_fields=["payload"])
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                research_desk.accept(self.user, call["id"], TODAY, paper=True)
+        pending.payload = original
+        pending.save(update_fields=["payload"])
+        self.assertFalse(ResearchDecision.objects.exists())
+
+        stale = research_paper.account(self.user)  # read by an order...
+        research_paper.open_account(self.user, "50000")  # ...then the owner starts again
+        with patch.object(research_paper, "account", return_value=stale), self.assertRaisesRegex(ValueError, "changed"):
+            research_desk.accept(self.user, call["id"], TODAY, paper=True)
+        self.assertFalse(ResearchDecision.objects.exists())
+        self.assertEqual(research_paper.portfolio(self.user)["cash"], "50000.00")
+        self.assertEqual(research_paper.portfolio(self.user)["positions"], [])
+
+        book = research_paper.account(self.user)
+        snapshot = type(book).objects.get(pk=book.pk)  # a second order priced on the same cash
+        research_paper.place(self.user, call, TODAY)
+        with patch.object(research_paper, "account", return_value=snapshot), self.assertRaisesRegex(ValueError, "changed"):
+            research_paper.place(self.user, call, TODAY)
+        portfolio = research_paper.portfolio(self.user)
+        self.assertEqual(len(portfolio["trades"]), 1)
+        self.assertEqual(portfolio["cash"], str(Decimal("50000.00") - Decimal(portfolio["trades"][0]["value"])))
+
+    def test_paper_values_use_the_latest_dated_usable_close_and_say_when_cost_is_used(self):
+        from apps.investments.services import research_paper
+        call = self.open_call()
+        research_paper.open_account(self.user, "100000")
+        research_paper.place(self.user, call, TODAY)
+        quantity = research_paper.portfolio(self.user)["positions"][0]["quantity"]
+        newer = (date.fromisoformat(call["price_as_of"]) + timedelta(days=1)).isoformat()
+        older = (date.fromisoformat(call["price_as_of"]) - timedelta(days=3)).isoformat()
+        for price, as_of, currency in (("300", newer, "INR"), ("100", older, "INR"), ("0", newer, "INR"), ("999", newer, "USD")):
+            research_desk._log(self.user, research_desk.SUPERSEDED, "synthetic close",
+                               {"symbol": call["symbol"], "price": price, "price_as_of": as_of, "currency": currency})
+        portfolio = research_paper.portfolio(self.user)  # the older close was written last; the newer one still wins
+        self.assertEqual(portfolio["positions"][0]["value"], str(Decimal("300") * quantity) + ".00")
+        self.assertEqual(portfolio["positions"][0]["price_as_of"], newer)
+        self.assertFalse(any("counted at what it cost" in line for line in portfolio["limits"]))
+        research_desk._records(self.user).exclude(event_type__in=(research_paper.ACCOUNT, research_paper.TRADE)).delete()
+        portfolio = research_paper.portfolio(self.user)
+        self.assertIsNone(portfolio["positions"][0]["value"])
+        self.assertTrue(any(f"No usable close for {call['symbol']}" in line for line in portfolio["limits"]))
+
     def test_social_mood_needs_reddit_keys_and_labels_titles_locally(self):
         from apps.investments.services import research_social
         self.assertIsNone(research_social.mood("GOOD.NS", "Good Co"))

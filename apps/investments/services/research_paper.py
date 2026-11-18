@@ -53,6 +53,15 @@ def open_account(user, cash) -> dict:
     return portfolio(user)
 
 
+def _price(value) -> Decimal | None:
+    """A usable last close: a finite amount above zero, else None (a bad quote never fills or values a paper trade)."""
+    try:
+        price = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    return price if price.is_finite() and price > 0 else None
+
+
 def _positions(user) -> dict:
     held = {}
     for trade in _records(user).filter(event_type=TRADE).order_by("created_at", "id"):
@@ -65,17 +74,19 @@ def _positions(user) -> dict:
     return {symbol: pair for symbol, pair in held.items() if pair[0] > 0}
 
 
-def proposal(user, suggestion) -> dict | None:
+def proposal(user, suggestion, book=None) -> dict | None:
     """What the paper trader would do if the owner accepts this call, or None (no account, no order, other currency)."""
-    book = account(user)
+    book = book or account(user)
     if book is None or suggestion.get("rating") not in ORDER:
         return None
     if suggestion.get("currency") != CURRENCY:
         return {"possible": False, "text": "Paper trading uses rupees; this share is priced in another currency."}
     side, share = ORDER[suggestion["rating"]]
-    price = Decimal(suggestion["price"])
+    price = _price(suggestion.get("price"))
+    if price is None:
+        return {"possible": False, "text": "This call has no usable last close, so the paper trader waits for the next daily research."}
     if side == "buy":
-        quantity = int((Decimal(book.payload["cash"]) * share / price).to_integral_value(ROUND_DOWN)) if price > 0 else 0
+        quantity = int((Decimal(book.payload["cash"]) * share / price).to_integral_value(ROUND_DOWN))
         if quantity < 1:
             return {"possible": False, "text": "Not enough paper cash for one share."}
     else:
@@ -94,7 +105,7 @@ def place(user, suggestion, today) -> dict:
     from .research_desk import _log
 
     book = account(user, lock=True)
-    order = proposal(user, suggestion)
+    order = proposal(user, suggestion, book)
     if book is None:
         raise ValueError("Open a paper trading account first, with the pretend money you want to start with.")
     if not order or not order["possible"]:
@@ -103,8 +114,11 @@ def place(user, suggestion, today) -> dict:
     cash = cash - value if order["side"] == "buy" else cash + value
     if cash < 0:
         raise ValueError("Not enough paper cash for this paper trade.")
-    book.payload = {**book.payload, "cash": str(_money(cash))}
-    book.save(update_fields=["payload"])
+    # Compare-and-set: the write lands only if the account is still open with the cash this order was priced on, so a
+    # reset or a second order in between can never attach this trade to another account or spend the same cash twice.
+    if not _records(user).filter(pk=book.pk, event_type=ACCOUNT, payload__cash=book.payload["cash"]).update(
+            payload={**book.payload, "cash": str(_money(cash))}):
+        raise ValueError("The paper account changed while this order was placed. Nothing was traded; try again.")
     trade = {key: order[key] for key in ("side", "quantity", "price", "value")} | {
         "symbol": suggestion["symbol"], "name": suggestion["name"], "rating": suggestion["rating"], "on": today.isoformat(),
         "price_as_of": suggestion["price_as_of"], "suggestion_id": suggestion["id"]}
@@ -119,15 +133,19 @@ def portfolio(user) -> dict | None:
     book = account(user)
     if book is None:
         return None
-    latest = {}
+    latest = {}  # symbol -> (date, price): the latest-dated usable rupee close, whatever order the records were made in
     for row in _records(user).filter(event_type__in=(PENDING, ACCEPTED, SUPERSEDED)).order_by("created_at", "id"):
-        if row.payload.get("price") and row.payload.get("symbol"):
-            latest[row.payload["symbol"]] = (Decimal(row.payload["price"]), row.payload.get("price_as_of"))
-    rows, value = [], Decimal(book.payload["cash"])
+        p = row.payload
+        price, as_of = _price(p.get("price")), str(p.get("price_as_of") or "")
+        if p.get("symbol") and price is not None and p.get("currency") == CURRENCY and as_of >= latest.get(p["symbol"], ("", None))[0]:
+            latest[p["symbol"]] = (as_of, price)
+    rows, value, at_cost = [], Decimal(book.payload["cash"]), []
     for symbol, (quantity, cost) in sorted(_positions(user).items()):
-        price, as_of = latest.get(symbol, (None, None))
+        as_of, price = latest.get(symbol, (None, None))
         worth = _money(price * quantity) if price is not None else None
         value += worth if worth is not None else cost
+        if worth is None:
+            at_cost.append(symbol)
         rows.append({"symbol": symbol, "quantity": quantity, "cost": str(_money(cost)), "value": None if worth is None else str(worth),
                      "price_as_of": as_of})
     start = Decimal(book.payload["start_cash"])
@@ -137,4 +155,5 @@ def portfolio(user) -> dict | None:
             "trades": trades, "opened_at": book.payload["opened_at"],
             "limits": ["Pretend money only: nothing was bought or sold, and your real holdings are untouched.",
                        "Fills at the last daily close, with no brokerage, taxes or slippage, so real results would be lower.",
-                       "Values use each share's latest close from the daily research."]}
+                       "Values use each share's latest close from the daily research."]
+                      + ([f"No usable close for {', '.join(at_cost)}, so it is counted at what it cost."] if at_cost else [])}
