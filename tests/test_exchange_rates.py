@@ -106,3 +106,91 @@ class ApproximateApiTests(TestCase):
         plan = self.client.get("/api/mobility/dashboard/").json()["travel_plans"][0]
         self.assertEqual(plan["approximate"], {"currency": "USD", "budget": "212.94"})
         self.assertEqual(self.client.patch("/api/users/profile/", {"display_currency": ""}, content_type="application/json").json()["display_currency"], None)
+
+
+class RateHistoryTests(TestCase):
+    """Rates change every day: each ECB business day is stored once and a dated amount uses its own day's table."""
+
+    def setUp(self):
+        self.today = timezone.localdate()
+        self.owner = get_user_model().objects.create_user(username="synthetic-fx-history-owner")
+        self.client.force_login(self.owner)
+
+    def series(self, *days):
+        return {"amount": 1.0, "base": "EUR", "rates": {
+            (self.today - timedelta(days=ago)).isoformat(): {"INR": inr, "USD": "1.10"} for ago, inr in days}}
+
+    def fill(self, payload):
+        with patch("alfred_ai.services.public_http.request", return_value=SimpleNamespace(json=lambda: payload)) as fetch:
+            added = verified_intelligence.exchange_rate_history()
+        return added, fetch
+
+    def test_history_is_backfilled_once_then_only_new_days_are_fetched_and_kept_through_cleanup(self):
+        with patch("alfred_ai.services.public_http.request", no_network):
+            self.assertEqual(verified_intelligence.exchange_rate_history(), 0)  # nothing to anchor on yet
+        store_table()
+        added, fetch = self.fill(self.series((0, "100"), (3, "90"), (400, "1")))  # 400 days ago is outside the asked range
+        self.assertEqual(added, 2)
+        url = fetch.call_args.args[1]
+        self.assertEqual(url, verified_intelligence.FX_HISTORY_URL.format(
+            start=(self.today - timedelta(days=366)).isoformat(), end=self.today.isoformat()))
+        self.assertNotIn("params", fetch.call_args.kwargs)  # a date range only; nothing about the owner
+        with patch("alfred_ai.services.public_http.request", no_network):
+            self.assertEqual(verified_intelligence.exchange_rate_history(), 0)  # up to date: no request
+        verified_intelligence.cleanup_stale(retention_days=0)
+        self.assertEqual(VerifiedExternalInsight.objects.filter(scope="fx-history").count(), 2)
+        # A bad table adds nothing and keeps what is stored.
+        VerifiedExternalInsight.objects.filter(scope="fx", cache_key="ecb-daily").update(
+            payload={"base": "EUR", "date": (self.today + timedelta(days=1)).isoformat(), "rates": {"EUR": "1", **RATES}})
+        with self.assertRaises(ValueError), patch("alfred_ai.services.public_http.request",
+                return_value=SimpleNamespace(json=lambda: self.series((0, "-5")))):
+            verified_intelligence.exchange_rate_history()
+        self.assertEqual(VerifiedExternalInsight.objects.filter(scope="fx-history").count(), 2)
+
+    def test_a_dated_amount_uses_its_own_days_rate_or_the_business_day_before(self):
+        store_table(rates={"INR": "100", "USD": "1.10"})
+        self.fill(self.series((0, "100"), (3, "90")))
+        on = lambda ago: exchange_rates.rate_table(on=self.today - timedelta(days=ago))
+        self.assertEqual(on(3)["rates"]["INR"], Decimal("90"))
+        self.assertEqual((on(2)["date"], on(2)["rates"]["INR"]), ((self.today - timedelta(days=3)).isoformat(), Decimal("90")))
+        self.assertEqual(on(0)["rates"]["INR"], Decimal("100"))
+        self.assertIsNone(on(4))  # before the stored history: no rate, no guess
+        self.assertTrue(on(-10)["stale"])  # a week past the newest table
+        self.assertEqual(exchange_rates.convert("11", "USD", "INR", on(3)), Decimal("900.00"))
+        self.assertEqual(exchange_rates.convert("11", "USD", "INR", on(0)), Decimal("1000.00"))
+
+    def test_spending_shows_each_foreign_transaction_at_its_own_days_rate(self):
+        from apps.expenses.models import Expense
+        store_table(rates={"INR": "100", "USD": "1.10"})
+        self.fill(self.series((0, "100"), (3, "90")))
+        for ago in (0, 3, 30):
+            Expense.objects.create(user=self.owner, amount="11.00", currency="USD", category="travel", raw_description="SYNTHETIC",
+                                   transaction_date=self.today - timedelta(days=ago), source="manual")
+        Expense.objects.create(user=self.owner, amount="50.00", currency="INR", category="food", raw_description="SYNTHETIC",
+                               transaction_date=self.today, source="manual")
+        with patch("alfred_ai.services.public_http.request", no_network):
+            payload = self.client.get("/api/expenses/timeline/").json()
+        rows = {(item["transaction_date"], item["currency"]): item["approximate"] for day in payload["timeline"] for item in day["items"]}
+        day = lambda ago: (self.today - timedelta(days=ago)).isoformat()
+        self.assertEqual(rows[(day(0), "USD")], {"currency": "INR", "amount": "1000.00", "rate_date": day(0)})
+        self.assertEqual(rows[(day(3), "USD")], {"currency": "INR", "amount": "900.00", "rate_date": day(3)})
+        self.assertIsNone(rows[(day(30), "USD")])  # older than the stored history: not converted
+        self.assertIsNone(rows[(day(0), "INR")])
+        self.assertEqual(payload["summary"]["other_currency_transaction_count"], 3)  # still never added to rupee totals
+
+    def test_the_exchange_rates_bot_goes_online_only_for_an_owner_who_needs_a_rate(self):
+        from apps.expenses.models import BankAccount
+        from apps.ml_engine.services import task_bots
+        self.assertIn("fx_rates", task_bots.NETWORK_BOTS)
+        with patch("alfred_ai.services.public_http.request", no_network):
+            self.assertEqual(task_bots.fx_rates(self.owner, self.today), [])  # rupee-only owner: no request
+        BankAccount.objects.create(user=self.owner, account_number="SYN-USD", current_balance="10.00", currency="USD")
+        latest = {"amount": 1.0, "base": "EUR", "date": self.today.isoformat(), "rates": {"INR": 100, "USD": 1.1}}
+        answers = iter([latest, self.series((0, "100"))])
+        with patch("alfred_ai.services.public_http.request", side_effect=lambda *a, **k: SimpleNamespace(json=lambda: next(answers))):
+            self.assertEqual(task_bots.fx_rates(self.owner, self.today), [])
+        self.assertEqual(VerifiedExternalInsight.objects.filter(scope="fx-history").count(), 1)
+        VerifiedExternalInsight.objects.all().delete()
+        with patch("alfred_ai.services.public_http.request", side_effect=OSError("offline")):
+            items = task_bots.fx_rates(self.owner, self.today)  # the daily fetch failed and nothing is stored
+        self.assertEqual([item["title"] for item in items], ["Exchange rates are out of date"])

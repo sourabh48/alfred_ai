@@ -107,6 +107,33 @@ def fund_review(user, today):
             for row in holdings if row["action"] in ("review", "sell")]
 
 
+def fx_rates(user, today):
+    """Fetch the ECB reference table and fill missing days, so money in other currencies shows at its own day's rate."""
+    from alfred_ai.services.currency import RUPEE
+    from alfred_ai.services.exchange_rates import STALE_DAYS, display_currency, rate_table
+    from apps.expenses.models import BankAccount, Expense
+    from apps.integrations.services import verified_intelligence
+    from apps.investments.models import Investment
+    from apps.loans.models import Loan
+    # Online only when this owner needs a rate: money recorded in another currency, or pages shown in one.
+    if display_currency(user)[0] == RUPEE and not any(
+            model.objects.filter(user=user).exclude(currency__isnull=True).exclude(currency__in=("", RUPEE)).exists()
+            for model in (BankAccount, Expense, Loan, Investment)):
+        return []
+    verified_intelligence.exchange_rates()
+    try:
+        verified_intelligence.exchange_rate_history()
+    except Exception as error:  # offline or the ECB source is down: the last stored rates stay in use
+        raise BotUnavailable("ECB exchange rates are not reachable right now. Pages keep the last stored rates.") from error
+    table = rate_table()
+    if table and not table["stale"]:
+        return []
+    when = f"from {table['date']}" if table else "not stored yet"
+    return [_item(f"fx:{table['date'] if table else 'none'}", "Exchange rates are out of date",
+                  f"The newest ECB reference rate is {when}, more than {STALE_DAYS} days old, so approximate figures in other "
+                  "currencies may be off. Your records and rupee totals never change.", DIAGNOSTICS)]
+
+
 def paperwork(user, today):
     from apps.mobility.models import BikeDocument, BikeServiceRecord
     items, seen = [], set()
@@ -435,6 +462,7 @@ BOTS = {
     "money_review": ("Weekly money review", 7, money_review, "Last 7 days of spending against the week before."),
     "bills_due": ("Bills and EMIs due", 1, bills_due, "Loan instalments due in the next 7 days."),
     "fund_review": ("Fund review", 1, fund_review, "Owned funds that dropped from their recent high (AMFI prices)."),
+    "fx_rates": ("Exchange rates", 1, fx_rates, "Daily ECB reference rates, kept by date so other currencies show at the right day's rate; sends no personal data."),
     "paperwork": ("Documents and service", 1, paperwork, "Vehicle papers expiring and bike service due."),
     "career_follow_ups": ("Career follow-ups", 1, career_follow_ups, "Applications where a follow-up is due."),
     "travel_prep": ("Travel preparation", 1, travel_prep, "Next steps for trips in the coming weeks."),
@@ -600,9 +628,9 @@ def dismiss(user, identity):
 
 
 # Daily bots that read only this PC's records refresh every hour, so a new spend or statement shows up the same
-# day; an unchanged review keeps its fingerprint and is reused, never duplicated. The fund bot reads AMFI online,
-# so it stays once a day, and the weekly bots stay weekly.
-NETWORK_BOTS = {"fund_review", "research_watch"}
+# day; an unchanged review keeps its fingerprint and is reused, never duplicated. Bots that go online (AMFI, stock
+# research, ECB rates) stay once a day, and the weekly bots stay weekly.
+NETWORK_BOTS = {"fund_review", "research_watch", "fx_rates"}
 
 
 @transaction.atomic

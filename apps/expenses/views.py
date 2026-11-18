@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from alfred_ai.pagination import OptionalPageNumberPagination
 from alfred_ai.services import record_parser_learning
 from alfred_ai.services.currency import counts_in_rupees
+from alfred_ai.services.exchange_rates import approximate
 from alfred_ai.services.upload_privacy import purge_uploaded_file_after_extraction, raw_upload_cleanup_enabled
 from .models import BankAccount, Expense, StatementUpload, mask_account_number
 from .money import money_float
@@ -455,7 +456,9 @@ class ExpenseTimelineView(APIView):
                 summary["unwanted_total"] += expense.amount
                 summary["unwanted_count"] += 1
 
-        for payload in serializer.data:
+        # Display only: each transaction in another currency gets its approximate value at its own day's rate.
+        rows, display_currency_block = approximate(request, serializer.data, ("amount",), date_key="transaction_date")
+        for payload in rows:
             grouped[payload["transaction_date"]].append(payload)
 
         visible_treatments = {
@@ -488,6 +491,7 @@ class ExpenseTimelineView(APIView):
                     for key, value in summary.items()
                 },
                 "timeline": timeline,
+                "display_currency": display_currency_block,
                 "timeline_meta": {
                     **applied_filters,
                     "limit": limit,

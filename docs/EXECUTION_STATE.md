@@ -1,5 +1,48 @@
 # ALFRED execution state
 
+## Non-finance user walk-through — 2026-11-18
+
+LOCAL_TESTING; not pushed. Branch `work/tracker-items-2026-11-18`, worktree `F:/ALFRED_DEV/tracker-items-1118`, on
+`5cc75db` (the research desk branch below). Owner asked for a tester's pass as a client who is neither technical nor
+finance-minded and needs help. Walked Home, Spending, Budgets, Loans, Investments, Ask ALFRED, Travel and Settings on a
+synthetic copy (port 8010, synthetic data only). Commits `a9341d9`, `a084c5f`, `bdafad1`, `8680b05`. Fixed:
+
+- Home: one daily review instead of the same notices twice; rent, utilities and EMIs are no longer "subscriptions";
+  legacy amounts read as rupees; "Spent" says rent is separate; "Left in a usual month" names its 3-month average;
+  the spending-pattern label waits for pending review and uses plain words (no "Strategic Accumulator").
+- Spending: groceries are essential, not "spending you could cut" (the two category sets disagreed); labels such as
+  Delta, Net flow and raw bank debits read as everyday words.
+- Budgets: a category's usual spend is its floor, so groceries no longer show 164% "used" while unused travel and fuel
+  hold shares; the emergency-fund advice counts cash already held, in Indian digit grouping; forecast method and
+  backtest wording sit behind one click.
+- Loans: the prepay figure is labelled an example to try in the what-if, not advice; plain metric names.
+- Research desk: when personal fit says no, a Buy call shows "Not for you yet" and the fit line comes first, on the
+  card and in the Home notice; the per-card next-check text is short.
+- Ask ALFRED: "Can I afford X?" was always withheld (no source in general scope; model arithmetic wrong). It now gets
+  a fixed answer from the canonical baseline: cash, usual essential costs, months of cover before and after, against
+  a six-month cushion; accounts in other currencies are named, not added.
+- Documents and Career: ten jargon paragraphs in plain words; the income placeholder reads "Loading…".
+
+Owner decision 2026-11-18 (FIN-15 home currency): "check which country the user is based out of and select currency
+accordingly ... what will you do if user gets paid from other country?" A record with no currency is read in the
+owner's home currency: profile country, else this PC's time zone (tzdata zone table), else unknown and withheld. A
+recorded currency always wins, so a salary account abroad stays in its own currency, is listed separately and is never
+added or converted. The assistant's rupee figures (`baseline_source`) mark such rows `assumed_home`. Pages still read
+no-currency rows as INR whatever the country (follow-up).
+
+Owner decision 2026-11-18 (dated rates): "the currency values changes eveyday ... the app must track the changes during
+coversion right?" and "shouldnt the bots do the data fetch?" The hidden hourly `native_exchange_rate_refresh` task is
+replaced by a daily **Exchange rates** task bot (a network bot, once a day, also run by Run all bots). It goes online
+only for an owner with money recorded in another currency or a non-INR display currency, fetches the ECB latest table
+and fills every missing business day (a year on first run, one Frankfurter range request, no user data), stored as
+`fx-history` records that cleanup keeps. `rate_table(on=day)` gives that day's table or the business day before;
+balances convert at today's rate, transactions at their own day's rate (Spending shows "≈ … at the <date> rate").
+Display only: records, rupee totals and calculations never change.
+
+Not fixed: a "Back up now" button (the backup notice still points at `config/local.env`); general money questions
+other than affordability still need the finance scope; pages' no-currency rule above.
+Backend on `8680b05`: 4 shards, 0 failures (shard 3 skipped=6, shard 2 skipped=8). Final-tip results below.
+
 ## Research desk and investment audit — 2026-11-18
 
 LOCAL_ACCEPTED (bounded); not pushed. Branch `work/research-desk-2026-11-18`, worktree `F:/ALFRED_DEV/research-desk-1118`,

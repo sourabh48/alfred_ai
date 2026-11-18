@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from alfred_ai.services.currency import rupee_text
 from apps.expenses.models import BankAccount
@@ -28,7 +28,7 @@ class AskedAmountTests(SimpleTestCase):
 class AffordabilityAnswerTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.user = get_user_model().objects.create_user("afford-synthetic", rent_or_emi="20000")
+        self.user = get_user_model().objects.create_user("afford-synthetic", rent_or_emi="20000", country="India")
 
     def ask(self, text="Can I afford a 30000 rupee phone this month?", scope="general"):
         cache.clear()
@@ -46,8 +46,18 @@ class AffordabilityAnswerTests(TestCase):
         self.assertIn("below it", self.ask("can I afford a 1 lakh holiday?")["answer"])
         self.assertIn("more than that", self.ask("can I afford 2 lakh?", scope="finance")["answer"])
 
-    def test_a_balance_without_a_recorded_currency_asks_the_owner_to_set_it(self):
-        BankAccount.objects.create(user=self.user, account_number="SYN-2", current_balance="150000.00")  # legacy: currency not recorded
+    def test_an_unlabelled_balance_counts_as_rupees_for_an_owner_in_india_and_abroad_accounts_are_named(self):
+        BankAccount.objects.create(user=self.user, account_number="SYN-2", current_balance="150000.00")  # currency not recorded
+        BankAccount.objects.create(user=self.user, account_number="SYN-3", current_balance="2000.00", currency="USD")
         answer = self.ask()["answer"]
-        self.assertIn("set its currency to INR", answer)
-        self.assertNotIn("1,50,000", answer)  # FIN-15: a legacy balance is not shown as rupees here
+        self.assertIn("You hold ₹1,50,000 in your bank accounts", answer)
+        self.assertIn("You also hold USD 2000.00 in other currencies; that is not counted here", answer)
+
+    def test_an_unlabelled_balance_is_withheld_when_the_home_currency_is_unknown_or_not_inr(self):
+        BankAccount.objects.create(user=self.user, account_number="SYN-2", current_balance="150000.00")
+        for country, fix in (("", "Set your country in Settings"), ("Germany", "set its currency to INR")):
+            get_user_model().objects.filter(pk=self.user.pk).update(country=country); self.user.refresh_from_db()
+            with self.subTest(country=country), override_settings(TIME_ZONE="UTC"):
+                answer = self.ask()["answer"]
+                self.assertIn(fix, answer)
+                self.assertNotIn("1,50,000", answer)

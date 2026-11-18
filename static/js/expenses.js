@@ -674,7 +674,7 @@ function renderTimeline(timeline, meta = {}) {
                     <td>${badge(item.classification_label, classificationTone(item.classification))}</td>
                     <td>${badge(item.category_label, "light text-dark border")}</td>
                     <td>${escapeHtml(item.payment_mode || "BANK")}</td>
-                    <td class="text-end fw-semibold ${amountClass}">${item.direction === "credit" ? "+" : "-"}${formatCurrency(item.amount, item.currency)}${item.currency && item.currency !== "INR" ? `<div class="small text-warning-emphasis fw-normal" data-expense-currency>Kept out of rupee totals</div>` : ""}</td>
+                    <td class="text-end fw-semibold ${amountClass}">${item.direction === "credit" ? "+" : "-"}${formatCurrency(item.amount, item.currency)}${item.currency && item.currency !== "INR" ? `<div class="small text-warning-emphasis fw-normal" data-expense-currency>Kept out of rupee totals</div>` : ""}${item.approximate ? `<div class="small text-muted fw-normal" data-expense-approximate>${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "amount"))} at the ${Alfred.escapeHtml(item.approximate.rate_date)} rate</div>` : ""}</td>
                     <td>${escapeHtml(item.source_label)}</td>
                     <td class="text-muted small">${escapeHtml(item.description || item.raw_description || "")}</td>
                     <td class="text-end">

@@ -1,8 +1,8 @@
 """'Can I afford X?' answered from the canonical baseline every page uses, with no model arithmetic.
 
 The local model's money sums are not reliable, so this question gets a fixed, checkable answer instead.
-Cash is used only when every active account records INR (the FIN-15 rule baseline_source applies); otherwise
-the owner is told exactly what to record. Nothing is bought, moved or saved.
+Cash counts rupee accounts only (the FIN-15 rule baseline_source applies, with the owner's home currency for
+unlabelled rows); accounts in other currencies are named, not added. Otherwise the owner is told what to record. Nothing is bought, moved or saved.
 """
 import re
 from decimal import Decimal, ROUND_HALF_UP
@@ -39,13 +39,21 @@ def affordability_answer(user, query):
                  grounding="canonical_affordability", sources=[source], narrative_withheld=False, context_omitted=0,
                  memory_retrieval_available=None)
     if cash is None:
+        from alfred_ai.services.exchange_rates import home_currency
+        fix = ("Set your country in Settings so ALFRED knows which currency an unlabelled balance is in, "
+               "or open Spending, go to Bank accounts and set each account's currency" if home_currency(user)[0] is None else
+               "Open Spending, go to Bank accounts, check each balance and set its currency to INR")
         return reply | {"answer": "ALFRED cannot answer this yet, because it does not know your bank balance in rupees. "
-                        "Open Spending, go to Bank accounts, check each balance and set its currency to INR, then ask again."}
+                        f"{fix}, then ask again."}
     cash = Decimal(str(cash))
     base = resolve_canonical_financial_baseline(user)
     essentials = Decimal(str(base["decimal_amounts"].get("essential_monthly_outflow") or 0))
     known = (base["metric_states"].get("essential_monthly_outflow") or {}).get("status", "unavailable") != "unavailable"
     lines = [f"You hold {rupee_text(cash)} in your bank accounts [canonical-finance]."]
+    abroad = source["data"].get("other_currencies", {}).get("cash") or []
+    if abroad:
+        lines.append(f"You also hold {', '.join(row['currency'] + ' ' + row['amount'] for row in abroad)} in other currencies; "
+                     "that is not counted here, because exchange rates change and ALFRED does not convert your records.")
     if amount > cash:
         lines.append(f"{rupee_text(amount)} is more than that, so paying it now would need a loan or card debt.")
     elif known and essentials > 0:

@@ -37,8 +37,7 @@ def display_currency(user, accept_language: str = "") -> tuple[str, str]:
     chosen = getattr(user, "display_currency", None)
     if chosen in DISPLAY_CURRENCIES:
         return chosen, "chosen"
-    country = str(getattr(user, "country", "") or "").strip()
-    region = COUNTRY_NAMES.get(country.lower()) or (country.upper() if country.upper() in REGIONS else None)
+    region = _profile_region(user)
     if region:
         return REGIONS[region][1], "country"
     for tag in str(accept_language or "")[:200].split(","):
@@ -48,20 +47,69 @@ def display_currency(user, accept_language: str = "") -> tuple[str, str]:
     return RUPEE, "default"
 
 
-def rate_table():
-    """The newest stored ECB table, or None. Reads only: the background task fetches (native_exchange_rate_refresh)."""
+def _profile_region(user):
+    country = str(getattr(user, "country", "") or "").strip()
+    return COUNTRY_NAMES.get(country.lower()) or (country.upper() if country.upper() in REGIONS else None)
+
+
+def _zone_region(zone):
+    """The country of an IANA time zone, from the pinned tzdata zone table; None when unknown."""
+    try:
+        from importlib.resources import files
+        rows = files("tzdata").joinpath("zoneinfo/zone.tab").read_text(encoding="utf-8").splitlines()
+    except (ImportError, OSError, ValueError):
+        return None
+    # Asia/Calcutta is the old name some Windows mappings still give for Asia/Kolkata.
+    zone = {"Asia/Calcutta": "Asia/Kolkata"}.get(zone, zone)
+    return next((cols[0] for cols in (row.split("\t") for row in rows if not row.startswith("#"))
+                 if len(cols) > 2 and cols[2] == zone and cols[0] in REGIONS), None)
+
+
+def home_currency(user) -> tuple[str | None, str, str]:
+    """(currency, country name, why) the owner lives in: profile country, then this PC's time zone; (None, "", "unknown").
+
+    Owner decision 2026-11-18: a record with no currency is read in this currency. A recorded currency always wins,
+    so a salary paid abroad into a foreign account stays in that currency and is never added to home-currency sums.
+    """
+    from django.conf import settings
+
+    region, why = _profile_region(user), "your country in Settings"
+    if not region:
+        region, why = _zone_region(settings.TIME_ZONE), "this PC's time zone"
+    if not region:
+        return None, "", "unknown"
+    name, currency = REGIONS[region]
+    return currency, name, why
+
+
+def rate_table(on=None):
+    """The stored ECB table for a day (the newest business day on or before it), else the newest; None without one.
+
+    Reads only: the Exchange rates bot fetches. Rates change daily, so an amount from a past date uses that day's
+    table, and `stale` says the table is over a week older than the day asked for.
+    """
     from apps.integrations.models import VerifiedExternalInsight
 
-    record = (VerifiedExternalInsight.objects.filter(scope="fx", cache_key="ecb-daily", is_active=True)
-              .exclude(status__in=["failed", "rejected"]).order_by("-verified_at", "-id").first())
+    rows = VerifiedExternalInsight.objects.filter(is_active=True).exclude(status__in=["failed", "rejected"])
+    record = rows.filter(scope="fx", cache_key="ecb-daily").order_by("-verified_at", "-id").first()
+    table = _table(record)
+    day = on or timezone.localdate()
+    if on and (table is None or on < date.fromisoformat(table["date"])):
+        table = _table(rows.filter(scope="fx-history", cache_key__startswith="ecb:", cache_key__lte=f"ecb:{on.isoformat()}")
+                       .order_by("-cache_key").first())
+    if table:
+        table["stale"] = (day - date.fromisoformat(table["date"])).days > STALE_DAYS
+    return table
+
+
+def _table(record):
     payload = record.payload if record and isinstance(record.payload, dict) else {}
     try:
         rates = {code: Decimal(value) for code, value in payload["rates"].items()}
         rate_date = date.fromisoformat(payload["date"])
     except (KeyError, TypeError, ValueError, ArithmeticError, AttributeError):
         return None
-    return {"rates": rates, "date": rate_date.isoformat(), "source": record.source_name,
-            "stale": (timezone.localdate() - rate_date).days > STALE_DAYS}
+    return {"rates": rates, "date": rate_date.isoformat(), "source": record.source_name}
 
 
 def convert(amount, code, target: str, table) -> Decimal | None:
@@ -74,22 +122,32 @@ def convert(amount, code, target: str, table) -> Decimal | None:
     return (Decimal(str(amount)) * table["rates"][target] / table["rates"][code]).quantize(CENT, ROUND_HALF_UP)
 
 
-def approximate(request, groups, fields, totals=None, *, currency_key="currency"):
+def approximate(request, groups, fields, totals=None, *, currency_key="currency", date_key=None):
     """Add an `approximate` block in the viewer's currency to each group and sum `totals` across currencies.
 
     groups: dicts holding `currency_key` and the money `fields`. totals: name -> [(amount, code)].
     A total is None unless every part could be converted. Rates are read only when something differs.
+    date_key: a group's ISO date (a transaction's), converted at that day's rate; otherwise today's rate (balances).
     """
     target, basis = display_currency(request.user, request.META.get("HTTP_ACCEPT_LANGUAGE", ""))
     totals = totals or {}
     codes = {group.get(currency_key) or RUPEE for group in groups} | {code or RUPEE for parts in totals.values() for _, code in parts}
     table = rate_table() if codes - {target} else None
+    dated = {}
     out = []
     for group in groups:
-        values = {field: convert(group.get(field) or 0, group.get(currency_key), target, table) for field in fields}
         same = (group.get(currency_key) or RUPEE) == target
+        day = str(group.get(date_key) or "")[:10] if date_key and not same else ""
+        if day and day not in dated:
+            try:
+                dated[day] = rate_table(on=date.fromisoformat(day))
+            except ValueError:
+                dated[day] = None
+        used = dated[day] if day else table
+        values = {field: convert(group.get(field) or 0, group.get(currency_key), target, used) for field in fields}
         out.append({**group, "approximate": None if same or None in values.values()
-                    else {"currency": target, **{field: format(value, "f") for field, value in values.items()}}})
+                    else {"currency": target, **{field: format(value, "f") for field, value in values.items()},
+                          **({"rate_date": used["date"]} if day else {})}})
     combined = {}
     for name, parts in totals.items():
         converted = [convert(amount or 0, code, target, table) for amount, code in parts]

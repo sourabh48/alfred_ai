@@ -30,7 +30,8 @@ class CanonicalEvidenceTests(TestCase):
             ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'limits'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
             ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
         self.enterContext(_offline_fixture_patches())
-        self.owner=get_user_model().objects.create_user(username='canonical-owner',monthly_income='12345.67',rent_or_emi='123.45')
+        # Based outside India, so a record with no currency stays withheld from rupee sums (owner decision 2026-11-18).
+        self.owner=get_user_model().objects.create_user(username='canonical-owner',monthly_income='12345.67',rent_or_emi='123.45',country='Germany')
         self.other=get_user_model().objects.create_user(username='canonical-other')
         self.account=BankAccount.objects.create(user=self.owner,account_number='SYNTHETIC-ACCOUNT-ONLY',current_balance='987.65')
         self.expense=Expense.objects.create(user=self.owner,bank_account=self.account,amount='12.34',
@@ -162,17 +163,49 @@ class CanonicalEvidenceTests(TestCase):
         # One more active account without a recorded currency withholds cash again; EMI is unaffected.
         legacy=BankAccount.objects.create(user=self.owner,account_number='SYNTHETIC-LEGACY',current_balance='5.00')
         self.assertIsNone(amounts()['liquid_cash']['amount']); self.assertEqual(amounts()['recurring_emi_burden']['amount'],'100.01')
+        # An account recorded in another currency is listed on its own and never added to rupee cash.
         BankAccount.objects.filter(pk=legacy.pk).update(currency='USD')
-        self.assertIsNone(amounts()['liquid_cash']['amount'])
+        source=baseline_source(self.owner)
+        self.assertEqual(source['data']['amounts']['liquid_cash']['amount'],'987.65')
+        self.assertEqual(source['data']['other_currencies']['cash'],[{'currency':'USD','amount':'5.00'}])
+        self.assertIn('Not counted in rupee figures: USD 5.00 in accounts held in that currency; nothing is converted.',source['data']['limitations'])
         BankAccount.objects.filter(pk=legacy.pk).update(is_active=False)  # an inactive account does not count
-        self.assertEqual(amounts()['liquid_cash']['amount'],'987.65')
+        self.assertEqual(baseline_source(self.owner)['data']['other_currencies']['cash'],[])
         Loan.objects.create(user=self.owner,principal='1.00',emi='1.00',remaining_balance='1.00',interest_rate=1,tenure_months=1,
             start_date=date(2026,1,1),verification_status='confirmed',currency='USD')
+        source=baseline_source(self.owner)
+        self.assertEqual(source['data']['amounts']['recurring_emi_burden']['amount'],'100.01')
+        self.assertEqual(source['data']['other_currencies']['emi'],[{'currency':'USD','amount':'1.00'}])
+        Loan.objects.filter(pk=self.loan.pk).update(currency='USD')  # no rupee loan left: EMI is withheld, not zero
         self.assertIsNone(amounts()['recurring_emi_burden']['amount'])
         # Another owner's INR records never release this owner's figures.
         BankAccount.objects.filter(user=self.owner).update(currency=None)
         BankAccount.objects.create(user=self.other,account_number='SYNTHETIC-OTHER',current_balance='1.00',currency='INR')
         self.assertIsNone(amounts()['liquid_cash']['amount'])
+
+    def test_no_currency_is_read_in_the_home_currency_from_country_then_this_pcs_time_zone(self):
+        amounts=lambda: baseline_source(self.owner)['data']['amounts']
+        get_user_model().objects.filter(pk=self.owner.pk).update(country='India')
+        given=amounts()
+        self.assertEqual([(given[key]['amount'],given[key]['currency'],given[key]['currency_status']) for key in ('liquid_cash','recurring_emi_burden')],
+            [('987.65','INR','assumed_home'),('100.01','INR','assumed_home')])
+        self.assertIn('Records with no currency are read as INR because you are based in India (your country in Settings).',
+            baseline_source(self.owner)['data']['limitations'])
+        # A salary account abroad keeps its own currency, even for an owner based in India.
+        BankAccount.objects.create(user=self.owner,account_number='SYNTHETIC-SALARY-ABROAD',current_balance='2000.00',currency='USD')
+        source=baseline_source(self.owner)
+        self.assertEqual(source['data']['amounts']['liquid_cash']['amount'],'987.65')
+        self.assertEqual(source['data']['other_currencies']['cash'],[{'currency':'USD','amount':'2000.00'}])
+        # No country: this PC's time zone decides; an unknown zone withholds.
+        get_user_model().objects.filter(pk=self.owner.pk).update(country='')
+        for zone,expected in (('Asia/Kolkata','987.65'),('Asia/Calcutta','987.65'),('Europe/Berlin',None),('UTC',None)):
+            with self.subTest(zone=zone), override_settings(TIME_ZONE=zone):
+                self.assertEqual(amounts()['liquid_cash']['amount'],expected)
+        with override_settings(TIME_ZONE='UTC'):
+            self.assertIn('Records with no currency are withheld: set your country in Settings so ALFRED knows your home currency.',
+                baseline_source(self.owner)['data']['limitations'])
+        with override_settings(TIME_ZONE='Asia/Kolkata'):
+            self.assertIn("(this PC's time zone)",baseline_source(self.owner)['data']['limitations'][0])
 
     def test_baseline_totals_withheld_without_currency_and_uncached_user_reload(self):
         source=baseline_source(self.owner)

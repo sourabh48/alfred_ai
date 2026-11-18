@@ -444,6 +444,8 @@ class VerifiedIntelligenceService:
         )
 
     FX_SOURCE_URL = "https://api.frankfurter.dev/v1/latest?base=EUR"
+    FX_HISTORY_URL = "https://api.frankfurter.dev/v1/{start}..{end}?base=EUR"
+    FX_HISTORY_DAYS = 366
 
     def exchange_rates(self, *, force: bool = False) -> InsightResult:
         """ECB reference rates through Frankfurter; no user data is sent. A failed refresh keeps the last table."""
@@ -464,20 +466,76 @@ class VerifiedIntelligenceService:
                                       max_bytes=100_000, deadline=monotonic() + 8).json()
         if not isinstance(payload, dict) or payload.get("base") != "EUR" or not isinstance(payload.get("rates"), dict):
             raise ValueError("Exchange rate table has no EUR base.")
-        rate_date = date.fromisoformat(str(payload.get("date", "")))
+        rate_date, rates = self._checked_rates(payload.get("date", ""), payload["rates"])
+        return ({"base": "EUR", "date": rate_date.isoformat(), "rates": rates},
+                f"ECB reference rates for {rate_date.isoformat()} ({len(rates)} currencies).",
+                "Reference rates for display only; recorded amounts keep their own currency.")
+
+    @staticmethod
+    def _checked_rates(day, raw) -> tuple[date, dict]:
+        rate_date = date.fromisoformat(str(day))
         if rate_date > timezone.localdate() + timedelta(days=1):
             raise ValueError("Exchange rate table is dated in the future.")
+        if not isinstance(raw, dict):
+            raise ValueError("Exchange rate table has no rates.")
         rates = {"EUR": "1"}
-        for code, value in payload["rates"].items():
+        for code, value in raw.items():
             amount = Decimal(str(value)) if isinstance(value, (int, float, str)) and not isinstance(value, bool) else None
             if not (isinstance(code, str) and re.fullmatch(r"[A-Z]{3}", code) and amount is not None and amount.is_finite() and amount > 0):
                 raise ValueError("Exchange rate table has an invalid rate.")
             rates[code] = format(amount, "f")
         if "INR" not in rates:
             raise ValueError("Exchange rate table has no INR rate.")
-        return ({"base": "EUR", "date": rate_date.isoformat(), "rates": rates},
-                f"ECB reference rates for {rate_date.isoformat()} ({len(rates)} currencies).",
-                "Reference rates for display only; recorded amounts keep their own currency.")
+        return rate_date, rates
+
+    def exchange_rate_history(self) -> int:
+        """Keep one ECB table per business day (scope fx-history) so a past amount shows at its own day's rate.
+
+        Fetches only the days missing up to the newest daily table, a year on the first run, in one range request.
+        No user data is sent. Days are never overwritten, and cleanup_stale keeps them (they stay active).
+        Returns how many days were added.
+        """
+        from time import monotonic
+        from alfred_ai.services.exchange_rates import rate_table
+
+        newest = rate_table()
+        if not newest:
+            return 0
+        end = date.fromisoformat(newest["date"])
+        stored = set(VerifiedExternalInsight.objects.filter(scope="fx-history", is_active=True).values_list("cache_key", flat=True))
+        last = max(stored, default="")
+        if last >= f"ecb:{end.isoformat()}":
+            return 0
+        start = date.fromisoformat(last[4:]) + timedelta(days=1) if last else end - timedelta(days=self.FX_HISTORY_DAYS)
+        url = self.FX_HISTORY_URL.format(start=start.isoformat(), end=end.isoformat())
+        if self._circuit_is_open("fx-history", "ecb", self.FX_HISTORY_URL):
+            raise ValueError("Exchange rate history refresh is paused after repeated failures.")
+        try:
+            payload = public_http.request("GET", url, headers={"User-Agent": self.USER_AGENT},
+                                          max_bytes=1_500_000, deadline=monotonic() + 20).json()
+            if not isinstance(payload, dict) or payload.get("base") != "EUR" or not isinstance(payload.get("rates"), dict):
+                raise ValueError("Exchange rate history has no EUR base.")
+            days = [self._checked_rates(day, rates) for day, rates in payload["rates"].items()]
+        except Exception as exc:
+            error = safe_error_details(exc, "Exchange rate history refresh failed.", logger_name=__name__, field="error")
+            self._record_circuit_failure("fx-history", "ecb", self.FX_HISTORY_URL, error["error"])
+            raise
+        self._clear_circuit("fx-history", "ecb", self.FX_HISTORY_URL)
+        now = timezone.now()
+        rows = []
+        for rate_date, rates in days:
+            key = f"ecb:{rate_date.isoformat()}"
+            if key in stored or not start <= rate_date <= end:
+                continue
+            stored.add(key)
+            table = {"base": "EUR", "date": rate_date.isoformat(), "rates": rates}
+            rows.append(VerifiedExternalInsight(scope="fx-history", cache_key=key, title=f"ECB reference rates {rate_date.isoformat()}",
+                source_name="European Central Bank via Frankfurter", source_url=url, payload=table,
+                checksum=hashlib.sha256(json.dumps(table, sort_keys=True).encode("utf-8")).hexdigest(),
+                summary="Reference rates for display only; recorded amounts keep their own currency.",
+                status="fresh", fetched_at=now, verified_at=now, stale_after=now))
+        VerifiedExternalInsight.objects.bulk_create(rows)
+        return len(rows)
 
     def market_snapshot(self, stale_hours: int = 12, *, force: bool = False) -> InsightResult:
         def fetch():

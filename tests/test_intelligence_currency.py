@@ -18,7 +18,8 @@ class IntelligenceCurrencyTests(TestCase):
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-currency-synthetic-')))
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits')))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
-        self.user=get_user_model().objects.create_user(username='synthetic-currency-owner')
+        # Based outside India: the loan's missing currency stays unknown, so no rupee evidence exists (owner decision 2026-11-18).
+        self.user=get_user_model().objects.create_user(username='synthetic-currency-owner',country='Germany')
         self.store=MemoryStore(root/'vault'); self.local=Mock()
         self.loan=Loan.objects.create(user=self.user,loan_type='personal',lender='Synthetic currency lender',principal=100,
             remaining_balance=0,interest_rate=5,emi=10,tenure_months=10,start_date=date(2026,1,1))

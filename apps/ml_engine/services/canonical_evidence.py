@@ -1,5 +1,6 @@
 """Read-only individual financial records; unknown currencies never form new totals."""
 from datetime import date, datetime, time, timezone as datetime_timezone
+from decimal import Decimal
 from hashlib import sha256
 import json
 import re
@@ -360,25 +361,49 @@ def baseline_source(user):
     _owner(user)
     owner=get_object_or_404(get_user_model(),pk=user.pk)
     baseline=resolve_canonical_financial_baseline(owner,fresh=True)
+    from alfred_ai.services.exchange_rates import home_currency
+    home,place,why=home_currency(owner)
+    # Owner decision 2026-11-18: a record with no currency is read in the owner's home currency (country, else this PC's
+    # time zone). Sums here are rupees, so that applies only when home is INR; a recorded currency always wins.
+    rupee_status=lambda code: 'recorded' if code==RUPEE else 'assumed_home' if not code and home==RUPEE else None
+    unrecorded=(f'Records with no currency are read as INR because you are based in {place} ({why}).' if home==RUPEE else
+        f'Records with no currency are withheld: you are based in {place}, and these sums are in rupees.' if home else
+        'Records with no currency are withheld: set your country in Settings so ALFRED knows your home currency.')
     data=dict(record_type='baseline',record_id=owner.pk,applicable_date=timezone.localdate().isoformat(),
         provenance='resolve_canonical_financial_baseline (fresh)',verification='user_recorded',
-        limitations=['Legacy totals require approved matching currency evidence and are withheld.',
+        limitations=[unrecorded,
             'Reported income and housing are not independently verified.',
             *(['Recent salary credits disagree with the confirmed income.'] if baseline.get('income_conflict') else [])],amounts={},metric_states={})
-    # FIN-15: cash and EMI are given only when every active account or loan records INR itself; a legacy record with no
-    # currency keeps them withheld. Asset, liability and net-worth totals stay withheld: they include a labelled proxy.
-    recorded_inr=lambda rows: bool(rows) and all(currency==RUPEE for currency in rows)
-    in_rupees=dict(liquid_cash=recorded_inr(list(BankAccount.objects.filter(user=owner,is_active=True).values_list('currency',flat=True))),
-        recurring_emi_burden=recorded_inr(list(Loan.objects.filter(user=owner,is_active=True).values_list('currency',flat=True))))
+    # FIN-15: cash and EMI count rupee rows only (recorded INR, or no currency with an INR home). A row recorded in another
+    # currency, such as a salary account abroad, is listed in its own currency and never added or converted. A row with
+    # no currency and no INR home withholds the figure. Asset, liability and net-worth totals stay withheld (labelled proxy).
+    def in_rupees_status(rows):
+        states=[rupee_status(code) for code in rows]
+        if not any(states) or any(state is None and not code for code,state in zip(rows,states)): return None
+        return 'assumed_home' if 'assumed_home' in states else 'recorded'
+    def foreign(model,field):
+        totals={}
+        for code,amount in model.objects.filter(user=owner,is_active=True).exclude(currency__isnull=True).exclude(
+                currency__in=('',RUPEE)).values_list('currency',field):
+            totals[code]=totals.get(code,Decimal('0'))+Decimal(str(amount or 0))
+        return [dict(currency=code,amount=format(total.quantize(Decimal('0.01')),'f')) for code,total in sorted(totals.items())]
+    data['other_currencies']=dict(cash=foreign(BankAccount,'current_balance'),emi=foreign(Loan,'emi'))
+    data['limitations']+= [f"Not counted in rupee figures: {', '.join(f'{row['currency']} {row['amount']}' for row in rows)} {label}; nothing is converted."
+                           for rows,label in ((data['other_currencies']['cash'],'in accounts held in that currency'),
+                                              (data['other_currencies']['emi'],'of monthly EMIs on loans in that currency')) if rows]
+    in_rupees=dict(liquid_cash=in_rupees_status(list(BankAccount.objects.filter(user=owner,is_active=True).values_list('currency',flat=True))),
+        recurring_emi_burden=in_rupees_status(list(Loan.objects.filter(user=owner,is_active=True).values_list('currency',flat=True))),
+        rent_burden=rupee_status(owner.rent_currency),
+        monthly_income=rupee_status(owner.income_currency))
     for key in (*BASELINE_KEYS,'rent_burden'):
         state=baseline['metric_states'][key]
         supported=((key=='rent_burden' and owner.rupee_rent_or_emi==owner.rent_or_emi) or (key=='monthly_income' and baseline['income_source']=='reported_monthly_income'
             and owner.rupee_monthly_income>0 and baseline['decimal_amounts']['monthly_income']==format(profile_money(owner.rupee_monthly_income),'.2f'))
-            or in_rupees.get(key,False))
+            or (key in ('liquid_cash','recurring_emi_burden') and in_rupees[key] is not None))
         value=owner.rent_or_emi if key=='rent_burden' else baseline['decimal_amounts'].get(key)
         available=supported and state['status']!='unavailable'
         data['amounts'][key]=_amount(value if available else None,profile_money,state['status'],state['source'])
-        if available and in_rupees.get(key): data['amounts'][key].update(currency=RUPEE,currency_status='recorded')
+        if available and in_rupees.get(key): data['amounts'][key].update(currency=RUPEE,currency_status=in_rupees[key])
         data['amounts'][key]['limitation']=None if available else 'Unavailable or requires approved currency/source compatibility.'
         data['metric_states'][key]=dict(status=state['status'] if available else 'unavailable',source=state['source'])
         data[key]=float(value) if available else None

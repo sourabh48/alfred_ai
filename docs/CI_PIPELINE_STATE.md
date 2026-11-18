@@ -1,5 +1,12 @@
 # Development CI and integration pipeline
 
+## Non-finance walk-through branch — 2026-11-18
+
+LOCAL_TESTING. Branch `work/tracker-items-2026-11-18` on `5cc75db`; source tip `8680b05`; not pushed, no hosted CI, no
+PR. New backend label `tests.test_affordability_answer` is in the BACKEND list with a measured duration. Master is
+`1377eff`. A local fast-forward of master to the verified tip is authorized by the owner's "merge and restart"; pushing
+needs a separate OK, and the docs delta publishes to Pages and needs its own approval.
+
 ## Research desk branch — 2026-11-18
 
 LOCAL_TESTING. Branch `work/research-desk-2026-11-18` on base `45c3d89` (contains CI-verified `0dbad2a`); not pushed, no
