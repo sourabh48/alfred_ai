@@ -180,6 +180,42 @@ class ResearchPacketView(APIView):
         return Response(packet, headers={"Cache-Control": "no-store, private"})
 
 
+class ResearchDeskView(APIView):
+    """Owner request 2026-11-18: ALFRED researches by itself and suggests; the owner only accepts or rejects. Never trades."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def get(self, request):
+        from .services.research_desk import desk
+        return Response(desk(request.user), headers={"Cache-Control": "no-store, private"})
+
+    def post(self, request):
+        from .services import research_desk
+
+        data = request.data if isinstance(request.data, dict) else {}
+        operation, user = data.get("operation"), request.user
+        try:
+            if operation == "run":
+                result = research_desk.run_now(user)
+            elif operation == "accept":
+                result = research_desk.accept(user, data.get("id"))
+            elif operation == "reject":
+                result = research_desk.reject(user, data.get("id"))
+            elif operation == "watch_add":
+                result = research_desk.watch_add(user, data.get("symbol"))
+            elif operation == "watch_remove":
+                result = research_desk.watch_remove(user, str(data.get("symbol") or ""))
+            elif operation == "holdings" and isinstance(data.get("include"), bool):
+                result = research_desk.save_settings(user, include_holdings=data["include"])
+            else:
+                return Response({"detail": "Choose an action."}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except public_http.PublicHTTPError as exc:
+            return Response({"detail": f"Yahoo data is unavailable right now ({exc.code}). Try again later."}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response({"result": result, "desk": research_desk.desk(user)}, headers={"Cache-Control": "no-store, private"})
+
+
 class ResearchSearchHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 

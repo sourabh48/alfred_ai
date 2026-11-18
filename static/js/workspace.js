@@ -60,12 +60,20 @@ function styleCharts(dark) {
                 } else {
                     const c = color(i);
                     Object.assign(ds, { borderColor: c, backgroundColor: c + "26", pointBackgroundColor: c, pointBorderColor: surface,
-                        pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 7, borderWidth: 2, tension: ds.tension ?? 0.3 });
+                        pointBorderWidth: 2, pointRadius: ds.pointRadius ?? 4, pointHoverRadius: 7, borderWidth: 2, tension: ds.tension ?? 0.3 });
                 }
             });
         },
     });
-    Object.values(Chart.instances).forEach(chart => chart.update("none"));
+    // Charts already drawn keep their resolved axis colours, so repaint them for the new theme.
+    Object.values(Chart.instances).forEach(chart => {
+        Object.values(chart.options.scales || {}).forEach(scale => {
+            scale.ticks.color = ink; scale.grid.color = grid;
+            if (scale.pointLabels) scale.pointLabels.color = ink;
+            if (scale.angleLines) scale.angleLines.color = grid;
+        });
+        chart.update("none");
+    });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -285,6 +285,15 @@ def build_packet(symbol: str, fundamentals: dict, prices: dict, *, holding=None,
 def research_packet(symbol: str, *, holding=None, portfolio_total=None, refresh=False) -> dict:
     """Fetch (cached fifteen minutes) and build; raises ValueError for a bad symbol or when no dated data came back."""
     symbol = str(symbol or "").strip().upper()
+    data = research_data(symbol, refresh=refresh)
+    packet = build_packet(symbol, data["fundamentals"], data["prices"], holding=holding, portfolio_total=portfolio_total)
+    packet["retrieved_at"] = data.get("retrieved_at")
+    return packet
+
+
+def research_data(symbol: str, *, refresh=False) -> dict:
+    """{fundamentals, prices, retrieved_at} for one symbol, shared by the packet and the research desk."""
+    symbol = str(symbol or "").strip().upper()
     if len(symbol) > 20 or not SYMBOL.fullmatch(symbol):
         raise ValueError("Enter an exchange symbol such as INFY.NS or TCS.BO.")
     key = f"invest2-packet:{symbol}"
@@ -299,6 +308,4 @@ def research_packet(symbol: str, *, holding=None, portfolio_total=None, refresh=
             raise ValueError("No dated data came back for that symbol.")
         data = {"fundamentals": fundamentals, "prices": prices, "retrieved_at": timezone.now().isoformat()}
         cache.set(key, data, CACHE_SECONDS)
-    packet = build_packet(symbol, data["fundamentals"], data["prices"], holding=holding, portfolio_total=portfolio_total)
-    packet["retrieved_at"] = data.get("retrieved_at")
-    return packet
+    return data

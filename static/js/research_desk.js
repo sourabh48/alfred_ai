@@ -1,0 +1,135 @@
+/* Research desk: ALFRED researches by itself each day and suggests; the owner only accepts or rejects. Nothing is traded. */
+window.ResearchDesk = (() => {
+    const $ = id => document.getElementById(id), e = v => Alfred.escapeHtml(String(v ?? ""));
+    const URL = "/api/investments/research/desk/";
+    const charts = {};
+    let epoch = 0, state = null;
+    const tone = rating => ({ buy: "status-buy", overweight: "status-buy", hold: "status-neutral", underweight: "status-warn", sell: "status-bad" }[rating] || "");
+
+    function say(text, kind = "info") {
+        const box = $("researchDeskFeedback");
+        box.className = `alert alert-${kind} small mb-3`;
+        box.textContent = text;
+        box.hidden = !text;
+    }
+
+    function card(s) {
+        const list = (items, title) => items.length ? `<div class="col-md-6"><div class="fw-semibold small">${title}</div><ul class="small mb-2">${items.map(p =>
+            `<li>${e(p.point)} <span class="muted">(${e(p.as_of)})</span></li>`).join("")}</ul></div>` : "";
+        const ind = s.indicators || {};
+        const news = (s.news || []).length ? `<div class="small mb-2"><span class="fw-semibold">Headlines (not scored):</span><ul class="mb-0">${s.news.map(n =>
+            `<li><a href="${e(n.url)}" target="_blank" rel="noopener noreferrer">${e(n.title)}</a> <span class="muted">${e(n.source)} ${e(n.published)}</span></li>`).join("")}</ul></div>` : "";
+        return `<article class="mini-card" data-desk-card="${e(s.id)}">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div><div class="fw-semibold">${e(s.symbol)}${s.name !== s.symbol ? ` · ${e(s.name)}` : ""}${s.held ? ' <span class="muted small">(you own it)</span>' : ""}</div>
+                    <div class="small muted">${e(s.summary)} Last price ${e(s.currency || "")} ${e(Alfred.formatNumber(s.price, 2))} on ${e(s.price_as_of)}.</div></div>
+                <span class="status-pill ${tone(s.rating)}" data-desk-label>${e(s.label)}</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-primary" data-desk-accept="${e(s.id)}" aria-label="Accept: ${e(s.label)} ${e(s.symbol)}">Accept</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-desk-reject="${e(s.id)}" aria-label="Reject: ${e(s.label)} ${e(s.symbol)}">Reject</button>
+            </div>
+            <details class="mt-2" data-desk-details="${e(s.id)}"><summary class="small">Why, with charts</summary>
+                <ol class="small mt-2 mb-2">${s.steps.map(step => `<li><span class="fw-semibold">${e(step.role)}:</span> ${e(step.text)}</li>`).join("")}</ol>
+                <div class="row g-2">
+                    <div class="col-lg-7"><div class="small fw-semibold">Price over the past year, with its 50 and 200-day averages (${e(s.currency || "currency not recorded")})</div>
+                        <div class="chart-box"><canvas id="deskPrice-${e(s.id)}" aria-label="${e(s.symbol)} price and averages chart"></canvas></div></div>
+                    <div class="col-lg-5"><div class="small fw-semibold">Yearly revenue and profit (${e(s.charts.results.unit)})</div>
+                        <div class="chart-box"><canvas id="deskResults-${e(s.id)}" aria-label="${e(s.symbol)} revenue and profit chart"></canvas></div></div>
+                </div>
+                <p class="small mt-2 mb-1">RSI ${e(ind.rsi14 ?? "n/a")} · 50-day average ${e(ind.sma50 ?? "n/a")} · 200-day average ${e(ind.sma200 ?? "n/a")} · MACD histogram ${e(ind.macd_histogram ?? "n/a")}. ${e(s.valuation)}</p>
+                <div class="row g-2">${list(s.good, "Good signs")}${list(s.bad, "Warning signs")}</div>
+                ${news}
+                <ul class="small muted mb-1">${s.limits.map(l => `<li>${e(l)}</li>`).join("")}</ul>
+                <a class="small" href="${e(s.source_url)}" target="_blank" rel="noopener noreferrer">Source: Yahoo Finance</a>
+            </details>
+        </article>`;
+    }
+
+    function draw(id, canvasId, config) {
+        const canvas = $(canvasId);
+        if (canvas) charts[id + canvasId] = Alfred.renderChart(charts[id + canvasId], canvas, config);
+    }
+
+    function drawDetails(s) {
+        const p = s.charts.price, r = s.charts.results;
+        if (p) draw(s.id, `deskPrice-${s.id}`, { type: "line", data: { labels: p.labels, datasets: [
+            { label: "Close", data: p.close, pointRadius: 0 }, { label: "50-day average", data: p.sma50, pointRadius: 0 },
+            { label: "200-day average", data: p.sma200, pointRadius: 0, borderDash: [6, 4] }] },
+            options: { interaction: { mode: "index", intersect: false }, scales: { x: { ticks: { maxTicksLimit: 6 } } } } });
+        if (r.labels.length) draw(s.id, `deskResults-${s.id}`, { type: "bar", data: { labels: r.labels, datasets: [
+            { label: "Revenue", data: r.revenue }, { label: "Profit", data: r.profit }] } });
+        else $(`deskResults-${s.id}`)?.closest(".chart-box")?.replaceWith(Object.assign(document.createElement("p"), { className: "small muted", textContent: "No two dated years of results to draw." }));
+    }
+
+    function render(data) {
+        state = data;
+        Object.values(charts).forEach(chart => chart.destroy());
+        Object.keys(charts).forEach(key => delete charts[key]);
+        const run = data.last_run, suggestions = data.suggestions || [];
+        $("researchDeskStatus").textContent = run ? `Last researched ${Alfred.formatDateTime(run.at)}: ${run.researched} share(s) rated, ${run.skipped.length} skipped.`
+            : "Not researched yet. ALFRED researches by itself once a day after markets close; press Research now to start.";
+        $("researchDeskSkipped").innerHTML = run && run.skipped.length ? `<summary class="small">Skipped (${run.skipped.length})</summary><ul class="small mb-0">${run.skipped.map(item =>
+            `<li>${e(item.name)}: ${e(item.reason)}</li>`).join("")}</ul>` : "";
+        $("researchDeskSkipped").hidden = !(run && run.skipped.length);
+        $("researchDeskHoldings").checked = data.settings.include_holdings;
+        $("researchDeskWatch").innerHTML = data.settings.watch.map(item => `<span class="badge text-bg-light border me-1 mb-1">${e(item.symbol)}
+            <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-desk-remove="${e(item.symbol)}" aria-label="Remove ${e(item.symbol)} from the watch list">×</button></span>`).join("")
+            || '<span class="small muted">Empty. Add a symbol below.</span>';
+        $("researchDeskList").innerHTML = suggestions.map(card).join("") || '<p class="small muted mb-0">No open suggestions.</p>';
+        $("researchDeskAnswered").innerHTML = (data.answered || []).map(a => `<li>${e(a.symbol)}: ${e(a.label)} · ${a.state === "accepted" ? "accepted" : "rejected"} ${e(a.decided_at ? Alfred.formatDateTime(a.decided_at) : "")}</li>`).join("");
+        const overview = $("researchDeskOverview");
+        overview.closest(".chart-box").hidden = !suggestions.length;
+        if (suggestions.length) charts.overview = Alfred.renderChart(null, overview, { type: "bar",
+            data: { labels: suggestions.map(s => `${s.symbol}: ${s.label}`), datasets: [
+                { label: "Good signs", data: suggestions.map(s => s.good.length) }, { label: "Warning signs", data: suggestions.map(s => s.bad.length) }] },
+            options: { indexAxis: "y", scales: { x: { ticks: { precision: 0 } } } } });
+    }
+
+    async function load() {
+        const ticket = ++epoch;
+        try {
+            const data = await Alfred.fetchJSON(URL);
+            if (ticket === epoch) render(data);
+        } catch (error) { if (ticket === epoch) say(error.message, "danger"); }
+    }
+
+    async function act(body, button, done) {
+        if (button) button.disabled = true;
+        try {
+            const data = await Alfred.fetchJSON(URL, { method: "POST", body: JSON.stringify(body) });
+            render(data.desk);
+            say(done(data.result) || "", "success");
+            if (body.operation === "accept") document.dispatchEvent(new CustomEvent("research:changed"));
+        } catch (error) { say(error.message, "danger"); }
+        finally { if (button && button.isConnected) button.disabled = false; }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (!$("researchDeskSection")) return;
+        load();
+        $("researchDeskRun").addEventListener("click", event => {
+            say("Researching. This takes up to a minute.", "info");
+            act({ operation: "run" }, event.currentTarget, r => `Rated ${r.researched} share(s).`);
+        });
+        $("researchDeskHoldings").addEventListener("change", event => act({ operation: "holdings", include: event.currentTarget.checked }, null,
+            s => s.include_holdings ? "Your shares recorded by symbol are included from the next research." : "Your shares are left out from the next research."));
+        $("researchDeskAddForm").addEventListener("submit", event => {
+            event.preventDefault();
+            const input = $("researchDeskAdd");
+            act({ operation: "watch_add", symbol: input.value }, event.submitter, () => { input.value = ""; return "Added to the watch list."; });
+        });
+        document.getElementById("researchDeskSection").addEventListener("click", event => {
+            const accept = event.target.closest("[data-desk-accept]"), reject = event.target.closest("[data-desk-reject]"), remove = event.target.closest("[data-desk-remove]");
+            if (accept) act({ operation: "accept", id: accept.dataset.deskAccept }, accept, r => r.message);
+            if (reject) act({ operation: "reject", id: reject.dataset.deskReject }, reject, r => r.message);
+            if (remove) act({ operation: "watch_remove", symbol: remove.dataset.deskRemove }, remove, () => "Removed from the watch list.");
+        });
+        document.getElementById("researchDeskList").addEventListener("toggle", event => {
+            const id = event.target.dataset?.deskDetails, s = id && (state?.suggestions || []).find(item => item.id === id);
+            if (s && event.target.open) drawDetails(s);
+        }, true);
+        window.addEventListener("pagehide", () => { epoch++; });
+    });
+    return { load };
+})();

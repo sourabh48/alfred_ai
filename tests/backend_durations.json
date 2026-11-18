@@ -268,5 +268,6 @@
  "tests.test_assistant_web_lookup": 1.5,
  "tests.test_task_bots": 21.3,
  "tests.test_research_searches": 0.981,
+ "tests.test_research_desk": 3.0,
  "tests.test_travel_photos": 0.331
 }

@@ -574,6 +574,7 @@ function initResearchJournal() {
     form.addEventListener("submit", submitResearchDecision);
     form.elements.instrument.addEventListener("change", () => loadResearchLessons(form.elements.instrument.value));
     loadResearchDecisions();
+    document.addEventListener("research:changed", loadResearchDecisions);  // the research desk saved an accepted call
     document.getElementById("researchPacketForm")?.addEventListener("submit", loadResearchPacket);
 }
 

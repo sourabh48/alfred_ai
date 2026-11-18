@@ -587,6 +587,16 @@ h1, h2, h3, h4, h5, h6,
     color: #148f63;
 }
 
+/* Research desk calls: text colours chosen for at least 4.5:1 on their own tint, in both themes. */
+.status-buy { background: #e3f4ec; color: #0b6b49; }
+.status-neutral { background: #eceff4; color: #3f4d61; }
+.status-warn { background: #fdf0de; color: #8a4a00; }
+.status-bad { background: #fbe7e4; color: #a3352a; }
+html[data-theme="dark"] .status-buy { background: #123d30; color: #8fe0bf; }
+html[data-theme="dark"] .status-neutral { background: #253650; color: #d3dff0; }
+html[data-theme="dark"] .status-warn { background: #43300f; color: #ffcf8a; }
+html[data-theme="dark"] .status-bad { background: #46201c; color: #ffb4aa; }
+
 .status-high {
     background: rgba(196, 74, 61, 0.12);
     color: var(--alfred-danger);

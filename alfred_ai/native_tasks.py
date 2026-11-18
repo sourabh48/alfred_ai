@@ -103,12 +103,19 @@ def _task_bots():
     return run_scheduled()
 
 
+def _research_desk():
+    # Suggestions only; the owner accepts or rejects each one, and nothing is ever bought or sold.
+    from apps.investments.services.research_desk import run_scheduled
+    return run_scheduled()
+
+
 DAILY_JOBS = {
     "budget-publication-check": _budget_publication_check,
     "intelligence-cleanup": lambda: cleanup_verified_external_intelligence(retention_days=90),
     "private-memory-cleanup": _private_memory_cleanup,
     "nightly-training": lambda: run_global_training_cycle(),
     "task-bots": _task_bots,
+    "research-desk": _research_desk,
 }
 MISSED_AFTER = 25 * 3600  # A daily job with no success for this long missed its slot, usually because the PC was off.
 RETRY_AFTER = 3600
@@ -163,6 +170,11 @@ def native_daily_catch_up():
         except Exception as error:  # One failing job must not stop the others; it is retried after RETRY_AFTER.
             logger.warning("Daily job %s failed during catch-up (%s)", name, type(error).__name__)
     return {"status": "completed", "processed": len(ran)}
+
+
+@db_periodic_task(crontab(minute="0", hour="13"))  # after Indian markets close (UTC)
+def native_research_desk():
+    return _run_daily("research-desk")
 
 
 @db_periodic_task(crontab(minute="30"))  # every hour; see task_bots.NETWORK_BOTS for what stays daily

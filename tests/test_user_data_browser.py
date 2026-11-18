@@ -9194,6 +9194,43 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('investment-research-history')
         self.run_axe_light_dark('investment-research-history')
 
+    def test_research_desk_suggests_with_charts_and_the_owner_only_accepts(self):
+        from datetime import timedelta
+        from unittest.mock import patch
+        from django.utils import timezone
+        from apps.investments.models import Investment, ResearchDecision
+        from apps.investments.services import research_desk
+        from tests.test_research_packet import RISING, Y2, _fund, _prices
+        shift = timezone.localdate() - timedelta(days=180) - Y2
+        fund = {name: [(day + shift, amount, currency) for day, amount, currency in rows] for name, rows in _fund().items()}
+        prices = _prices(RISING); end = int(timezone.now().timestamp())
+        prices['timestamp'] = [end - (len(RISING) - 1 - i) * 86400 for i in range(len(RISING))]
+        owner = self.scenario['user']
+        research_desk.save_settings(owner, watch=[{'symbol': 'SYNTH.NS', 'name': 'Synthetic Co'}])
+        holdings = list(Investment.objects.filter(user=owner).values())
+        self.login()
+        self.enterContext(patch('apps.investments.services.research_packet.fetch_fundamentals', return_value=fund))
+        self.enterContext(patch('apps.investments.services.research_packet.fetch_prices', return_value=prices))
+        self.enterContext(patch.object(research_desk, 'headlines', return_value=[]))
+        self.enterContext(patch.object(research_desk, 'benchmark', return_value=None))
+        self.browser.get(self.live_server_url + '/investments/')
+        self.wait.until(lambda _: 'Not researched yet' in self.text('researchDeskStatus'))
+        self.memory_click('#researchDeskRun')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-desk-card]'))
+        self.assertEqual(self.text('researchDeskFeedback'), 'Rated 1 share(s).')
+        card = self.browser.find_element(self.By.CSS_SELECTOR, '[data-desk-card]')
+        self.assertIn('SYNTH.NS', card.text); self.assertIn('Buy a little', card.text)
+        self.browser.execute_script("document.querySelector('[data-desk-details]').open = true")
+        self.wait.until(lambda _: self.browser.execute_script(
+            "return Object.values(Chart.instances).filter(c => c.canvas.closest('[data-desk-card]')).length") == 2)
+        self.assertIn('Portfolio manager', card.text)
+        self.capture('research-desk-suggestion')
+        self.memory_click('[data-desk-accept]')
+        self.wait.until(lambda _: 'SYNTH.NS' in self.text('researchDecisionList') and 'No open suggestions' in self.text('researchDeskList'))
+        decision = ResearchDecision.objects.get(user=owner)
+        self.assertEqual((decision.instrument, decision.review_on - decision.decided_on), ('SYNTH.NS', timedelta(days=91)))
+        self.assertEqual(list(Investment.objects.filter(user=owner).values()), holdings)  # accepting never trades
+
     def test_research_packet_shows_dated_case_for_and_against_without_writing(self):
         from unittest.mock import patch
         from apps.investments.models import Investment, ResearchDecision
