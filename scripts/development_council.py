@@ -382,6 +382,44 @@ class Council:
             valid=valid and all(roles[role].get('actor') for role in required) and roles['developer']['actor']!=roles['reviewer']['actor']
         return bool(valid)
 
+    def _test_definition(self, task):
+        paths = {path for path in task['paths'] if path.startswith('tests/')}
+        paths.update('/'.join(label.split('.')[:2])+'.py' for label in task['labels'])
+        return sha256(json.dumps({path: release.sha256(self._path(path)) for path in sorted(paths)}, sort_keys=True).encode()).hexdigest()
+
+    def evaluate(self, identity):
+        """Compare actual test receipts; advice and a recovery never grant write authority."""
+        task = self._read(identity)
+        result = dict(status='INCONCLUSIVE', code='two_comparable_runs_required', task=identity,
+                      automatic_execution=False, production_authorized=False)
+        history = task.get('test_history', [])
+        if len(history) < 2: return result
+        before, after = history[-2:]
+        result.update(before_source=before.get('source'), after_source=after.get('source'))
+        try:
+            source, _ = self.snapshot(task, commit=task.get('commit'))
+            if source != after.get('source') or not self._reviews_valid(task, source):
+                raise CouncilError('current_host_reviews_required')
+            definition = self._test_definition(task)
+            if (before.get('test_definition') != definition or after.get('test_definition') != definition
+                    or before.get('source') == after.get('source')):
+                raise CouncilError('unchanged_tests_and_distinct_sources_required')
+            if any(type(row.get('tests')) is not int or row['tests'] <= 0 or row.get('skips') != 0
+                   or row.get('code') != 'suite_exit' for row in (before, after)) or before['tests'] != after['tests']:
+                raise CouncilError('comparable_executed_tests_required')
+            for row in (before, after):
+                log = self.directory / (identity+'-'+str(row['attempt'])) / 'tests.log'
+                if log.is_symlink() or not log.is_file() or release.sha256(log) != row.get('log_sha256'):
+                    raise CouncilError('test_receipt_missing_or_changed')
+            if before['status'] != 'FAIL' or after['status'] != 'PASS':
+                raise CouncilError('test_recovery_not_observed')
+        except (CouncilError, OSError, ValueError) as exc:
+            result['code'] = str(exc) if isinstance(exc, CouncilError) else 'test_evidence_unavailable'
+        else:
+            result.update(status='RECOVERY_OBSERVED', code='same_tests_failed_then_passed', tests=after['tests'],
+                          limitation='Scoped test recovery only; no general model-quality or performance claim.')
+        return result
+
     def test(self, identity):
         def claim(task):
             fingerprint,_ = self.snapshot(task)
@@ -392,7 +430,7 @@ class Council:
             self._retain_legacy_test(task)
             task['attempts'] += 1; task['stage']='TESTING'
             task['roles']['tester']=dict(status='RUNNING',source=fingerprint,started=int(time.time()))
-            task.setdefault('test_history',[]).append(dict(attempt=task['attempts'],source=fingerprint,status='RUNNING',started=int(time.time())))
+            task.setdefault('test_history',[]).append(dict(attempt=task['attempts'],source=fingerprint,status='RUNNING',started=int(time.time()),test_definition=self._test_definition(task)))
         task=self._change(identity,claim)
         deadline=time.monotonic()+task['budgets']['seconds']
         out=self.directory/(identity+'-'+str(task['attempts'])); out.mkdir()
@@ -549,6 +587,8 @@ class Council:
             for advice in task.get('advisories',[]):
                 rows.append('<p>'+escape(advice['role']+': '+advice['status']+'; '+advice.get('code','legacy_unclassified')+'; signals: '+', '.join(advice['signals']))+'</p>')
                 for step in advice.get('steps',[]): rows.append('<p>Proposal only, host action required: '+escape(step['action']+' '+step['path'])+'</p>')
+            evaluation=self.evaluate(task['id'])
+            rows.append('<p>Improvement experiment: '+escape(evaluation['status']+' / '+evaluation['code'])+'. Scoped test evidence only; no automatic edits, approval or deployment.</p>')
             blockers=[role+': '+result['status']+' ('+result.get('code',', '.join(result.get('codes',[])))+')' for role,result in task['roles'].items() if result['status']!='PASS']
             rows.append('<p>Required-role blockers: '+escape('; '.join(blockers) or 'none')+'</p>')
             if task.get('commit'): rows.append('<p>Verified host commit: '+escape(task['commit'])+'</p>')
@@ -564,7 +604,7 @@ class Council:
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command',choices=('plan','handoff','inspect','record','test','advise','resume','complete','status'))
+    parser.add_argument('command',choices=('plan','handoff','inspect','record','test','advise','resume','complete','evaluate','status'))
     parser.add_argument('--repo',type=Path,default=Path.cwd()); parser.add_argument('--task')
     parser.add_argument('--path',action='append',default=[]); parser.add_argument('--label',action='append',default=[])
     parser.add_argument('--feature'); parser.add_argument('--profile',default='backend'); parser.add_argument('--role')
@@ -586,6 +626,7 @@ def main(argv=None):
             except CouncilError as exc:
                 if str(exc)=='host_review_budget_exhausted': council.status(args.task)
                 raise
+        elif args.command=='evaluate': result=council.evaluate(args.task)
         elif args.command=='test': result=council.test(args.task)
         elif args.command=='resume': result=council.resume(args.task,confirm_worker_stopped=args.confirm_worker_stopped)
         elif args.command=='complete': result=council.complete(args.task,args.commit,args.authorization_reference)

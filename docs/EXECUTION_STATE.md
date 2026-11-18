@@ -49,6 +49,15 @@ MERGED locally (owner "merge and restart - ok"): database copied first with the 
 `F:/ALFRED/restored-runtime/backups/before-migrations-investments0011-20261118` (integrity ok, 78 tables, at
 investments 0009); master fast-forwarded to `8d368f4`; app restarted, investments 0010/0011 applied, health ready.
 Not pushed; no hosted CI on this tip. Owner checks still open: docs/OWNER_CHECKS_2026-11-18.md.
+Owner "merge all code to master" (2026-11-18): every branch was compared with master's content. Already in master
+(often reworked): seven notice bots, fund price rules, Google hotel links, default-deny web lookup, chart theme repaint,
+deadline test fix, Scrapling and PR #22 docs. Not merged on purpose: `357360e` (AWS cloud-agent instructions, against
+the no-cloud rule), `6f33b6d` (Wikivoyage stays, against the Travel Google-only decision), `8fa63b9` (unfinished WIP),
+`work/alfred3-research-2026-11-18` (ALFRED 3.0 planning docs; its own decision is to wait for the 2.0 release gates).
+Merged: the uncommitted work in `F:/ALFRED_DEV/remaining-capabilities-1118` (left in place there): the Career mock
+interview stops microphone and speech when the page closes or a new round starts, and the Development Council gains
+`evaluate` (the same tests failed then passed; advice only). tests.test_development_council 47 OK; 19 Career Chrome
+tests OK.
 
 ## Research desk and investment audit — 2026-11-18
 

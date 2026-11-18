@@ -5443,6 +5443,53 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').get_attribute('data-checked-on') == today.isoformat())
         self.assertFalse(self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').is_displayed())
 
+    def test_career_mock_interview_discards_late_voice_and_feedback(self):
+        from tests.test_career_matching_acceptance import offline_career
+        offline_career(self)
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRoot'))
+        result = self.browser.execute_async_script("""
+            const done = arguments[0], original = {...AlfredVoice}, fetch = Alfred.fetchJSON;
+            const form = document.createElement('form'); document.body.append(form);
+            const practice = {round_type:'technical', questions:[
+                {question:'First synthetic question?',origin:'practice'},
+                {question:'Second synthetic question?',origin:'practice'}]};
+            let stopped = 0, spoken = [], resolveStatus, resolveFeedback, resolveVoice;
+            const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+            const start = () => runCareerMockInterview({id:1}, practice, form, () => {});
+            (async () => {
+                AlfredVoice.stop = () => { stopped++; };
+                AlfredVoice.stopSpeaking = () => {};
+                AlfredVoice.speak = async text => { spoken.push(text); };
+                AlfredVoice.status = () => new Promise(resolve => { resolveStatus = resolve; });
+                start(); document.getElementById('careerMockEnd').click();
+                resolveStatus({speak:true, listen:true}); await tick();
+                const afterEnd = spoken.length;
+                AlfredVoice.status = async () => ({speak:false, listen:true});
+                start(); await tick();
+                AlfredVoice.listen = () => new Promise(resolve => { resolveVoice = resolve; });
+                document.getElementById('careerMockSpeak').click();
+                const beforeSkip = stopped;
+                document.getElementById('careerMockSkip').click();
+                const stoppedOnSkip = stopped > beforeSkip;
+                resolveVoice('Late answer for first question'); await tick();
+                const nextAnswer = document.getElementById('careerMockAnswer').value;
+                Alfred.fetchJSON = () => new Promise(resolve => { resolveFeedback = resolve; });
+                document.getElementById('careerMockAnswer').value = 'Synthetic reviewed answer';
+                document.getElementById('careerMockNext').click();
+                const voiceDisabled = document.getElementById('careerMockSpeak').disabled;
+                document.getElementById('careerMockEnd').click();
+                AlfredVoice.status = async () => ({speak:true, listen:true});
+                resolveFeedback({available:true, works:'Old feedback', improve:'Old suggestion', basis:'synthetic'});
+                await tick(); await tick();
+                done({afterEnd, stoppedOnSkip, nextAnswer, voiceDisabled, lateSpeech:spoken.length});
+            })().catch(error => done({error:String(error)})).finally(() => {
+                for (const key of ['status','stop','stopSpeaking','speak','listen']) AlfredVoice[key] = original[key];
+                Alfred.fetchJSON = fetch; form.remove();
+            });
+        """)
+        self.assertEqual(result, dict(afterEnd=0, stoppedOnSkip=True, nextAnswer='', voiceDisabled=True, lateSpeech=0))
+
     def test_career_application_kit_triage_drafts_and_offer_reading(self):
         from selenium.webdriver.support.ui import Select
         from apps.career.models import CareerJobAnalysis, CareerResume

@@ -49,6 +49,82 @@ class DevelopmentCouncilTests(SimpleTestCase):
         with patch('scripts.development_council.run',return_value=dict(status='PASS',code='suite_exit',tests=1,skips=0)):
             return self.council.test(task['id'])
 
+    def recovery_experiment(self):
+        task = self.reviewed()
+        def execute(repo, command, env, out, name, timeout):
+            number = self.council._read(task['id'])['attempts']
+            log = out/'tests.log'; log.write_text('synthetic run '+str(number), encoding='utf-8')
+            return dict(status='FAIL' if number == 1 else 'PASS', code='suite_exit', tests=1, skips=0,
+                        log=log.name, log_sha256=release.sha256(log))
+        with patch('scripts.development_council.run', side_effect=execute):
+            self.council.test(task['id'])
+            (self.repo/'apps/sample.py').write_text('VALUE = 3\n', encoding='utf-8')
+            source = self.council.snapshot(task)[0]
+            for role in ('architect','developer','reviewer','security'):
+                self.council.record(task['id'], role, 'PASS', source, actor='synthetic_'+role)
+            self.council.test(task['id'])
+        return task['id']
+
+    def test_improvement_compares_retained_runs_without_auto_approval(self):
+        identity = self.recovery_experiment()
+        previous = self.council._read(identity)
+        result = self.council.evaluate(identity)
+        self.assertEqual(result['status'], 'RECOVERY_OBSERVED')
+        self.assertNotEqual(result['before_source'], result['after_source'])
+        self.assertFalse(result['automatic_execution']); self.assertFalse(result['production_authorized'])
+        self.assertEqual(self.council._read(identity), previous)
+        self.assertEqual(Council(self.repo).evaluate(identity), result)
+        self.council.status(identity)
+        self.assertIn('RECOVERY_OBSERVED', (self.council.directory/'status.html').read_text())
+        with self.assertRaisesRegex(CouncilError, 'repeated_failure_budget_exhausted'):
+            self.council.test(identity)
+
+    def test_improvement_refuses_stale_reviews_changed_tests_and_missing_receipts(self):
+        identity = self.recovery_experiment()
+        original = self.council._read(identity)
+        for key, value, code in (
+            ('test_definition', 'changed', 'unchanged_tests_and_distinct_sources_required'),
+            ('tests', 2, 'comparable_executed_tests_required'),
+            ('skips', 1, 'comparable_executed_tests_required'),
+            ('status', 'PASS', 'test_recovery_not_observed'),
+            ('log_sha256', 'changed', 'test_receipt_missing_or_changed')):
+            with self.subTest(key=key):
+                self.council._change(identity, lambda task: task['test_history'][0].update({key:value}))
+                self.assertEqual(self.council.evaluate(identity)['code'], code)
+                self.council._change(identity, lambda task: task.update(test_history=json.loads(json.dumps(original['test_history']))))
+        (self.repo/'apps/sample.py').write_text('VALUE = 4\n', encoding='utf-8')
+        self.assertEqual(self.council.evaluate(identity)['code'], 'current_host_reviews_required')
+
+    def test_improvement_uses_real_isolated_runner_before_and_after_fix(self):
+        (self.repo/'manage.py').write_text(
+            'import runpy, unittest\n'
+            'scope = runpy.run_path("tests/test_council_fixture.py")\n'
+            'suite = unittest.defaultTestLoader.loadTestsFromTestCase(scope["Regression"])\n'
+            'result = unittest.TextTestRunner().run(suite)\n'
+            'raise SystemExit(0 if result.wasSuccessful() else 1)\n', encoding='utf-8')
+        (self.repo/'tests/test_council_fixture.py').write_text(
+            'import runpy, unittest\n'
+            'class Regression(unittest.TestCase):\n'
+            '    def test_value(self):\n'
+            '        self.assertEqual(runpy.run_path("apps/sample.py")["VALUE"], 3)\n', encoding='utf-8')
+        self.git('add', '.'); self.git('commit', '-m', 'synthetic regression fixture')
+        task = self.reviewed(); identity = task['id']
+        self.assertEqual(self.council.test(identity)['roles']['tester']['status'], 'FAIL')
+        (self.repo/'apps/sample.py').write_text('VALUE = 3\n', encoding='utf-8')
+        source = self.council.snapshot(task)[0]
+        for role in ('architect','developer','reviewer','security'):
+            self.council.record(identity, role, 'PASS', source, actor='synthetic_'+role)
+        self.assertEqual(self.council.test(identity)['roles']['tester']['status'], 'PASS')
+        self.assertEqual(self.council.evaluate(identity)['status'], 'RECOVERY_OBSERVED')
+        with redirect_stdout(StringIO()) as output:
+            self.assertEqual(main(['evaluate', '--repo', str(self.repo), '--task', identity]), 0)
+        self.assertEqual(json.loads(output.getvalue())['status'], 'RECOVERY_OBSERVED')
+        self.assertEqual(self.git('log', '-1', '--format=%s'), 'synthetic regression fixture')
+
+    def test_improvement_does_not_promote_one_passing_run(self):
+        task = self.passing()
+        self.assertEqual(self.council.evaluate(task['id'])['status'], 'INCONCLUSIVE')
+
     def test_host_cycle_resume_exact_commit_and_safe_html(self):
         task=self.passing(); council=Council(self.repo)
         self.assertEqual(council._read(task['id'])['stage'],'READY_FOR_AUTHORIZED_COMMIT')

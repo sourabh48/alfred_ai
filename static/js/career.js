@@ -1,4 +1,6 @@
 let salaryChart;
+let stopCareerMockInterview = () => {};
+window.addEventListener("pagehide", () => stopCareerMockInterview());
 let careerSimulationBaseline = null;
 let careerOpeningFilters = { country: "", state: "" };
 let careerOpportunities = [];
@@ -1258,6 +1260,7 @@ function renderCareerInterviewNotes(item, host) {
             .catch(error => showCareerFeedback("careerNotesFeedback", error.message, "danger"));
     });
     document.getElementById("careerPracticeStart").addEventListener("click", () => {
+        stopCareerMockInterview();
         const round = value("careerPracticeRound");
         Alfred.fetchJSON(`${guideUrl}?round=${encodeURIComponent(round)}`).then(data => {
             const practice = data.practice, form = document.getElementById("careerPracticeForm");
@@ -1296,12 +1299,16 @@ function renderCareerInterviewNotes(item, host) {
 
 // CAREER-07 mock interview: one question at a time, spoken and heard on this PC (voice.js), with local-AI comments after each answer.
 function runCareerMockInterview(item, practice, form, send) {
+    stopCareerMockInterview();
+    if (!form?.isConnected) return;
     const e = Alfred.escapeHtml, turns = [], total = practice.questions.length;
-    let index = 0;
-    AlfredVoice.stopSpeaking();
+    let index = 0, active = true;
+    const stopVoice = () => { AlfredVoice.stop(); AlfredVoice.stopSpeaking(); };
+    stopCareerMockInterview = () => { active = false; stopVoice(); };
+    stopVoice();
     form.onsubmit = event => event.preventDefault();
     const finish = () => {
-        AlfredVoice.stopSpeaking();
+        stopCareerMockInterview();
         form.innerHTML = turns.length
             ? `<p class="small mb-2" role="status">Mock interview finished: you answered ${turns.length} of ${total}. Save it to keep your answers and the checks against your CV.</p>
                <button class="btn btn-primary btn-sm" type="submit" id="careerMockSave">Save this practice round</button>`
@@ -1309,6 +1316,7 @@ function runCareerMockInterview(item, practice, form, send) {
         form.onsubmit = event => { event.preventDefault(); send({action: "add", kind: "practice", item: {round_type: practice.round_type, turns}}); };
     };
     const show = () => {
+        stopVoice();
         if (index >= total) { finish(); return; }
         const row = practice.questions[index];
         form.innerHTML = `<p class="small muted mb-1">Question ${index + 1} of ${total} · ${e(row.origin)}</p>
@@ -1324,20 +1332,26 @@ function runCareerMockInterview(item, practice, form, send) {
             <div class="small mt-2" id="careerMockFeedback" aria-live="polite"></div>`;
         const answer = document.getElementById("careerMockAnswer"), out = document.getElementById("careerMockFeedback");
         const voice = document.getElementById("careerMockSpeak"), next = document.getElementById("careerMockNext");
+        const current = () => active && form.isConnected && form.contains(answer);
         AlfredVoice.status().then(state => {
+            if (!current() || answer.readOnly) return;
             if (state.speak) AlfredVoice.speak(row.question).catch(() => {});
             voice.hidden = !state.listen || !navigator.mediaDevices?.getUserMedia;
         });
         voice.addEventListener("click", async () => {
+            if (!current() || answer.readOnly) return;
             if (AlfredVoice.listening) { AlfredVoice.stop(); return; }
             voice.textContent = "Stop listening"; voice.setAttribute("aria-pressed", "true");
             try {
                 const text = await AlfredVoice.listen(stage => {
+                    if (!current() || answer.readOnly) { AlfredVoice.stop(); return; }
                     out.textContent = stage === "listening" ? "Listening. Answer as you would in the room; ALFRED stops when you pause." : "Turning your speech into text on this PC.";
                 });
+                if (!current() || answer.readOnly) return;
                 if (text) answer.value = [answer.value.trim(), text].filter(Boolean).join(" ");
                 out.textContent = text ? "Check the text, then press Done." : "No speech was heard.";
             } catch (error) {
+                if (!current() || answer.readOnly) return;
                 out.textContent = error.name === "NotAllowedError" ? "Microphone access was not allowed." : error instanceof DOMException ? "The microphone could not start." : error.message;
             } finally { voice.textContent = "Answer by voice"; voice.setAttribute("aria-pressed", "false"); }
         });
@@ -1347,16 +1361,19 @@ function runCareerMockInterview(item, practice, form, send) {
             const text = answer.value.trim();
             if (!text) { out.textContent = "Answer first, or press Skip."; return; }
             turns.push({question: row.question, answer: text, rating: ""});
-            next.disabled = true; answer.readOnly = true;
+            stopVoice();
+            next.disabled = true; answer.readOnly = true; voice.disabled = true;
             out.textContent = "Asking your local model...";
             Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/practice-feedback/`, {method: "POST", body: JSON.stringify({question: row.question, answer: text, round_type: practice.round_type})})
                 .then(data => {
+                    if (!current()) return;
                     out.innerHTML = data.available ? `<p class="mb-1"><strong>Works:</strong> ${e(data.works)}</p><p class="mb-1"><strong>Improve:</strong> ${e(data.improve)}</p><p class="muted mb-0">${e(data.basis)}</p>`
                         : `<p class="mb-0">${e(data.issues.join(" "))}</p>`;
-                    if (data.available) AlfredVoice.status().then(state => state.speak && AlfredVoice.speak(`What worked: ${data.works} To improve: ${data.improve}`).catch(() => {}));
+                    if (data.available) AlfredVoice.status().then(state => current() && state.speak && AlfredVoice.speak(`What worked: ${data.works} To improve: ${data.improve}`).catch(() => {}));
                 })
-                .catch(error => { out.innerHTML = `<p class="mb-0">${e(error.message)} Your answer is kept; carry on.</p>`; })
+                .catch(error => { if (current()) out.innerHTML = `<p class="mb-0">${e(error.message)} Your answer is kept; carry on.</p>`; })
                 .finally(() => {
+                    if (!current()) return;
                     next.textContent = index + 1 < total ? "Next question" : "Finish";
                     next.disabled = false;
                     next.onclick = () => { index++; show(); };
@@ -1367,6 +1384,7 @@ function runCareerMockInterview(item, practice, form, send) {
 }
 
 function renderCareerOutcomeForm(item) {
+    stopCareerMockInterview();
     renderCareerApplication(item);
     renderCareerInterviewPrep(item);
     renderCareerApplicationKit(item);
