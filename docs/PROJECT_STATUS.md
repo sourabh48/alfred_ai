@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 89/143 (62.2%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 2 | COMPLETE_VERIFIED: 89 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 89 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -823,7 +823,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | TRAVEL | 12 | 23 | 52.2 | 2 | 5 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
-| COUNCIL | 0 | 5 | 0.0 | 1 | 3 | 1 | 0 | 0 |
+| COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 2 | 0 | 2 | 0 |
 | RUNTIME | 11 | 16 | 68.8 | 2 | 1 | 0 | 2 | 0 |
@@ -2357,6 +2357,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Pinned gpt-4.1-mini-2025-04-14 is deprecated; documented retirement 2027-01-14. Verified $0.40/$1.60 per million still matches code. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Select/test replacement with current official rates before enabling; no silent model switch.
 - SCOPED_INSPECTION 2026-11-06: OpenAI stays OFF by the owner's decision and no call is made. The pinned model retires 2027-01-14; choosing a replacement and re-checking rates waits until the owner approves enabling OpenAI.
+- 2026-11-19 official pages read (no API call): [deprecations](https://developers.openai.com/api/docs/deprecations) lists `gpt-4.1-mini-2025-04-14` shutdown 2027-01-14 (notice 2026-10-14) with recommended replacement `gpt-6-luna`; [pricing](https://developers.openai.com/api/docs/pricing) standard short-context rates per 1M tokens: `gpt-6-luna` $0.10 input / $0.50 output / $0.01 cached, `gpt-4.1-mini` still listed at $0.40 / $1.60 / $0.10. No dated `gpt-6-luna` snapshot is listed. The code stays on the pinned model until the owner chooses; no silent switch.
 
 ### OPENAI-03 — Encrypted key provisioning and owner consent
 
@@ -2433,7 +2434,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Synthetic S3 server only; no real account acceptance.
 - Limitations/dependencies: AWS endpoint/account ownership restrictions; not arbitrary Azure/Drive/S3-compatible endpoint support. IAM/account unselected. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: AWS is permanently withdrawn, not a deliverable. Non-AWS replacement adapter remains unimplemented; R2 is a candidate, not approved/configured/live-tested.
+- Next: AWS is permanently withdrawn, not a deliverable. The Cloudflare R2 adapter was built 2026-11-06 (below); live use waits for the owner's free R2 bucket and bucket-scoped token in the data folder `config/local.env`, then one live sync check. (Corrected 2026-11-19: this line previously said the adapter was unimplemented.)
 - Owner decision 2026-11-06: cloud sync approved. Build an S3-compatible non-AWS adapter with client-side encryption; test against a synthetic local server only. Live use waits for a free-tier account and keys the owner creates and enters in `config/local.env` inside the app's data folder; no paid plan.
 - 2026-11-06 implementation: Cloudflare R2 provider `R2MemoryProvider` (S3 Signature V4, region `auto`, endpoint built only from the account id, conditional writes for immutable snapshots and the head compare-and-swap). Active only with `ALFRED_MEMORY_SYNC_PROVIDER=r2`, `ALFRED_MEMORY_CLOUD_AUTHORIZED=true` and a valid R2 profile; off by default. [tests/test_memory_r2.py](../tests/test_memory_r2.py) (6 tests, synthetic signed server): only ciphertext is stored, a second store restores, refusals and outages keep local data and leak no secret, head races conflict, pruning stays owner-scoped. Related suites 339 PASS locally. Not live-tested: no R2 account exists yet.
 
@@ -2699,6 +2700,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Link-outs exist; no live bus booking/inventory adapter is demonstrated. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Confirm approved provider before building live integration.
 - Owner decision 2026-11-06: owner left the choice to Claude; kept deferred. Indian bus inventory needs a partner contract (no free official source) and live booking stays off, so links to verified bus websites remain.
+- 2026-11-19: still no approved provider. TBO is business-to-business for registered travel agencies, with separate API access, KYC and a deposit; the owner applies themselves if wanted. Aeronfly offers flights only (no bus) and states no eligibility or pricing; flights stay on Duffel. ALFRED keeps honest links to verified bus websites and presents no fixture as a live fare or seat.
 
 ### TRAVEL-15 — Live permits and road closure confirmation
 
@@ -3093,14 +3095,14 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### COUNCIL-03 — Experimental self-improvement engine
 
-**NOT_IMPLEMENTED** · AI Council and developer intelligence · P1.
+**IMPLEMENTED_NOT_ACCEPTED** · AI Council and developer intelligence · P1.
 
-- Source: [apps/ml_engine/core/alfred_registry.py](../apps/ml_engine/core/alfred_registry.py), [apps/ml_engine/self_improve/advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py).
-- APIs/UI/models: ML runtime status; no routed self-improvement/coding-council API; AdaptiveModelState/AdaptiveTrainingRun; Codex skills are tools outside the application.
-- Tests: [tests/test_ml_readiness.py](../tests/test_ml_readiness.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: advanced_engine imports absent patch_generator; SelfImproveAPI is not routed. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Unsafe experimental self-editing prototype retired by M17. Retirement is not delivery of a safe human-approved AI Council; no autonomous production code writes.
+- Source: [development Council](../scripts/development_council.py) (`plan --improvement`, `evaluate`, `complete`); the retired prototype [advanced_engine.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/self_improve/advanced_engine.py) stays retired.
+- APIs/UI/models: operator CLI only; no routed self-improvement API and no autonomous production code writes. An improvement task is proposed with `plan --improvement`, reviewed through the existing host reviews, compared by `evaluate` (the same pinned tests must be seen failing on the base and passing on the change) and completed only with the owner's authorization reference for the exact commit.
+- Tests: [Council contracts](../tests/test_development_council.py): `test_improvement_task_is_committed_only_after_an_observed_recovery`, `test_improvement_task_with_a_recovery_completes_and_keeps_the_comparison`, plus the existing recovery-experiment, budget and approval contracts.
+- Acceptance: PENDING. 2026-11-19 (sprint commit f153a39): proposal → reviewed change → test comparison → authorized commit flow is enforced; `complete` refuses an improvement task with `test_recovery_required` unless the comparison is RECOVERY_OBSERVED, and the accepted task keeps the comparison. Synthetic repositories only; no real improvement cycle has been run and accepted by the owner.
+- Limitations/dependencies: depends on COUNCIL-05 (partial). The comparison proves the named tests moved from failing to passing on that exact commit, not that the change is a product improvement. Paid Council providers remain unapproved.
+- Next: one owner-approved real improvement cycle through the CLI, then owner acceptance.
 
 ### COUNCIL-04 — Persistent tasks, conflicts and usage-limit recovery
 
@@ -3266,6 +3268,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: M20 publish approved CI changes and verify actual remote checks.
 - SCOPED_INSPECTION 2026-11-06: the Browser Regression workflow runs on every master push (Linux secure-failure, four measured Windows backend shards, three measured Selenium shards); results are read through the public GitHub API, for example run 42141398727 at 1a36f53. Branch protection and rulesets need signed-in GitHub access, which this machine lacks (gh is not installed).
 - 2026-11-12 (owner approved): repository ruleset 27070437 "Protect master" is active on the default branch with two rules, deletion and non_fast_forward, and no bypass actors; read back through the public rulesets API. Before it, master had no classic protection and no ruleset. Actions settings read: default workflow token read-only, first-time contributor approval on, actions not SHA-pinned. Required status checks and pull requests are deliberately unset (direct pushes of finished work); adding them needs an owner decision. Workflow actions moved to their Node 24 releases in local commit 7c4f7a2, not yet run on GitHub.
+- 2026-11-19: CI_FAILED on `e6fa006` (Browser Regression 44388204965, started 20:10 UTC 2026-11-18): `native-windows-shards (native)` failed in its native verification step after about 4 minutes and `selenium-shards (1)` in its test step after about 19 minutes, both well under their timeouts; the two aggregate jobs failed with them; every other shard and Pages 44388200887 passed. Not reproduced locally: the extended native verification passed every check on `e6fa006` in India time and again with the clock in UTC (date 18 Nov, as in CI), and the exact 78-test CI shard 1 ran OK with 0 skips. The public API shows no failure detail and the job logs need a GitHub sign-in, so the cause is unknown; no fix is claimed. The next push gives a fresh run; if it fails again the logs are needed.
 - 2026-11-13 (local commit, not yet on master): the backend shards ran only the 179 labels in `scripts/release_validation.BACKEND`; 84 backend test files were outside it, so CI never ran them, and one had been failing on master unseen. 76 are now listed with measured durations (the whole `test_platform_hardening` file replaces its single class label), eight stay out with a written reason in `BACKEND_NOT_IN_CI` (six need a real local Ollama model, one needs signing tools, one has a symlink-privilege skip), and `tests/test_release_validation.py` now fails when a new backend test file is in neither list. Still four shards (254 labels, about 630 s each on the development PC). Local run of the four shards as CI splits them: 2,988 tests, no failures; 14 skips, all in three files CI already ran, because the calendar test parser is not installed on the development PC. Hosted CI has not run on this change.
 
 ### RUNTIME-13 — M20 automated source/finance/privacy/backup gates

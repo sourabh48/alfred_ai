@@ -1,8 +1,31 @@
 # ALFRED execution state
 
+## Completion sprint — 2026-11-19
+
+LOCAL_TESTING; not pushed. Worktree `F:/ALFRED_DEV/completion-sprint-1119`, branch `work/completion-sprint-2026-11-19`
+from `e6fa006`. Owner asked for the gap audit's completion sprint (audit folder `alfred-gap-audit-20261117`,
+`AUDIT.md` and `REQUIREMENT_MATRIX.md` there). Preserved untouched: `F:/ALFRED_DEV/remaining-capabilities-1118`
+(base `45c3d89`, five modified files; its Council and Career changes are already upstream).
+
+- `c3a20cd` Career practice: each practice/mock request carries a ticket and its form, so a reply that arrives after a
+  job switch or a newer request is ignored; each mock question owns its voice capture (AbortController), so a late
+  Q1 transcription can no longer stop Q2; `AlfredVoice.listen` honours an abort while the microphone prompt is open.
+- `2b9e5af` Paper trader: zero, negative, NaN, infinite or missing prices never fill; a future-dated quote cannot be
+  accepted; orders compare-and-set the account cash, so a reset or a second order in between fails instead of
+  spending the same cash twice; positions are valued at the latest-dated usable INR close and say when cost is used.
+- `f153a39` Council (COUNCIL-03): `plan --improvement` tasks complete only after `evaluate` observed the same pinned
+  tests failing on the base and passing on the change; COUNCIL-03 moves to IMPLEMENTED_NOT_ACCEPTED (synthetic only).
+- Tracker: SYNC-02 stale "Next" corrected (R2 adapter exists); TRAVEL-14 and OPENAI-02 dated facts added. Counts:
+  89 verified, 19 implemented not accepted, 25 partial, 5 approval, 3 external, 1 not implemented, 1 descoped.
+- Audit defects re-checked on `e6fa006`: their fixes are on master (tax and loan term `3487576`, fund exposures
+  `257dcc4`, web consent `d0c34cd`, research holding match and review back-off `f878e34`, career abstention `9df7e1d`,
+  travel keep/remove `9a21c73`, stream isolation `754a9fd`); the audit regression tests ran 174 PASS. Career send safeguards: 54 PASS; no real send.
+- Master CI on `e6fa006` (run 44388204965) failed in `native-windows-shards (native)` and `selenium-shards (1)`;
+  locally the extended native check and the exact 78-test shard 1 both PASS. See CI_PIPELINE_STATE.
+
 ## Upstream gap build: TradingAgents, Career Ops, TREK, phone sync — 2026-11-18
 
-LOCAL_TESTING; not pushed. Branch `work/tracker-items-2026-11-18` after `665816c`: `dd8b28e` research desk, `25daa3c`
+MERGED to master as `e6fa006` (owner OK 2026-11-19); was LOCAL_TESTING. Branch `work/tracker-items-2026-11-18` after `665816c`: `dd8b28e` research desk, `25daa3c`
 Career, `223beea` Travel, `4b87483` phone sync, `208c2da` Google button always shown, `a4fc288` travel fixes,
 `850bf86` Google holidays. Owner asked what is still missing from TradingAgents (`9fa1196f`),
 career-ops (`fe9cb888`) and TREK (`2bcfc1bf`) at code level, approved the conflict items (mailbox read, Google transit,

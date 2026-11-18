@@ -1,8 +1,14 @@
 # Development CI and integration pipeline
 
+## Completion sprint — 2026-11-19
+
+LOCAL_TESTING. Branch `work/completion-sprint-2026-11-19` from `e6fa006`: `c3a20cd` Career practice races, `2b9e5af` paper trader prices and account guard, `f153a39` Council improvement flow, then tracker/state docs. Not pushed; the owner approved merge and push for this sprint if the full backend and Chrome suites pass.
+
+CI_FAILED on `e6fa006` (Browser Regression 44388204965, started 20:10 UTC 2026-11-18): `native-windows-shards (native)` failed in its native verification step after about 4 minutes and `selenium-shards (1)` in its test step after about 19 minutes, both well under their timeouts; the two aggregate jobs failed with them; every other shard and Pages 44388200887 passed. Not reproduced locally: the extended native verification passed every check on `e6fa006` in India time and again with the clock in UTC (date 18 Nov, as in CI), and the exact 78-test CI shard 1 ran OK with 0 skips. The public API shows no failure detail and the job logs need a GitHub sign-in, so the cause is unknown; no fix is claimed. The next push gives a fresh run; if it fails again the logs are needed.
+
 ## Upstream gap build — 2026-11-18
 
-LOCAL_TESTING. Same worktree after `665816c`: `dd8b28e`, `25daa3c`, `223beea`, `4b87483`, `208c2da`, `a4fc288`,
+MERGED as `e6fa006` (see the completion sprint above for its CI). Was LOCAL_TESTING. Same worktree after `665816c`: `dd8b28e`, `25daa3c`, `223beea`, `4b87483`, `208c2da`, `a4fc288`,
 `850bf86` (TradingAgents, Career Ops and TREK gaps, Google phone sync, Google button, travel route/duplicate/photo
 fixes, Google holidays; see EXECUTION_STATE). Local gate on `850bf86` (docs-only commit after): backend four shards 3,203 run, OK
 with 14 skips, all "Calendar test parser is not installed"; after installing the CI-pinned ICAL.js 2.2.1 (hash checked)
