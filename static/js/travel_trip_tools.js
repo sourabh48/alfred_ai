@@ -140,7 +140,7 @@
                 <ul class="small mb-2">${r.long_weekends.map(w => `<li>${e(day(w.start))} to ${e(day(w.end))}: ${n(w.days)} days off${w.leave_days.length
                     ? ` if you take ${w.leave_days.map(d => e(day(d))).join(", ")} as leave` : " with no leave needed"}</li>`).join("") || "<li>None listed.</li>"}</ul>
                 <p class="small fw-semibold mb-1">Public holidays</p>
-                <ul class="small mb-2">${r.holidays.map(h => `<li>${e(day(h.date))}: ${e(h.name)}${h.english && h.english !== h.name ? ` (${e(h.english)})` : ""}${h.national ? "" : `<span class="muted"> · regional: ${e(h.regions.join(", ") || "some regions")}</span>`}</li>`).join("")}</ul>
+                <ul class="small mb-2">${r.holidays.map(h => `<li>${e(day(h.date))}: ${e(h.name)}${h.english && h.english !== h.name ? ` (${e(h.english)})` : ""}${h.national ? "" : `<span class="muted"> · ${h.kind ? e(h.kind) : `regional: ${e(h.regions.join(", ") || "some regions")}`}</span>`}</li>`).join("")}</ul>
                 <p class="small muted mb-0">${e(r.basis)}</p>`;
         });
     });

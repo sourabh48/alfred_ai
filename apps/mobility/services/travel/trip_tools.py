@@ -380,7 +380,7 @@ def transit(origin, destination, departure="") -> dict:
     return {**result.payload, "stale": result.stale, "attribution": result.attribution}
 
 
-def holidays(country="", year=None) -> dict:
+def holidays(country="", year=None, user=None) -> dict:
     from .cache import query
     from .offline_maps import home_country
     from .providers.holidays import NagerHolidays
@@ -390,6 +390,14 @@ def holidays(country="", year=None) -> dict:
     if not re.fullmatch(r"[A-Z]{2}", country):
         raise ValueError("Choose a country.")
     result = query(NagerHolidays(), {"country": country, "year": year})
+    if not result.success and result.error in {"country_not_covered", "no_holidays"} and user is not None:
+        from alfred_ai.services import google_sync  # owner decision 2026-11-19: Google's holiday calendar where Nager.Date has none
+        try:
+            found = google_sync.public_holidays(user, country, year)
+        except google_sync.SyncError as exc:
+            raise ValueError(f"Nager.Date has no holidays for {country}. {exc}") from None
+        return {"country": country, "year": year, **found, "attribution": "Holidays from Google Calendar",
+                "basis": "Public holidays from Google Calendar's holiday calendar; restricted and optional days are marked. Check your employer's list."}
     if not result.success:
         raise ValueError(f"Nager.Date has no holidays for {country}; it does not cover every country." if result.error in
                          {"country_not_covered", "no_holidays"} else "Nager.Date cannot be reached right now. Try again later.")

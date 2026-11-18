@@ -1108,7 +1108,7 @@ class TripToolsView(APIView):
 
 
 class TravelLookupView(APIView):
-    """Public transport (Google) and public holidays (Nager.Date) lookups; nothing is stored (owner approval 2026-11-18)."""
+    """Public transport (Google) and public holidays (Nager.Date, else Google Calendar) lookups; nothing is stored (owner approvals 2026-11-18, 2026-11-19)."""
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
 
@@ -1119,7 +1119,7 @@ class TravelLookupView(APIView):
             if data.get("operation") == "transit":
                 result = trip_tools.transit(data.get("origin"), data.get("destination"), data.get("departure") or "")
             elif data.get("operation") == "holidays":
-                result = trip_tools.holidays(data.get("country") or "", data.get("year"))
+                result = trip_tools.holidays(data.get("country") or "", data.get("year"), request.user)
             else:
                 return Response({"detail": "Unknown lookup."}, status=status.HTTP_400_BAD_REQUEST)
         except (ValueError, TypeError) as exc:

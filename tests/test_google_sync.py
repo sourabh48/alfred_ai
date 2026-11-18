@@ -33,6 +33,13 @@ class Google:
         status, body = 200, {}
         if url == social_login.PROVIDERS["google"][2] or url == google_sync.TOKEN_URL:
             body = {"access_token": "short-lived", "refresh_token": "lasting-secret", "scope": self.scope}
+        elif "holiday%40group" in url:
+            if "en.in%23" in url:
+                status = 404  # the two-letter name is missing, the older name answers
+            else:
+                body = {"items": [{"summary": "Republic Day", "description": "Public holiday", "start": {"date": "2027-01-26"}},
+                                  {"summary": "Holi", "description": "Restricted holiday", "start": {"date": "2027-03-22"}},
+                                  {"summary": "Independence Day", "description": "Public holiday", "start": {"date": "2027-08-13"}}]}
         elif "openidconnect" in url:
             body = {"sub": "g-1", "email": "owner@example.org", "email_verified": True}
         elif method == "POST":
@@ -47,7 +54,7 @@ class Google:
                 and "googleapis.com/token" not in u and "oauth2" not in u]
 
 
-class GoogleSyncTests(TestCase):
+class ConnectedGoogle(TestCase):
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
@@ -66,6 +73,8 @@ class GoogleSyncTests(TestCase):
             response = self.client.get("/auth/google/callback/", {"code": "c", "state": query["state"][0]})
         return query, response
 
+
+class GoogleSyncTests(ConnectedGoogle):
     def test_connect_asks_for_offline_calendar_and_tasks_and_keeps_the_token_encrypted(self):
         query, response = self.connect()
         self.assertEqual(response["Location"], "/settings/#settingsGoogleSync")
@@ -126,3 +135,33 @@ class GoogleSyncTests(TestCase):
         self.assertEqual(google.calls[0][1], google_sync.REVOKE_URL)
         self.assertEqual(google.calls[0][2]["data"]["token"], "lasting-secret")
         self.assertFalse(Path(google_sync._path(self.owner)).exists())
+
+
+class GoogleHolidayTests(ConnectedGoogle):
+    """India is missing from Nager.Date, so its public holidays come from Google's holiday calendar (owner, 2026-11-19)."""
+
+    def test_country_missing_from_nager_reads_google_holiday_calendar_with_long_weekends(self):
+        from apps.mobility.services.travel.providers.base import ProviderResult
+        self.connect()
+        missing = ProviderResult("nager_date", "holidays", success=False, error="country_not_covered")
+        google = Google()
+        with patch("apps.mobility.services.travel.cache.query", return_value=missing), patch.object(google_sync.public_http, "request", google):
+            data = self.client.post("/api/mobility/travel-lookup/", {"operation": "holidays", "country": "IN", "year": 2027},
+                                    content_type="application/json").json()
+        self.assertEqual([h["name"] for h in data["holidays"]], ["Republic Day", "Holi", "Independence Day"])
+        self.assertEqual([h["national"] for h in data["holidays"]], [True, False, True])
+        self.assertEqual(data["holidays"][1]["kind"], "Restricted holiday")
+        self.assertEqual(data["attribution"], "Holidays from Google Calendar")
+        # Tuesday 26 Jan: Saturday to Tuesday with Monday as leave; Friday 13 Aug: Friday to Sunday.
+        self.assertEqual(data["long_weekends"], [{"start": "2027-01-23", "end": "2027-01-26", "days": 4, "leave_days": ["2027-01-25"]},
+                                                 {"start": "2027-08-13", "end": "2027-08-15", "days": 3, "leave_days": []}])
+        reads = [u for m, u, _ in google.calls if m == "GET" and "holiday" in u]
+        self.assertEqual(len(reads), 2)
+        self.assertIn("en.indian%23holiday", reads[1])
+        self.assertTrue(all(kw.get("json_body") is None for m, u, kw in google.calls if "holiday" in u))  # only the country leaves
+
+    def test_without_the_public_calendar_permission_sync_still_connects_and_holidays_say_how_to_get_them(self):
+        self.connect(Google(scope=f"openid email {google_sync.REQUIRED}"))
+        self.assertEqual(self.client.get("/api/settings/google-sync/").json()["holidays"], False)
+        with self.assertRaisesRegex(google_sync.SyncError, "Connect Google"):
+            google_sync.public_holidays(self.owner, "IN", 2027)

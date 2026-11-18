@@ -4,6 +4,9 @@ One way, ALFRED to Google: trips, bookings, career follow-ups and research revie
 "ALFRED" calendar that ALFRED creates (the calendar.app.created permission cannot see any other calendar), and trip
 reminders and saved packing lists become tasks in an "ALFRED" task list. Amounts, balances and notes never leave this
 PC. The refresh token is kept encrypted under ALFRED's data folder, and Disconnect revokes it at Google.
+
+The same consent also asks to read public calendars (read-only), so a country Nager.Date does not cover, such as
+India, gets its public holidays from Google's holiday calendar (owner decision 2026-11-19). Only the country leaves.
 """
 from __future__ import annotations
 
@@ -19,7 +22,9 @@ from django.utils import timezone
 from alfred_ai.services import public_http
 from alfred_ai.services.public_http import PublicHTTPError
 
-SCOPES = "https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/tasks"
+REQUIRED = "https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/tasks"
+HOLIDAY_SCOPE = "https://www.googleapis.com/auth/calendar.events.public.readonly"
+SCOPES = f"{REQUIRED} {HOLIDAY_SCOPE}"
 CALENDAR, TASKS = "https://www.googleapis.com/calendar/v3", "https://tasks.googleapis.com/tasks/v1"
 TOKEN_URL, REVOKE_URL = "https://oauth2.googleapis.com/token", "https://oauth2.googleapis.com/revoke"
 NAME, LIMIT, PAST_DAYS, AHEAD_DAYS = "ALFRED", 400, 30, 400
@@ -59,7 +64,7 @@ def status(user) -> dict:
     data = _load(user) or {}
     return {"available": "google" in {p["id"] for p in social_login.configured()}, "connected": bool(data.get("refresh")),
             "account": data.get("email", ""), "last_sync": data.get("last_sync"), "last_error": data.get("last_error", ""),
-            "events": len(data.get("events", {})), "tasks": len(data.get("tasks", {}))}
+            "events": len(data.get("events", {})), "tasks": len(data.get("tasks", {})), "holidays": bool(data.get("holidays"))}
 
 
 def connect(user, identity: dict, refresh_token: str | None, scope: str) -> None:
@@ -68,10 +73,61 @@ def connect(user, identity: dict, refresh_token: str | None, scope: str) -> None
     granted = set((scope or "").split())
     if not refresh_token:
         raise SyncError("Google did not give ALFRED lasting access. Remove ALFRED at myaccount.google.com/permissions and connect again.")
-    if not set(SCOPES.split()) <= granted:
+    if not set(REQUIRED.split()) <= granted:
         raise SyncError("Tick both Google Calendar and Google Tasks on Google's screen so ALFRED can sync them.")
     old = _load(user) or {}
-    _store(user, {**old, "email": identity["email"], "refresh": _encrypt_token(refresh_token), "last_error": ""})
+    _store(user, {**old, "email": identity["email"], "refresh": _encrypt_token(refresh_token), "last_error": "",
+                  "holidays": HOLIDAY_SCOPE in granted})
+
+
+# shortcut: Google's older holiday calendar names are known here only for India; other countries use the two-letter name.
+HOLIDAY_CALENDARS = {"IN": ("in", "indian")}
+
+
+def public_holidays(user, country: str, year: int) -> dict:
+    """Public holidays from Google's holiday calendar for a country, read with the owner's connected Google account."""
+    from urllib.parse import quote, urlencode
+
+    data = _load(user) or {}
+    if not data.get("refresh") or not data.get("holidays"):
+        raise SyncError("Connect Google under Settings > Phone calendar and tasks to read this country's public holidays from Google.")
+    token = _access(data)
+    window = urlencode({"timeMin": f"{year}-01-01T00:00:00Z", "timeMax": f"{year + 1}-01-01T00:00:00Z",
+                        "singleEvents": "true", "orderBy": "startTime", "maxResults": 250})
+    for name in HOLIDAY_CALENDARS.get(country, (country.lower(),)):
+        calendar = quote(f"en.{name}#holiday@group.v.calendar.google.com", safe="")
+        status_code, body = _call(token, "GET", f"{CALENDAR}/calendars/{calendar}/events?{window}")
+        if status_code == 200:
+            break
+    else:
+        raise SyncError(f"Google has no public holiday calendar for {country}.")
+    holidays = []
+    for event in body.get("items") or []:
+        day = str((event.get("start") or {}).get("date") or "")
+        if len(day) == 10 and day.startswith(str(year)):
+            kind = str(event.get("description") or "").strip()[:60]
+            holidays.append({"date": day, "name": str(event.get("summary") or "")[:120], "english": "",
+                             "national": kind.lower().startswith("public holiday"), "kind": kind, "regions": []})
+    if not holidays:
+        raise SyncError(f"Google lists no public holidays for {country} in {year}.")
+    return {"holidays": holidays, "long_weekends": long_weekends(h["date"] for h in holidays if h["national"])}
+
+
+def long_weekends(days) -> list:
+    """A public holiday next to a weekend: Monday or Friday gives three days off, Tuesday or Thursday four with one leave day."""
+    found = []
+    for day in sorted({date.fromisoformat(d) for d in days}):
+        weekday = day.weekday()
+        if weekday in (0, 1):  # Saturday before to the holiday
+            start, leave = day - timedelta(days=weekday + 2), [day - timedelta(days=1)] if weekday == 1 else []
+            end = day
+        elif weekday in (3, 4):  # holiday to the Sunday after
+            start, end, leave = day, day + timedelta(days=6 - weekday), [day + timedelta(days=1)] if weekday == 3 else []
+        else:
+            continue
+        found.append({"start": start.isoformat(), "end": end.isoformat(), "days": (end - start).days + 1,
+                      "leave_days": [d.isoformat() for d in leave]})
+    return found
 
 
 def _access(data: dict) -> str:

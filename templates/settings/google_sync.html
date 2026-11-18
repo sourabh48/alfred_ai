@@ -1,6 +1,6 @@
 <section class="surface-card mb-4" id="settingsGoogleSync" aria-labelledby="settingsGoogleSyncTitle">
     <h2 class="page-section-title mb-1" id="settingsGoogleSyncTitle">Phone calendar and tasks (Google)</h2>
-    <p class="page-section-copy mb-2">See ALFRED's dates on your phone. Trips, bookings, career follow-ups and research review dates go to a separate "ALFRED" calendar in Google Calendar; trip reminders and packing lists go to an "ALFRED" list in Google Tasks. ALFRED can see only the calendar it creates, and syncs one way, every 30 minutes. Amounts, balances and notes stay on this PC.</p>
+    <p class="page-section-copy mb-2">See ALFRED's dates on your phone. Trips, bookings, career follow-ups and research review dates go to a separate "ALFRED" calendar in Google Calendar; trip reminders and packing lists go to an "ALFRED" list in Google Tasks. ALFRED can change only the calendar it creates and can read public calendars, which it uses for your country's public holidays when the free holiday list lacks it. It syncs one way, every 30 minutes. Amounts, balances and notes stay on this PC.</p>
     <div id="googleSyncFeedback" class="d-none alert mb-2" role="status"></div>
     <p class="small mb-2" id="googleSyncStatus">Checking…</p>
     <div class="d-flex flex-wrap gap-2">
@@ -8,5 +8,5 @@
         <button class="btn btn-outline-dark btn-sm rounded-pill d-none" type="button" id="googleSyncNow">Sync now</button>
         <button class="btn btn-outline-danger btn-sm rounded-pill d-none" type="button" id="googleSyncDisconnect">Disconnect</button>
     </div>
-    <p class="small muted mt-2 mb-0">Uses the Google sign-in set up under Online services. In your Google Cloud project, turn on the Google Calendar API and Google Tasks API, and add both permissions to the consent screen. Disconnecting keeps the ALFRED calendar in your Google account; delete it there if you want it gone.</p>
+    <p class="small muted mt-2 mb-0">Uses the Google sign-in set up under Online services. In your Google Cloud project, turn on the Google Calendar API and Google Tasks API, and add the Calendar (app-created and public read-only) and Tasks permissions to the consent screen. Disconnecting keeps the ALFRED calendar in your Google account; delete it there if you want it gone.</p>
 </section>
