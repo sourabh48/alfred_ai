@@ -236,61 +236,9 @@
     </div>
 </section>
 
-<section class="surface-card mb-4" id="tripToolsSection" aria-labelledby="tripToolsTitle">
-    <h2 class="page-section-title" id="tripToolsTitle">Trip tools</h2>
-    <p class="page-section-copy mb-2">Your bookings, a recorded ride and your saved places for one trip. Everything stays on this PC; ALFRED records bookings, it never books.</p>
-    <div class="row g-2 align-items-end mb-2">
-        <div class="col-sm-6"><label class="form-label small mb-1" for="tripToolsPlan">Trip</label>
-            <select class="form-select form-select-sm" id="tripToolsPlan"></select></div>
-    </div>
-    <div id="tripToolsFeedback" class="d-none alert mb-2" role="status"></div>
-    <details class="mt-2" id="tripBookingsTool"><summary>Bookings</summary>
-        <div id="tripBookingsList" class="mt-2"></div>
-        <div class="mt-2">
-            <label class="form-label small mb-1" for="tripBookingText">Fill from a confirmation (paste its text, or load its PDF). Your local AI reads it; you check the form before saving.</label>
-            <textarea class="form-control form-control-sm mb-2" id="tripBookingText" rows="3" maxlength="20000"></textarea>
-            <div class="d-flex flex-wrap gap-2 mb-2">
-                <button class="btn btn-outline-secondary btn-sm" type="button" id="tripBookingRead">Read the text</button>
-                <label class="btn btn-outline-secondary btn-sm mb-0 d-inline-flex align-items-center" for="tripBookingPdf">Load a PDF</label>
-                <input class="visually-hidden" type="file" id="tripBookingPdf" accept=".pdf,.txt,.eml,.html">
-            </div>
-        </div>
-        <form id="tripBookingForm" class="row g-2">
-            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingKind">Kind</label>
-                <select class="form-select form-select-sm" id="tripBookingKind" name="kind">
-                    <option value="flight">Flight</option><option value="train">Train</option><option value="bus">Bus</option><option value="hotel">Hotel</option>
-                    <option value="car">Car or bike hire</option><option value="event">Event or ticket</option><option value="other">Other</option></select></div>
-            <div class="col-sm-5"><label class="form-label small mb-1" for="tripBookingTitle">Title</label>
-                <input class="form-control form-control-sm" id="tripBookingTitle" name="title" maxlength="160" required placeholder="e.g. AI 864 Pune to Delhi"></div>
-            <div class="col-sm-4"><label class="form-label small mb-1" for="tripBookingCode">Confirmation code</label>
-                <input class="form-control form-control-sm" id="tripBookingCode" name="confirmation" maxlength="40"></div>
-            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingStart">Starts</label>
-                <input class="form-control form-control-sm" id="tripBookingStart" name="start" type="datetime-local"></div>
-            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingEnd">Ends</label>
-                <input class="form-control form-control-sm" id="tripBookingEnd" name="end" type="datetime-local"></div>
-            <div class="col-sm-6"><label class="form-label small mb-1" for="tripBookingPlace">Place</label>
-                <input class="form-control form-control-sm" id="tripBookingPlace" name="place" maxlength="200"></div>
-            <div class="col-sm-4"><label class="form-label small mb-1" for="tripBookingProvider">Booked with</label>
-                <input class="form-control form-control-sm" id="tripBookingProvider" name="provider" maxlength="120"></div>
-            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingAmount">Amount paid</label>
-                <input class="form-control form-control-sm" id="tripBookingAmount" name="amount" inputmode="decimal" maxlength="20"></div>
-            <div class="col-sm-2"><label class="form-label small mb-1" for="tripBookingCurrency">Currency</label>
-                <input class="form-control form-control-sm" id="tripBookingCurrency" name="currency" maxlength="3" placeholder="INR"></div>
-            <div class="col-sm-3 d-flex align-items-end"><button class="btn btn-primary btn-sm w-100" type="submit">Save booking</button></div>
-        </form>
-    </details>
-    <details class="mt-2" id="tripRideTool"><summary>Recorded ride: plan vs actual</summary>
-        <p class="small muted mt-2 mb-2">Load the GPX file your phone, GPS or bike computer recorded. ALFRED works out distance, climb, time and grades from it and compares the distance with the plan.</p>
-        <label class="btn btn-outline-secondary btn-sm mb-2" for="tripRideFile">Load a GPX ride</label>
-        <input class="visually-hidden" type="file" id="tripRideFile" accept=".gpx">
-        <div id="tripRideBody"></div>
-    </details>
-    <details class="mt-2" id="tripPlacesTool"><summary>Import places</summary>
-        <p class="small muted mt-2 mb-2">Load a KML or GPX file, or a Google Takeout export of your Google Maps saved places (.json) or a saved list (.csv).</p>
-        <label class="btn btn-outline-secondary btn-sm mb-2" for="tripPlacesFile">Load a places file</label>
-        <input class="visually-hidden" type="file" id="tripPlacesFile" accept=".kml,.gpx,.json,.geojson,.csv">
-        <div id="tripPlacesBody"></div>
-    </details>
+<section class="surface-card mb-4" id="travelLookupSection" aria-labelledby="travelLookupTitle">
+    <h2 class="page-section-title" id="travelLookupTitle">Public transport and holidays</h2>
+    <div id="travelLookupFeedback" class="d-none alert mb-2" role="status"></div>
     <details class="mt-2" id="tripTransitTool"><summary>Public transport, door to door</summary>
         <p class="small muted mt-2 mb-2">Google's buses, trains and metro lines between two addresses, with times and its fare estimate. Your two addresses go to Google; nothing is booked.</p>
         <form id="tripTransitForm" class="row g-2 align-items-end">
@@ -379,7 +327,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="/static/css/travel_planner.css?v=cards1">
+<link rel="stylesheet" href="/static/css/travel_planner.css?v=cards2">
 <script src="/static/js/mobility.js?v=9"></script>
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <script src="/static/vendor/leaflet/leaflet.js"></script>
@@ -392,7 +340,7 @@
 <script src="/static/js/travel_affordability.js?v=2"></script>
 <script src="/static/js/travel_suggestions.js?v=4"></script>
 <script src="/static/js/travel_gallery.js?v=4"></script>
-<script src="/static/js/travel_planner.js?v=cards1"></script>
+<script src="/static/js/travel_planner.js?v=cards2"></script>
 <script src="/static/js/travel_preferences.js?v=2"></script>
-<script src="/static/js/travel_trip_tools.js?v=4"></script>
+<script src="/static/js/travel_trip_tools.js?v=5"></script>
 {% endblock %}

@@ -5329,13 +5329,21 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.mobility.models import TravelPlan
         from apps.mobility.services.travel.providers import holidays
         from tests.test_trip_tools import gpx
-        TravelPlan.objects.create(user=self.scenario['user'], title='Synthetic Delhi trip', destination='Delhi',
-                                  itinerary={'route': {'distance_km_total': 2.0}})
+        from apps.mobility.services.travel_conversation import new_session
+        plan = TravelPlan.objects.create(user=self.scenario['user'], title='Synthetic Delhi trip', destination='Delhi',
+                                         itinerary={'route': {'distance_km_total': 2.0}})
         replies = {'AvailableCountries': [{'countryCode': 'US'}],
                    'PublicHolidays': [{'date': '2026-07-03', 'localName': 'Independence Day', 'name': 'Independence Day', 'global': True}],
                    'LongWeekend': [{'startDate': '2026-07-03', 'endDate': '2026-07-05', 'dayCount': 3, 'bridgeDays': []}]}
         self.enterContext(patch.object(holidays, 'request_json', side_effect=lambda method, url, **kw: (next(v for k, v in replies.items() if k in url), 'h')))
-        self.login(); self.browser.get(self.live_server_url + '/mobility/')
+        self.login(); self.browser.execute_script("sessionStorage.clear()"); self.browser.get(self.live_server_url + '/mobility/')
+        # The per-trip tools sit inside the open trip (owner, 2026-11-19): a fresh chat has none.
+        self.wait.until(lambda _: 'destination is optional' in self.text('plannerMessages'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'tripToolsSection').is_displayed())
+        self.assertTrue(self.browser.find_element(self.By.ID, 'travelLookupSection').is_displayed())
+        session = new_session(self.scenario['user'], plan)
+        self.browser.get(self.live_server_url + f'/mobility/?session={session.pk}')
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'tripToolsSection').is_displayed())
         self.browser.execute_script("document.getElementById('tripBookingsTool').open = true")
         self.wait.until(lambda _: 'No bookings recorded' in self.text('tripBookingsList'))
         self.browser.find_element(self.By.ID, 'tripBookingTitle').send_keys('AI 864 Pune to Delhi <b>x</b>')

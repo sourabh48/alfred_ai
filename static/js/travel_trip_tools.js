@@ -4,8 +4,7 @@
     if (!$("tripToolsSection")) return;
     const url = () => `/api/mobility/travel-plans/${$("tripToolsPlan").value}/tools/`;
 
-    function say(text, kind = "success") {
-        const box = $("tripToolsFeedback");
+    function say(text, kind = "success", box = $("tripToolsFeedback")) {
         box.className = `alert alert-${kind} mb-2`;
         box.textContent = text;
     }
@@ -86,13 +85,15 @@
         if ($("tripToolsPlan").value) Alfred.fetchJSON(url()).then(render).catch(error => say(error.message, "danger"));
     }
 
-    Alfred.fetchJSON("/api/mobility/travel-plans/").then(data => {
-        const plans = Array.isArray(data) ? data : data.results || [];
-        $("tripToolsPlan").innerHTML = plans.length ? plans.map(p => `<option value="${e(p.id)}">${e(p.title)}${p.start_date ? ` (${e(p.start_date)})` : ""}</option>`).join("")
-            : '<option value="">No trips yet</option>';
+    // The tools follow the trip open in the planner; a chat with no saved plan or draft hides them (owner, 2026-11-19).
+    window.TravelTripTools = {show(planId) {
+        const id = planId ? String(planId) : "";
+        $("tripToolsSection").hidden = $("plannerToolsLink").hidden = !id;
+        if (id === $("tripToolsPlan").value) return;
+        $("tripToolsPlan").value = id;
+        $("tripToolsFeedback").className = "d-none";
         load();
-    }).catch(error => say(error.message, "danger"));
-    $("tripToolsPlan").addEventListener("change", load);
+    }};
 
     function fill(draft) {
         const set = (id, value) => { if (value) $(id).value = value; };
@@ -119,7 +120,7 @@
     });
 
     const lookup = (body, done) => Alfred.fetchJSON("/api/mobility/travel-lookup/", { method: "POST", body: JSON.stringify(body) })
-        .then(done).catch(error => say(error.message, "danger"));
+        .then(done).catch(error => say(error.message, "danger", $("travelLookupFeedback")));
     const clock = iso => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
     $("tripHolidaysYear").value = new Date().getFullYear();
     $("tripTransitForm").addEventListener("submit", event => {

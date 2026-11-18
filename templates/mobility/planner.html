@@ -36,7 +36,7 @@
         <section class="surface-card"><h2 class="h5">Made for you</h2><p class="small mb-0">Alfred learns from the trips you choose. Tell the chat when your preferences change.</p><div id="plannerStyle" class="travel-chips mt-2"></div><details class="mt-2"><summary class="small">Privacy and corrections</summary><a href="/settings/#travelPreferences">Review or forget travel preferences</a></details></section>
     </aside>
 </section>
-<nav id="plannerTripActions" class="travel-actions mb-3" aria-label="Explore your selected trip" hidden><a class="btn btn-outline-primary" href="#plannerAttractions">Attractions & offbeat leads</a><a class="btn btn-outline-primary" href="#plannerStays">Find a stay</a><a class="btn btn-outline-primary" href="#plannerMapPanel">Map & routes</a><a class="btn btn-primary" href="#plannerItinerary">Review itinerary</a></nav>
+<nav id="plannerTripActions" class="travel-actions mb-3" aria-label="Explore your selected trip" hidden><a class="btn btn-outline-primary" href="#plannerAttractions">Attractions & offbeat leads</a><a class="btn btn-outline-primary" href="#plannerStays">Find a stay</a><a class="btn btn-outline-primary" href="#plannerMapPanel">Map & routes</a><a class="btn btn-outline-primary" href="#tripToolsSection" id="plannerToolsLink" hidden>Bookings & ride</a><a class="btn btn-primary" href="#plannerItinerary">Review itinerary</a></nav>
 <section id="plannerSuggestions" class="surface-card mb-4" aria-labelledby="plannerSuggestionsTitle" hidden></section>
 <section id="plannerResults" class="mb-4" hidden aria-label="Destination recommendations">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"><h2 class="page-section-title mb-0">Places that fit your escape</h2><button type="button" class="btn btn-outline-primary" id="plannerCompare">Compare destinations</button></div>
@@ -46,6 +46,59 @@
 </section>
 <section id="plannerStops" class="surface-card mb-4" aria-label="Ordered itinerary stops" aria-live="polite"></section>
 <section id="plannerItinerary" class="mb-4" hidden aria-label="Your itinerary"></section>
+<section class="surface-card mb-4 trip-tools" id="tripToolsSection" aria-labelledby="tripToolsTitle" hidden>
+    <h2 class="h5" id="tripToolsTitle">Bookings, ride and places for this trip</h2>
+    <p class="small mb-2">Everything stays on this PC. ALFRED records bookings you made elsewhere; it never books.</p>
+    <input type="hidden" id="tripToolsPlan">
+    <div id="tripToolsFeedback" class="d-none alert mb-2" role="status"></div>
+    <details class="trip-tool" id="tripBookingsTool"><summary>Bookings</summary>
+        <div id="tripBookingsList" class="mt-2"></div>
+        <div class="mt-2">
+            <label class="form-label small mb-1" for="tripBookingText">Fill from a confirmation (paste its text, or load its PDF). Your local AI reads it; you check the form before saving.</label>
+            <textarea class="form-control form-control-sm mb-2" id="tripBookingText" rows="3" maxlength="20000"></textarea>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="tripBookingRead">Read the text</button>
+                <label class="btn btn-outline-secondary btn-sm mb-0 d-inline-flex align-items-center" for="tripBookingPdf">Load a PDF</label>
+                <input class="visually-hidden" type="file" id="tripBookingPdf" accept=".pdf,.txt,.eml,.html">
+            </div>
+        </div>
+        <form id="tripBookingForm" class="row g-2">
+            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingKind">Kind</label>
+                <select class="form-select form-select-sm" id="tripBookingKind" name="kind">
+                    <option value="flight">Flight</option><option value="train">Train</option><option value="bus">Bus</option><option value="hotel">Hotel</option>
+                    <option value="car">Car or bike hire</option><option value="event">Event or ticket</option><option value="other">Other</option></select></div>
+            <div class="col-sm-5"><label class="form-label small mb-1" for="tripBookingTitle">Title</label>
+                <input class="form-control form-control-sm" id="tripBookingTitle" name="title" maxlength="160" required placeholder="e.g. AI 864 Pune to Delhi"></div>
+            <div class="col-sm-4"><label class="form-label small mb-1" for="tripBookingCode">Confirmation code</label>
+                <input class="form-control form-control-sm" id="tripBookingCode" name="confirmation" maxlength="40"></div>
+            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingStart">Starts</label>
+                <input class="form-control form-control-sm" id="tripBookingStart" name="start" type="datetime-local"></div>
+            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingEnd">Ends</label>
+                <input class="form-control form-control-sm" id="tripBookingEnd" name="end" type="datetime-local"></div>
+            <div class="col-sm-6"><label class="form-label small mb-1" for="tripBookingPlace">Place</label>
+                <input class="form-control form-control-sm" id="tripBookingPlace" name="place" maxlength="200"></div>
+            <div class="col-sm-4"><label class="form-label small mb-1" for="tripBookingProvider">Booked with</label>
+                <input class="form-control form-control-sm" id="tripBookingProvider" name="provider" maxlength="120"></div>
+            <div class="col-sm-3"><label class="form-label small mb-1" for="tripBookingAmount">Amount paid</label>
+                <input class="form-control form-control-sm" id="tripBookingAmount" name="amount" inputmode="decimal" maxlength="20"></div>
+            <div class="col-sm-2"><label class="form-label small mb-1" for="tripBookingCurrency">Currency</label>
+                <input class="form-control form-control-sm" id="tripBookingCurrency" name="currency" maxlength="3" placeholder="INR"></div>
+            <div class="col-sm-3 d-flex align-items-end"><button class="btn btn-primary btn-sm w-100" type="submit">Save booking</button></div>
+        </form>
+    </details>
+    <details class="trip-tool" id="tripRideTool"><summary>Recorded ride: plan vs actual</summary>
+        <p class="small muted mt-2 mb-2">Load the GPX file your phone, GPS or bike computer recorded. ALFRED works out distance, climb, time and grades from it and compares the distance with the plan.</p>
+        <label class="btn btn-outline-secondary btn-sm mb-2" for="tripRideFile">Load a GPX ride</label>
+        <input class="visually-hidden" type="file" id="tripRideFile" accept=".gpx">
+        <div id="tripRideBody"></div>
+    </details>
+    <details class="trip-tool" id="tripPlacesTool"><summary>Import places</summary>
+        <p class="small muted mt-2 mb-2">Load a KML or GPX file, or a Google Takeout export of your Google Maps saved places (.json) or a saved list (.csv).</p>
+        <label class="btn btn-outline-secondary btn-sm mb-2" for="tripPlacesFile">Load a places file</label>
+        <input class="visually-hidden" type="file" id="tripPlacesFile" accept=".kml,.gpx,.json,.geojson,.csv">
+        <div id="tripPlacesBody"></div>
+    </details>
+</section>
 <section id="plannerExport" class="surface-card mb-4" hidden aria-label="Private itinerary export"><h2 class="h5">Private saved itinerary exports</h2><p>Exports use your saved trip. Save recent itinerary changes to include them. Costs, checklists, reminders and linked documents stay in ALFRED.</p><button type="button" id="plannerExportPDF" class="btn btn-outline-primary">Download saved itinerary PDF</button> <button type="button" id="plannerExportGPX" class="btn btn-outline-primary">Download saved waypoints / GPX</button><p class="small mt-2 mb-0">GPX contains saved locations and only current source-backed route geometry. Waypoints alone are not road navigation. No recorded tracks or motorcycle legality are claimed.</p><button type="button" id="plannerPrepareICS" class="btn btn-outline-primary mt-2">Review calendar dates / times</button> <button type="button" id="plannerExportICS" class="btn btn-outline-primary mt-2" disabled>Download private calendar (.ics)</button><div id="plannerCalendar" class="mt-3" hidden role="group" aria-label="Calendar export date and time evidence"></div></section>
 <section id="plannerDocuments" class="surface-card mb-4" aria-label="Private trip documents"></section>
 <section id="plannerPacking" class="surface-card mb-4" aria-label="Private packing checklist"></section>

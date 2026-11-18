@@ -226,6 +226,7 @@ window.TravelPlanner = (() => {
     function render() {
         const session = state.session;
         markCurrent();
+        window.TravelTripTools?.show(session.plan_id);
         $("plannerTitle").textContent = session.title;
         const messages = $("plannerMessages");
         const oldLast = messages.dataset.last;
