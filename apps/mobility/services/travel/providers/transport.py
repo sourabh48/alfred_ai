@@ -166,7 +166,9 @@ class AmadeusFlights(Provider):
                 "fare_scope": "all requested travellers; the airline's page shows the final price",
                 "availability": "price_returned_recheck_before_purchase", "booking_url": link if link.startswith("https://") else None})
         options.sort(key=lambda o: Decimal(o["fare"]))
-        return {"options": options[:10], "coverage": "Airlines in the Amadeus Travel Builder beta, a subset of airlines; not every fare on the market."}
+        # Checked live 2026-11-19 (BLR-DEL, BLR-GOI, DEL-BOM, BLR-CCU): Air India is the only Indian airline in the beta.
+        return {"options": options[:10], "coverage": "Some airlines only. Of Indian airlines only Air India is included; IndiGo, Akasa, "
+                                                      "SpiceJet and Air India Express are not, so cheaper domestic fares may exist."}
 
 
 class IndianRailProvider(Provider):

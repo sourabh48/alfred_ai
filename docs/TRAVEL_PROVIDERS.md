@@ -150,7 +150,7 @@ and Weather API**; Geocoding is not needed because Places text search finds plac
 | Routing | `google_routes`: Routes API | 1 hour | Two-wheeler, car or walking; up to three alternatives; distance and time only, no line on a non-Google map (Google terms); motorcycle legality and closures unverified |
 | Weather | `google_weather`: Weather API daily forecast | 2 hours | Today and the next nine days only; trips further out show "not checked"; official warnings unavailable |
 | Flights | `skyscanner`: Flights Live Prices v3; `TRAVEL_SKYSCANNER_API_KEY` | 15 minutes | Waiting for Skyscanner partner approval; until then each trip shows a Google Flights link |
-| Flights (when no Skyscanner key) | `amadeus`: free Amadeus Travel Builder beta, `GET /api/v3/search/`; `TRAVEL_AMADEUS_API_KEY` | 15 minutes | Some airlines only (Amadeus publishes no list; Indian carriers unverified); search only, the airline's own link to buy |
+| Flights (when no Skyscanner key) | `amadeus`: free Amadeus Travel Builder beta, `GET /api/v3/search/`; `TRAVEL_AMADEUS_API_KEY` | 15 minutes | Some airlines only; of Indian airlines only Air India (live check 2026-11-19; no IndiGo, Akasa, SpiceJet or Air India Express); search only, the airline's own link to buy |
 | Permits | Dated official references | 6 hours near departure, otherwise 24 hours | No authorized live permit inventory API verified; opening remains unverified |
 | Indian rail | Unavailable boundary | None | Authorized agreement/API required; timetable never implies seats, waitlist or fare |
 | Bus | Reviewed state-operator links and a search link | None | No live inventory integration; availability unknown |
@@ -183,7 +183,11 @@ keys in `config/local.env` are ignored and can be deleted.
    converted. Results are kept 15 minutes; the terms allow only caching needed to run. Nothing is booked.
 4. The terms say access is free, may be limited or ended by Amadeus at any time, and forbid using the data to
    train AI. The adapter (`providers/transport.py::AmadeusFlights`) is tested against fixtures and UNVERIFIED
-   against a live key; which Indian airlines answer is known only after the first real search.
+   against a live key until the live check below.
+5. Live check 2026-11-19 (owner's key, one adult, economy, 19 December 2026): offers on all six routes, all in INR with
+   airline links and correct local times. Domestic (BLR-DEL, BLR-GOI, DEL-BOM, BLR-CCU): Air India non-stops plus
+   Qatar Airways and Saudia offers routed through their hubs; IndiGo, Akasa, SpiceJet and Air India Express are not
+   Amadeus merchants. International: BLR-DXB answered by 7 airlines, DEL-LHR by 11. About 22 airlines were queried.
 
 Choose a displayed route explicitly before using it in a draft. Selection checks
 the owned session revision, route identity and source timestamps. An expired or
