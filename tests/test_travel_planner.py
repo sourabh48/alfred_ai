@@ -90,6 +90,21 @@ class TravelPlannerTests(TestCase):
         self.assertEqual(state["budget"]["source"], "user_message")
         self.assertTrue(state["budget"]["confirmed_by_user"])
 
+    def test_month_first_dates_group_words_and_a_place_mid_sentence_are_read(self):
+        with patch("apps.mobility.services.travel_conversation.timezone.localdate", return_value=date(2026, 11, 20)):
+            goa, _ = extract({}, "i wanna plan a goa trip on dec from 20 to 25 plan a trio to goa")
+            new_year, _ = extract({}, "dec 30 to jan 2 with 2 friends")
+            kerala, _ = extract({}, "three of us going to kerala")
+            bike, _ = extract({}, "a bike trip to the hills, 25 days")
+        self.assertEqual({k: value(goa, k) for k in ("requested_destination", "available_start_date", "available_end_date",
+                                                      "trip_duration", "number_of_travelers")},
+                         {"requested_destination": "Goa", "available_start_date": "2026-12-20", "available_end_date": "2026-12-25",
+                          "trip_duration": 6, "number_of_travelers": 3})
+        self.assertEqual((value(new_year, "available_end_date"), value(new_year, "number_of_travelers")), ("2027-01-02", 3))
+        self.assertEqual((value(kerala, "requested_destination"), value(kerala, "number_of_travelers")), ("Kerala", 3))
+        self.assertNotIn("requested_destination", bike)  # "a bike trip" and "the hills" are not places
+        self.assertEqual(value(bike, "trip_duration"), 25)
+
     def test_configured_origin_is_reused_without_repeated_question(self):
         s = new_session(self.user)
         self.assertFalse(s.state["origin"]["confirmed_by_user"])

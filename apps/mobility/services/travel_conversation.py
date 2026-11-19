@@ -31,6 +31,8 @@ STYLE_WORDS = {
 }
 MONTHS = {name.lower(): n for n in range(1, 13) for name in (calendar.month_name[n], calendar.month_abbr[n])}
 MONTH_PATTERN = "|".join(sorted(MONTHS, key=len, reverse=True))
+COUNT_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+GROUP_WORDS = {"duo": 2, "pair": 2, "trio": 3, "quartet": 4}
 
 
 def say(session, text, chips=()):
@@ -113,6 +115,11 @@ def extract(state, text):
         else:
             pattern = rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s*({MONTH_PATTERN})?\s*(?:to|until|through|[-–—])\s*(\d{{1,2}})(?:st|nd|rd|th)?\s*({MONTH_PATTERN})(?:\s+(20\d{{2}}))?"
             m = re.search(pattern, lower)
+            if not m:  # month first: "dec 20 to 25", "dec from 20 to 25", "dec 30 to jan 2"
+                first = re.search(rf"\b({MONTH_PATTERN})\.?\s+(?:from\s+)?(\d{{1,2}})(?:st|nd|rd|th)?\s*(?:to|until|till|through|[-–—])\s*"
+                                  rf"(?:({MONTH_PATTERN})\.?\s+)?(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+(20\d{{2}}))?", lower)
+                if first:  # same groups as the day-first pattern: start day, start month, end day, end month, year
+                    m = (None, first[2], first[1], first[4], first[3] or first[1], first[5])
             if m:
                 year = int(m[5] or timezone.localdate().year)
                 start = date(year, MONTHS[m[2] or m[4]], int(m[1]))
@@ -183,11 +190,17 @@ def extract(state, text):
             put(kind+"_trip", True)
             if kind in {"solo", "couple"}:
                 put("number_of_travelers", 1 if kind == "solo" else 2)
-    travellers = re.search(r"\b(\d+)\s*(?:people|persons|travellers|travelers|adults)\b", lower)
-    if travellers:
-        if not 1 <= int(travellers[1]) <= 50:
+    counted = rf"(\d+|{'|'.join(COUNT_WORDS)})"
+    travellers = re.search(counted + r"\s*(?:people|persons|travellers|travelers|adults|of us)\b", lower)
+    friends = re.search(r"\bwith\s+(?:my\s+)?" + counted + r"\s+(?:friends|others)\b", lower)
+    group = re.search(rf"\b({'|'.join(GROUP_WORDS)})\b", lower)
+    count = (int(COUNT_WORDS.get(travellers[1], travellers[1])) if travellers
+             else int(COUNT_WORDS.get(friends[1], friends[1])) + 1 if friends
+             else GROUP_WORDS[group[1]] if group else None)
+    if count is not None:
+        if not 1 <= count <= 50:
             raise ValidationError("Use between 1 and 50 travellers.")
-        put("number_of_travelers", int(travellers[1]))
+        put("number_of_travelers", count)
     if "not too much riding" in lower or "short rides" in lower:
         put("maximum_daily_driving", 200)
     daily = re.search(r"(\d+)\s*km\s*(?:a|per|each)?\s*day", lower)
