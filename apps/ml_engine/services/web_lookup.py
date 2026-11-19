@@ -59,9 +59,8 @@ PUBLIC_LOOKUP = re.compile(
 )
 
 
-# Owner 2026-11-19: research by itself when saved data has nothing, unless the question may be about someone's private life:
-# a capitalised name after the first word, a family or work relation, or a health, legal or money-trouble word waits for a tap.
-NAME_LIKE = re.compile(r"(?<=\s)[A-Z][a-z]+")
+# Owner 2026-11-19: research by itself when saved data has nothing. Owner 2026-11-20: online data is used without asking,
+# so a name alone no longer waits; a family or work relation, or a health, legal or money-trouble word still waits for a tap.
 PRIVATE_LIFE = re.compile(
     r"(?i)\b(?:friend|wife|husband|partner|son|daughter|mother|father|mom|dad|brother|sister|cousin|uncle|aunt|colleague|boss"
     r"|neighbou?r|girlfriend|boyfriend|ex|diagnos\w*|hiv|aids|cancer|pregnan\w*|depression|anxiety|therapy|treatment|disease"
@@ -72,7 +71,7 @@ def clearly_public(question):
     """A complete recognized public query, or a general one with no sign of anyone's private life."""
     if PUBLIC_LOOKUP.fullmatch(question):
         return True
-    return (not PERSONAL.search(question) and not NAME_LIKE.search(question) and not PRIVATE_LIFE.search(question)
+    return (not PERSONAL.search(question) and not PRIVATE_LIFE.search(question)
             and bool(GENERAL.search(question) or CURRENT.search(question)))
 
 

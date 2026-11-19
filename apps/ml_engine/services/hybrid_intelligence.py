@@ -320,6 +320,15 @@ def validate_dialogue(context, scope, cloud_consent):
             raise ValueError('Conversation context is restricted to local general chat.')
 
 
+def _gemini_by_itself(store,user,query):
+    """A clearly public, self-contained question goes to Gemini without a per-question tick once Gemini is on in Settings."""
+    from . import web_lookup
+    from .memory_reasoning import answers_by_itself
+    try: public=web_lookup.clearly_public(web_lookup.check_public(query))
+    except web_lookup.PrivateQuestion: return False
+    return public and answers_by_itself(store,user)
+
+
 def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None,conversation_context=None,answer_style='auto',web_search=False,provider='local'):
     from .canonical_evidence import KINDS, supported_question, requested_record_field
     if type(web_search) is not bool or provider not in ('local','gemini') or (web_search and scope!='general'):
@@ -339,6 +348,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             or (scope=='financial_document' and (record_type not in ('expense','loan','investment') or record_id is not None or selected_documents is not None))
             or (scope!='financial_document' and selected_records is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
+    if provider=='local' and scope=='general' and not cloud_consent and not conversation_context and _gemini_by_itself(store,user,query):
+        try:
+            return hybrid_answer(store,user,query,cloud_consent=True,query_sensitivity='public',answer_style=answer_style,web_search=web_search,provider='gemini')
+        except Exception as exc:  # over the daily cap, offline or refused: the local model answers instead
+            safe_error_details(exc,'Gemini could not answer; the local model answers instead.',logger_name=__name__)
     style, output_limit = answer_budget(query, scope, answer_style)
     if provider=='local' and not cloud_consent and not web_search and scope in ('general','finance'):
         # "Can I afford X?" gets a fixed sum from the canonical baseline: model arithmetic about money is not reliable.

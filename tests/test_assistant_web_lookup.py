@@ -54,14 +54,15 @@ class QuestionFilterTests(SimpleTestCase):
     def test_a_question_that_may_be_about_someones_private_life_is_offered_not_sent(self):
         # Third-party health, money trouble, work and family facts; no pronoun or keyword is needed for the default to hold.
         for question in ("What should Anika do after her HIV diagnosis?", "How should Anika handle bankruptcy after losing her job?",
-                         "Does Anika have cancer?", "Is Anika pregnant?", "When did Anika leave Infosys?", "What is Anika's rent today",
-                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression",
-                         "Who is the director of Cedar Clinic?", "Current interview results at Cedar Clinic"):
+                         "Does Anika have cancer?", "Is Anika pregnant?", "What is Anika's rent today",
+                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression"):
             with self.subTest(question=question):
                 self.assertFalse(web_lookup.clearly_public(question))
                 self.assertFalse(web_lookup.should_search(question))
                 self.assertEqual(web_lookup.offer(question), question)  # the exact text, for the owner to confirm
-        for question in ("latest repo rate in India", "what is a mutual fund", "What is the capital of France?", "how does a SIP work"):
+        # Owner 2026-11-20: online data without asking, so a name alone no longer waits for a tap.
+        for question in ("latest repo rate in India", "what is a mutual fund", "What is the capital of France?", "how does a SIP work",
+                         "When did Anika leave Infosys?", "Who is the director of Cedar Clinic?", "Current interview results at Cedar Clinic"):
             with self.subTest(public=question):
                 self.assertTrue(web_lookup.should_search(question))
                 self.assertIsNone(web_lookup.offer(question))
@@ -168,9 +169,9 @@ class HybridWebLookupTests(TestCase):
             self.assertEqual({call.kwargs.get("params", {}).get("q", exact) for call in request.call_args_list}, {exact})
             self.assertNotIn("web_offer", confirmed)
             request.reset_mock()
-            cloud = self.ask("When did Anika leave Infosys?", provider="gemini", cloud_consent=True, query_sensitivity="public")
+            cloud = self.ask("Why does Anika avoid Rahul?", provider="gemini", cloud_consent=True, query_sensitivity="public")
             request.assert_not_called()
-            self.assertEqual(cloud["web_offer"], "When did Anika leave Infosys?")
+            self.assertEqual(cloud["web_offer"], "Why does Anika avoid Rahul?")
             with self.assertRaises(PermissionError):  # the cloud path keeps its own stricter refusal for sensitive text
                 self.ask(question, provider="gemini", cloud_consent=True, query_sensitivity="public")
         self.assertNotIn("web_offer", self.ask(question))  # automatic lookup switched off: no offer either
@@ -183,6 +184,24 @@ class HybridWebLookupTests(TestCase):
         for refused in ({}, {"cloud_consent": True}, {"cloud_consent": True, "query_sensitivity": "public", "scope": "travel"}):
             with self.subTest(refused=refused), self.assertRaises(ValueError):
                 self.ask(provider="gemini", **refused)
+
+
+    def test_with_gemini_on_a_public_question_goes_to_gemini_without_asking_and_a_personal_one_stays_local(self):
+        """Owner decision 2026-11-20: no per-question approval for public questions; personal ones never leave this PC."""
+        self.local.reason.return_value = "Synthetic local answer."
+        on = patch("apps.ml_engine.services.memory_reasoning.answers_by_itself", return_value=True)
+        with on:
+            self.assertEqual(self.ask("What is the capital of France?")["provider"], "mock")
+            self.local.reason.assert_not_called()
+            for personal in ("what did I save about my trip", "Does Anika have cancer?"):
+                with self.subTest(personal=personal):
+                    self.assertEqual(self.ask(personal)["provider"], "ollama")
+            self.assertEqual(self.ask("What is the capital of France?", conversation_context=[
+                {"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}])["provider"], "ollama")  # follow-ups need the chat
+            with patch("apps.ml_engine.services.hybrid_intelligence.reason_with_memory", side_effect=RuntimeError("over the daily cap")):
+                self.assertEqual(self.ask("What is the capital of France?")["provider"], "ollama")  # Gemini failed: local answers
+        self.local.reason.reset_mock()
+        self.assertEqual(self.ask("What is the capital of France?")["provider"], "ollama")  # Gemini off in Settings: local only
 
 
 @override_settings(ALFRED_MEMORY_MOCK_REASONING=False)

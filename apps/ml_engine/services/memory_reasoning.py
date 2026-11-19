@@ -160,6 +160,13 @@ class GeminiReasoner:
         return answer
 
 
+def answers_by_itself(store,user):
+    """Owner decision 2026-11-20: with a saved key and the Settings opt-in, Gemini answers clearly public questions without
+    asking each time; personal and sensitive questions still stay on this PC."""
+    state=forget_openai(store,user)
+    return bool(saved_key(state) and (state.get('reasoning_policy') or {}).get('enabled') is True)
+
+
 def reasoning_provider(store,user):
     if settings.ALFRED_MEMORY_MOCK_REASONING: return MockReasoner()
     key=saved_key(forget_openai(store,user))

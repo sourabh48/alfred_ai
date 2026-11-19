@@ -450,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
         document.getElementById("intelligenceCloudStatus").textContent = !reasoning ? "Cloud policy unavailable · cloud disabled" : !reasoning.real_provider_enabled
             ? (cloudAvailable ? "Synthetic cloud testing · Gemini disabled" : "Gemini disabled")
-            : (cloudAvailable ? "Gemini · consent required per question" : "Gemini · owner consent or configuration required");
+            : (cloudAvailable ? "Gemini · answers public questions by itself; personal ones stay on this PC" : "Gemini · add your key and tick the opt-in in Settings");
         if (policy.error) feedback.textContent = `${policy.error.message} Cloud is disabled. Reload to recheck its policy; local sources remain available.`;
         updateScope();
     }
@@ -697,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (event.type === 'error') {
                         throw Object.assign(new Error(event.detail || 'Local output is incomplete. Your draft is preserved.'),{status:event.status,code:event.code,reference:event.error_id});
                     } else if (event.type === 'final') {
-                        if (!event.result || !['ollama','local_evidence'].includes(event.result.provider) || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
+                        if (!event.result || !['ollama','local_evidence','gemini'].includes(event.result.provider) || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
                         partial.remove(); return event.result;
                     } else if (!['started','heartbeat'].includes(event.type)) throw new Error('Invalid local stream event.');
                 }
@@ -813,7 +813,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     retry.hidden = false;
                 }
             } else {
-                setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
+                if (result.provider !== "gemini") setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
                 query.value = ""; requestToken = null;
             }
             if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && result.provider === "ollama" && !result.narrative_withheld) {

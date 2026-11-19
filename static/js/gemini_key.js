@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("memoryReasoningForm").addEventListener("submit", event => {
         event.preventDefault();
         const enabled = $("memoryReasoningEnabled").checked;
-        act("reason", {enabled, consent: enabled, daily_tokens: Number($("memoryReasoningTokens").value), daily_microusd: Math.round(Number($("memoryReasoningDollars").value) * 1000000)}, "Gemini settings saved. Each cloud question still asks first.");
+        act("reason", {enabled, consent: enabled, daily_tokens: Number($("memoryReasoningTokens").value), daily_microusd: Math.round(Number($("memoryReasoningDollars").value) * 1000000)}, "Gemini settings saved. Public questions go to Gemini by themselves; personal ones stay on this PC.");
     });
     // Clear what the page showed when it goes into the back/forward cache, and reload it on return.
     window.addEventListener("pagehide", () => { generation++; feedback.textContent = ""; $("memoryReasoningUsage").textContent = ""; $("memoryReasoningKey").value = ""; });
