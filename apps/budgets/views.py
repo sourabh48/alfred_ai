@@ -66,6 +66,37 @@ class SavingsGoalPlanView(APIView):
         })
 
 
+class SavingsGoalInvestmentsView(APIView):
+    """INV-06, read-only: the owner's holdings in the goal's currency, grown to its date by the investments projection engine."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        from apps.investments.models import Investment
+        from apps.investments.views import _project_position_money
+        goal = get_object_or_404(SavingsGoal, pk=pk, user=request.user)
+        progress = goal_progress(goal.target_amount, goal.saved_amount, goal.target_date, timezone.localdate())
+        if not progress["months_left"]:
+            return Response({"detail": "Give the goal a target date that is still ahead."}, status=status.HTTP_400_BAD_REQUEST)
+        currency, cent, holdings, other = goal.currency or "INR", Decimal("0.01"), [], 0
+        for row in Investment.objects.filter(user=request.user).order_by("-current_value", "id"):
+            if (row.currency or "INR") != currency:  # never converted: FX stays out of the maths
+                other += 1
+                continue
+            projected = _project_position_money(current_value=row.current_value, monthly_sip=row.monthly_sip,
+                                                annual_return_rate=row.annual_return_rate, months=progress["months_left"]).quantize(cent)
+            holdings.append({"id": row.pk, "name": row.asset_name, "current_value": str(row.current_value), "monthly_sip": str(row.monthly_sip),
+                             "annual_return_rate": row.annual_return_rate, "projected": str(projected)})
+        total = sum((Decimal(item["projected"]) for item in holdings), Decimal("0"))
+        return Response({
+            "goal_id": goal.pk, "currency": currency, "months_left": progress["months_left"], "target_amount": str(goal.target_amount),
+            "projected_total": str(total), "covers_percent": float(min(Decimal("100"), total * 100 / goal.target_amount).quantize(Decimal("0.1")))
+            if goal.target_amount > 0 else None, "holdings": holdings, "other_currency_holdings": other,
+            "assumptions": ["Each holding grows at the yearly return you entered for it (0% if none), compounded monthly, with its monthly SIP added each month.",
+                            "Real returns vary and can be negative; this is not a forecast or advice.",
+                            "If Saved so far already counts these holdings, do not add the two together."],
+        })
+
+
 class BudgetListCreateView(ListCreateAPIView):
     serializer_class = BudgetSerializer
     permission_classes = [IsAuthenticated]

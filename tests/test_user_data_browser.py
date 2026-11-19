@@ -9885,3 +9885,6 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click(f'[data-goal-plan="{goal.pk}"]')
         self.wait.until(lambda _: '%' in self.text(f'savingsGoalPlanResult{goal.pk}'))
         self.capture('savings-goal-required-return')
+        self.memory_click(f'[data-goal-invest="{goal.pk}"]')  # INV-06: the scenario's holdings grown to the goal's date
+        self.wait.until(lambda _: 'investments could be about' in self.text(f'savingsGoalInvestResult{goal.pk}'))
+        self.capture('savings-goal-investments-by-then')

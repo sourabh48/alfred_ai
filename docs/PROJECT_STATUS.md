@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 33 | PARTIALLY_IMPLEMENTED: 18 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 34 | PARTIALLY_IMPLEMENTED: 17 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -816,7 +816,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
-| INV | 3 | 8 | 37.5 | 4 | 1 | 0 | 0 | 0 |
+| INV | 3 | 8 | 37.5 | 5 | 0 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
@@ -1989,8 +1989,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: Obtain mandatory review and validate permitted integration; retain both bounded receipts. Do not repeat or promote completed synthetic scope into full capability acceptance.
 ### INV-06 — Long-term investment planning
 
-**PARTIALLY_IMPLEMENTED** · Investments · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
 
+- 2026-11-19 (goals joined to the projection engine): each open savings goal with a future date has "My investments by then" (`GET /api/budgets/goals/<id>/investments/`, [budgets/views.py](../apps/budgets/views.py) `SavingsGoalInvestmentsView`). It grows every holding in the goal's own currency to the goal's date with the existing `_project_position_money` engine (the owner's entered yearly return, compounded monthly, plus its monthly SIP) and shows each holding, the total and the share of the target. Holdings in other currencies are counted and left out, never converted (approved FX-off contract); a record without a currency is the legacy rupee amount. Read-only and owner-only; it warns not to add holdings already counted in Saved so far. Tests: `GoalInvestmentsApiTests` (2) with goal and projection suites 30 PASS; Chrome `test_savings_goal_plan_shows_the_yearly_return_needed` extended and PASS. Risk calibration of the entered returns stays the owner's input, not a forecast.
+- Next: owner check with a real goal; FIN-06 and FIN-15 acceptance still apply to the goal and currency data it reads.
 - Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
 - APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
 - Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.

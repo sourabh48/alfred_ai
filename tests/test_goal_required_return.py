@@ -55,3 +55,39 @@ class GoalPlanApiTests(TestCase):
         foreign = SavingsGoal.objects.create(user=other, name="Theirs", target_amount=Decimal("100.00"),
                                              target_date=timezone.localdate() + timedelta(days=60))
         self.assertEqual(self.plan(foreign, "1").status_code, 404)
+
+
+class GoalInvestmentsApiTests(TestCase):
+    """INV-06: holdings in the goal's currency grown to its date by the investments engine; read-only, owner-only, no FX."""
+
+    def setUp(self):
+        from apps.investments.models import Investment
+        users = get_user_model().objects
+        self.owner, other = users.create_user(username="synthetic-goal-invest"), users.create_user(username="synthetic-goal-other")
+        self.client.force_login(self.owner)
+        self.goal = SavingsGoal.objects.create(user=self.owner, name="Synthetic", target_amount=Decimal("120000.00"),
+                                               target_date=timezone.localdate() + timedelta(days=730))
+        Investment.objects.create(user=self.owner, asset_name="Synthetic Lump", asset_type="equity", current_value="1200.00", currency="INR")
+        Investment.objects.create(user=self.owner, asset_name="Synthetic SIP", asset_type="mutual_fund", current_value="0", monthly_sip="100.00")
+        Investment.objects.create(user=self.owner, asset_name="Synthetic Dollar", asset_type="equity", current_value="999.00", currency="USD")
+        Investment.objects.create(user=other, asset_name="Not Mine", asset_type="equity", current_value="5000000.00", currency="INR")
+
+    def test_projection_counts_only_same_currency_holdings_and_writes_nothing(self):
+        from apps.investments.models import Investment
+        before = list(Investment.objects.values())
+        data = self.client.get(f"/api/budgets/goals/{self.goal.pk}/investments/").json()
+        self.assertEqual((data["currency"], data["months_left"], data["other_currency_holdings"]), ("INR", 24, 1))
+        self.assertEqual({item["name"]: item["projected"] for item in data["holdings"]},
+                         {"Synthetic Lump": "1200.00", "Synthetic SIP": "2400.00"})  # 0% entered: no growth, legacy no-currency is INR
+        self.assertEqual((data["projected_total"], data["covers_percent"]), ("3600.00", 3.0))
+        self.assertEqual(list(Investment.objects.values()), before)
+        Investment.objects.filter(asset_name="Synthetic Lump").update(annual_return_rate=12)
+        grown = self.client.get(f"/api/budgets/goals/{self.goal.pk}/investments/").json()["holdings"][0]["projected"]
+        self.assertEqual(grown, str((Decimal("1200") * Decimal("1.01") ** 24).quantize(Decimal("0.01"))))
+
+    def test_needs_a_future_date_and_an_own_goal(self):
+        undated = SavingsGoal.objects.create(user=self.owner, name="Undated", target_amount=Decimal("10.00"))
+        self.assertEqual(self.client.get(f"/api/budgets/goals/{undated.pk}/investments/").status_code, 400)
+        theirs = SavingsGoal.objects.create(user=get_user_model().objects.get(username="synthetic-goal-other"), name="Theirs",
+                                            target_amount=Decimal("10.00"), target_date=timezone.localdate() + timedelta(days=60))
+        self.assertEqual(self.client.get(f"/api/budgets/goals/{theirs.pk}/investments/").status_code, 404)

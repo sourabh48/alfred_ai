@@ -265,13 +265,36 @@ function renderSavingsGoals(goals) {
                     <input class="form-control form-control-sm" id="savingsGoalPlanAmount${goal.id}" type="number" min="0" step="0.01">
                 </div>
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-plan="${goal.id}">Return needed</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-invest="${goal.id}">My investments by then</button>
             </div>
-            <p class="small mt-2 mb-0" id="savingsGoalPlanResult${goal.id}" aria-live="polite"></p>` : ""}
+            <p class="small mt-2 mb-0" id="savingsGoalPlanResult${goal.id}" aria-live="polite"></p>
+            <p class="small mt-2 mb-0" id="savingsGoalInvestResult${goal.id}" aria-live="polite"></p>` : ""}
         </div>`;
     }).join("");
     target.querySelectorAll("[data-goal-save]").forEach(button => button.addEventListener("click", () => updateSavingsGoal(button)));
     target.querySelectorAll("[data-goal-delete]").forEach(button => button.addEventListener("click", () => deleteSavingsGoal(button)));
     target.querySelectorAll("[data-goal-plan]").forEach(button => button.addEventListener("click", () => planSavingsGoal(button)));
+    target.querySelectorAll("[data-goal-invest]").forEach(button => button.addEventListener("click", () => projectGoalInvestments(button)));
+}
+
+// INV-06: the owner's holdings in the goal's currency, grown to the goal's date at the returns they entered.
+function projectGoalInvestments(button) {
+    const id = button.dataset.goalInvest;
+    const result = document.getElementById(`savingsGoalInvestResult${id}`);
+    button.disabled = true;
+    Alfred.fetchJSON(`/api/budgets/goals/${id}/investments/`)
+        .then(data => {
+            const money = value => Alfred.formatCurrency(value, data.currency);
+            const parts = data.holdings.slice(0, 5).map(item => `${item.name} ${money(item.projected)}`);
+            const more = data.holdings.length > 5 ? `, and ${data.holdings.length - 5} more` : "";
+            const lead = data.holdings.length
+                ? `In ${data.months_left} month(s) your ${data.currency} investments could be about ${money(data.projected_total)} (${parts.join(", ")}${more}), ${data.covers_percent}% of the ${money(data.target_amount)} target.`
+                : `No investments in ${data.currency} to count.`;
+            const other = data.other_currency_holdings ? ` ${data.other_currency_holdings} holding(s) in other currencies are left out; nothing is converted.` : "";
+            result.textContent = `${lead}${other} ${data.assumptions.join(" ")}`;
+        })
+        .catch(error => { result.textContent = error.message; })
+        .finally(() => { button.disabled = false; });
 }
 
 const GOAL_RETURN_BANDS = {
