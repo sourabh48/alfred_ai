@@ -38,6 +38,7 @@ def answer_budget(query, scope, style='auto'):
     return style, min(ANSWER_STYLES[style][0], output_token_cap())
 
 
+TRIPS = 20
 THINKING_SCOPES = ('general', 'travel')  # owner-record scopes copy recorded values; reasoning adds delay, not accuracy
 HARD_QUESTION = re.compile(
     r'\b(?:puzzles?|riddles?|solve|prove|proof|deduce|logic(?:al)?|algorithms?|optimi[sz]e|maximi[sz]e|minimi[sz]e|'
@@ -189,10 +190,18 @@ def _read_source_context(user,scope,document_id=None,transaction_id=None,record_
         from .canonical_evidence import baseline_source
         return [baseline_source(user)|{'ref':'canonical-finance','classification':'canonical_financial_baseline'}]
     if scope=='travel':
-        from apps.mobility.models import TravelPreferenceProfile
+        from apps.mobility.models import TravelPlan, TravelPreferenceProfile
         profile=TravelPreferenceProfile.objects.filter(user=user).first()
-        return [] if profile is None else [{'ref':'travel-preferences','classification':'owner_travel_preferences',
+        sources=[] if profile is None else [{'ref':'travel-preferences','classification':'owner_travel_preferences',
             'url':'/mobility/','data':{'novelty':profile.novelty,'preferences':profile.preferences}}]
+        # AI-12 (2026-11-19): the owner's own saved trips; no notes, costs, fares or bookings.
+        trips=[{'title':plan.title,'destination':plan.destination or None,'start_date':plan.start_date and plan.start_date.isoformat(),
+                'end_date':plan.end_date and plan.end_date.isoformat(),'status':plan.status,'transport_mode':plan.transport_mode}
+               for plan in TravelPlan.objects.filter(user=user).order_by('-start_date','-updated_at')[:TRIPS]]
+        if trips:
+            sources.append({'ref':'travel-trips','classification':'owner_saved_trips','url':'/mobility/',
+                'data':{'trips':trips,'limitation':f'Your {TRIPS} most recent saved trips at most; notes, costs, fares and bookings are not included.'}})
+        return sources
     from apps.loans.models import LoanClosureDocument
     from apps.loans.money import loan_money_float, loan_money
     document=LoanClosureDocument.objects.filter(pk=document_id,loan__user=user,verification_status='verified').first()

@@ -130,7 +130,7 @@ TOOLS = (
          ('record_type', 'document_id', 'selected_records', 'source_catalog'),
          ('record_type', 'document_id', 'selected_records', 'source_catalog')),
     Tool('documents.loan_closure', 'documents', 'Verified loan closure', ('document_id',), ('document_id',)),
-    Tool('travel.preferences', 'travel', 'Saved travel preferences'),
+    Tool('travel.preferences', 'travel', 'Saved travel preferences and trips'),
     Tool('career.applications', 'career', 'Recorded Career application progress'),
 )
 

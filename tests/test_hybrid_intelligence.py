@@ -248,7 +248,21 @@ class HybridIntelligenceTests(TestCase):
         TravelPreferenceProfile.objects.create(user=self.bob,preferences={'private':'SYNTHETIC-BOB'})
         result=self.answer(scope='travel')
         self.assertEqual(result['sources'][0]['data']['preferences'],{'terrain':'mountains'})
-        self.assertNotIn('SYNTHETIC-BOB',str(result))
+        self.assertNotIn('SYNTHETIC-BOB',str(result))
+
+    def test_saved_trips_are_owner_scoped_and_leave_notes_out(self):
+        from datetime import date
+        from apps.mobility.models import TravelPlan
+        TravelPlan.objects.create(user=self.alice,title='Synthetic Spiti ride',destination='Kaza',start_date=date(2026,6,1),
+                                  end_date=date(2026,6,9),status='completed',notes='SYNTHETIC-PRIVATE-NOTE')
+        TravelPlan.objects.create(user=self.alice,title='Synthetic Goa idea')
+        TravelPlan.objects.create(user=self.bob,title='SYNTHETIC-BOB-TRIP')
+        result=self.answer(scope='travel')
+        trips=next(source for source in result['sources'] if source['ref']=='travel-trips')['data']['trips']
+        self.assertEqual([(t['title'],t['start_date'],t['status']) for t in trips],
+                         [('Synthetic Spiti ride','2026-06-01','completed'),('Synthetic Goa idea',None,'planned')])
+        self.assertNotIn('SYNTHETIC-BOB',str(result)+str(self.local.reason.call_args))
+        self.assertNotIn('SYNTHETIC-PRIVATE-NOTE',str(result)+str(self.local.reason.call_args))
 
     def test_insights_api_session_csrf_validation_safe_errors_and_no_store(self):
         url='/api/ai/personal-insights/'; data={'query':'mountain'}

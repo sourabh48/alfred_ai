@@ -2261,6 +2261,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **PARTIALLY_IMPLEMENTED** · ALFRED intelligence · P2.
 
+- Saved trips (2026-11-19, scope picked by ALFRED at the owner's request): the Travel assistant now also reads the owner's 20 most recent saved trips (title, destination, dates, status, transport) as source `travel-trips`, owner-scoped and read-only, local only. Trip notes, costs, fares and bookings are left out. Tests: 44 assistant/tool/MCP backend + 1 Chrome PASS (synthetic). Still partial: Bike service history and Career outcomes are not yet in the assistant, and arbitrary cross-module questions are not supported.
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
 - Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
