@@ -315,7 +315,8 @@ def read_message(session_id, user, text):
     from apps.ml_engine.services.brain import try_examples
     recent = reversed(session.messages.order_by("-id").values_list("role", "text")[:4])
     return read(without_itinerary_commands(str(text)) if session.itinerary else text, pending=value(session.state, "pending_question"),
-                recent=list(recent), lessons=try_examples(user, "travel_reading", limit=8) if settings.ALFRED_TRAVEL_LOCAL_READING else ())
+                recent=list(recent), lessons=try_examples(user, "travel_reading", limit=8) if settings.ALFRED_TRAVEL_LOCAL_READING else (),
+                user=user)
 
 
 def learn_correction(session, user, old_state):

@@ -1,5 +1,5 @@
 """The Travel planner reads each message with the local model (owner request 2026-11-20); rules stay the backup."""
-from datetime import timedelta
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -96,6 +96,26 @@ class ReadTests(TestCase):
         today = timezone.localdate()
         saturday = today + timedelta(days=(5 - today.weekday()) % 7)
         self.assertIn(f"'this weekend' means Saturday {saturday.isoformat()}", system)  # the model miscounted weekdays itself
+
+    def test_a_festival_message_gets_holiday_dates_and_the_lookup_is_used_when_it_answers(self):
+        user = get_user_model().objects.create_user("synthetic-travel-festival")
+        diwali = (timezone.localdate() + timedelta(days=30)).isoformat()
+        with override_settings(ALFRED_TRAVEL_LOCAL_READING=True), \
+                patch("apps.mobility.services.travel.trip_tools.holidays", return_value={"holidays": [{"date": diwali, "english": "Diwali"}]}) as lookup, \
+                patch("apps.career.services.bullet_rewrite.LocalChat.ask", return_value={}) as ask:
+            understanding.read("a trip for the diwali weekend", user=user)
+            holidays = ask.call_args.args[1]["upcoming_holidays"]
+            self.assertIn({"name": "Diwali", "date": diwali, "weekday": date.fromisoformat(diwali).strftime("%A")}, holidays)
+            self.assertEqual(lookup.call_args.kwargs["user"], user)
+            christmas = next(h["date"] for h in holidays if h["name"] == "Christmas")
+            self.assertTrue(christmas.endswith("-12-25") and christmas >= timezone.localdate().isoformat())
+            lookup.side_effect = OSError("offline")
+            understanding.read("around christmas", user=user)
+            self.assertIn("Christmas", [h["name"] for h in ask.call_args.args[1]["upcoming_holidays"]])  # fixed dates still given
+            lookup.reset_mock()
+            understanding.read("3 days in goa", user=user)
+            self.assertNotIn("upcoming_holidays", ask.call_args.args[1])
+            lookup.assert_not_called()  # no lookup unless a holiday is named
 
 
 class ChatTests(TestCase):
