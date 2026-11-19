@@ -248,20 +248,22 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
         return Response(status=204)
 
     def post(self, request, pk):
-        reading = None
+        reading, answer = None, ""
         if isinstance(request.data, dict) and request.data.get("action", "message") == "message":
-            from .services.travel_conversation import read_message
-            reading = read_message(pk, request.user, request.data.get("text", ""))  # outside the lock: the local model takes seconds
-        return self._post(request, pk, reading)
+            from .services.travel_conversation import answer_message, read_message
+            text = request.data.get("text", "")
+            reading = read_message(pk, request.user, text)  # outside the lock: the local model takes seconds
+            answer = answer_message(pk, request.user, text)
+        return self._post(request, pk, reading, answer)
 
     @transaction.atomic
-    def _post(self, request, pk, reading):
+    def _post(self, request, pk, reading, answer=""):
         if not isinstance(request.data, dict):
             return Response({"detail": "Choose a supported trip action."}, status=400)
         session = get_object_or_404(TravelPlanningSession.objects.select_for_update(), pk=pk, user=request.user)
         action = request.data.get("action", "message")
         if action == "message":
-            session = send_message(pk, request.user, request.data.get("text", ""), reading)
+            session = send_message(pk, request.user, request.data.get("text", ""), reading, answer)
         elif action == "itinerary_edit":
             apply_edit(session, request.data)
         elif action == "packing":

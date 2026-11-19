@@ -129,6 +129,7 @@
  "tests.test_ollama_keeper": 0.05,
  "tests.test_travel_understanding": 0.5,
  "tests.test_brain": 1.5,
+ "tests.test_travel_answers": 0.5,
  "tests.test_safe_cache": 7.88,
  "tests.test_salary_evidence": 59.75,
  "tests.test_savings_goals": 0.57,

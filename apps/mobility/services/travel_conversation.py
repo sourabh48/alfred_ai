@@ -20,6 +20,7 @@ from .travel_catalog import ALIASES, CITIES, DESTINATIONS, lookup
 from .travel_discovery import budget_for, candidates_for, fact, learn, profile_for, value
 from .travel_itinerary import build_itinerary, build_multi_stop_itinerary, edit_itinerary, without_itinerary_commands
 from .travel_research import queue_research
+from .travel.answers import NOT_FOUND
 
 STYLE_WORDS = {
     "mountains": ["mountain", "hills"], "beaches": ["beach"], "forests": ["forest", "nature"],
@@ -319,6 +320,13 @@ def read_message(session_id, user, text):
                 user=user)
 
 
+def answer_message(session_id, user, text):
+    """The local model's answer to a question about a planned trip, taken before the chat is locked."""
+    from .travel.answers import answer
+    session = TravelPlanningSession.objects.filter(pk=session_id, user=user).only("state", "itinerary").first()
+    return answer(text, session.itinerary, session.state) if session is not None and session.itinerary else ""
+
+
 def learn_correction(session, user, old_state):
     """Right after "I understood: ...", a message that changes one of those values teaches the reader (central brain)."""
     from apps.ml_engine.services.brain import try_remember
@@ -335,11 +343,11 @@ def learn_correction(session, user, old_state):
 
 
 @transaction.atomic
-def send_message(session_id, user, text, reading=None):
+def send_message(session_id, user, text, reading=None, answer=""):
     session = TravelPlanningSession.objects.select_for_update().get(pk=session_id, user=user)
     before, revision = deepcopy(session.itinerary), session.revision
     destination = value(session.state, "selected_destination")
-    session = _send_message(session, user, text, reading)
+    session = _send_message(session, user, text, reading, answer)
     if session.itinerary != before and session.revision == revision:
         session.revision += 1
         session.save(update_fields=["revision", "updated_at"])
@@ -348,7 +356,7 @@ def send_message(session_id, user, text, reading=None):
     return session
 
 
-def _send_message(session, user, text, reading=None):
+def _send_message(session, user, text, reading=None, answer=""):
     text = str(text).strip()
     if not text or len(text) > 2000:
         raise ValidationError("Send a message of 1–2,000 characters.")
@@ -484,6 +492,8 @@ def _send_message(session, user, text, reading=None):
         reply = "I'll update research using your saved trip details and fresh cached results where available. Open Attractions, Find a stay or Map & routes below to explore the results."
         if "flight" in lower and not (value(session.state,"origin_airport") and value(session.state,"destination_airport")):
             reply += " For flight search, give the airport codes, for example BLR to CCJ; I won't guess the nearest airports."
+        if answer and answer != NOT_FOUND:
+            reply = answer + " I'm also refreshing this trip's research; the cards below update when it finishes."
         say(session,reply)
         return session
     if lower in {"compare", "compare destinations", "compare again"}:
@@ -556,7 +566,8 @@ def _send_message(session, user, text, reading=None):
             edited, reply = edit_itinerary(session.itinerary, text, session.state)
             if edited:
                 session.itinerary = edited
-            say(session, reply)
+            asked_only = all(session.state.get(k) == old_state.get(k) for k in set(session.state) | set(old_state) if k != "research_categories")
+            say(session, answer if answer and not edited and asked_only else reply)  # a question nothing else acted on
     else:
         if "cheaper" in lower:
             session.state["budget_type"] = fact("budget")
