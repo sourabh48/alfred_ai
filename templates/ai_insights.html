@@ -2,23 +2,22 @@
 {% block title %}AI Assistant · ALFRED{% endblock %}
 
 {% block content %}
-<header class="workspace-heading">
-    <div class="workspace-badge">Private by default</div>
-    <h1>Your ALFRED assistant</h1>
-    <p>Ask, explore and plan. Alfred handles the routine work.</p><a class="small" href="/settings/diagnostics/">Assistant health</a>
-</header>
-<section class="surface-card mb-4" id="intelligencePanel">
-    <div class="conversation-header">
-        <div><h2 class="page-section-title mb-2">Ask ALFRED</h2>
-            <div class="workspace-status">
-                <span id="intelligenceLocalStatus" class="workspace-badge" role="status">Checking Ollama</span>
-                <span id="intelligenceCloudStatus" class="workspace-badge">OpenAI disabled</span>
+<section class="surface-card mb-4 ask-panel" id="intelligencePanel" aria-labelledby="askTitle">
+    <div class="ask-header">
+        <div class="ask-title">
+            <span class="ask-avatar" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+            <div><h1 id="askTitle" class="ask-heading">Ask ALFRED</h1>
+                <div class="workspace-status">
+                    <span id="intelligenceLocalStatus" class="workspace-badge" role="status">Checking Ollama</span>
+                    <span id="intelligenceCloudStatus" class="workspace-badge">OpenAI disabled</span>
+                    <a class="workspace-badge ask-health-link" href="/settings/diagnostics/">Assistant health</a>
+                </div>
             </div>
         </div>
-        <button id="intelligenceNew" class="btn btn-outline-secondary btn-sm" type="button">New conversation</button>
+        <button id="intelligenceNew" class="btn btn-outline-primary btn-sm" type="button">New conversation</button>
     </div>
     <details id="conversationHistoryPanel" class="conversation-evidence mb-3">
-        <summary>Your chats · <span id="conversationHistoryStatus">loading</span></summary>
+        <summary><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Your chats · <span id="conversationHistoryStatus">loading</span></summary>
         <ul id="conversationHistoryList" class="list-unstyled mt-2" aria-label="Your saved chats"></ul>
         <p id="conversationHistoryFeedback" class="small" role="status" aria-live="polite"></p>
         <label for="conversationHistorySearch" class="form-label visually-hidden">Search your chats</label>
@@ -51,15 +50,36 @@
         </div>
     </details>
     <p id="conversationHistoryCurrent" class="small text-muted" role="status">Page-only conversation</p>
-    <div id="intelligenceEmpty" class="conversation-empty"><h3>What would you like to understand?</h3>
-        <p>Ask about a saved memory, your financial snapshot or your Travel preferences.</p>
-        <div class="d-flex flex-wrap gap-2"><a class="btn btn-sm btn-outline-primary" href="/mobility/">Plan a trip</a><a class="btn btn-sm btn-outline-primary" href="/investments/#researchJournalSection">Research a stock</a><a class="btn btn-sm btn-outline-primary" href="/dashboard/#taskBots">See what needs attention</a></div></div>
+    <div id="intelligenceEmpty" class="conversation-empty ask-empty">
+        <h2 class="ask-empty-title">What would you like to know?</h2>
+        <p>Ask anything. ALFRED checks your own records and saved notes first, and looks up public facts online when they are missing.</p>
+        <div class="ask-suggestions" role="group" aria-label="Try one of these">
+            <button type="button" class="ask-chip" data-ask="What is a mutual fund?"><i class="fa-solid fa-coins" aria-hidden="true"></i>What is a mutual fund?</button>
+            <button type="button" class="ask-chip" data-ask="Latest repo rate in India"><i class="fa-solid fa-building-columns" aria-hidden="true"></i>Latest repo rate in India</button>
+            <button type="button" class="ask-chip" data-ask="Explain compound interest"><i class="fa-solid fa-chart-line" aria-hidden="true"></i>Explain compound interest</button>
+            <button type="button" class="ask-chip" data-ask="What do you know about my travel style?"><i class="fa-solid fa-suitcase-rolling" aria-hidden="true"></i>My travel style</button>
+        </div>
+        <div class="ask-shortcuts">
+            <a href="/mobility/"><i class="fa-solid fa-route" aria-hidden="true"></i>Plan a trip</a>
+            <a href="/investments/#researchJournalSection"><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>Research a stock</a>
+            <a href="/dashboard/#taskBots"><i class="fa-solid fa-bell" aria-hidden="true"></i>See what needs attention</a>
+        </div>
+    </div>
     <div id="intelligenceAnswers" role="log" aria-live="polite" aria-label="Current conversation" class="conversation-messages"></div>
-    <form id="intelligenceForm" class="conversation-composer" data-live-refresh-hold="true">
-        <label for="intelligenceQuery" class="form-label">Your question</label>
-        <textarea id="intelligenceQuery" class="form-control mb-3" rows="3" maxlength="1024" required autocomplete="off" placeholder="Ask a question…" aria-describedby="intelligencePrivacy"></textarea>
-        <details class="small mb-2"><summary>Examples of things you can ask</summary><p id="intelligenceActionHint">Try “add a savings goal Emergency fund of 1 lakh by March 2027” or “update Emergency fund saved to 25000”. ALFRED shows the change and saves it only when you press Confirm.</p></details>
-        <details id="intelligenceOptions" class="conversation-evidence mb-3"><summary>Answer options and sources</summary>
+    <form id="intelligenceForm" class="conversation-composer ask-form" data-live-refresh-hold="true">
+        <div class="ask-composer">
+            <label for="intelligenceQuery" class="visually-hidden">Your question</label>
+            <textarea id="intelligenceQuery" class="form-control ask-input" rows="2" maxlength="1024" required autocomplete="off" placeholder="Ask ALFRED anything…" aria-describedby="intelligencePrivacy"></textarea>
+            <div class="ask-composer-actions">
+                <button class="btn btn-primary ask-send" type="submit"><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Ask ALFRED</button>
+                <button id="intelligenceStop" class="btn btn-outline-danger btn-sm" type="button" hidden aria-describedby="intelligenceStreamHelp">Stop generation</button>
+                <button id="intelligenceMic" class="btn btn-outline-primary btn-sm" type="button" aria-pressed="false" aria-describedby="intelligenceSpeechHint" hidden>Speak</button>
+                <span class="ask-keys">Enter for a new line · Ctrl/⌘ + Enter to send</span>
+            </div>
+        </div>
+        <label class="d-block mb-2" hidden><input id="intelligenceHandsFree" type="checkbox"> Hands-free conversation: ask when I pause, read the answer aloud, then listen again. Changes still wait for Confirm.</label>
+        <div class="ask-tools">
+        <details id="intelligenceOptions" class="conversation-evidence mb-3"><summary><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Options: your records, sources and online lookup</summary>
         <label class="form-label" for="intelligenceAnswerStyle">Local answer style</label>
         <select id="intelligenceAnswerStyle" class="form-select mb-2" aria-describedby="intelligenceAnswerStyleHelp">
             <option value="auto">Automatic</option><option value="concise">Concise</option>
@@ -100,18 +120,17 @@
             <a class="btn btn-outline-primary btn-sm" href="/documents/#documentSourcesTitle">Choose a financial document</a>
         </div>
         <label class="d-block mb-2"><input id="intelligenceWebSearch" type="checkbox">
-            Look this question up online. ALFRED automatically searches recognized public topics such as the current repo rate. For other questions it can show the exact text and ask before searching. Only the question goes to Wikipedia and Google News, never your records, and they may keep what they receive; questions with amounts, long numbers, emails or keys are never sent.</label>
+            Always look this question up online. Without the tick ALFRED still looks up general and current public questions that your saved data cannot answer; a question that may be about someone's private life waits for you to approve the exact text. Only the question goes to Wikipedia and Google News, never your records, and they may keep what they receive; questions with amounts, long numbers, emails or keys are never sent.</label>
         <label class="d-block mb-2"><input id="intelligenceCloudConsent" type="checkbox" disabled>
             This question is public. Answer it with OpenAI using your own key from Settings.</label>
 </details>
-        <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
-        <details class="small mb-2"><summary>How answers and privacy work</summary><p class="small" id="intelligenceStreamHelp">Local general chat can show an unverified preview with history on or off. Finance, saved records, statement evidence, verified closures and Travel answers stay buffered until source checks finish; Stop generation keeps your draft. A completed turn may already be saved if its final response is lost; reopen history or retry the same draft.</p>
-        </details><p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone until you pause or press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Without hands-free, check the text before you ask.</p>
-        <label class="d-block mb-2" hidden><input id="intelligenceHandsFree" type="checkbox"> Hands-free conversation: ask when I pause, read the answer aloud, then listen again. Changes still wait for Confirm.</label>
-        <div class="conversation-actions"><button class="btn btn-primary" type="submit">Ask ALFRED</button>
-            <button id="intelligenceStop" class="btn btn-outline-danger" type="button" hidden aria-describedby="intelligenceStreamHelp">Stop generation</button>
-            <button id="intelligenceMic" class="btn btn-outline-primary" type="button" aria-pressed="false" aria-describedby="intelligenceSpeechHint" hidden>Speak</button>
-            <span class="small text-muted">Enter for a new line · Ctrl/⌘ + Enter to send</span></div>
+        <details class="conversation-evidence ask-help"><summary><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>Tips and privacy</summary>
+            <p class="small mt-2" id="intelligenceActionHint">Try “add a savings goal Emergency fund of 1 lakh by March 2027” or “update Emergency fund saved to 25000”. ALFRED shows the change and saves it only when you press Confirm.</p>
+            <p class="small text-muted" id="intelligencePrivacy">Financial, document and Travel questions stay local. AI advice is a hypothesis. Financial records remain authoritative. Questions stay page-only unless you explicitly enable local history.</p>
+            <p class="small" id="intelligenceStreamHelp">Local general chat can show an unverified preview with history on or off. Finance, saved records, statement evidence, verified closures and Travel answers stay buffered until source checks finish; Stop generation keeps your draft. A completed turn may already be saved if its final response is lost; reopen history or retry the same draft.</p>
+            <p class="small" id="intelligenceSpeechHint" hidden>Speak turns on the microphone until you pause or press Stop listening (30 seconds at most). Speech becomes text on this PC; the audio is not stored or sent anywhere. Without hands-free, check the text before you ask.</p>
+        </details>
+        </div>
         <fieldset id="intelligenceSources" class="conversation-evidence mt-3 d-none" aria-describedby="intelligenceSourcesHelp">
             <legend id="intelligenceSourcesTitle" class="h6">Choose financial source documents</legend>
             <p id="intelligenceSourcesHelp" class="small">Browse every linked source. Select one to five reviewed files across pages. Only selected revisions will be used; other files are not silently included. Owner confirmation is not independent authentication.</p>
@@ -130,7 +149,7 @@
     <p id="intelligenceFeedback" role="status" aria-live="polite" class="mt-2"></p>
     <button id="intelligenceRetry" class="btn btn-outline-primary" type="button" hidden>Retry question</button>
     <details class="mt-3" id="intelligenceMemorySave"><summary>Save a verified memory</summary>
-        <p>Only save information you have checked. AI answers may be incorrect. Manage corrections, deletion and retention in <a href="/settings/">Settings</a>.</p>
+        <p>Only save information you have checked. AI answers may be incorrect. Manage corrections, deletion and retention in <a href="/settings/diagnostics/#memoryHealth">App health</a>.</p>
         <form id="intelligenceMemoryForm" data-live-refresh-hold="true">
             <label for="intelligenceMemoryText" class="form-label">Information I have verified</label>
             <textarea id="intelligenceMemoryText" class="form-control mb-2" rows="2" maxlength="8192" required autocomplete="off"></textarea>
@@ -219,5 +238,5 @@
 <script src="/static/js/ai_insights.js?v=2.1.2"></script>
 <script src="/static/js/answer_markdown.js?v=1"></script>
 <script src="/static/js/voice.js?v=2"></script>
-<script src="/static/js/intelligence.js?v=44"></script>
+<script src="/static/js/intelligence.js?v=45"></script>
 {% endblock %}

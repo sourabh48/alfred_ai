@@ -1,8 +1,27 @@
 # ALFRED execution state
 
+## Sign-in, built-in keys and UI polish — 2026-11-19
+
+LOCAL_TESTING; not pushed. Same worktree and branch, after `397b5e2` (pushed to master with the owner's OK; CI on
+`397b5e2`: Browser Regression and Pages build both success). Owner decisions this day: offline-first retired (only
+sensitive data stays offline); sign-in only through Google, GitHub or Microsoft with a verified email, a phone signs in
+with a code approved on the PC; free keys that never charge ship inside the installer, encrypted; Font Awesome icons and
+a polished UI; AI Memory off Settings with the OpenAI key beside the other keys; no session countdown or expiry.
+
+- `a8400ae` built-in free keys (`alfred_ai/bundled_keys.py`, sealed at build time from `ALFRED_BUNDLE_KEYS_FROM`; never
+  committed; extractable from an installer, said in the code and docs) and the rule changes in CLAUDE.md and AGENTS.md.
+- `81eca4e` provider-only sign-in (password form and admin password login refused once a provider is set up; accounts
+  linked by matching verified email; 127.0.0.1 redirected to localhost for Google and Microsoft), phone code sign-in.
+  Full backend on `81eca4e`: 3,217 tests in 4 shards PASS.
+- `a54e0b0` Font Awesome Free 6.7.2 vendored; brand logo sign-in buttons; icons on every text button from its label;
+  AI Memory card removed from Settings (tools stay in App health; old `/settings/#memory-<id>` links forward there);
+  OpenAI key and limits under Online services; session countdown, idle sign-out and browser-close sign-out removed
+  (a session lasts a year from the last visit or until Sign out; old `ALFRED_SESSION_*` settings are ignored).
+- Owner action after merge: sign in with GitHub at http://localhost:8000 (user 1 is already linked by email).
+
 ## Completion sprint — 2026-11-19
 
-LOCAL_TESTING; not pushed. Worktree `F:/ALFRED_DEV/completion-sprint-1119`, branch `work/completion-sprint-2026-11-19`
+PUSHED to master through `397b5e2` (owner OK). Worktree `F:/ALFRED_DEV/completion-sprint-1119`, branch `work/completion-sprint-2026-11-19`
 from `e6fa006`. Owner asked for the gap audit's completion sprint (audit folder `alfred-gap-audit-20261117`,
 `AUDIT.md` and `REQUIREMENT_MATRIX.md` there). Preserved untouched: `F:/ALFRED_DEV/remaining-capabilities-1118`
 (base `45c3d89`, five modified files; its Council and Career changes are already upstream).

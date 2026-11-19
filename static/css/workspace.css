@@ -228,3 +228,36 @@ html[data-theme="dark"] li > .provider-logo .fa-github { color: var(--alfred-ink
 .auth-alt-links a { display: inline-flex; align-items: center; gap: .4rem; }
 .alfred-btn-icon { margin-right: .45em; font-size: .92em; }
 .btn-sm .alfred-btn-icon { margin-right: .35em; }
+
+/* Ask ALFRED as a chat: one header, suggestions, the thread, then a composer with Send inside (owner, 2026-11-19). */
+.ask-panel { padding: 1.25rem 1.5rem; }
+.ask-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding-bottom: 1rem; border-bottom: 1px solid var(--alfred-stroke); }
+.ask-title { display: flex; align-items: center; gap: .85rem; min-width: 0; }
+.ask-avatar { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 14px; flex: none; color: #fff;
+    background: linear-gradient(135deg, #3b6fe0, #6a4fd8); font-size: 1.15rem; }
+.ask-heading { font-size: 1.35rem; font-weight: 700; margin: 0 0 .3rem; color: var(--alfred-ink); }
+.ask-health-link { text-decoration: none; }
+.ask-panel #conversationHistoryPanel { margin-top: 1rem; }
+.ask-empty { padding: 1.5rem 0 .5rem !important; }
+.ask-empty-title { font-size: 1.4rem; font-weight: 700; color: var(--alfred-ink); margin-bottom: .35rem; }
+.ask-suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .6rem; margin: 1rem 0 .85rem; }
+.ask-chip { display: flex; align-items: center; gap: .6rem; padding: .75rem .9rem; text-align: left; border: 1px solid var(--alfred-stroke);
+    border-radius: 12px; background: var(--alfred-surface-strong); color: var(--alfred-ink); font-weight: 500; transition: border-color .15s, background-color .15s; }
+.ask-chip:hover { border-color: var(--alfred-primary); }
+.ask-chip:focus-visible { outline: 3px solid var(--alfred-primary); outline-offset: 2px; }
+.ask-chip i { color: var(--alfred-primary); width: 1.1rem; text-align: center; }
+.ask-shortcuts { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; font-size: .9rem; }
+.ask-shortcuts a { display: inline-flex; align-items: center; gap: .4rem; text-decoration: none; }
+.ask-form { border-top: 0; padding-top: .5rem; }
+.ask-composer { border: 1px solid var(--alfred-stroke); border-radius: 16px; background: var(--alfred-surface-strong); padding: .5rem .5rem .5rem .75rem;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, .06); }
+.ask-composer:focus-within { border-color: var(--alfred-primary); box-shadow: 0 0 0 3px var(--alfred-primary-soft); }
+.ask-input { border: 0 !important; background: transparent !important; box-shadow: none !important; resize: vertical; min-height: 3.25rem; padding: .4rem .25rem; color: var(--alfred-ink); }
+.ask-composer-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; flex-direction: row-reverse; }
+.ask-keys { margin-right: auto; font-size: .78rem; color: var(--alfred-muted); }
+.ask-send { border-radius: 12px; padding-inline: 1.1rem; }
+.ask-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .75rem; align-items: start; margin-top: .75rem; }
+.ask-tools > details { margin-top: 0; }
+.ask-tools > details[open] { grid-column: 1 / -1; }
+html[data-theme="dark"] .ask-composer, html[data-theme="dark"] .ask-chip { background: #182b44; }
+@media (max-width: 575.98px) { .ask-panel { padding: 1rem; } .ask-keys { display: none; } .ask-suggestions { grid-template-columns: 1fr; } }

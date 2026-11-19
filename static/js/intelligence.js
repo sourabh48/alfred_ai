@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const newConversation = document.getElementById("intelligenceNew");
     const retry = document.getElementById("intelligenceRetry");
     const empty = document.getElementById("intelligenceEmpty");
+    // Suggestion chips ask straight away, like typing the question and pressing Ask.
+    empty.querySelectorAll("[data-ask]").forEach(chip => chip.addEventListener("click", () => { query.value = chip.dataset.ask; form.requestSubmit(); }));
     const localStatus = document.getElementById("intelligenceLocalStatus");
     const historyForm = document.getElementById("conversationHistoryForm");
     const historyConsent = document.getElementById("conversationHistoryConsent");

@@ -1,8 +1,18 @@
 # Development CI and integration pipeline
 
+## Sign-in, built-in keys and UI polish — 2026-11-19
+
+LOCAL_TESTING. Same branch after `397b5e2`: `a8400ae` built-in keys and rule change, `81eca4e` provider-only sign-in and phone
+code, `a54e0b0` Font Awesome UI, memory card moved, OpenAI key with the other keys, sessions without countdown or expiry.
+Backend on `81eca4e`: 3,217 PASS in 4 shards. Final gates run on the last local commit before asking. Not pushed; push needs
+the owner's OK for that push. The docs delta publishes to Pages.
+
+CI_PASSED on `397b5e2` (Browser Regression 44427069114 success; pages build and deployment 44427068050 success), pushed with
+the owner's OK after the local gates passed. A green result applies to `397b5e2` only.
+
 ## Completion sprint — 2026-11-19
 
-LOCAL_TESTING. Branch `work/completion-sprint-2026-11-19` from `e6fa006`: `c3a20cd` Career practice races, `2b9e5af` paper trader prices and account guard, `f153a39` Council improvement flow, then tracker/state docs. Not pushed; the owner approved merge and push for this sprint if the full backend and Chrome suites pass.
+MERGED and pushed through `397b5e2`. Was LOCAL_TESTING. Branch `work/completion-sprint-2026-11-19` from `e6fa006`: `c3a20cd` Career practice races, `2b9e5af` paper trader prices and account guard, `f153a39` Council improvement flow, then tracker/state docs. Not pushed; the owner approved merge and push for this sprint if the full backend and Chrome suites pass.
 
 CI_FAILED on `e6fa006` (Browser Regression 44388204965, started 20:10 UTC 2026-11-18): `native-windows-shards (native)` failed in its native verification step after about 4 minutes and `selenium-shards (1)` in its test step after about 19 minutes, both well under their timeouts; the two aggregate jobs failed with them; every other shard and Pages 44388200887 passed. Not reproduced locally: the extended native verification passed every check on `e6fa006` in India time and again with the clock in UTC (date 18 Nov, as in CI), and the exact 78-test CI shard 1 ran OK with 0 skips. The public API shows no failure detail and the job logs need a GitHub sign-in, so the cause is unknown; no fix is claimed. The next push gives a fresh run; if it fails again the logs are needed.
 

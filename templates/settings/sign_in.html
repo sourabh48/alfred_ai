@@ -6,7 +6,7 @@
     {% if email_verified %}
     <p class="page-section-copy mb-3" id="settingsEmailStatus">Your email <strong>{{ request.user.email }}</strong> is verified.</p>
     {% else %}
-    <p class="page-section-copy mb-3" id="settingsEmailStatus">Your email is not verified yet. Connect Google, GitHub or Microsoft once to confirm it; you can then sign in with it as well as your password.</p>
+    <p class="page-section-copy mb-3" id="settingsEmailStatus">Your email is not verified yet. Connect Google, GitHub or Microsoft once to confirm it; that is also how you sign in.</p>
     {% endif %}
     {% if email_identities %}
     <ul class="list-unstyled small mb-3">

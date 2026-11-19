@@ -43,6 +43,12 @@ class QuestionFilterTests(SimpleTestCase):
             with self.subTest(question=question):
                 self.assertFalse(web_lookup.should_search(question))
         self.assertFalse(web_lookup.should_search("what is a mutual fund", [{"id": "saved"}]))  # memory answers it
+        # Owner 2026-11-19: any general or current public question is researched when saved data has nothing.
+        for question in ("how does photosynthesis work", "what is quantum computing", "latest phone launches this month",
+                         "explain the rules of cricket"):
+            with self.subTest(auto=question):
+                self.assertTrue(web_lookup.should_search(question))
+                self.assertIsNone(web_lookup.offer(question))
         self.assertTrue(web_lookup.should_search("latest mutual fund news", [{"id": "saved"}]))  # memory cannot be current
 
     def test_a_question_that_may_be_about_someones_private_life_is_offered_not_sent(self):
@@ -72,7 +78,7 @@ class QuestionFilterTests(SimpleTestCase):
                 with patch("apps.ml_engine.services.web_lookup.public_http.request") as request, self.assertRaises(web_lookup.PrivateQuestion):
                     web_lookup.search(private)
                 request.assert_not_called()
-        self.assertEqual(web_lookup.offer("one in a million meaning today"), "one in a million meaning today")
+        self.assertTrue(web_lookup.should_search("one in a million meaning today"))  # words, not an amount: a public question
 
     def test_search_sends_only_the_question_cleans_results_and_skips_a_failed_source(self):
         with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:

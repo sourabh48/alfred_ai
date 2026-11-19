@@ -1,8 +1,9 @@
 """Public web results for a general Ask ALFRED question: when the owner ticks "Look this up online", or when ALFRED decides
 a plainly public question needs current or reference information that saved memories do not hold.
 
-Only the question text leaves this PC. Automatic lookup is default-deny: it sends only recognized public reference and
-current information queries; anything else waits until the owner confirms the exact text.
+Only the question text leaves this PC. Automatic lookup sends general and current public questions that saved data does not
+answer; a question that may be about someone's private life (a name, a relation, a health, legal or money-trouble word)
+waits until the owner confirms the exact text, and one about the owner or with amounts, numbers, emails or keys never leaves.
 No records, memories or history are ever sent. ALFRED does not cache the question or the results, but Wikipedia and
 Google receive the text and may keep it under their own policies.
 """
@@ -58,9 +59,21 @@ PUBLIC_LOOKUP = re.compile(
 )
 
 
+# Owner 2026-11-19: research by itself when saved data has nothing, unless the question may be about someone's private life:
+# a capitalised name after the first word, a family or work relation, or a health, legal or money-trouble word waits for a tap.
+NAME_LIKE = re.compile(r"(?<=\s)[A-Z][a-z]+")
+PRIVATE_LIFE = re.compile(
+    r"(?i)\b(?:friend|wife|husband|partner|son|daughter|mother|father|mom|dad|brother|sister|cousin|uncle|aunt|colleague|boss"
+    r"|neighbou?r|girlfriend|boyfriend|ex|diagnos\w*|hiv|aids|cancer|pregnan\w*|depression|anxiety|therapy|treatment|disease"
+    r"|illness|sick|arrest\w*|jail|court|lawsuit|divorce|affair|bankrupt\w*|debt|fired|laid off|rent|salary|avoid\w*)\b")
+
+
 def clearly_public(question):
-    """Only a complete recognized public query may be sent automatically."""
-    return bool(PUBLIC_LOOKUP.fullmatch(question))
+    """A complete recognized public query, or a general one with no sign of anyone's private life."""
+    if PUBLIC_LOOKUP.fullmatch(question):
+        return True
+    return (not PERSONAL.search(question) and not NAME_LIKE.search(question) and not PRIVATE_LIFE.search(question)
+            and bool(GENERAL.search(question) or CURRENT.search(question)))
 
 
 def should_search(question, memories=()):
