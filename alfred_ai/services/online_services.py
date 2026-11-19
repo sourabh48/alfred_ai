@@ -14,6 +14,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from alfred_ai import bundled_keys
+from alfred_ai.services import social_login
 from alfred_private_storage import private_directory
 
 # name: (label, what ALFRED uses it for, where to get one)
@@ -111,6 +112,8 @@ def changes_from(data: dict) -> dict:
         value = str(value or "").strip()
         if value and not VALUE.fullmatch(value):
             raise ValueError(f"That {KEYS[name][0]} key does not look right: paste it without spaces or quotes.")
+        if name == "ALFRED_MICROSOFT_CLIENT_SECRET" and social_login.GUID.fullmatch(value):
+            raise ValueError(social_login.SECRET_ID_MESSAGE)
         changes[name] = value
     for name, on in (data.get("switches") or {}).items():
         if name not in SWITCHES or not isinstance(on, bool):

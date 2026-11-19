@@ -44,7 +44,8 @@ class OnlineServicesTests(TestCase):
         for bad in ({"keys": {"DJANGO_SECRET_KEY": "x" * 20}}, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "has space inside"}},
                     {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "quote'injected\nDJANGO_SECRET_KEY=x"}}, {"switches": {"TRAVEL_VALHALLA_URL": True}},
                     {"switches": {"ALFRED_MEMORY_CLOUD_AUTHORIZED": True}}, {"mail": {"address": "me@unknown-provider.example", "password": "abcdefghij"}},
-                    {"mail": {"address": "me@gmail.com", "password": "abcdefghij", "port": "99999"}}, {"mail": {"address": "not-an-email", "password": "abcdefghij"}}):
+                    {"mail": {"address": "me@gmail.com", "password": "abcdefghij", "port": "99999"}}, {"mail": {"address": "not-an-email", "password": "abcdefghij"}},
+                    {"keys": {"ALFRED_MICROSOFT_CLIENT_SECRET": "0b6a3c1e-2f4d-4e5a-9b7c-1d2e3f4a5b6c"}}):  # the Secret ID, not the Value
             with self.subTest(bad=bad):
                 self.assertEqual(self.post(self.owner, bad).status_code, 400)
         self.assertEqual(self.post(self.owner, ["not", "a", "dict"]).status_code, 400)

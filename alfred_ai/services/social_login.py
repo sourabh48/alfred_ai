@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
+import re
 import secrets
 from urllib.parse import urlencode
 
@@ -27,6 +28,9 @@ PROVIDERS = {
                   "https://login.microsoftonline.com/consumers/oauth2/v2.0/token", "openid email"),
 }
 SESSION_KEY = "alfred_social_login"
+# Azure lists each client secret with a Secret ID (a GUID) beside its Value; only the Value signs in.
+GUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
+SECRET_ID_MESSAGE = ("That is the Microsoft secret's ID, not the secret. In the Azure portal open the app, then Certificates & secrets, and copy the Value column (shown only when the secret is created; make a new one if it is hidden).")
 
 
 class SignInError(Exception):
@@ -91,6 +95,8 @@ def finish(session, provider, params) -> tuple[dict, dict]:
             pending = {**pending, "refresh_token": token.get("refresh_token"), "granted": token.get("scope", "")}
     except PublicHTTPError as exc:
         if exc.code in ("authorization_failed", "api_error"):  # a wrong secret or an expired code
+            if provider == "microsoft" and GUID.fullmatch(secret):
+                raise SignInError(SECRET_ID_MESSAGE) from None
             raise SignInError(f"{PROVIDERS[provider][0]} did not accept the sign-in. Try again, or check its client id and secret in Settings.") from None
         raise SignInError(f"Could not reach {PROVIDERS[provider][0]}. Check the internet connection and try again.") from None
     return identity, pending

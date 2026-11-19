@@ -78,6 +78,10 @@ class SocialLoginTests(TestCase):
             raise PublicHTTPError("authorization_failed")
         self.sign_in("github", refuse)
         self.assertIn("did not accept", self.client.get("/login/").context["sign_in_error"])
+        # A Microsoft secret saved as its Secret ID (a GUID) is named as such instead of a general refusal.
+        with patch.dict(os.environ, {"ALFRED_MICROSOFT_CLIENT_SECRET": "0b6a3c1e-2f4d-4e5a-9b7c-1d2e3f4a5b6c"}):
+            self.sign_in("microsoft", refuse)
+        self.assertIn("copy the Value column", self.client.get("/login/").context["sign_in_error"])
 
     def test_password_signup_closes_once_a_provider_is_set_up_and_settings_connect_adds_another_provider(self):
         page = self.client.get("/signup/")
