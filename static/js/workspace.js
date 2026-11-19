@@ -204,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         used.add(h.id);
         const link = document.createElement("a");
-        const label = h.textContent.trim().replace(/\s+/g, " ");
+        const label = h.textContent.trim().replace(/\s+/g, " ").replace(/[.!]$/, "");
         link.href = "#" + h.id; link.textContent = label.length > 34 ? label.slice(0, 34).replace(/\s+\S*$/, "") + "…" : label;
         nav.append(link);
     });

@@ -163,7 +163,7 @@ window.TravelPlanner = (() => {
             window.TravelSuggestions.load(identity);  // once the reply shows places, weekend ideas step aside
             if (payload.action === "save") {
                 await loadMobilityDashboard();
-                alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your Plans below.");
+                alert(payload.draft ? "Draft saved." : "Travel Plan saved. Open it from Your plans.");
             } else if(payload.action==='itinerary_edit')alert('Itinerary updated. Route and cost estimates may need recalculation.');
             else if(payload.action==='packing')alert('Packing checklist saved.');
             else if(payload.action==='reminders')alert(payload.operation==='consent'?(payload.enabled?'Local reminders enabled for this trip.':'Local reminders disabled; pending occurrences cancelled.'):'Local reminder change saved.');
@@ -362,7 +362,7 @@ window.TravelPlanner = (() => {
                 if (button.id==='plannerPrepareICS')await prepareCalendar();
                 if (button.id==='plannerExportICS')await exportItinerary('ics');
                 if (button.dataset.session) await open(Number(button.dataset.session));
-                if (button.dataset.deleteSession && !state.busy && confirm("Delete this conversation? Its messages go; a plan you saved from it stays under Your Plans.")) {
+                if (button.dataset.deleteSession && !state.busy && confirm("Delete this conversation? Its messages go; a plan you saved from it stays under Your plans.")) {
                     const id = Number(button.dataset.deleteSession);
                     await fetchPlanner(api+`sessions/${id}/`, {method: "DELETE"});
                     if (state.session?.id === id) await create(); else await list();
