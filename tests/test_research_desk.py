@@ -435,6 +435,44 @@ class ResearchSourcesTests(TestCase):
             with patch.object(self.src.public_http, "request", return_value=_reply({"Information": "rate limit"})):
                 self.assertEqual(self.src.alpha_vantage_lines("SYNTH", TODAY), [])
 
+    def test_finnhub_reads_earnings_analysts_insiders_and_news_with_the_key_in_a_header(self):
+        replies = {
+            "/stock/earnings": [{"actual": 2.8, "estimate": 2.64, "period": "2025-06-30"}],
+            "/stock/recommendation": [{"period": "2025-09-01", "strongBuy": 5, "buy": 10, "hold": 6, "sell": 1, "strongSell": 0}],
+            "/stock/insider-transactions": {"data": [{"transactionDate": "2025-08-20", "transactionCode": "S"},
+                                                     {"transactionDate": "2025-08-21", "transactionCode": "A"},  # a grant
+                                                     {"transactionDate": "2025-08-22", "transactionCode": "P"},
+                                                     {"transactionDate": "2025-01-02", "transactionCode": "S"}]},  # too old
+            "/company-news": [{"headline": "Synthetic Inc. beats", "source": "Wire", "url": "https://news.example.org/a"},
+                              {"headline": "Bad link", "url": "javascript:alert(1)"},
+                              {"headline": "Plain http", "url": "http://news.example.org/b"}],
+        }
+
+        def reply(method, url, params, headers, max_bytes):
+            self.assertEqual(headers, {"X-Finnhub-Token": "SYNTHETICFINNHUB1"})
+            self.assertNotIn("token", params)  # the key never goes into a URL
+            path = url.removeprefix(self.src.FINNHUB_URL)
+            if path == "/stock/recommendation":
+                raise self.src.public_http.PublicHTTPError("403")  # one closed endpoint must not hide the rest
+            return _reply(replies[path])
+
+        with patch.object(self.src.public_http, "request") as request:
+            self.assertEqual(self.src.finnhub_lines("SYNTH", TODAY), [])  # no key
+        request.assert_not_called()
+        with patch.dict("os.environ", {"ALFRED_FINNHUB_API_KEY": "SYNTHETICFINNHUB1"}):
+            self.assertEqual(self.src.finnhub_lines("INFY.NS", TODAY), [])  # US shares only
+            with patch.object(self.src.public_http, "request", side_effect=reply) as request:
+                lines = self.src.finnhub_lines("SYNTH", TODAY)
+                self.src.finnhub_lines("SYNTH", TODAY)
+        self.assertEqual(request.call_count, 4)  # cached for the day
+        texts = [line["text"] for line in lines]
+        self.assertIn("earnings per share 2.8 against an expected 2.64 (6.1% above) (Finnhub).", texts[0])
+        self.assertIn("1 purchase(s) and 1 sale(s) on the open market", texts[1])
+        self.assertEqual(lines[2], {"text": "Synthetic Inc. beats (Wire, via Finnhub).", "url": "https://news.example.org/a"})
+        self.assertEqual(len(lines), 3)  # the unsafe and plain-http links are dropped
+        self.assertEqual(self.src._finnhub_analysts(replies["/stock/recommendation"])["text"],
+                         "Analysts in 2025-09: 15 buy, 6 hold, 1 sell (Finnhub; opinions, not a forecast).")
+
     def test_sec_edgar_sends_the_account_email_and_links_recent_reports(self):
         with patch.object(self.src.public_http, "request") as request:
             self.assertEqual(self.src.sec_filings("SYNTH", ""), [])

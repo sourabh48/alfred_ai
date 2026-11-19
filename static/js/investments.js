@@ -319,7 +319,7 @@ document.addEventListener("click", event => {
     document.getElementById("investmentName").value = name.slice(0, 120);
     document.getElementById("investmentFund").value = name;
     document.getElementById("investmentFundCode").value = button.dataset.boughtCode;
-    fundMatches = [{scheme_code: button.dataset.boughtCode, name}];
+    pickerMatches.Fund = [{scheme_code: button.dataset.boughtCode, name, nav: "", nav_date: ""}];
     const units = document.getElementById("investmentUnits");
     units.scrollIntoView({behavior: "smooth", block: "center"});
     units.focus();
@@ -424,9 +424,9 @@ function renderInvestmentPositions(items) {
                 <div class="muted small">${Alfred.escapeHtml(item.asset_type.replaceAll("_", " "))} | ${Alfred.escapeHtml(item.institution || "Unspecified institution")}</div>
                 <div class="muted small">Account: ${Alfred.escapeHtml(item.account_number ? `…${item.account_number.slice(-4)}` : "not recorded")}</div>
                 <div class="muted small" data-position-currency>Currency: ${Alfred.escapeHtml(item.currency || "not recorded, shown in ₹")}</div>
-                ${item.nav_state === "stale" ? `<div class="small text-danger" data-nav-state="stale">Value uses the AMFI price of ${Alfred.escapeHtml(item.nav_date)}. No newer price has arrived, so it may be out of date.</div>`
-                    : item.nav_state === "waiting" ? `<div class="muted small" data-nav-state="waiting">Waiting for a fresh AMFI price. The value shown is the one you entered.</div>`
-                    : item.nav_state === "current" ? `<div class="muted small" data-nav-state="current">Valued at the AMFI price of ${Alfred.escapeHtml(item.nav_date)}.</div>` : ""}
+                ${item.nav_state === "stale" ? `<div class="small text-danger" data-nav-state="stale">Value uses the ${item.coingecko_id ? "CoinGecko" : "AMFI"} price of ${Alfred.escapeHtml(item.nav_date)}. No newer price has arrived, so it may be out of date.</div>`
+                    : item.nav_state === "waiting" ? `<div class="muted small" data-nav-state="waiting">Waiting for a fresh ${item.coingecko_id ? "CoinGecko" : "AMFI"} price. The value shown is the one you entered.</div>`
+                    : item.nav_state === "current" ? `<div class="muted small" data-nav-state="current">Valued at the ${item.coingecko_id ? "CoinGecko" : "AMFI"} price of ${Alfred.escapeHtml(item.nav_date)}.</div>` : ""}
             </td>
             <td class="text-end">${Alfred.formatCurrency(item.invested_amount, item.currency)}</td>
             <td class="text-end">${Alfred.formatCurrency(item.current_value, item.currency)}</td>
@@ -489,30 +489,35 @@ function submitInvestmentForm(event) {
         .catch(error => showInvestmentFeedback(error.message, "danger"));
 }
 
-// Fund picker: the name is looked up in AMFI's list; picking one stores its scheme code for daily revaluation.
-let fundSearchTimer = null, fundMatches = [];
-function setupFundPicker() {
-    const input = document.getElementById("investmentFund"), list = document.getElementById("investmentFundList"), code = document.getElementById("investmentFundCode");
+// Name pickers: a fund is looked up in AMFI's list and a coin in CoinGecko's; picking one stores its code for revaluation.
+const pickerMatches = {};
+function setupPicker(prefix, url, field, describe) {
+    const input = document.getElementById(`investment${prefix}`), list = document.getElementById(`investment${prefix}List`), code = document.getElementById(`investment${prefix}Code`);
     if (!input) return;
+    let timer = null;
+    pickerMatches[prefix] = [];
     input.addEventListener("input", () => {
-        const picked = fundMatches.find(fund => fund.name === input.value);
-        code.value = picked ? picked.scheme_code : "";
+        const picked = pickerMatches[prefix].find(match => describe(match).value === input.value);
+        code.value = picked ? picked[field] : "";
         if (picked) {
             const name = document.getElementById("investmentName") || document.querySelector('[name="asset_name"]');
             if (name && !name.value) name.value = picked.name.slice(0, 120);
             return;
         }
-        clearTimeout(fundSearchTimer);
+        clearTimeout(timer);
         if (input.value.trim().length < 3) return;
-        fundSearchTimer = setTimeout(async () => {
+        timer = setTimeout(async () => {
             try {
-                fundMatches = (await Alfred.fetchJSON(`/api/investments/funds/?q=${encodeURIComponent(input.value.trim())}`)).funds;
-                list.replaceChildren(...fundMatches.map(fund => Object.assign(document.createElement("option"), {value: fund.name, label: `NAV ₹${fund.nav} on ${fund.nav_date}`})));
-            } catch (error) { fundMatches = []; }
+                pickerMatches[prefix] = Object.values(await Alfred.fetchJSON(`${url}?q=${encodeURIComponent(input.value.trim())}`))[0] || [];
+                list.replaceChildren(...pickerMatches[prefix].map(match => Object.assign(document.createElement("option"), describe(match))));
+            } catch (error) { pickerMatches[prefix] = []; }
         }, 300);
     });
 }
-document.addEventListener("DOMContentLoaded", setupFundPicker);
+document.addEventListener("DOMContentLoaded", () => {
+    setupPicker("Fund", "/api/investments/funds/", "scheme_code", fund => ({value: fund.name, label: `NAV ₹${fund.nav} on ${fund.nav_date}`}));
+    setupPicker("Coin", "/api/investments/coins/", "id", coin => ({value: `${coin.name} (${coin.symbol})`, label: coin.id}));
+});
 
 function showInvestmentFeedback(message, tone) {
     const box = document.getElementById("investmentFormFeedback");

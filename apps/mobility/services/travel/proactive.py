@@ -6,6 +6,7 @@ confirms it (planner card or task bot).
 """
 from datetime import timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 
 from ...models import TravelPlan
@@ -18,6 +19,7 @@ from .reminders import RemindersUnavailable, _load as reminder_policy
 
 ACTIVE = ("draft", "researching", "suggestions_ready", "planned", "confirmed", "booked")
 HORIZON_DAYS = 60
+SAFETY_DAYS = 3
 IDEA_WEEKS = 8
 
 
@@ -34,15 +36,71 @@ def _latest_recheck(plan):
     return session.research_runs.filter(recheck=True, status="ready", completed_at__gte=plan.created_at).order_by("-completed_at").first()
 
 
+def flight_steps(plan, today):
+    """Live status for each booked flight leaving today or tomorrow (AeroDataBox, with the person's own key)."""
+    from . import trip_tools
+    from .cache import query
+    from .providers.flight_status import AeroDataBoxStatus, describe, flight_number
+
+    steps = []
+    for booking in trip_tools._latest(plan.user, f"bookings:{plan.pk}", []):
+        number, day = flight_number(booking.get("title")), str(booking.get("start") or "")[:10]
+        if booking.get("kind") != "flight" or not number or day not in (today.isoformat(), (today + timedelta(days=1)).isoformat()):
+            continue
+        try:
+            result = query(AeroDataBoxStatus(), {"number": number, "date": day})
+        except Exception:
+            continue  # a status lookup must never break the trip page
+        if result.success:
+            status = result.payload
+            late = status["delay_minutes"] >= 15 or status["status"].lower() in ("canceled", "cancelled", "diverted")
+            steps.append({**_step(plan, "flight", ("Flight change: " if late else "Flight status: ") + number, describe(status),
+                                  due_on=today, basis=f"AeroDataBox, checked {timezone.localtime():%d %b %H:%M}"),
+                          "id": f"{plan.pk}:flight:{booking.get('id')}"})
+    return steps
+
+
+def safety_steps(plan, today):
+    """Strong recent earthquakes near the destination and poor air there, for a trip starting within three days."""
+    from .cache import query
+    from .providers.safety import POOR_AIR, QUAKE_DAYS, QUAKE_RADIUS_KM, GoogleAirQuality, UsgsEarthquakes, destination_point
+
+    point = destination_point(plan)
+    if point is None:
+        return []
+    where, steps = {"latitude": point[0], "longitude": point[1]}, []
+    try:
+        quakes = query(UsgsEarthquakes(), {**where, "since": (today - timedelta(days=QUAKE_DAYS)).isoformat()})
+        air = query(GoogleAirQuality(), where)
+    except Exception:
+        return []  # a safety lookup must never break the trip page
+    for quake in (quakes.payload.get("quakes") or [])[:2] if quakes.success else []:
+        steps.append({**_step(plan, "safety", f"Earthquake near {plan.destination or 'your destination'}",
+            f"Magnitude {quake['magnitude']} {quake['place']} on {quake['when']}" + (", with a tsunami flag" if quake["tsunami"] else "")
+            + f" (within {QUAKE_RADIUS_KM} km, last {QUAKE_DAYS} days). Check local authorities' advice before you go.",
+            due_on=today, links=[{"label": "USGS details", "url": quake["url"]}] if quake["url"] else [],
+            basis="US Geological Survey"), "id": f"{plan.pk}:safety:quake:{quake['when']}"})
+    if air.success and air.payload["aqi"] < POOR_AIR:
+        steps.append(_step(plan, "air", f"Poor air in {plan.destination or 'your destination'}",
+            f"{air.payload['category']} right now (Universal AQI {air.payload['aqi']} of 100; main pollutant {air.payload['pollutant'] or 'unknown'}). "
+            "Consider a mask and fewer outdoor hours; this is current air, not a forecast.", due_on=today, basis="Google Air Quality"))
+    return steps
+
+
 def next_steps(plan, today=None):
     """What to do next for one saved trip, earliest first. Empty for past, closed or undated trips."""
     today = today or timezone.localdate()
-    if plan.status not in ACTIVE or not plan.start_date or plan.start_date < today:
+    if plan.status not in ACTIVE or not plan.start_date:
         return []
+    live = flight_steps(plan, today)
+    if (plan.start_date - today).days <= SAFETY_DAYS and (plan.end_date or plan.start_date) >= today:
+        live += safety_steps(plan, today)
+    if plan.start_date < today:
+        return live  # a trip under way: only live news about its flights
     days = (plan.start_date - today).days
     end = plan.end_date or plan.start_date
     session = getattr(plan, "planning_session", None)
-    steps = []
+    steps = live
 
     forecast_from = plan.start_date - timedelta(days=FORECAST_DAYS - 1)
     run = session.research_runs.filter(status="ready").order_by("-completed_at").first() if session else None
@@ -99,8 +157,9 @@ def next_steps(plan, today=None):
 
 def upcoming_steps(user, today=None):
     today = today or timezone.localdate()
-    plans = (TravelPlan.objects.filter(user=user, status__in=ACTIVE, start_date__gte=today,
-                                       start_date__lte=today + timedelta(days=HORIZON_DAYS))
+    under_way = Q(start_date__lt=today, end_date__gte=today)  # its return flight can still be delayed
+    plans = (TravelPlan.objects.filter(Q(start_date__gte=today, start_date__lte=today + timedelta(days=HORIZON_DAYS)) | under_way,
+                                       user=user, status__in=ACTIVE)
              .select_related("vehicle_profile", "planning_session").order_by("start_date", "id")[:10])
     return [step for plan in plans for step in next_steps(plan, today)]
 

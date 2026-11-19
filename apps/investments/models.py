@@ -36,6 +36,8 @@ class Investment(models.Model):
     current_value = InvestmentMoneyField(max_digits=14, decimal_places=2, default=0)
     # Mutual funds: with an AMFI scheme code and units, the value follows AMFI's daily NAV (services/fund_prices.py).
     amfi_scheme_code = models.CharField(max_length=12, blank=True, default="")
+    # Crypto: with a CoinGecko coin id, units and a currency, the value follows CoinGecko (services/crypto_prices.py).
+    coingecko_id = models.CharField(max_length=100, blank=True, default="")
     units = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     nav = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
     nav_date = models.DateField(null=True, blank=True)

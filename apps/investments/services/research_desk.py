@@ -369,7 +369,9 @@ def analyse(symbol: str, name: str, *, holding=None, portfolio_total=None, news=
             "levels": levels(prices, decision["rating"], holding is not None, packet["price_currency"]),
             "macro": (macro() + research_sources.fred_lines("india")) if indian
                      else research_sources.fred_lines("us") if research_sources.us_listed(symbol) else [],
-            "context": research_sources.alpha_vantage_lines(symbol) + research_sources.sec_filings(symbol, contact),
+            # Finnhub when its key is saved (60 requests a minute); else Alpha Vantage, whose free key allows 25 a day.
+            "context": (research_sources.finnhub_lines(symbol) or research_sources.alpha_vantage_lines(symbol))
+                       + research_sources.sec_filings(symbol, contact),
             "odds": research_sources.prediction_markets(name) if news and name != symbol else [],
             "charts": {"price": tech.get("series"), "results": results_chart(data["fundamentals"], packet["statement_currency"])},
             "latest_period_end": packet["latest_period_end"], "source_url": packet["source_url"],

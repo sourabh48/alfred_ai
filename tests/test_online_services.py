@@ -50,7 +50,7 @@ class OnlineServicesTests(TestCase):
         with personal_keys.acting_for(admin):
             self.assertEqual(personal_keys.get("TRAVEL_SKYSCANNER_API_KEY"), "")  # nobody else uses it
         self.client.force_login(admin)
-        self.assertEqual([k["saved"] for k in self.client.get("/api/settings/online-services/").json()["keys"]], [False, False, False])
+        self.assertEqual([k["saved"] for k in self.client.get("/api/settings/online-services/").json()["keys"]], [False] * 5)
 
     def test_input_is_checked_before_anything_is_written(self):
         for bad in ({"keys": {"DJANGO_SECRET_KEY": "x" * 20}}, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "has space inside"}},

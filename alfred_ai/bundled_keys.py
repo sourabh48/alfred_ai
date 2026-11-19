@@ -1,6 +1,6 @@
 """Free service keys built into the installer (owner decision 2026-11-19).
 
-Only keys that can never charge anyone are allowed (sign-in clients, FRED, Alpha Vantage, Reddit, OpenRouteService).
+Only keys that can never charge anyone are allowed (sign-in clients, FRED, Alpha Vantage, Finnhub, Reddit, OpenRouteService).
 The builder's own config/local.env supplies them at build time; they are never committed. A person's own saved key
 always wins, and Settings shows "Built in" instead of any part of a built-in key.
 
@@ -19,7 +19,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 FREE = ("ALFRED_GOOGLE_CLIENT_ID", "ALFRED_GOOGLE_CLIENT_SECRET", "ALFRED_GITHUB_CLIENT_ID", "ALFRED_GITHUB_CLIENT_SECRET",
         "ALFRED_MICROSOFT_CLIENT_ID", "ALFRED_MICROSOFT_CLIENT_SECRET", "ALFRED_FRED_API_KEY", "ALFRED_ALPHA_VANTAGE_API_KEY",
-        "ALFRED_REDDIT_CLIENT_ID", "ALFRED_REDDIT_CLIENT_SECRET", "TRAVEL_ORS_API_KEY")
+        "ALFRED_REDDIT_CLIENT_ID", "ALFRED_REDDIT_CLIENT_SECRET", "TRAVEL_ORS_API_KEY", "ALFRED_FINNHUB_API_KEY")
 FILE_NAME = "alfred_keys.bin"
 _built_in = {}
 

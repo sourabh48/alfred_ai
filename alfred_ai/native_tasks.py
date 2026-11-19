@@ -72,6 +72,13 @@ def native_fund_value_refresh():
     return refresh_fund_values()
 
 
+@db_periodic_task(crontab(minute="45", hour="*/4"))
+def native_crypto_value_refresh():
+    # One CoinGecko request for every held coin; the public API needs no key at this rate.
+    from apps.investments.services.crypto_prices import refresh_crypto_values
+    return refresh_crypto_values()
+
+
 @db_periodic_task(crontab(minute="*"))
 def native_private_memory_sync():
     from django.core.management import call_command

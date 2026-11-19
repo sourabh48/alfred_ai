@@ -56,7 +56,7 @@ class InvestmentValueAlertTests(TestCase):
             current_value="10.00", nav_date=timezone.localdate() - timedelta(days=30))
         self.post("set", id=self.row.pk, below="500")
         self.assertEqual(self.item()["status"], "unknown")
-        self.assertIn("fund price is not current", self.item()["reason"])
+        self.assertIn("price is not current", self.item()["reason"])
 
     def test_bad_limits_other_peoples_holdings_and_stale_revisions_are_refused(self):
         theirs = Investment.objects.create(user=self.other, asset_name="SYNTHETIC-OTHER", asset_type="equity", current_value="5")
