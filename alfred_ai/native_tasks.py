@@ -34,6 +34,16 @@ def native_travel_research_recovery():
     return resume_travel_research()
 
 
+@db_periodic_task(crontab(minute="*/2"))
+def native_ollama_keeper():
+    """Ollama stopped on the owner PC on 2026-11-20 and local answers failed until it was started again."""
+    from alfred_ai.services.ollama_keeper import ensure_running
+    state = ensure_running()
+    if state == "started":
+        logger.warning("Local Ollama was not answering; started it again.")
+    return state
+
+
 @db_periodic_task(crontab(minute="*"))
 def native_scheduler_heartbeat():
     cache.set("native:scheduler-heartbeat", {

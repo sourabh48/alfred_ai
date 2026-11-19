@@ -126,6 +126,7 @@
  "tests.test_remaining_public_http": 0.05,
  "tests.test_retention_release_boundary": 0.08,
  "tests.test_retrieval_quality": 17.41,
+ "tests.test_ollama_keeper": 0.05,
  "tests.test_safe_cache": 7.88,
  "tests.test_salary_evidence": 59.75,
  "tests.test_savings_goals": 0.57,
