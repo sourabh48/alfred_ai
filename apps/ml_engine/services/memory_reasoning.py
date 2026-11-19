@@ -120,7 +120,8 @@ class GeminiReasoner:
     it sees only the public question, verified public memories and ALFRED's own public web results."""
     name='gemini'
     def __init__(self,key):
-        if not isinstance(key,str) or not re.fullmatch('AIza[0-9A-Za-z_-]{35}',key): raise SyncUnavailable('No approved owner reasoning credential is available.')
+        # AI Studio issues "AQ." keys since May 2026 besides the older 39-character "AIza" ones; Google does not document the format.
+        if not isinstance(key,str) or not re.fullmatch(r'[0-9A-Za-z._-]{30,512}',key): raise SyncUnavailable('No approved owner reasoning credential is available.')
         self.key=key
         self.model=settings.ALFRED_GEMINI_MODEL
 

@@ -162,7 +162,7 @@ class MemoryReasoningKeyAPI(MemoryAPI):
     def post(self,request):
         try: save_key(memory_store(),request.user,self.payload(('key',)).get('key'))
         except Exception as exc:
-            return safe_error_response(exc,'That does not look like a Gemini API key (it starts with AIza and is 39 characters). Nothing was saved.',logger_name=__name__,status_code=400)
+            return safe_error_response(exc,'That does not look like a Gemini API key. Copy the whole key from Google AI Studio (it starts with AQ. or AIza). Nothing was saved.',logger_name=__name__,status_code=400)
         return Response(self._status(request))
 
     def delete(self,request):

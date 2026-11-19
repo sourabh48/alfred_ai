@@ -77,6 +77,12 @@ class MemoryReasoningTests(TestCase):
         self.assertEqual(client.delete(url,HTTP_X_CSRFTOKEN=csrf).json(),{'key_saved':False,'key_hint':'','policy_enabled':False})
         self.assertIsNone(reasoning_provider(self.store,self.bob))
         self.assertIsInstance(reasoning_provider(self.store,self.alice),GeminiReasoner)  # other owners untouched
+        # Owner check 2026-11-20: AI Studio's newer keys start with "AQ." (made-up value below).
+        newer='AQ.'+'Synthetic_Only-Never.Real-'*2
+        self.assertEqual(client.post(url,{'key':newer},content_type='application/json',HTTP_X_CSRFTOKEN=csrf).json()['key_hint'],'…eal-')
+        for bad in ('AQ.short','AQ. has spaces inside the key value here','x'*513):
+            with self.subTest(bad=bad[:20]):
+                self.assertEqual(client.post(url,{'key':bad},content_type='application/json',HTTP_X_CSRFTOKEN=csrf).status_code,400)
         self.http.assert_not_called()
 
     def test_request_is_fixed_bounded_stateless_and_strips_private_provenance(self):
