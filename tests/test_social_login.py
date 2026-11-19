@@ -109,6 +109,16 @@ class SocialLoginTests(TestCase):
         self.assertIn("Passwords are not used", page)
         self.assertNotIn('name="password"', page)
         self.assertNotIn('href="/signup/"', page)
+        # The home address shows the same sign-in page: every provider button, and it refuses passwords too.
+        refused = self.client.post("/", {"username": "old-owner", "password": "x-synthetic-1"})
+        self.assertEqual((refused.status_code, refused["Location"]), (302, "/"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        home = self.client.get("/").content.decode()
+        for provider in ("google", "github", "microsoft"):
+            self.assertIn(f'href="/auth/{provider}/start/"', home)
+        self.assertIn("Passwords are not used", home)
+        self.assertNotIn('name="password"', home)
+        self.assertNotIn("googleSignInHint", home)
         self.assertEqual(self.client.get("/admin/login/?next=/admin/")["Location"], "/login/?next=%2Fadmin%2F")
         # A session from before the change, without a verified email, is ended at the next page or API call.
         self.client.force_login(old)

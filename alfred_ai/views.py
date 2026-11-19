@@ -216,8 +216,12 @@ def _attention_items(user, sources):
 
 
 def index_view(request):
+    from .services import social_login
     if request.user.is_authenticated:
         return render(request, "dashboard.html", _home_context(request.user))
+    if request.method == "POST" and social_login.configured():  # the home address follows the provider-only rule too
+        request.session["alfred_sign_in_error"] = "Sign in with Google, GitHub or Microsoft. Passwords are not used."
+        return redirect("index")
 
     form = AuthenticationForm(request, data=request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -231,6 +235,7 @@ def index_view(request):
             "form": form,
             "hide_sidebar": True,
             "hide_nav_auth_actions": True,
+            **_sign_in_context(request),
         },
     )
 
