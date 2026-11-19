@@ -31,7 +31,7 @@ KEYS = {
     "ALFRED_GITHUB_CLIENT_SECRET": ("Sign in with GitHub (optional): client secret", "Generated on the same OAuth App page.", "https://github.com/settings/developers"),
     "ALFRED_MICROSOFT_CLIENT_ID": ("Sign in with Microsoft (optional): application ID", "Azure portal > App registrations, personal Microsoft accounts only; Web redirect URI http://localhost:8000/auth/microsoft/callback/.",
                                    "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
-    "ALFRED_MICROSOFT_CLIENT_SECRET": ("Sign in with Microsoft (optional): client secret", "Certificates & secrets on the same app registration.",
+    "ALFRED_MICROSOFT_CLIENT_SECRET": ("Sign in with Microsoft (optional): client secret", "Certificates & secrets on the same app registration: copy the Value column, not the Secret ID.",
                                        "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
     "ALFRED_FRED_API_KEY": ("FRED (St. Louis Fed)", "Investments research desk: interest rates and inflation for India and the US, shown as context on each call.",
                             "https://fred.stlouisfed.org/docs/api/api_key.html"),
