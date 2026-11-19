@@ -581,6 +581,30 @@ class ResearchAgentsTests(TestCase):
         research_desk.refresh(self.user, TODAY)  # a new call, but the owner switched the AI debate off
         self.assertEqual(research_debate.debate_due(reasoner=FakeReasoner([]))["debated"], 0)
 
+    def test_closing_alfred_stops_a_debate_at_the_next_model_reply_and_records_no_failure(self):
+        """Closing waited for whole 15-minute debates; now it waits for one model reply at most."""
+        import os
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from apps.investments.services import research_debate
+        self.open_call()
+        root = Path(self.enterContext(TemporaryDirectory(prefix="alfred-debate-stop-synthetic-")))
+        self.enterContext(patch.dict(os.environ, {"ALFRED_DATA_DIR": str(root), "ALFRED_NATIVE_INSTANCE": "synthetic"}))
+        stop = root / "artifacts" / "native" / "worker-stop-synthetic"
+        stop.parent.mkdir(parents=True)
+
+        class ClosingReasoner(FakeReasoner):
+            def reason(self, payload, **kwargs):
+                stop.touch()  # the owner closes ALFRED while the model answers the first role
+                return super().reason(payload, **kwargs)
+
+        reasoner = ClosingReasoner(DEBATE + DEBATE)
+        self.assertEqual(research_debate.debate_due(reasoner=reasoner), {"status": "completed", "debated": 0, "failed": 0, "reflected": 0})
+        self.assertEqual(len(reasoner.calls), 1)  # no further model call after the stop
+        self.assertNotIn("debate", self.suggestions()["GOOD.NS"])  # nothing recorded, so it is debated after the next start
+        stop.unlink()
+        self.assertEqual(research_debate.debate_due(reasoner=FakeReasoner(DEBATE + DEBATE))["debated"], 2)  # lock was released
+
     def test_paper_trader_buys_and_sells_only_pretend_money_on_approval(self):
         from apps.investments.services import research_paper
         holdings = list(Investment.objects.values())
