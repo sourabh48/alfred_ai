@@ -18,6 +18,12 @@ PLACE_END = (r"(?=\s+(?:(?:for|on|with|under|and|by|from|during|starting|next|th
              r"|in\s+(?:\d|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next|this))|[.,;!?]|$)")
 
 
+def known_place(name):
+    """A curated destination, a known city, or a country or state from the offline world dataset."""
+    from .world import match_text
+    return bool(lookup(name) or str(name).casefold() in CITIES or match_text(name))
+
+
 def validate_preference(key, val):
     booleans = {"pillion","avoid_expressways","avoid_tolls","camping_interest","trekking_interest","adventure_interest","nightlife_interest","scenic_preference"}
     ranges = {"trip_duration":(1,30),"typical_duration":(1,30),"maximum_daily_driving":(20,1500),
@@ -78,6 +84,13 @@ def augment(state, text):
         named = re.match(r"([a-z][a-z '-]{1,70}?)\s+(?:trip|getaway|holiday|vacation|ride)\b", lower)
         if named and lookup(named[1]):
             match = named
+    if not match:
+        # "plan a goa trip", "a trio to goa": only a known place, so "a bike trip" and "to 25" stay out.
+        for found in re.finditer(rf"\b(?:a|an|our|my)\s+([a-z][a-z '-]{{1,40}}?)\s+(?:trip|getaway|holiday|vacation)\b"
+                                 rf"|\bto\s+([a-z][a-z .'-]{{1,40}}?){PLACE_END}", lower):
+            if known_place((found[1] or found[2]).strip()):
+                match = re.match(r"(.*)", (found[1] or found[2]).strip())
+                break
     if not match and value(state, "origin") and value(state, "pending_question") != "origin" and lookup(lower):
         match = re.match(r"(.*)", lower)
     if match:
