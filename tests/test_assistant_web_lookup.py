@@ -203,6 +203,22 @@ class HybridWebLookupTests(TestCase):
         self.local.reason.reset_mock()
         self.assertEqual(self.ask("What is the capital of France?")["provider"], "ollama")  # Gemini off in Settings: local only
 
+    def test_gemini_answers_to_public_questions_teach_the_local_model(self):
+        """Owner decision 2026-11-20: public Gemini answers are kept encrypted in the brain and given to the local model."""
+        from apps.ml_engine.services.brain import examples
+        self.local.reason.return_value = "Synthetic local answer."
+        with patch("apps.ml_engine.services.memory_reasoning.answers_by_itself", return_value=True):
+            gemini = self.ask("What is the capital of France?")
+            self.ask("what did I save about my trip")  # personal: answered here, never taught or sent
+        self.assertEqual(examples(self.user, "public_answer", store=self.store),
+                         [{"question": "What is the capital of France?", "answer": gemini["answer"]}])
+        self.ask("Tell me the capital city of France")
+        learned = [s for s in self.local.reason.call_args.args[0]["sources"] if s["classification"] == "learned_public_answer"]
+        self.assertEqual(learned, [{"ref": "learned-1", "classification": "learned_public_answer",
+                                    "data": {"question": "What is the capital of France?", "answer": gemini["answer"]}}])
+        self.ask("What is the boiling point of water?")
+        self.assertFalse([s for s in self.local.reason.call_args.args[0]["sources"] if s["classification"] == "learned_public_answer"])
+
 
 @override_settings(ALFRED_MEMORY_MOCK_REASONING=False)
 class WebLookupAPITests(TestCase):

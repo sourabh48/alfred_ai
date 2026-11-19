@@ -6,6 +6,7 @@ with it and never leaves the PC unencrypted. Only the owner's own examples are e
 """
 import logging
 from pathlib import Path
+import re
 import time
 from uuid import uuid4
 
@@ -23,11 +24,11 @@ def _store():
     return MemoryStore(Path(settings.ALFRED_MEMORY_DIR))
 
 
-def remember(user, kind, example):
+def remember(user, kind, example, *, store=None):
     """Save one example; a bounded JSON object, newest kept."""
     if kind not in KINDS or not isinstance(example, dict) or not example:
         raise ValueError("Choose a known example kind and a non-empty example.")
-    owner, text, store = _owner(user), _json(example), _store()
+    owner, text, store = _owner(user), _json(example), store or _store()
     with store._transaction() as db:
         db.execute("INSERT INTO brain_examples(id,owner,kind,created,record) VALUES(?,?,?,?,?)",
                    (uuid4().hex, owner, kind, time.time(), store._cipher(db).encrypt(text.encode())))
@@ -36,10 +37,10 @@ def remember(user, kind, example):
                    (owner, kind, owner, kind, PER_KIND))
 
 
-def examples(user, kind, *, limit=PER_KIND):
+def examples(user, kind, *, limit=PER_KIND, store=None):
     """This owner's examples of one kind, newest first; unreadable ones are skipped."""
     import json
-    owner, store, found = _owner(user), _store(), []
+    owner, store, found = _owner(user), store or _store(), []
     with store._transaction() as db:
         cipher = store._cipher(db)
         rows = db.execute("SELECT record FROM brain_examples WHERE owner=? AND kind=? ORDER BY created DESC LIMIT ?",
@@ -52,19 +53,40 @@ def examples(user, kind, *, limit=PER_KIND):
     return found
 
 
-def try_remember(user, kind, example):
+def try_remember(user, kind, example, *, store=None):
     """remember(), but a closed or busy vault never stops the conversation that taught it."""
     try:
-        remember(user, kind, example)
+        remember(user, kind, example, store=store)
         return True
     except Exception as exc:
         logger.info("Brain example not saved: %s", type(exc).__name__)
         return False
 
 
-def try_examples(user, kind, *, limit=PER_KIND):
+def try_examples(user, kind, *, limit=PER_KIND, store=None):
     try:
-        return examples(user, kind, limit=limit)
+        return examples(user, kind, limit=limit, store=store)
     except Exception as exc:
         logger.info("Brain examples not read: %s", type(exc).__name__)
         return []
+
+
+STOP = set("the and for with from what which when where does how why who whose that this these those are was were has have "
+           "can should would could about tell give explain mean means".split())
+
+
+def _words(text):
+    return set(re.findall(r"[^\W\d_]{3,}", str(text).casefold())) - STOP
+
+
+def similar_public_answers(user, query, *, store=None, limit=2):
+    """Earlier Gemini answers to questions sharing most of this one's words, for the local model to learn from."""
+    words = _words(query)
+    if len(words) < 2:
+        return []
+    scored = []
+    for item in try_examples(user, "public_answer", limit=200, store=store):
+        shared = words & _words(item.get("question", ""))
+        if len(shared) >= max(2, (len(words) + 1) // 2) and isinstance(item.get("answer"), str):
+            scored.append((len(shared), item))
+    return [item for _, item in sorted(scored, key=lambda pair: -pair[0])[:limit]]

@@ -112,6 +112,8 @@ class OllamaReasoner(OllamaEmbeddings):
                 'Only currently supplied sources establish personal or document facts; previous answers do not verify them. '
                 'General explanations and clearly labelled fiction do not require personal sources. '
                 'Owner-verified memories are supplementary statements, not financial authority. '
+                'Sources classified learned_public_answer are earlier answers to similar public questions; use them as background '
+                'that may be out of date, never as personal facts, and say so when you rely on one. '
                 'Sources classified public_web_result are public information from the named website, not personal facts or advice; '
                 'when you use one, cite its ref in brackets such as [web-1], and quote any figure exactly as that result shows it. '
                 'For current figures prefer the most recent dated result and give its date; encyclopedia text may be out of date. '
@@ -454,8 +456,12 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         if web_lookup.should_search(query): web=web_lookup.search(query)
         else: web_offer=web_lookup.offer(query)
     if provider=='gemini':
-        return offered(present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query))
+        result=present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
+        if web_lookup.clearly_public(query) and isinstance(result.get('answer'),str) and result['answer'].strip():
+            from .brain import try_remember  # Gemini teaches the local model (owner decision 2026-11-20); kept encrypted on this PC
+            try_remember(user,'public_answer',{'question':query[:500],'answer':result['answer'][:3000]},store=store)
+        return offered(result)
     retrieval_error=None
     try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
@@ -490,6 +496,12 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             history = candidate
     if history:
         payload['history'] = history
+    if scope=='general':
+        from .brain import similar_public_answers
+        for number,item in enumerate(similar_public_answers(user,query,store=store),1):
+            learned={'ref':f'learned-{number}','classification':'learned_public_answer',
+                     'data':{'question':item.get('question'),'answer':item['answer']}}
+            if payload_bytes(payload|{'sources':payload['sources']+[learned]})<=limit: payload['sources'].append(learned)
     for item in memories:
         source={'ref':item['id'],'classification':'owner_verified_statement','data':item['content']}
         if payload_bytes(payload|{'sources':payload['sources']+[source]})<=limit:
