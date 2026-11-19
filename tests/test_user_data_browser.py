@@ -5979,14 +5979,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_career_evaluation_batch_triage_and_reviewed_send(self):
         from django.core import mail
-        from django.test import override_settings
         from selenium.webdriver.support.ui import Select
         from apps.career.models import CareerJobAnalysis, CareerResume
         from django.core.files.uploadedfile import SimpleUploadedFile
         from tests.test_career_application_kit import CV
         from tests.test_career_evaluation import JD, job
         from tests.test_career_matching_acceptance import offline_career
-        from tests.test_career_send import MAILBOX
+        from unittest import mock
+        from apps.career.services import career_mail
+        from tests.test_career_send import connected
         offline_career(self)
         owner = self.scenario['user']
         CareerResume.objects.create(user=owner, uploaded_file=SimpleUploadedFile('eval-cv.pdf', b'%PDF-synthetic'), file_name='eval-cv.pdf',
@@ -5994,7 +5995,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             extracted_payload={'role': 'Backend Engineer', 'experience_years': 5, 'skills': ['Python', 'Django', 'SQL']})
         item = CareerJobAnalysis.objects.create(user=owner, job_url='https://jobs.example.test/eval', job_title='Senior Backend Engineer',
             company='Synthetic Eval Corp', location='Pune', extracted_text=JD, extracted_payload=job().extracted_payload)
-        with override_settings(**MAILBOX):
+        connected(self, owner)
+        with mock.patch.object(career_mail, 'deliver', side_effect=lambda user, message: mail.outbox.append(message) or 'sent'):
             self.login(); self.browser.get(self.live_server_url + '/career/')
             self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#careerOutcomeAnalysis option[value="{item.pk}"]'))
             Select(self.browser.find_element(self.By.ID, 'careerOutcomeAnalysis')).select_by_value(str(item.pk))
@@ -6044,14 +6046,15 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
 
     def test_career_recruiter_reply_quotes_asks_blocks_blanks_and_sends_only_to_the_typed_address(self):
         from django.core import mail
-        from django.test import override_settings
         from selenium.webdriver.support.ui import Select
         from apps.career.models import CareerJobAnalysis, CareerResume
         from django.core.files.uploadedfile import SimpleUploadedFile
         from tests.test_career_application_kit import CV
         from tests.test_career_evaluation import JD, job
         from tests.test_career_matching_acceptance import offline_career
-        from tests.test_career_send import MAILBOX
+        from unittest import mock
+        from apps.career.services import career_mail
+        from tests.test_career_send import connected
         offline_career(self)
         owner = self.scenario['user']
         CareerResume.objects.create(user=owner, uploaded_file=SimpleUploadedFile('reply-cv.pdf', b'%PDF-synthetic'), file_name='reply-cv.pdf',
@@ -6061,7 +6064,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         item = CareerJobAnalysis.objects.create(user=owner, job_url='https://jobs.example.test/reply', job_title='Senior Backend Engineer',
             company='Synthetic Reply Corp', location='Pune', extracted_text=JD,
             extracted_payload={**job().extracted_payload, 'source_kind': 'recruiter_message', 'intake_message_text': message})
-        with override_settings(**MAILBOX):
+        connected(self, owner)
+        with mock.patch.object(career_mail, 'deliver', side_effect=lambda user, message: mail.outbox.append(message) or 'sent'):
             self.login(); self.browser.get(self.live_server_url + '/career/')
             self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, f'#careerOutcomeAnalysis option[value="{item.pk}"]'))
             Select(self.browser.find_element(self.By.ID, 'careerOutcomeAnalysis')).select_by_value(str(item.pk))
