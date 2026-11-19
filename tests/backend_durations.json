@@ -74,6 +74,7 @@
  "tests.test_investment_market_acceptance": 0.48,
  "tests.test_investment_money": 4.2,
  "tests.test_investment_review_alerts": 13.75,
+ "tests.test_investment_value_alerts": 3.0,
  "tests.test_knowledge_hub": 27.31,
  "tests.test_live_ui_contracts": 141.97,
  "tests.test_loan_diagnostics": 17.8,

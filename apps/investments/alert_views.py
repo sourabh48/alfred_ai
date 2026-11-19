@@ -3,6 +3,7 @@ from rest_framework.response import Response
 
 from apps.ml_engine.api.memory import MemoryAPI, memory_store
 from .services.review_alerts import RecordReviewAlerts
+from .services.value_alerts import ValueAlerts
 
 
 class InvestmentReviewAlertView(MemoryAPI):
@@ -16,3 +17,12 @@ class InvestmentReviewAlertView(MemoryAPI):
             raise ValueError('Reminder parameters belong in the request body.')
         data=self.payload(('action','revision','enabled','days','consent','id'))
         return Response(RecordReviewAlerts(memory_store()).run(request.user,data))
+
+
+class InvestmentValueAlertView(MemoryAPI):
+    """INV-07 limits on a holding's value; the hourly task bots tell the owner when one is crossed."""
+    def get(self, request):
+        return Response(ValueAlerts(memory_store()).run(request.user))
+
+    def post(self, request):
+        return Response(ValueAlerts(memory_store()).run(request.user, self.payload(('action','revision','id','below','above'))))

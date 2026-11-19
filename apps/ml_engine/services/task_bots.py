@@ -457,12 +457,25 @@ def research_watch(user, today):
     return review_recent(user, today)
 
 
+def value_alerts(user, today):
+    from apps.investments.services.value_alerts import crossed
+    items = []
+    for alert in crossed(user):
+        limit = Decimal(alert["below"] if alert["status"] == "below" else alert["above"])
+        priced = f" (fund price of {alert['nav_date']})" if alert["nav_date"] else " (the value you recorded)"
+        items.append(_item(f"value:{alert['id']}:{alert['status']}:{alert['value']}", f"{alert['name']}: {alert['status']} your limit",
+            f"Now {_amount(Decimal(alert['value']), alert['currency'])}{priced}, {alert['status']} your limit of "
+            f"{_amount(limit, alert['currency'])}. Not a trading signal; ALFRED never buys or sells.", "/investments/#investmentValueAlerts"))
+    return items
+
+
 BOTS = {
     "research_watch": ("Stock research", 1, research_watch, "Refresh up to three recent stock searches daily; never trade."),
     "research_desk": ("Research desk", 1, research_desk, "New or changed buy, keep or sell calls from the daily research; never trades."),
     "money_review": ("Weekly money review", 7, money_review, "Last 7 days of spending against the week before."),
     "bills_due": ("Bills and EMIs due", 1, bills_due, "Loan instalments due in the next 7 days."),
     "fund_review": ("Fund review", 1, fund_review, "Owned funds that dropped from their recent high (AMFI prices)."),
+    "value_alerts": ("Value alerts", 1, value_alerts, "Holdings whose value went below or above the limits you set."),
     "fx_rates": ("Exchange rates", 1, fx_rates, "Daily ECB reference rates, kept by date so other currencies show at the right day's rate; sends no personal data."),
     "paperwork": ("Documents and service", 1, paperwork, "Vehicle papers expiring and bike service due."),
     "career_follow_ups": ("Career follow-ups", 1, career_follow_ups, "Applications where a follow-up is due."),

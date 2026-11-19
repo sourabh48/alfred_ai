@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("uploadInvestmentPdfBtn").addEventListener("click", uploadInvestmentPdfs);
     loadInvestmentDashboard();
     initInvestmentReviewAlerts();
+    initInvestmentValueAlerts();
     initResearchJournal();
     initLookThrough();
     Alfred.enableLiveRefresh("investments-live", loadInvestmentDashboard, { rootId: "investmentRoot" });
@@ -65,6 +66,54 @@ function initInvestmentReviewAlerts() {
     check.addEventListener('click',()=>perform({action:'evaluate'}));
     window.addEventListener('pagehide',()=>{active=false; policy=null; enabled.checked=false; list.replaceChildren(); controls();});
     window.addEventListener('pageshow',event=>{if(event.persisted){active=true; perform();}});
+    perform();
+}
+
+// INV-07: limits on a holding's value, in its own currency; the hourly bots report a crossed one on Home.
+function initInvestmentValueAlerts() {
+    const form=document.getElementById('investmentValueForm');
+    if (!form) return;
+    const holding=document.getElementById('investmentValueHolding'), below=document.getElementById('investmentValueBelow');
+    const above=document.getElementById('investmentValueAbove'), status=document.getElementById('investmentValueStatus');
+    const list=document.getElementById('investmentValueItems'), save=form.querySelector('button[type="submit"]');
+    const words={below:'Below your limit', above:'Above your limit', inside:'Within your limits', unknown:'Not checked'};
+    let data=null, pending=false;
+    const money=(amount,currency)=>amount===null ? 'none' : `${currency} ${Number(amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+    function render(next) {
+        data=next;
+        const chosen=holding.value;
+        holding.replaceChildren(...data.holdings.map(item=>new Option(`${item.name} (${item.currency})`,String(item.id))));
+        if (chosen) holding.value=chosen;
+        list.replaceChildren();
+        for (const item of data.items) {
+            const row=document.createElement('li'); row.className='mb-3';
+            const text=document.createElement('p'); text.className='mb-1';
+            text.textContent=`${item.name}: ${words[item.status]}. Now ${item.value===null ? 'unknown' : money(item.value,item.currency)}`
+                +`${item.nav_date ? ` (fund price of ${item.nav_date})` : ''}; below ${money(item.below,item.currency)}, above ${money(item.above,item.currency)}.`
+                +(item.reason ? ` ${item.reason}` : '');
+            const clear=document.createElement('button'); clear.type='button'; clear.className='btn btn-outline-secondary btn-sm';
+            clear.textContent='Remove limit'; clear.setAttribute('aria-label',`Remove limit: ${item.name}`);
+            clear.addEventListener('click',()=>perform({action:'clear',id:item.id}));
+            row.append(text,clear); list.append(row);
+        }
+        status.textContent=!data.holdings.length ? 'Add a holding first.' : data.items.length ? `${data.items.length} value ${data.items.length===1 ? 'limit' : 'limits'} set.` : 'No value limits yet.';
+    }
+    async function perform(payload) {
+        if (pending) return;
+        pending=true; save.disabled=true; list.querySelectorAll('button').forEach(button=>{button.disabled=true;});
+        try {
+            render(await Alfred.fetchJSON('/api/investments/value-alerts/',payload ? {method:'POST',body:JSON.stringify({...payload,revision:data.revision})} : {}));
+            if (payload?.action==='set') { below.value=''; above.value=''; status.textContent+=' Limit saved.'; }
+        } catch (error) {
+            status.textContent=`${error.message} Your entries are kept; reload the page if limits changed elsewhere.`;
+        } finally {
+            pending=false; save.disabled=!data?.holdings.length; list.querySelectorAll('button').forEach(button=>{button.disabled=false;});
+        }
+    }
+    form.addEventListener('submit',event=>{
+        event.preventDefault();
+        perform({action:'set',id:Number(holding.value),below:below.value.trim() || null,above:above.value.trim() || null});
+    });
     perform();
 }
 

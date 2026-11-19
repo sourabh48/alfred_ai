@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 31 | PARTIALLY_IMPLEMENTED: 20 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 32 | PARTIALLY_IMPLEMENTED: 19 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -816,7 +816,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
-| INV | 3 | 8 | 37.5 | 2 | 3 | 0 | 0 | 0 |
+| INV | 3 | 8 | 37.5 | 3 | 2 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
@@ -1998,8 +1998,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### INV-07 — Persistent portfolio alerts
 
-**PARTIALLY_IMPLEMENTED** · Investments · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
 
+- 2026-11-19 (closes the monetary-threshold and background gaps): Investments > Value alerts ([value_alerts.py](../apps/investments/services/value_alerts.py), `/api/investments/value-alerts/`) lets the owner set a lower and/or upper limit per holding, in that holding's own recorded currency (Decimal cents, HALF_UP; the approved FX-off contract, nothing converted). Limits live in the encrypted local vault without names. The new `value_alerts` task bot checks them every hour, after AMFI's daily fund revaluation, and a crossed limit shows on Home under For your attention as "below/above your limit" with the value and its source. A holding with no value, a fund price that is not current, or a currency changed since the limit was set is reported as not checked, never as crossed. Owner-only, revision-checked, read-only on holdings; no email, price forecast, trading signal or trade. Tests: `tests.test_investment_value_alerts` 5 PASS, with task bots, review alerts, fund prices and Home 84 PASS; Chrome `test_investment_value_alerts_limit_crossing_and_removal` PASS with axe light/dark and 390px.
+- Next: owner check: set a limit on a real fund just above its value and see the Home notice after the next price update.
 - Source: [local review-reminder service](../apps/investments/services/review_alerts.py), [owner API](../apps/investments/alert_views.py), [vault reset/expiry](../apps/ml_engine/services/persistent_memory.py), [investment UI](../static/js/investments.js), [template](../templates/investments/list.html).
 - APIs/UI/models: `/api/investments/review-alerts/` and `/investments/`; existing Investment records read only, opt-in/reminders in existing encrypted owner vault; no schema change.
 - Tests: 129 broader backend PASS, eight final focused PASS (overlapping), two Chrome workflows PASS plus one overlapping final rerun. Exact receipts and desktop/390px views in the resume checkpoint above. Linux API secure-failure coverage extended.

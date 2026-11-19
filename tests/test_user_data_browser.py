@@ -6880,6 +6880,40 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('investmentReviewItems'),'')
         holding.refresh_from_db(); self.assertEqual(str(holding.current_value),'123.45')
 
+    def test_investment_value_alerts_limit_crossing_and_removal(self):
+        from selenium.webdriver.support.ui import Select
+        from apps.investments.models import Investment
+        from tests.test_persistent_memory import SyntheticEmbeddings
+        root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-value-alert-browser-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
+        self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
+        holding=Investment.objects.create(user=self.scenario['user'],asset_type='equity',asset_name='Synthetic <img src=x onerror="window.valueLeak=true">',current_value='1000.00',currency='INR')
+        self.login(); self.browser.get(self.live_server_url+'/investments/#investmentValueAlerts')
+        self.wait.until(lambda _: 'No value limits yet' in self.text('investmentValueStatus'))
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#investmentSummaryCards > *'))  # late cards move the form
+        Select(self.browser.find_element(self.By.ID,'investmentValueHolding')).select_by_value(str(holding.pk))
+        self.browser.find_element(self.By.ID,'investmentValueBelow').send_keys('900')
+        self.browser.find_element(self.By.ID,'investmentValueAbove').send_keys('800')
+        self.memory_click('#investmentValueForm button[type="submit"]')
+        self.wait.until(lambda _: 'lower limit must be below' in self.text('investmentValueStatus'))
+        self.assertEqual(self.browser.find_element(self.By.ID,'investmentValueBelow').get_property('value'),'900')  # entries kept
+        self.browser.find_element(self.By.ID,'investmentValueAbove').clear()
+        self.memory_click('#investmentValueForm button[type="submit"]')
+        self.wait.until(lambda _: 'Within your limits' in self.text('investmentValueItems'))
+        Investment.objects.filter(pk=holding.pk).update(current_value='850.50')
+        self.browser.refresh(); self.wait.until(lambda _: 'Below your limit' in self.text('investmentValueItems'))
+        self.assertIn('INR 850.50',self.text('investmentValueItems'))
+        self.assertFalse(self.browser.execute_script('return Boolean(window.valueLeak)'))
+        self.browser.execute_script("document.getElementById('investmentValueAlerts').scrollIntoView({behavior:'instant',block:'start'})")
+        self.capture('investment-value-alerts-desktop')
+        self.run_axe_light_dark('investment-value-alerts')
+        self.browser.set_window_size(390,844)
+        self.browser.execute_script("document.getElementById('investmentValueAlerts').scrollIntoView({behavior:'instant',block:'start'})")
+        self.capture('investment-value-alerts-390px')
+        self.assertLessEqual(self.browser.execute_script('return document.documentElement.scrollWidth'),self.browser.execute_script('return window.innerWidth'))
+        self.memory_click('#investmentValueItems button')
+        self.wait.until(lambda _: 'No value limits yet' in self.text('investmentValueStatus'))
+
     def test_investment_pdf_upload_keeps_accounts_receipts_and_reimport_identity(self):
         from decimal import Decimal
         from selenium.webdriver.support.ui import WebDriverWait

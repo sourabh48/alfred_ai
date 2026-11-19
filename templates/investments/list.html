@@ -66,6 +66,19 @@
     <ul id="investmentReviewItems" class="list-unstyled"></ul>
 </section>
 
+<section class="surface-card mb-4" id="investmentValueAlerts" aria-labelledby="investmentValueAlertsTitle">
+    <h2 id="investmentValueAlertsTitle" class="page-section-title">Value alerts</h2>
+    <p class="page-section-copy">Tell me when a holding's value goes below or above a limit. Limits are in the holding's own currency; fund values follow AMFI's daily price and ALFRED checks every hour. A crossed limit shows on Home under For your attention. ALFRED never buys or sells.</p>
+    <form id="investmentValueForm" class="row g-3 align-items-end">
+        <div class="col-md-4"><label for="investmentValueHolding" class="form-label">Holding</label><select id="investmentValueHolding" class="form-select" required></select></div>
+        <div class="col-md-3"><label for="investmentValueBelow" class="form-label">Alert below</label><input id="investmentValueBelow" class="form-control" inputmode="decimal" autocomplete="off"></div>
+        <div class="col-md-3"><label for="investmentValueAbove" class="form-label">Alert above</label><input id="investmentValueAbove" class="form-control" inputmode="decimal" autocomplete="off"></div>
+        <div class="col-md-2 d-grid"><button class="btn btn-outline-primary" type="submit" disabled>Save limit</button></div>
+    </form>
+    <p id="investmentValueStatus" class="mt-3" role="status" aria-live="polite">Loading value alerts…</p>
+    <ul id="investmentValueItems" class="list-unstyled mb-0"></ul>
+</section>
+
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
@@ -393,7 +406,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.20.3"></script>
+<script src="/static/js/investments.js?v=2.20.4"></script>
 <script src="/static/js/research_history.js?v=1"></script>
 <script src="/static/js/research_desk.js?v=7"></script>
 {% endblock %}
