@@ -102,6 +102,11 @@
 
 ## Owner decisions in force
 
+- Sign-in and keys (2026-11-19): offline-first is retired; only sensitive data must stay offline. Sign-in is only
+  through Google, GitHub or Microsoft with a verified email (no passwords); a phone on the home network signs in
+  with a code approved on the signed-in PC. Free keys that can never charge (sign-in clients, FRED, Alpha Vantage,
+  Reddit, OpenRouteService) ship encrypted inside the installer, added at build time from the builder's private
+  config and never committed; paid keys such as Google Maps are never bundled.
 - Credit score is descoped (2026-11-12): FIN-17 is OWNER_DESCOPED and the 143
   original count stays 143. A card's credit limit is not a credit score.
 - Local AI limits are configurable in `config/local.env` (`ALFRED_OLLAMA_*`,

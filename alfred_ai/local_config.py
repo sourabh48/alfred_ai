@@ -21,6 +21,8 @@ def load_local_environment(data_dir):
             if os.name == "nt" and not verify_private(path.absolute()):
                 raise PermissionError("Private configuration requires authorized permission repair.")
             environ.Env.read_env(path, overwrite=False)
+    from . import bundled_keys
+    bundled_keys.load()  # built-in free keys fill only what the owner has not saved
 
 
 def native_secret_file(data_dir):

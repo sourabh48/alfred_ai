@@ -15,6 +15,13 @@ os.environ["ALFRED_TASK_BACKEND"] = "huey"
 os.environ["DJANGO_SETTINGS_MODULE"] = "alfred_ai.settings"
 datas = [(str(root / "templates"), "templates"), (str(root / "static"), "static"),
          (str(root / "docs" / "guide"), "guide")]
+# Free keys go in only when the builder names their own private config (owner decision 2026-11-19); never committed.
+if os.environ.get("ALFRED_BUNDLE_KEYS_FROM"):
+    from alfred_ai import bundled_keys
+    sealed = root / "build" / bundled_keys.FILE_NAME
+    sealed.parent.mkdir(exist_ok=True)
+    sealed.write_bytes(bundled_keys.seal(bundled_keys.read_env_file(Path(os.environ["ALFRED_BUNDLE_KEYS_FROM"]))))
+    datas.append((str(sealed), "."))
 binaries = []
 hiddenimports = ["alfred_launcher", "alfred_tray", "pystray._win32", "alfred_ai.native_settings", "diskcache.djangocache", "huey.contrib.djhuey",
                  "django.db.backends.sqlite3", "django.contrib.sessions.backends.db",

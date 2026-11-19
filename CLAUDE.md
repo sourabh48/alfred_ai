@@ -12,7 +12,9 @@
 
 ## Non-negotiable constraints
 
-- Offline-first Windows desktop: Django, Python, SQLite, Waitress, Huey and local Ollama.
+- Local Windows desktop: Django, Python, SQLite, Waitress, Huey and local Ollama. Owner decision 2026-11-19: the
+  offline-first rule is retired; only sensitive data (financial records, documents, private history and keys) must
+  stay offline. Sign-in uses Google, GitHub or Microsoft over the internet.
 - No cloud database and no unauthorized transmission of private data.
 - Canonical financial calculations use Decimal. Strict owner isolation, authentication and privacy always apply.
 - Preserve existing financial records and signing and encryption keys.

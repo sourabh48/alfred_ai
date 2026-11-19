@@ -13,6 +13,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from alfred_ai import bundled_keys
 from alfred_private_storage import private_directory
 
 # name: (label, what ALFRED uses it for, where to get one)
@@ -68,7 +69,8 @@ def can_manage(user) -> bool:
 
 
 def status(user) -> dict:
-    hint = lambda name: ("…" + os.environ[name][-4:]) if os.environ.get(name) else ""
+    # A built-in key is never hinted at, not even its last characters.
+    hint = lambda name: "built in" if bundled_keys.is_built_in(name) else ("…" + os.environ[name][-4:]) if os.environ.get(name) else ""
     mail_user = os.environ.get("ALFRED_SMTP_USER", "")
     return {
         "can_manage": can_manage(user),
@@ -134,6 +136,7 @@ def save(changes: dict) -> None:
             os.environ[name] = value
         else:
             os.environ.pop(name, None)
+            bundled_keys.restore(name)
         if name in MAIL:  # settings.py read these at start-up; refresh the running copy
             default = {"ALFRED_SMTP_PORT": 587, "ALFRED_SMTP_SSL": False}.get(name, "")
             typed = int(value) if name == "ALFRED_SMTP_PORT" and value else value == "true" if name == "ALFRED_SMTP_SSL" and value else value

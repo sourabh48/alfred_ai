@@ -91,3 +91,42 @@ class OnlineServicesTests(TestCase):
         self.assertNotIn("TRAVEL_GOOGLE", (self.root / "config" / "local.env").read_text(encoding="utf-8"))
         self.assertNotIn("TRAVEL_GOOGLE_MAPS_API_KEY", os.environ)
         self.assertEqual((settings.ALFRED_SMTP_HOST, settings.ALFRED_SMTP_PORT), ("", 587))
+
+
+class BuiltInFreeKeysTests(TestCase):
+    """Owner decision 2026-11-19: free keys ship encrypted in the installer; a person's own key wins; none is ever shown."""
+
+    def setUp(self):
+        from alfred_ai import bundled_keys
+        self.keys = bundled_keys
+        self.root = Path(self.enterContext(TemporaryDirectory(prefix="alfred-built-in-keys-synthetic-")))
+        self.enterContext(patch.dict(os.environ, {"ALFRED_DATA_DIR": str(self.root)}))
+        for name in NAMES:
+            os.environ.pop(name, None)
+        self.enterContext(patch.dict(bundled_keys._built_in, clear=True))
+        self.owner = get_user_model().objects.create_user(username="synthetic-built-in-owner", password="pw-synthetic-1")
+
+    def test_only_free_keys_are_sealed_unreadable_and_a_saved_key_wins(self):
+        env = self.root / "local.env"
+        env.write_text("ALFRED_FRED_API_KEY='synthetic-fred-free-123'\nTRAVEL_GOOGLE_MAPS_API_KEY=synthetic-paid-maps-456\n"
+                       "export ALFRED_GITHUB_CLIENT_ID=\"synthetic-gh-id-789\"\n", encoding="utf-8")
+        blob = self.keys.seal(self.keys.read_env_file(env))
+        self.assertNotIn(b"synthetic", blob)  # nothing in plain text
+        self.assertEqual(self.keys.unseal(blob), {"ALFRED_FRED_API_KEY": "synthetic-fred-free-123", "ALFRED_GITHUB_CLIENT_ID": "synthetic-gh-id-789"})
+        self.assertEqual(self.keys.unseal(blob[:-3] + b"xyz"), {})  # damaged file: no keys, no crash
+        sealed = self.root / self.keys.FILE_NAME
+        sealed.write_bytes(blob)
+        os.environ["ALFRED_GITHUB_CLIENT_ID"] = "synthetic-own-github-id"
+        self.keys.load(sealed)
+        self.assertEqual(os.environ["ALFRED_FRED_API_KEY"], "synthetic-fred-free-123")
+        self.assertEqual(os.environ["ALFRED_GITHUB_CLIENT_ID"], "synthetic-own-github-id")
+        self.assertNotIn("TRAVEL_GOOGLE_MAPS_API_KEY", os.environ)
+        rows = {k["name"]: k for k in online.status(self.owner)["keys"]}
+        self.assertEqual((rows["ALFRED_FRED_API_KEY"]["saved"], rows["ALFRED_FRED_API_KEY"]["hint"]), (True, "built in"))
+        self.assertEqual(rows["ALFRED_GITHUB_CLIENT_ID"]["hint"], "…b-id")  # your own key keeps its usual hint
+        self.assertNotIn("123", json.dumps(online.status(self.owner)))
+        online.save({"ALFRED_FRED_API_KEY": "synthetic-own-fred-key"})
+        self.assertEqual(os.environ["ALFRED_FRED_API_KEY"], "synthetic-own-fred-key")
+        online.save({"ALFRED_FRED_API_KEY": ""})  # removing your own key falls back to the built-in one
+        self.assertEqual(os.environ["ALFRED_FRED_API_KEY"], "synthetic-fred-free-123")
+        self.assertNotIn("synthetic-fred-free-123", (self.root / "config" / "local.env").read_text(encoding="utf-8"))

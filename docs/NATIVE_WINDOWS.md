@@ -260,6 +260,13 @@ It uses synthetic records in disposable folders, never the live account.
 .\.venv\Scripts\python.exe scripts/package_windows_release.py --bundle dist/ALFRED --output artifacts/windows-release --iscc F:/ALFRED-tools/InnoSetup/ISCC.exe --signing-mode development
 ```
 
+To build the free keys into a copy for other people (owner decision 2026-11-19), set
+`$env:ALFRED_BUNDLE_KEYS_FROM = "F:\ALFRED\restored-runtime\config\local.env"` before the PyInstaller step.
+Only keys that can never charge are sealed (sign-in clients, FRED, Alpha Vantage, Reddit, OpenRouteService); Google
+Maps and other paid keys are always left out. The sealed file lives only in `build/` and the bundle, never in Git.
+Encryption keeps them out of plain text; someone who unpacks the installer can still recover them, so only free keys
+belong there.
+
 Build tools are listed in `requirements-build.txt`. Inno Setup 6.7.3 builds the
 installer. `artifacts/ops/native_huey_verification.json` and
 `native_exe_verification.json` record integration results. The executable is
