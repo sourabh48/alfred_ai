@@ -114,7 +114,7 @@ class SocialLoginTests(TestCase):
         self.client.force_login(old)
         self.assertEqual(self.client.get("/settings/")["Location"], "/login/")
         self.client.force_login(old)
-        self.assertEqual(self.client.get("/api/session/ping/").status_code, 401)
+        self.assertEqual(self.client.get("/api/session/data-version/").status_code, 401)
         # Signing in with a provider whose verified email matches reaches the same account and its records.
         self.sign_in("google")
         self.assertEqual((self.users.count(), int(self.client.session["_auth_user_id"])), (1, old.pk))
@@ -138,7 +138,7 @@ class GoogleButtonTests(TestCase):
         for page in ("/login/", "/signup/"):
             with patch.dict(os.environ, empty):
                 html = self.client.get(page).content.decode()
-            self.assertIn("Continue with Google</button>", html)
+            self.assertIn("Continue with Google</span></button>", html)
             self.assertIn("Google sign-in is not set up yet", html)
             with patch.dict(os.environ, KEYS):
                 html = self.client.get(page).content.decode()

@@ -13,7 +13,6 @@
                 <a href="#settingsSignIn">Email and sign-in</a>
                 <a href="#settingsGoogleSync">Phone calendar and tasks</a>
                 <a href="#travelPreferences">Travel style</a>
-                <a href="#privateMemoryPanel">Privacy & memory</a>
                 <a href="#settingsAccountData">Delete my data</a>
                 <a href="{% url 'diagnostics' %}">App health</a>
             </nav>
@@ -173,7 +172,6 @@
 {% include "mobility/preferences.html" %}
 {% include "settings/online.html" %}
 {% include "settings/offline_maps.html" %}
-{% include "settings/memory.html" %}
 <section class="surface-card" id="settingsAccountData">
     <h2 class="page-section-title mb-1">Delete my data</h2>
     <p class="page-section-copy mb-3">Remove your saved Alfred data and uploaded documents to start fresh. Your account stays active. This cannot be undone.</p>
@@ -182,8 +180,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/settings.js?v=1.6"></script>
-<script src="/static/js/memory.js?v=8"></script>
+<script src="/static/js/settings.js?v=1.7"></script>
+<script src="/static/js/openai_key.js?v=1"></script>
 <script src="/static/js/online_services.js?v=2"></script>
 <script src="/static/js/offline_maps.js?v=3"></script>
 <script src="/static/js/google_sync.js?v=1"></script>

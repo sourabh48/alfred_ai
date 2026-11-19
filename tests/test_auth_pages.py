@@ -96,34 +96,20 @@ class SessionSecurityTests(TestCase):
         self.user = user_model.objects.create_user(username="session_user", password="Pass12345!")
         self.client = Client()
 
-    def test_authenticated_shell_renders_session_timer_metadata(self):
+    def test_signed_in_shell_has_no_countdown_and_the_session_lasts_until_sign_out(self):
         self.client.force_login(self.user)
 
         response = self.client.get("/dashboard/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="alfredSessionTimer"', count=1)
-        self.assertContains(response, 'data-session-ping-url="/api/session/ping/"')
-        self.assertContains(response, 'data-login-url="/login/"')
+        self.assertNotContains(response, "alfredSessionTimer")
+        self.assertNotContains(response, "data-session-timeout-seconds")
         self.assertContains(response, 'data-logout-url="/logout/"')
         self.assertContains(response, 'data-home-url="/"')
-        self.assertContains(response, f'data-session-timeout-seconds="{settings.SESSION_COOKIE_AGE}"')
         self.assertNotContains(response, "requested_path")
-
-    def test_session_ping_requires_authentication_and_returns_timeout_contract(self):
-        anonymous_response = self.client.post("/api/session/ping/", data="{}", content_type="application/json")
-        self.assertEqual(anonymous_response.status_code, 302)
-        self.assertTrue(anonymous_response.headers["Location"].startswith("/login/"))
-
-        self.client.force_login(self.user)
-        response = self.client.post("/api/session/ping/", data="{}", content_type="application/json")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["timeout_seconds"], settings.SESSION_COOKIE_AGE)
-        self.assertGreater(payload["timeout_seconds"], 0)
-        self.assertGreaterEqual(payload["warning_seconds"], 0)
-        self.assertLessEqual(payload["warning_seconds"], payload["timeout_seconds"])
+        self.assertGreaterEqual(settings.SESSION_COOKIE_AGE, 365 * 24 * 60 * 60)
+        self.assertFalse(settings.SESSION_EXPIRE_AT_BROWSER_CLOSE)
+        self.assertFalse(self.client.session.get_expire_at_browser_close())
 
     @override_settings(DEBUG=False)
     def test_not_found_page_does_not_echo_missing_url_path(self):
@@ -136,7 +122,7 @@ class SessionSecurityTests(TestCase):
     def test_client_diagnostics_do_not_collect_browser_route_fields(self):
         script = (Path(__file__).resolve().parents[1] / "static" / "js" / "app.js").read_text(encoding="utf-8")
 
-        self.assertIn("installSessionSecurityTimer", script)
+        self.assertNotIn("installSessionSecurityTimer", script)
         self.assertIn("page_context", script)
         for forbidden in (
             "page_path",

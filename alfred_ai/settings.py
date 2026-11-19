@@ -195,13 +195,11 @@ CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=_default_secure_cook
 SESSION_COOKIE_HTTPONLY = env.bool("SESSION_COOKIE_HTTPONLY", default=True)
 SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", default="Lax")
 CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
-SESSION_COOKIE_AGE = env.int("ALFRED_SESSION_TIMEOUT_SECONDS", default=3600 if LOCAL_RUNTIME else 1800)
-ALFRED_SESSION_WARNING_SECONDS = env.int(
-    "ALFRED_SESSION_WARNING_SECONDS",
-    default=min(300, max(60, SESSION_COOKIE_AGE // 6)),
-)
-SESSION_SAVE_EVERY_REQUEST = env.bool("SESSION_SAVE_EVERY_REQUEST", default=True)
-SESSION_EXPIRE_AT_BROWSER_CLOSE = env.bool("SESSION_EXPIRE_AT_BROWSER_CLOSE", default=not LOCAL_RUNTIME)
+# Owner 2026-11-19: no idle sign-out, no countdown and no sign-out when the browser closes; Sign out ends a session.
+# Fixed on purpose so older local.env timeout lines no longer apply. Each visit renews the year.
+SESSION_COOKIE_AGE = 365 * 24 * 60 * 60
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=_default_hsts_seconds(LOCAL_RUNTIME))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
     "SECURE_HSTS_INCLUDE_SUBDOMAINS",

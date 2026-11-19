@@ -11,20 +11,20 @@
     {% if email_identities %}
     <ul class="list-unstyled small mb-3">
         {% for identity in email_identities %}
-        <li>{{ identity.provider|capfirst }}: {{ identity.email }}</li>
+        <li class="d-flex align-items-center gap-2 mb-1">{% include "registration/provider_logo.html" with id=identity.provider %}<span>{{ identity.provider|capfirst }}: {{ identity.email }}</span><i class="fa-solid fa-circle-check text-success" aria-hidden="true"></i><span class="visually-hidden">verified</span></li>
         {% endfor %}
     </ul>
     {% endif %}
     {% if sign_in_providers %}
-    <div class="d-flex flex-wrap gap-2">
+    <div class="provider-buttons provider-buttons-inline">
         {% for provider in sign_in_providers %}
-        <a class="btn btn-outline-dark btn-sm rounded-pill" href="/auth/{{ provider.id }}/start/?connect=1">Connect {{ provider.label }}</a>
+        <a class="provider-button" href="/auth/{{ provider.id }}/start/?connect=1">{% include "registration/provider_logo.html" with id=provider.id %}<span>Connect {{ provider.label }}</span></a>
         {% endfor %}
     </div>
     <form class="row g-2 align-items-end mt-3" id="phoneApproveForm">
         <div class="col-sm-5"><label class="form-label small mb-1" for="phoneApproveCode">Sign in a phone: the code it shows</label>
             <input class="form-control form-control-sm text-uppercase" id="phoneApproveCode" maxlength="9" autocomplete="off" placeholder="ABCD-2345" required></div>
-        <div class="col-sm-3"><button class="btn btn-outline-dark btn-sm w-100" type="submit">Approve phone</button></div>
+        <div class="col-sm-3"><button class="btn btn-outline-dark btn-sm w-100" type="submit"><i class="fa-solid fa-mobile-screen-button me-1" aria-hidden="true"></i>Approve phone</button></div>
         <p class="small text-muted mb-0">On the phone, open ALFRED's address on your home Wi-Fi and choose "Sign in with a code". Approve only a code you see on your own phone.</p>
         <div id="phoneApproveStatus" class="small" role="status" aria-live="polite"></div>
     </form>

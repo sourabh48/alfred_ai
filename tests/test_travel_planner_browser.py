@@ -136,9 +136,17 @@ class TravelPlannerBrowserTests(StaticLiveServerTestCase):
 
     def test_minimal_settings_and_assistant_controls(self):
         self.browser.get(self.live_server_url+'/settings/')
-        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'privateMemoryPanel'))
-        self.assertFalse(self.browser.find_element(self.By.ID,'memoryEvaluationForm').is_displayed())
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'settingsOpenAI'))
+        self.assertFalse(self.browser.find_elements(self.By.ID,'privateMemoryPanel'))  # memory runs by itself; its tools are in App health
+        # Font Awesome icons: a fixed one on Save key, and one added from the label of a plain button, without changing its words.
+        self.assertTrue(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryReasoningKeyForm .fa-key'))
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryReasoningForm button .alfred-btn-icon.fa-floppy-disk'))
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#memoryReasoningForm button').text.strip(),'Save OpenAI settings')
+        self.assertFalse(self.browser.find_elements(self.By.ID,'alfredSessionTimer'))
         self.assertFalse(self.browser.find_element(self.By.ID,'travelPreferenceForm').is_displayed())
+        self.browser.get(self.live_server_url+'/settings/#memory-'+'a'*32)  # citations saved before the move still open the memory
+        self.wait.until(lambda _: self.browser.current_url.endswith('/settings/diagnostics/#memory-'+'a'*32))
+        self.assertTrue(self.browser.find_element(self.By.ID,'memoryHealth').get_attribute('open'))
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: self.browser.find_elements(self.By.ID,'intelligenceQuery'))
         self.assertTrue(self.browser.find_element(self.By.ID,'intelligenceQuery').is_displayed())

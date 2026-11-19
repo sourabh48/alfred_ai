@@ -42,11 +42,6 @@ class LiveDataVersionTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertNotEqual(self.version(), first)
 
-    def test_session_ping_does_not_change_the_version(self):
-        first = self.version()
-        self.assertEqual(self.client.post("/api/session/ping/").status_code, 200)
-        self.assertEqual(self.version(), first)
-
     def test_client_error_log_does_not_change_the_version(self):
         from apps.reports.models import OperationalLog
 

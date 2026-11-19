@@ -113,7 +113,6 @@ html[data-theme="dark"] :focus-visible { outline-color: #a8caff; }
   .alfred-main { padding-inline: 1rem !important; }
   .alfred-brand small { display: none; }
   .alfred-navbar .gap-3 { gap: .4rem !important; }
-  .alfred-session-timer { display: none; }
   .conversation-options { grid-template-columns: 1fr; }
   .surface-card { padding: 1rem; }
   .conversation-message--user { max-width: 95%; }
@@ -209,3 +208,23 @@ html[data-theme="dark"] .panel-eyebrow { color: #8db8ff; }
 .offline-map-add .form-select { flex: 1 1 14rem; max-width: 24rem; }
 html[data-theme="dark"] .offline-map, html[data-theme="dark"] .offline-map-ring > span:not(.spinner-border) { background: #182b44; }
 @media (max-width: 575px) { .offline-map { flex-wrap: wrap; } .offline-map-actions { width: 100%; } }
+
+/* Sign-in buttons: white with each provider's own logo, as the providers' brand guides ask (owner, 2026-11-19). */
+.provider-buttons { display: grid; gap: .75rem; }
+.provider-buttons-inline { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); max-width: 52rem; }
+.provider-button { position: relative; display: flex; align-items: center; justify-content: center; min-height: 3.25rem; padding: .7rem 1rem .7rem 3.5rem;
+    border: 1px solid #c9d1dc; border-radius: 12px; background: #fff; color: #1f2328; font-weight: 600; font-size: 1rem; text-decoration: none;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .06); transition: background-color .15s, border-color .15s, box-shadow .15s; }
+.provider-button:hover { background: #f6f8fa; border-color: #9aa7b6; color: #1f2328; box-shadow: 0 3px 10px rgba(15, 23, 42, .1); }
+.provider-button:focus-visible { outline: 3px solid var(--alfred-primary); outline-offset: 2px; }
+.provider-button:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+.provider-button .provider-logo { position: absolute; left: 1.15rem; top: 50%; transform: translateY(-50%); }
+.provider-logo { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; flex: none; }
+.provider-logo .fa-github { font-size: 1.45rem; color: #1f2328; }
+.provider-buttons-inline .provider-button { min-height: 2.9rem; font-size: .95rem; }
+html[data-theme="dark"] .provider-button { border-color: #fff; color: #1f2328; }
+html[data-theme="dark"] li > .provider-logo .fa-github { color: var(--alfred-ink); }
+.auth-alt-links { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem 1.25rem; }
+.auth-alt-links a { display: inline-flex; align-items: center; gap: .4rem; }
+.alfred-btn-icon { margin-right: .45em; font-size: .92em; }
+.btn-sm .alfred-btn-icon { margin-right: .35em; }

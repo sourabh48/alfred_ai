@@ -21,3 +21,6 @@ Offline speech components (downloaded separately, not part of Alfred's code):
 - Voice en_GB-vctk-medium (https://huggingface.co/rhasspy/piper-voices), trained on the CSTR VCTK
   Corpus, University of Edinburgh (https://datashare.ed.ac.uk/handle/10283/3443), CC BY 4.0.
 - Whisper base speech recognition (https://huggingface.co/openai/whisper-base), OpenAI, Apache-2.0.
+
+Interface icons: Font Awesome Free 6.7.2 by Fonticons, Inc. (https://fontawesome.com), icons CC BY 4.0,
+fonts SIL OFL 1.1, code MIT; licence text in static/vendor/fontawesome/LICENSE.txt.

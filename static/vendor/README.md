@@ -29,3 +29,11 @@ These assets allow the interface, dialogs and charts to work without a CDN.
 
 Downloaded from the corresponding pinned npm package URLs at cdn.jsdelivr.net.
 Optional Google web fonts fall back to system fonts when offline.
+
+- Font Awesome Free 6.7.2: https://fontawesome.com, https://github.com/FortAwesome/Font-Awesome/tree/6.7.2
+  (icons CC BY 4.0, fonts SIL OFL 1.1, code MIT; fontawesome/LICENSE.txt). `css/all.min.css` and the
+  `webfonts/*.woff2` files from the npm tarball
+  https://registry.npmjs.org/@fortawesome/fontawesome-free/-/fontawesome-free-6.7.2.tgz, checked against the
+  registry's sha512 integrity. SHA256 CSS: 74005d7c17d4a02f2f25404ec0655d9bc2fdaa53166874c87d7b7eec69d9088a.
+  The CSS also names .ttf fallbacks that are not shipped; every supported browser uses the woff2 files.
+  The Google and Microsoft sign-in logos are inline SVG drawn to those companies' published sign-in button guides.

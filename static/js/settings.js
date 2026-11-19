@@ -1,3 +1,10 @@
+// Memory moved from Settings to App health (owner, 2026-11-19); saved citations still point at /settings/#memory-<id>.
+function openMovedMemoryLink() {
+    if (location.hash === "#privateMemoryPanel" || /^#memory-[a-f0-9]{32}$/.test(location.hash)) location.replace("/settings/diagnostics/" + location.hash);
+}
+openMovedMemoryLink();
+window.addEventListener("hashchange", openMovedMemoryLink);
+
 const settingsState = {
     profile: null,
     links: null,

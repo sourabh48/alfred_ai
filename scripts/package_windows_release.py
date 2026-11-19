@@ -85,7 +85,9 @@ def inspect_bundle(bundle):
                 "_internal/templates/career/list.html",
                 "_internal/templates/ai_insights.html", "_internal/templates/settings/memory.html",
                 "_internal/static/js/intelligence.js", "_internal/static/js/voice.js", "_internal/static/js/memory.js",
-                "_internal/static/css/workspace.css", "_internal/static/js/workspace.js")
+                "_internal/static/css/workspace.css", "_internal/static/js/workspace.js",
+                "_internal/static/vendor/fontawesome/css/all.min.css", "_internal/static/vendor/fontawesome/webfonts/fa-solid-900.woff2",
+                "_internal/static/vendor/fontawesome/LICENSE.txt", "_internal/static/js/icons.js")
     missing = [name for name in required if not (bundle / name).is_file()]
     for pattern in ("_internal/rapidocr_onnxruntime/models/*.onnx", "_internal/onnxruntime/capi/*.dll",
                     "_internal/_tcl_data/init.tcl", "_internal/_tk_data/tk.tcl"):

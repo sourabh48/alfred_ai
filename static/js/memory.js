@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const panel = document.getElementById("privateMemoryPanel");
     if (!panel) return;
     if(location.hash==='#privateMemoryPanel' || /^#memory-[a-f0-9]{32}$/.test(location.hash))panel.querySelector('details').open=true;
-    if(location.hash==='#memoryHealth')document.getElementById('memoryHealth').open=true;
+    if(location.hash==='#memoryHealth' || /^#memory-[a-f0-9]{32}$/.test(location.hash))document.getElementById('memoryHealth').open=true;
     const list = document.getElementById("memoryList");
     const feedback = document.getElementById("memoryFeedback");
     const expected = document.getElementById("memoryEvaluationExpected");
@@ -215,7 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
     list.addEventListener("change", () => { selectedReset.disabled = !list.querySelector('input[data-memory-select]:checked'); });
     async function refreshPrivacy() {
         const ticket = generation;
-        const [sync, reasoning] = await Promise.all([Alfred.fetchJSON("/api/ai/memories/sync/"), Alfred.fetchJSON("/api/ai/memories/reason/")]);
+        const sync = await Alfred.fetchJSON("/api/ai/memories/sync/");
         if (!active || ticket !== generation) return;
         document.getElementById("memorySyncStatus").textContent = `Provider: ${sync.provider}. ${sync.available ? "Available" : "Not connected"}. Revision ${sync.status.revision}; ${sync.status.pending ? "updates queued" : "no queued updates"}; ${sync.status.conflict ? "conflict requires review" : "no conflict"}; failures ${sync.status.failures}.`;
         document.getElementById("memorySyncEnabled").checked = sync.status.enabled;
@@ -226,13 +226,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const stamp = value => value ? new Date(value*1000).toLocaleString() : "Not recorded";
         document.getElementById("memorySyncDetails").textContent = `${sync.provider === 'mock' ? 'Synthetic provider only. ' : ''}Sync ${sync.status.enabled ? 'enabled' : 'disabled'}. Last successful sync: ${stamp(sync.status.last_success_at)}. Retry after: ${stamp(sync.status.retry_at)}. Deletion propagation follows this encrypted queue; historical backups retain their original copies.`;
         document.getElementById("memorySyncRecover").hidden = !sync.available || !sync.status.enabled || !sync.status.conflict;
-        document.getElementById("memoryReasoningStatus").textContent = !reasoning.key_saved ? "OpenAI off: no key saved. Answers use the local model." : reasoning.policy.enabled ? "OpenAI on with your key for public questions; consent and daily limits apply." : "Key saved. Tick the opt-in below and save to turn OpenAI on.";
-        document.getElementById("memoryReasoningKeyStatus").textContent = reasoning.key_saved ? `Key saved (ends ${reasoning.key_hint}).` : "No key saved.";
-        document.getElementById("memoryReasoningKeyRemove").hidden = !reasoning.key_saved;
-        document.getElementById("memoryReasoningUsage").textContent = `UTC day ${reasoning.usage.day}: ${reasoning.usage.reserved_tokens} tokens reserved; USD ${(reasoning.usage.reserved_microusd/1000000).toFixed(6)} conservatively reserved. Billing measurements are unavailable; these reservations enforce caps.`;
-        document.getElementById("memoryReasoningEnabled").checked = reasoning.policy.enabled;
-        document.getElementById("memoryReasoningTokens").value = reasoning.policy.daily_tokens;
-        document.getElementById("memoryReasoningDollars").value = reasoning.policy.daily_microusd / 1000000;
     }
     async function refresh() {
         if (!active) return;
@@ -426,20 +419,11 @@ document.addEventListener("DOMContentLoaded", () => {
     async function cloudAction(path, payload, text, method) {
         const ticket = generation;
         try {
-            await Alfred.fetchJSON(`/api/ai/memories/${path}/`, {method: method || (path === "reason" ? "PUT" : "POST"), ...(payload ? {body: JSON.stringify(payload)} : {})});
+            await Alfred.fetchJSON(`/api/ai/memories/${path}/`, {method: method || "POST", ...(payload ? {body: JSON.stringify(payload)} : {})});
             await refreshPrivacy();
             if (active && ticket === generation) document.getElementById("memoryCloudFeedback").textContent = text;
         } catch (error) { if (active && ticket === generation) document.getElementById("memoryCloudFeedback").textContent = error.message; }
     }
-    document.getElementById("memoryReasoningKeyForm").addEventListener("submit", async event => {
-        event.preventDefault();
-        const input = document.getElementById("memoryReasoningKey");
-        await cloudAction("reason/key", {key: input.value.trim()}, "Key saved. Tick the opt-in and save to turn OpenAI on.");
-        input.value = "";
-    });
-    document.getElementById("memoryReasoningKeyRemove").addEventListener("click", () => {
-        if (window.confirm("Remove your OpenAI key? OpenAI is switched off until you add a key again.")) cloudAction("reason/key", null, "Key removed. OpenAI is off.", "DELETE");
-    });
     document.getElementById("memorySyncForm").addEventListener("submit", event => {
         event.preventDefault();
         const enabled = document.getElementById("memorySyncEnabled").checked;
@@ -448,11 +432,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("memorySyncNow").addEventListener("click", () => cloudAction("sync", {action: "sync"}, "Synchronization attempt completed. Check queue and conflict status."));
     document.getElementById("memorySyncRecover").addEventListener("click", () => {
         if (window.confirm("Merge authenticated remote memory with local changes? Revoked memories stay deleted. Review recovery backups before continuing.")) cloudAction("sync", {action:"recover",confirm:true}, "Authenticated conflict recovery completed. Review the retained records.");
-    });
-    document.getElementById("memoryReasoningForm").addEventListener("submit", event => {
-        event.preventDefault();
-        const enabled = document.getElementById("memoryReasoningEnabled").checked;
-        cloudAction("reason", {enabled, consent: enabled, daily_tokens: Number(document.getElementById("memoryReasoningTokens").value), daily_microusd: Math.round(Number(document.getElementById("memoryReasoningDollars").value) * 1000000)}, "Reasoning policy saved. Each cloud request still requires consent.");
     });
     evaluationForm.addEventListener("submit", async event => {
         event.preventDefault();
@@ -510,14 +489,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 item.citations.forEach(cite => {
                     if (!/^[a-f0-9]{32}$/.test(cite.id) || !currentMemories.has(cite.id)) throw new Error("Sources changed. Refresh memories and rerun; no current result can be shown.");
                     const reference = document.createElement("p"), link = document.createElement("a");
-                    link.href = `/settings/#memory-${cite.id}`; link.textContent = currentMemories.get(cite.id); link.title = `Memory ${cite.id}`;
+                    link.href = `/settings/diagnostics/#memory-${cite.id}`; link.textContent = currentMemories.get(cite.id); link.title = `Memory ${cite.id}`;
                     reference.append(link,document.createTextNode(` · rank ${cite.rank} · cosine ${cite.score.toFixed(3)} · ${cite.relevant ? 'relevant' : 'unexpected'}`)); row.append(reference);
                 });
                 const returned = new Set(item.citations.map(cite => cite.id));
                 item.expected_ids.filter(id => !returned.has(id)).forEach(id => {
                     if (!/^[a-f0-9]{32}$/.test(id) || !currentMemories.has(id)) throw new Error("Expected sources changed. Refresh memories and review labels before rerunning.");
                     const reference = document.createElement("p"), link = document.createElement("a");
-                    link.href = `/settings/#memory-${id}`; link.textContent = currentMemories.get(id);
+                    link.href = `/settings/diagnostics/#memory-${id}`; link.textContent = currentMemories.get(id);
                     reference.dataset.missedSource = id;
                     reference.append(document.createTextNode("Expected but not retrieved: "),link); row.append(reference);
                 });
@@ -600,15 +579,11 @@ document.addEventListener("DOMContentLoaded", () => {
         cases = []; editingCase = null; evaluationAdd.textContent = "Add question to run"; currentMemories.clear(); previousExpected.clear(); evaluationCases.replaceChildren();
         expected.replaceChildren(); query.value = ""; clearEvaluationResult(); evaluationFeedback.textContent = ""; evaluationThreshold.value = ""; evaluationControls();
         document.getElementById("memorySyncStatus").textContent = "";
-        document.getElementById("memoryReasoningStatus").textContent = "";
-        document.getElementById("memorySyncDetails").textContent = ""; document.getElementById("memoryReasoningUsage").textContent = "";
+        document.getElementById("memorySyncDetails").textContent = "";
         document.getElementById("memoryCloudFeedback").textContent = "";
         document.getElementById("memorySyncEnabled").checked = false;
         document.getElementById("memorySyncEnabled").disabled = true;
         document.getElementById("memorySyncNow").disabled = true;
-        document.getElementById("memoryReasoningEnabled").checked = false;
-        document.getElementById("memoryReasoningTokens").value = "";
-        document.getElementById("memoryReasoningDollars").value = "";
     });
     window.addEventListener("pageshow", event => {
         active = true;

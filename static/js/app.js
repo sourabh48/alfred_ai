@@ -402,138 +402,6 @@ function clientBackgroundTasksDisabled() {
     return navigator.webdriver === true || document.body.dataset.disableClientBackgroundTasks === "true";
 }
 
-function formatSessionCountdown(totalSeconds) {
-    const seconds = Math.max(0, Math.floor(Number(totalSeconds || 0)));
-    const minutes = Math.floor(seconds / 60);
-    const remainder = seconds % 60;
-    return `${minutes}:${String(remainder).padStart(2, "0")}`;
-}
-
-function installSessionSecurityTimer() {
-    if (
-        clientBackgroundTasksDisabled()
-        || window.__alfredSessionTimerInstalled
-        || document.body.dataset.authenticated !== "true"
-    ) {
-        return;
-    }
-
-    const timer = document.querySelector("[data-session-timer]");
-    const countdown = timer?.querySelector("[data-session-countdown]");
-    const timeoutSeconds = Number(document.body.dataset.sessionTimeoutSeconds || 0);
-    if (!timer || !countdown || !Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
-        return;
-    }
-
-    window.__alfredSessionTimerInstalled = true;
-    timer.hidden = false;
-
-    const warningSeconds = Math.max(0, Math.min(Number(document.body.dataset.sessionWarningSeconds || 0), timeoutSeconds));
-    const pingUrl = document.body.dataset.sessionPingUrl || "/api/session/ping/";
-    const logoutUrl = document.body.dataset.logoutUrl || "/logout/";
-    const loginUrl = document.body.dataset.loginUrl || "/login/";
-    const refreshThrottleMs = Math.min(SESSION_REFRESH_THROTTLE_MS, Math.max(15000, (timeoutSeconds * 1000) / 3));
-    let sessionTimeoutSeconds = timeoutSeconds;
-    let sessionWarningSeconds = warningSeconds;
-    let expiresAt = Date.now() + sessionTimeoutSeconds * 1000;
-    let lastRefreshAt = 0;
-    let expired = false;
-
-    function renderSessionState() {
-        const remainingSeconds = Math.ceil((expiresAt - Date.now()) / 1000);
-        countdown.textContent = formatSessionCountdown(remainingSeconds);
-        timer.classList.toggle("is-warning", remainingSeconds > 0 && remainingSeconds <= sessionWarningSeconds);
-        timer.classList.toggle("is-expired", remainingSeconds <= 0);
-        if (remainingSeconds <= 0) {
-            expireSession();
-        }
-    }
-
-    function applySessionPayload(payload = {}) {
-        const nextTimeout = Number(payload.timeout_seconds || sessionTimeoutSeconds);
-        const nextWarning = Number(payload.warning_seconds || sessionWarningSeconds);
-        if (Number.isFinite(nextTimeout) && nextTimeout > 0) {
-            sessionTimeoutSeconds = nextTimeout;
-        }
-        if (Number.isFinite(nextWarning) && nextWarning >= 0) {
-            sessionWarningSeconds = Math.min(nextWarning, sessionTimeoutSeconds);
-        }
-        expiresAt = Date.now() + sessionTimeoutSeconds * 1000;
-        renderSessionState();
-    }
-
-    function refreshSession() {
-        const now = Date.now();
-        if (expired || now - lastRefreshAt < refreshThrottleMs) {
-            return;
-        }
-        lastRefreshAt = now;
-        fetch(pingUrl, {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: JSON.stringify({}),
-        })
-            .then(async response => {
-                if (response.redirected || response.status === 401 || response.status === 403) {
-                    expireSession();
-                    return null;
-                }
-                if (!response.ok) {
-                    return null;
-                }
-                return response.json().catch(() => null);
-            })
-            .then(payload => {
-                if (payload) {
-                    applySessionPayload(payload);
-                }
-            })
-            .catch(() => {});
-    }
-
-    function handleActivity() {
-        if (expired) {
-            return;
-        }
-        expiresAt = Date.now() + sessionTimeoutSeconds * 1000;
-        renderSessionState();
-        refreshSession();
-    }
-
-    function expireSession() {
-        if (expired) {
-            return;
-        }
-        expired = true;
-        timer.classList.add("is-expired");
-        countdown.textContent = "0:00";
-        fetch(logoutUrl, {
-            method: "POST",
-            credentials: "same-origin",
-            keepalive: true,
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": getCookie("csrftoken"),
-            },
-            body: JSON.stringify({}),
-        }).finally(() => {
-            window.location.assign(loginUrl);
-        });
-    }
-
-    ["click", "keydown", "pointerdown", "touchstart"].forEach(eventName => {
-        document.addEventListener(eventName, handleActivity, { passive: true });
-    });
-    document.addEventListener("scroll", handleActivity, { capture: true, passive: true });
-
-    renderSessionState();
-    window.setInterval(renderSessionState, 1000);
-}
-
 const liveRefreshRegistry = new Map();
 const liveRefreshGuardRegistry = new WeakMap();
 
@@ -719,6 +587,16 @@ function disableLiveRefresh(key) {
 
 // Replace only the child nodes whose markup changed, so unchanged cards and values are not rebuilt.
 // Use only where the caller does not attach listeners to the children afterwards (kept nodes would get them twice).
+// icons.js adds decorative button icons; compare pages without them so a refresh with the same content changes nothing.
+function withoutButtonIcons(node) {
+    if (node.nodeType !== 1 || !node.querySelector(".alfred-btn-icon")) {
+        return node;
+    }
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll(".alfred-btn-icon").forEach(icon => icon.remove());
+    return copy;
+}
+
 function setHTML(target, html) {
     if (!target) {
         return;
@@ -731,7 +609,7 @@ function setHTML(target, html) {
         const old = current[index];
         if (!old) {
             target.appendChild(node);
-        } else if (!old.isEqualNode(node)) {
+        } else if (!withoutButtonIcons(old).isEqualNode(node)) {
             target.replaceChild(node, old);
         }
     });
@@ -806,7 +684,7 @@ function setHTMLIfChanged(target, html) {
         return;
     }
     const nextHtml = String(html ?? "");
-    if (node.innerHTML !== nextHtml) {
+    if (node.innerHTML !== nextHtml && withoutButtonIcons(node).innerHTML !== nextHtml) {
         node.innerHTML = nextHtml;
     }
 }
@@ -1304,7 +1182,6 @@ function installClientDiagnostics() {
 }
 
 installUserDataResetAction();
-installSessionSecurityTimer();
 installMlRuntimeBanner();
 installClientDiagnostics();
 syncShellOffsets();
@@ -1338,7 +1215,6 @@ window.Alfred = {
     showUploadProgress,
     lockLiveRefresh,
     logClientIssue,
-    installSessionSecurityTimer,
     setDisabledIfChanged,
     setHTMLIfChanged,
     shouldPauseLiveRefresh,

@@ -259,21 +259,6 @@ def online_services_api_view(request):
 
 
 @login_required
-@require_http_methods(["POST"])
-def session_ping_api_view(request):
-    request.session.modified = True
-    timeout_seconds = max(0, int(getattr(settings, "SESSION_COOKIE_AGE", 0) or 0))
-    warning_seconds = max(0, int(getattr(settings, "ALFRED_SESSION_WARNING_SECONDS", 0) or 0))
-    return JsonResponse(
-        {
-            "timeout_seconds": timeout_seconds,
-            "warning_seconds": min(warning_seconds, timeout_seconds) if timeout_seconds else 0,
-        },
-        encoder=DjangoJSONEncoder,
-    )
-
-
-@login_required
 @require_http_methods(["GET"])
 def data_version_api_view(request):
     from .services.live_version import data_version

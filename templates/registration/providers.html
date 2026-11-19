@@ -1,12 +1,12 @@
 {% if sign_in_error %}
 <div class="alert alert-danger" role="alert">{{ sign_in_error }}</div>
 {% endif %}
-<div class="d-grid gap-2 mb-3" id="signInProviders">
+<div class="provider-buttons mb-3" id="signInProviders">
     {% for provider in sign_in_providers %}
-    <a class="btn btn-outline-dark btn-lg rounded-pill" href="/auth/{{ provider.id }}/start/{% if next %}?next={{ next|urlencode }}{% endif %}">Continue with {{ provider.label }}</a>
+    <a class="provider-button" href="/auth/{{ provider.id }}/start/{% if next %}?next={{ next|urlencode }}{% endif %}">{% include "registration/provider_logo.html" with id=provider.id %}<span>Continue with {{ provider.label }}</span></a>
     {% endfor %}
     {% if not google_sign_in_ready %}
-    <button class="btn btn-outline-dark btn-lg rounded-pill" type="button" disabled aria-describedby="googleSignInHint">Continue with Google</button>
+    <button class="provider-button" type="button" disabled aria-describedby="googleSignInHint">{% include "registration/provider_logo.html" with id="google" %}<span>Continue with Google</span></button>
     {% endif %}
 </div>
 {% if google_sign_in_ready %}

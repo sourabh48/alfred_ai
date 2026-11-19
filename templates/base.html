@@ -9,9 +9,10 @@
     <meta name="alfred-project-id" content="4bd97575-d520-4add-b0db-0afe0661156f">
 
     <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/vendor/fontawesome/css/all.min.css?v=6.7.2" rel="stylesheet">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/static/css/style.css?v=2.9.4">
-    <link rel="stylesheet" href="/static/css/workspace.css?v=19">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.9.5">
+    <link rel="stylesheet" href="/static/css/workspace.css?v=20">
 
     <!-- PWA -->
     <link rel="manifest" href="/static/manifest.json">
@@ -24,9 +25,6 @@
     data-home-url="{{ ui_config.brand.home_path }}"
     data-login-url="{% url 'login' %}"
     data-logout-url="{% url 'logout' %}"
-    data-session-ping-url="{% url 'session_ping_api' %}"
-    data-session-timeout-seconds="{{ session_security.timeout_seconds }}"
-    data-session-warning-seconds="{{ session_security.warning_seconds }}"
     data-shell-mode="{% if request.user.is_authenticated and not hide_sidebar %}workspace{% else %}focus{% endif %}"
 >
 
@@ -60,7 +58,8 @@
 <script src="/static/vendor/bootstrap.bundle.min.js"></script>
 <script src="/static/vendor/chart.umd.min.js"></script>
 {{ ui_config|json_script:"alfred-ui-config" }}
-<script src="/static/js/app.js?v=3.3.1"></script>
+<script src="/static/js/app.js?v=3.3.2"></script>
+<script src="/static/js/icons.js?v=1"></script>
 <script src="/static/js/workspace.js?v=10"></script>
 {% block extra_js %}{% endblock %}
 

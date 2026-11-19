@@ -547,7 +547,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const reviewButton = document.createElement("button"); reviewButton.type = "button"; reviewButton.className = "btn btn-outline-secondary btn-sm mt-3"; reviewButton.textContent = "Save answer as an unverified suggestion";
         reviewButton.addEventListener("click", async () => {
             reviewButton.disabled = true;
-            try { await Alfred.fetchJSON("/api/ai/memories/learning/",{method:"POST",body:JSON.stringify({action:"extract",text:result.answer.replaceAll("\n"," "),provenance:{source:"owner-proposed AI hypothesis",source_refs:(result.sources || []).map(source=>source.ref)},sensitivity:"sensitive"})}); if (active && ticket===generation) feedback.textContent = "Suggestion saved for review in AI Memory. It is not a verified fact."; }
+            try { await Alfred.fetchJSON("/api/ai/memories/learning/",{method:"POST",body:JSON.stringify({action:"extract",text:result.answer.replaceAll("\n"," "),provenance:{source:"owner-proposed AI hypothesis",source_refs:(result.sources || []).map(source=>source.ref)},sensitivity:"sensitive"})}); if (active && ticket===generation) feedback.textContent = "Suggestion saved for review under App health › Memory. It is not a verified fact."; }
             catch (error) { if (active && ticket===generation) feedback.textContent = error.message; reviewButton.disabled = false; }
         });
         assistantMessage.append(reviewButton, readAloudButton(result.answer));

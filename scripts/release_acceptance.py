@@ -96,7 +96,7 @@ def browser_acceptance(port, output):
             ("investments", "/investments/", "#investmentPositionsBodySearch"),
             ("travel", "/mobility/", "main"),
             ("documents", "/documents/", "main"),
-            ("memory", "/settings/#privateMemoryPanel", "#privateMemoryPanel"),
+            ("memory", "/settings/diagnostics/#memoryHealth", "#privateMemoryPanel"),
             ("conversation", "/ai/insights/", "#intelligenceQuery"),
         ):
             browser.get(base + path)

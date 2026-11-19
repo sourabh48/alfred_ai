@@ -1172,15 +1172,17 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         identities=[store.save_verified(owner,{'statement':text},{'source':'Synthetic owner review'},verified=True)
             for text in ('mountain preference','I prefer the coast','I dislike the coast')]
-        self.login(); self.browser.get(self.live_server_url+('/settings/diagnostics/#memoryHealth' if health else '/settings/#privateMemoryPanel'))
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')  # the AI Memory card left Settings (owner, 2026-11-19)
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
         return store,owner,identities
 
     def test_own_openai_key_is_saved_from_settings_never_shown_and_removable(self):
         from unittest.mock import patch as mock_patch
         from tests.test_memory_reasoning import KEY
-        store, owner, _ = self.memory_evaluation_fixture(health=False)
+        store, owner, _ = self.memory_evaluation_fixture()
         http = self.enterContext(mock_patch('apps.ml_engine.services.memory_reasoning.request', side_effect=AssertionError('No OpenAI call')))
+        self.browser.get(self.live_server_url + '/settings/#settingsOpenAI')  # with the other keys under Online services
+        self.assertFalse(self.browser.find_elements(self.By.ID, 'privateMemoryPanel'))
         self.wait.until(lambda _: 'no key saved' in self.text('memoryReasoningStatus'))
         self.assertIn('No key saved', self.text('memoryReasoningKeyStatus'))
         self.browser.find_element(self.By.ID, 'memoryReasoningKey').send_keys(KEY)
@@ -1315,7 +1317,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.execute_script('return document.documentElement.scrollWidth <= innerWidth'))
         self.browser.execute_script("document.querySelector('#memoryEvaluationResult').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('memory-evaluation-multi-case-mobile')
-        self.memory_click(f'#memoryEvaluationDetails a[href="/settings/#memory-{identities[0]}"]')
+        self.memory_click(f'#memoryEvaluationDetails a[href="/settings/diagnostics/#memory-{identities[0]}"]')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,f'memory-{identities[0]}').is_displayed())
         self.assertIn('mountain preference',self.browser.find_element(self.By.ID,f'memory-{identities[0]}').text)
         self.browser.back()
@@ -1501,7 +1503,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault')))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
-        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'No verified memories saved.' in self.text('memoryList'))
         payload={'action':'extract','text':'synthetic mountain <img src=x onerror="window.memoryLeak=true">','provenance':{'source':'synthetic browser review'},'sensitivity':'public'}
         self.assertEqual(self.memory_post('learning',payload,False)['status'],403)
@@ -1577,7 +1579,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']
         store.save_verified(owner,{'note':'synthetic public mountain preference'},{'source':'synthetic'},sensitivity='public',verified=True)
-        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'synthetic public mountain preference' in self.text('memoryList'))
         post=self.memory_post
         configure={'action':'configure','enabled':True,'consent':True}
@@ -1934,9 +1936,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         reject=learning.extract(owner,'synthetic incorrect suggestion',{'source':'synthetic hypothesis'})[0]
         foreign=get_user_model().objects.create_user(username='synthetic-ui-review-other')
         learning.extract(foreign,'FOREIGN-UI-CANDIDATE',{'source':'synthetic other'})
-        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'mountain hiking' in self.text('memoryList') and 'NEEDS REVIEW' in self.text('memoryCandidates'))
-        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#sidebarMenu a[href="/settings/"]').get_attribute('aria-current'),'page')
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR,'#sidebarMenu a[href="/settings/diagnostics/"]').get_attribute('aria-current'),'page')
         self.assertNotIn('FOREIGN-UI-CANDIDATE',self.text('privateMemoryPanel'))
         Select(self.browser.find_element(self.By.ID,'memoryCategory')).select_by_value('Travel')
         self.assertIn('1 of 2',self.text('memoryCount'))
@@ -1962,8 +1964,6 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store.restore_owner(owner)
         self.assertNotIn(first,{r['id'] for r in store.list_memories(owner)})
         self.assertIn(second,{r['id'] for r in store.list_memories(owner)})
-        self.assertIn('OpenAI off: no key saved',self.text('memoryReasoningStatus'))
-        self.assertIn('Billing measurements are unavailable',self.text('memoryReasoningUsage'))
         self.browser.execute_script("document.getElementById('privateMemoryPanel').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('ui-b-memory-search-review-revocation')
 
@@ -2759,7 +2759,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Verified memory saved locally.' in self.text('intelligenceFeedback'))
         self.assertEqual(len(store.list_memories(owner)),2)
         self.capture('hybrid-insights-local-grounding-verified-memory')
-        self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'synthetic owner checked hiking fact' in self.text('memoryList'))
         self.assertEqual(MemoryStore(root/'vault').restore_owner(owner),2)
 
@@ -2778,7 +2778,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         store.save_verified(owner,{'statement':'synthetic public mountain preference'},{'source':'synthetic review'},verified=True,sensitivity='public')
         from apps.ml_engine.services.conversation_history import ConversationHistory
         ConversationHistory(store).configure(owner, enabled=False)  # history is on by default; cloud answers need it off
-        self.login(); self.browser.get(self.live_server_url+'/settings/#privateMemoryPanel')
+        self.login(); self.browser.get(self.live_server_url+'/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'Provider: mock.' in self.text('memorySyncStatus'))
         self.memory_click('#memorySyncEnabled'); self.memory_click('#memorySyncForm button[type=submit]')
         self.wait.until(lambda _: 'Synchronization consent saved.' in self.text('memoryCloudFeedback'))
@@ -2786,11 +2786,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'memorySyncNow').is_enabled())
         self.memory_click('#memorySyncNow')
         self.wait.until(lambda _: 'Revision 1;' in self.text('memorySyncStatus'))
+        self.browser.get(self.live_server_url+'/settings/#settingsOpenAI')
+        self.wait.until(lambda _: 'Billing measurements are unavailable' in self.text('memoryReasoningUsage'))
         self.memory_click('#memoryReasoningEnabled')
         tokens=self.browser.find_element(self.By.ID,'memoryReasoningTokens'); tokens.clear(); tokens.send_keys('4000')  # two answers, each reserving up to 1024 output tokens
         dollars=self.browser.find_element(self.By.ID,'memoryReasoningDollars'); dollars.clear(); dollars.send_keys('0.005')
         self.memory_click('#memoryReasoningForm button')
-        self.wait.until(lambda _: 'Reasoning policy saved.' in self.text('memoryCloudFeedback'))
+        self.wait.until(lambda _: 'OpenAI settings saved.' in self.text('openaiFeedback'))
         with store._transaction() as db:
             self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy']['daily_microusd'],5000)
         self.capture('memory-sync-reasoning-owner-policy')
@@ -2830,7 +2832,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             clock.fromisoformat = datetime.fromisoformat
             store.save_verified(owner, {'note': 'synthetic-expiring-memory'}, {'source': 'synthetic'}, verified=True)
         self.login()
-        self.browser.get(self.live_server_url + '/settings/#privateMemoryPanel')
+        self.browser.get(self.live_server_url + '/settings/diagnostics/#memoryHealth')
         self.wait.until(lambda _: 'synthetic-delete' in self.text('memoryList'))
         self.assertNotIn('synthetic-other-owner-private', self.text('memoryList'))
         self.assertFalse(self.browser.execute_script('return Boolean(window.memoryLeak)'))

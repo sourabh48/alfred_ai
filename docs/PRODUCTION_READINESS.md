@@ -55,10 +55,7 @@ runtime; the following Celery items describe the optional server profile.
 | `REDIS_URL` | Redis broker/result backend for Celery |
 | `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` | Optional explicit Celery URLs; default to `REDIS_URL` when omitted |
 | `CELERY_TASK_ALWAYS_EAGER` | Must be `false` in production |
-| `ALFRED_SESSION_TIMEOUT_SECONDS` | Bounded authenticated idle timeout, recommended `1800` for production |
-| `ALFRED_SESSION_WARNING_SECONDS` | User-visible warning window, recommended `300` |
-| `SESSION_SAVE_EVERY_REQUEST` | `true`, so active authenticated requests refresh the idle timeout |
-| `SESSION_EXPIRE_AT_BROWSER_CLOSE` | `true` for production browser-close expiry |
+| Sessions | Owner decision 2026-11-19: no idle timeout, countdown or browser-close expiry; a session lasts a year from the last visit, or until Sign out. The old `ALFRED_SESSION_*` and `SESSION_EXPIRE_AT_BROWSER_CLOSE` settings are ignored |
 | `ALFRED_DELETE_SOURCE_UPLOADS_AFTER_EXTRACTION` | `true`, so raw uploaded documents are deleted after parser extraction |
 | `ALFRED_PRODUCTION_DEPLOYMENT_PROOF` | Optional path to the recorded production deployment proof JSON |
 | `ALFRED_MATERIALIZED_CACHE_TRAFFIC_PROOF` | Optional path to a cache traffic proof artifact |

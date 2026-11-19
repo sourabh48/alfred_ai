@@ -22,18 +22,6 @@
             >
                 {{ ui_config.navigation.menu_label }}
             </button>
-            <div
-                id="alfredSessionTimer"
-                class="alfred-session-timer"
-                role="status"
-                aria-live="polite"
-                data-session-timer
-                hidden
-            >
-                <span class="alfred-session-dot" aria-hidden="true"></span>
-                <span class="alfred-session-label">Session</span>
-                <span class="alfred-session-countdown" data-session-countdown>--:--</span>
-            </div>
             <div class="alfred-nav-chip d-none d-sm-inline-flex">{{ ui_config.navigation.signed_in_prefix }} {{ request.user.username }}</div>
             <form action="{% url 'logout' %}" method="post" class="m-0">
                 {% csrf_token %}
