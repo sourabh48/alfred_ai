@@ -261,3 +261,8 @@ html[data-theme="dark"] li > .provider-logo .fa-github { color: var(--alfred-ink
 .ask-tools > details[open] { grid-column: 1 / -1; }
 html[data-theme="dark"] .ask-composer, html[data-theme="dark"] .ask-chip { background: #182b44; }
 @media (max-width: 575.98px) { .ask-panel { padding: 1rem; } .ask-keys { display: none; } .ask-suggestions { grid-template-columns: 1fr; } }
+/* Light theme sign-in: a card edge and button borders that stand out from white (owner 2026-11-19); dark mode unchanged. */
+html:not([data-theme="dark"]) .auth-panel { background: #fff; border-color: rgba(16, 37, 63, .18); box-shadow: 0 1px 3px rgba(16, 37, 63, .08), 0 24px 70px rgba(16, 37, 63, .12); }
+html:not([data-theme="dark"]) .provider-button { border-color: #8c959f; }
+html:not([data-theme="dark"]) .provider-button:hover { border-color: #57606a; }
+html:not([data-theme="dark"]) .auth-alt-links a { color: #1858d6; }
