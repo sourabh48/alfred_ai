@@ -7,7 +7,9 @@ from .travel_discovery import budget_for, value
 from .travel_catalog import ACTIVITY_TAGS, CITIES, approximate_road_km
 from .travel.costs import calculate_budget
 from .travel.money import decimal_amount, rupees
+from .travel.cache import query
 from .travel.providers.base import number
+from .travel.providers.routing import GoogleRoutes
 from .travel.route_optimiser import optimise_route
 
 
@@ -19,7 +21,7 @@ def packing_suggestions(mode):
 
 
 def compare_stop_orders(state, stops):
-    current = build_multi_stop_itinerary(state, stops)
+    build_multi_stop_itinerary(state, stops, roads=False)  # same checks as applying; every order is compared on estimates
     origin = value(state, "origin")
     lat, lon = CITIES[origin.lower()]
     points = [{"name": origin, "lat": lat, "lon": lon}, *stops]
@@ -47,15 +49,32 @@ def compare_stop_orders(state, stops):
     if not fits:
         best = optimise_route(0, 0, visits, ride)  # Some leg is over the daily limit; still order every stop.
     order = tuple(best["stops"])  # Ties retain the original order: it is searched first.
-    return {"stops": [points[i]["name"] for i in order], "current_distance_km": current["route"]["distance_km_total"],
+    return {"stops": [points[i]["name"] for i in order], "current_distance_km": total(original),
         "suggested_distance_km": total(order), "suggested_ride_hours": round(best["ride_hours"], 1),
         "fits_daily_riding_limit": fits, "equal_orders": [[points[i]["name"] for i in o] for o in best["equal_orders"]],
         "changed": order != original,
         "basis": "Fewest estimated riding hours among every order of these stops, preferring orders where each leg fits your daily riding limit in 07:00–18:00 daylight. Town-centre distance allowances, not a verified fastest, cheapest or legal road route. Applying rebuilds days, nights and budget and removes day edits; no booking or financial record is changed."}
 
 
-def build_multi_stop_itinerary(state, stops):
-    """Manual order and estimated legs; no single-stop quote certifies the journey."""
+def road_leg(state, a, b):
+    """Google's road route for one leg in the trip's transport mode, or None (no key, limit, failure, stale copy)."""
+    result = query(GoogleRoutes(), {"start": [a["lon"], a["lat"]], "end": [b["lon"], b["lat"]], "mode": value(state, "transport_mode"),
+        "avoid_expressways": bool(value(state, "avoid_expressways", False)), "avoid_tolls": bool(value(state, "avoid_tolls", False))})
+    if not result.success or result.stale:
+        return None
+    route = result.payload["routes"][0]
+    return {"distance_km": max(1, round(route["distance_km"])), "hours": route["duration_hours"], "confidence": "PROVIDER",
+            "source": "google_routes", "profile": route["profile"], "retrieved_at": result.retrieved_at}
+
+
+def leg_text(leg):
+    if leg["confidence"] == "PROVIDER":
+        return f"~{leg['distance_km']} km by road, about {leg['hours']:g} h (Google); closures and legality unverified"
+    return f"~{leg['distance_km']} km allowance; duration and legal route unverified"
+
+
+def build_multi_stop_itinerary(state, stops, roads=True):
+    """Manual order; each leg is Google's road route when it answers, else a labelled estimate. No booking is certified."""
     days = int(value(state, "trip_duration", 3))
     if not 2 <= len(stops) <= 5 or not len(stops)+1 <= days <= 30:
         raise ValidationError("Choose 2–5 stops and allow at least one night per stop plus a return day (maximum 30 days).")
@@ -72,10 +91,22 @@ def build_multi_stop_itinerary(state, stops):
             number(stop.get("lon"), low=-180, high=180)
             number(stop.get("nightly", 1500), low=0, high=1_000_000)
         legs = [{"from": a["name"], "to": b["name"], "distance_km": approximate_road_km(
-                    a["name"], b, coordinates=(a["lat"], a["lon"])), "confidence": "ESTIMATED"}
+                    a["name"], b, coordinates=(a["lat"], a["lon"])), "confidence": "ESTIMATED", "hours": None}
                 for a, b in zip(points, points[1:]+points[:1])]
     except (TypeError, ValueError):
         raise ValidationError("Stop coordinates or stay allowances are missing or invalid. Your existing plan is retained.")
+    for leg, a, b in zip(legs, points, points[1:]+points[:1]):
+        road = road_leg(state, a, b) if roads else None
+        if road:
+            leg.update(road)
+    checked = sum(leg["confidence"] == "PROVIDER" for leg in legs)
+    if checked == len(legs):
+        basis = "Every leg is a Google road route for your transport mode (two-wheeler for a motorcycle); "
+    elif checked:
+        basis = (f"{checked} of {len(legs)} legs are Google road routes; Google did not answer for the others, which use "
+                 "straight-line distance × 1.35 rounded to 10 km (minimum 20 km); ")
+    else:
+        basis = "Google road routes are unavailable, so leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km); "
     nights = [(days-1)//len(stops) + (i < (days-1) % len(stops)) for i in range(len(stops))]
     nightly = sum(decimal_amount(s.get("nightly", 1500))*n for s, n in zip(stops, nights))/decimal_amount(days-1)
     budget = calculate_budget(state, {"nightly": nightly}, route_distance_km=sum(leg["distance_km"] for leg in legs))
@@ -86,8 +117,9 @@ def build_multi_stop_itinerary(state, stops):
     result["budget"] = budget
     result["route"] = {"summary": " → ".join([origin, *[s["name"] for s in stops], origin]),
         "distance_km_total": sum(leg["distance_km"] for leg in legs), "distance_km_one_way": None,
-        "hours_one_way": None, "confidence": "ESTIMATED", "legs": legs, "options": [],
-        "note": "User-chosen stop order; road routing is not optimized or verified. Leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km), not road routing. Travel times, road legality, closures and motorcycle access are unverified."}
+        "hours_one_way": None, "confidence": "PROVIDER" if checked == len(legs) else "ESTIMATED", "legs": legs, "options": [],
+        "road_legs_checked": checked,
+        "note": "User-chosen stop order, not optimized. " + basis + "Google's times leave out your stops and breaks. Closures, permits, traffic and motorcycle legality are unverified."}
     # Single-destination evidence and quotes cannot establish a multi-stop route or booking.
     for key in ("route_result", "weather_result", "places_result", "permit_result", "hotels_result", "stays_guide_result", "flights_result", "flight_prices_result", "trains_result", "buses_result", "discovery_result", "map", "quality"):
         result[key] = {}
@@ -102,12 +134,12 @@ def build_multi_stop_itinerary(state, stops):
             day["title"] = f"{'Arrive in' if index == 0 else 'Explore'} {stop['name']}"
             if index == 0:
                 day["items"].insert(0, {"title": f"{leg['from']} → {leg['to']}", "priority": "Must Do", "period": "Travel in daylight; take regular rest breaks",
-                    "duration": f"~{leg['distance_km']} km allowance; duration and legal route unverified", "type": "travel", "cost": 0})
+                    "duration": leg_text(leg), "type": "travel", "cost": 0})
             result["days"].append(day)
     last = legs[-1]
     result["days"].append({"title": "Return home", "pace": "balanced", "stay": "Home",
         "meals": "Allow regular meal and hydration breaks.", "items": [{"title": f"{last['from']} → {origin}",
-        "priority": "Must Do", "period": "Travel in daylight; take regular rest breaks", "duration": f"~{last['distance_km']} km allowance; duration and legal route unverified", "type": "travel", "cost": 0}]})
+        "priority": "Must Do", "period": "Travel in daylight; take regular rest breaks", "duration": leg_text(last), "type": "travel", "cost": 0}]})
     start = value(state, "available_start_date")
     for index, day in enumerate(result["days"]):
         day.update(day=index+1, date=(date.fromisoformat(start)+timedelta(days=index)).isoformat() if start else None,
@@ -119,7 +151,7 @@ def build_multi_stop_itinerary(state, stops):
         "Sunrise/sunset times and safe viewpoints remain unverified; travel in daylight and allow rest breaks."]
     result["checks"].extend(f"{s['name']}: {issue}" for s in stops for issue in s.get("issues", []))
     if any(leg["distance_km"] > value(state, "maximum_daily_driving", 300) for leg in legs):
-        result["checks"].append("At least one estimated leg exceeds your daily distance preference. Add a stop or shorten the journey before committing.")
+        result["checks"].append("At least one leg exceeds your daily distance preference. Add a stop or shorten the journey before committing.")
     return result
 
 

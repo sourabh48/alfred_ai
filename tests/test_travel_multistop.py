@@ -13,6 +13,7 @@ from apps.mobility.services.travel_conversation import save_plan, send_message
 from apps.mobility.services.travel_discovery import fact, value
 from apps.mobility.services.travel_itinerary import build_multi_stop_itinerary, compare_stop_orders
 from apps.mobility.services.travel.money import rupees
+from apps.mobility.services.travel.providers.base import ProviderError
 from apps.mobility.services.travel_research import queue_research, run_research
 from tests import test_travel_planner as fixtures
 
@@ -278,3 +279,33 @@ class TravelMultiStopTests(TestCase):
         self.assertFalse(proposal["changed"])
         self.assertEqual(proposal["stops"], names)
         self.assertEqual(proposal["current_distance_km"], proposal["suggested_distance_km"])
+
+    def test_each_leg_uses_google_road_routes_and_a_failed_leg_stays_a_labelled_estimate(self):
+        session = self.researched()
+        stops = deepcopy(session.candidates[:2])
+        calls = []
+
+        def google(provider, parameters):
+            calls.append(parameters)
+            self.assertEqual(parameters["mode"], "ride")  # the provider sends ride as TWO_WHEELER
+            if len(calls) == 3:  # a failure backs Google off for a minute, so it is the last leg here
+                raise ProviderError("timeout")
+            return {"routes": [{"distanceMeters": 123400, "duration": "9000s", "description": "synthetic road"}]}, "synthetic-hash"
+
+        with patch.dict("os.environ", {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-maps"}), \
+                patch("apps.mobility.services.travel.providers.routing.GoogleRoutes.fetch", autospec=True, side_effect=google):
+            result = build_multi_stop_itinerary(session.state, stops)
+            legs = result["route"]["legs"]
+            self.assertEqual([leg["confidence"] for leg in legs], ["PROVIDER", "PROVIDER", "ESTIMATED"])
+            self.assertEqual((legs[0]["distance_km"], legs[0]["hours"], legs[0]["profile"]), (123, 2.5, "google-two_wheeler"))
+            self.assertEqual(result["route"]["confidence"], "ESTIMATED")  # one leg is not a road route
+            self.assertIn("2 of 3 legs are Google road routes", result["route"]["note"])
+            self.assertEqual(result["route"]["distance_km_total"], sum(leg["distance_km"] for leg in legs))
+            self.assertIn("~123 km by road, about 2.5 h (Google)", result["days"][0]["items"][0]["duration"])
+            calls.clear()
+            proposal = compare_stop_orders(session.state, stops)  # every order compared on the same estimates, no calls
+            self.assertEqual(calls, [])
+            self.assertEqual(proposal["current_distance_km"], proposal["suggested_distance_km"])
+        without = build_multi_stop_itinerary(session.state, stops)  # no key: the old estimate, labelled
+        self.assertEqual({leg["confidence"] for leg in without["route"]["legs"]}, {"ESTIMATED"})
+        self.assertIn("Google road routes are unavailable", without["route"]["note"])

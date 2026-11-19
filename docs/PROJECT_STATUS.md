@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 28 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 31 | PARTIALLY_IMPLEMENTED: 20 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -820,12 +820,12 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
-| TRAVEL | 12 | 23 | 52.2 | 2 | 5 | 1 | 0 | 3 |
+| TRAVEL | 12 | 23 | 52.2 | 4 | 3 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
-| OPENAI | 0 | 7 | 0.0 | 6 | 1 | 0 | 0 | 0 |
-| SYNC | 7 | 11 | 63.6 | 1 | 2 | 0 | 0 | 1 |
+| OPENAI | 0 | 7 | 0.0 | 7 | 0 | 0 | 0 | 0 |
+| SYNC | 7 | 11 | 63.6 | 1 | 0 | 0 | 0 | 3 |
 | RUNTIME | 11 | 16 | 68.8 | 4 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
 
@@ -2350,18 +2350,20 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-02 — Model compatibility and current price review
 
-**PARTIALLY_IMPLEMENTED** · Optional Gemini (OPENAI IDs kept) · P1.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P1.
 
+- 2026-11-19 official pages read (no API call; ai.google.dev now redirects to aistudio.google.com/docs): [models](https://aistudio.google.com/docs/models) lists `gemini-3.5-flash-lite` as Stable; [deprecations](https://aistudio.google.com/docs/deprecations) gives release 2026-07-21 and no shutdown date; [pricing](https://aistudio.google.com/docs/pricing) lists it free of charge on the free tier (where Google may use content to improve its products) and $0.30 input / $2.50 output per 1M tokens with billing on. ALFRED's reservation of 1 and 4 micro-USD per input/output token is above both rates, so the local budget can only over-reserve. Free-tier request limits are not published per model; Google shows them in AI Studio per project. The model stays configurable (`ALFRED_GEMINI_MODEL`); no silent switch.
+- Next: the owner's live key test (OPENAI-07) confirms the model answers.
 - 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
 - Next: confirm the configured model name and free-tier limits on Google's official pages with a live key; the cost reservation (1 and 4 micro-USD per input/output token) only matters for a key with billing on.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. Official documentation reviewed 2026-10-15; no account availability call.
-- Limitations/dependencies: Pinned gpt-4.1-mini-2025-04-14 is deprecated; documented retirement 2027-01-14. Verified $0.40/$1.60 per million still matches code. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Select/test replacement with current official rates before enabling; no silent model switch.
-- SCOPED_INSPECTION 2026-11-06: OpenAI stays OFF by the owner's decision and no call is made. The pinned model retires 2027-01-14; choosing a replacement and re-checking rates waits until the owner approves enabling OpenAI.
-- 2026-11-19 official pages read (no API call): [deprecations](https://developers.openai.com/api/docs/deprecations) lists `gpt-4.1-mini-2025-04-14` shutdown 2027-01-14 (notice 2026-10-14) with recommended replacement `gpt-6-luna`; [pricing](https://developers.openai.com/api/docs/pricing) standard short-context rates per 1M tokens: `gpt-6-luna` $0.10 input / $0.50 output / $0.01 cached, `gpt-4.1-mini` still listed at $0.40 / $1.60 / $0.10. No dated `gpt-6-luna` snapshot is listed. The code stays on the pinned model until the owner chooses; no silent switch.
+- (Historical, OpenAI removed 2026-11-19.) Limitations/dependencies: Pinned gpt-4.1-mini-2025-04-14 is deprecated; documented retirement 2027-01-14. Verified $0.40/$1.60 per million still matches code. Existing owner/session controls; canonical data availability; acceptance plan.
+- (Historical, OpenAI removed 2026-11-19.) Next: Select/test replacement with current official rates before enabling; no silent model switch.
+- (Historical, OpenAI removed 2026-11-19.) SCOPED_INSPECTION 2026-11-06: OpenAI stays OFF by the owner's decision and no call is made. The pinned model retires 2027-01-14; choosing a replacement and re-checking rates waits until the owner approves enabling OpenAI.
+- (Historical, OpenAI removed 2026-11-19.) 2026-11-19 official pages read (no API call): [deprecations](https://developers.openai.com/api/docs/deprecations) lists `gpt-4.1-mini-2025-04-14` shutdown 2027-01-14 (notice 2026-10-14) with recommended replacement `gpt-6-luna`; [pricing](https://developers.openai.com/api/docs/pricing) standard short-context rates per 1M tokens: `gpt-6-luna` $0.10 input / $0.50 output / $0.01 cached, `gpt-4.1-mini` still listed at $0.40 / $1.60 / $0.10. No dated `gpt-6-luna` snapshot is listed. The code stays on the pinned model until the owner chooses; no silent switch.
 
 ### OPENAI-03 — Encrypted key provisioning and owner consent
 
@@ -2441,8 +2443,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-02 — Non-AWS encrypted object adapter (AWS withdrawn)
 
-**PARTIALLY_IMPLEMENTED** · Encrypted intelligence synchronization · P2.
+**BLOCKED_EXTERNAL** · Encrypted intelligence synchronization · P2.
 
+- 2026-11-19 status review: Built; what remains is outside ALFRED: the owner creates the free Cloudflare R2 account, one bucket and a bucket-only token and puts them in the data folder's config/local.env (never in chat), then one live check. Same blocker as SYNC-10.
 - Source: [apps/ml_engine/services/memory_r2.py](../apps/ml_engine/services/memory_r2.py), [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
 - APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
 - Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2545,8 +2548,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-11 — Full application/cloud backup
 
-**PARTIALLY_IMPLEMENTED** · Encrypted intelligence synchronization · P2.
+**BLOCKED_EXTERNAL** · Encrypted intelligence synchronization · P2.
 
+- 2026-11-19 status review: Built; what remains is outside ALFRED: the owner creates the free Cloudflare R2 account, one bucket and a bucket-only token and puts them in the data folder's config/local.env (never in chat), then one live check. Same blocker as SYNC-10.
 - Source: [scripts/cloud_backup.py](../scripts/cloud_backup.py), [scripts/release_recovery.py](../scripts/release_recovery.py), [apps/ml_engine/services/memory_r2.py](../apps/ml_engine/services/memory_r2.py), [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
 - APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
 - Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2594,8 +2598,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-04 — Multiple destinations and day-wise itineraries
 
-**PARTIALLY_IMPLEMENTED** · Travel · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
 
+- 2026-11-19 (closes the inter-stop gap): every leg of a multi-stop trip, home to each stop and back, is now asked of Google Routes (the approved router) in the trip's mode, two-wheeler for a motorcycle, with the avoid-expressway and toll choices ([travel_itinerary.py](../apps/mobility/services/travel_itinerary.py) `road_leg`). Road km feed the shared budget and each travel day reads "~N km by road, about H h (Google)". A leg Google does not answer (no key, limit, failure, back-off) keeps the labelled straight-line estimate and the note says how many legs are road routes; the route is PROVIDER only when every leg is. The stop-order proposal still compares every order on the same estimates and says so, with no extra Google calls. Closures, permits, traffic and motorcycle legality stay unverified. Test `test_each_leg_uses_google_road_routes_and_a_failed_leg_stays_a_labelled_estimate`; travel suites 135 PASS.
+- Next: owner check with their Google key: a two-stop ride, compare each leg with Google Maps.
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2652,8 +2658,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-09 — Route corridor stops and real detour distance
 
-**PARTIALLY_IMPLEMENTED** · Travel · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
 
+- 2026-11-19 status review: the road-detour part is built (2026-11-14, Google Routes through each of the top three stops); other stops keep the labelled straight-line distance. What remains is the owner's live comparison.
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js), [apps/mobility/services/travel/discovery.py](../apps/mobility/services/travel/discovery.py).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
