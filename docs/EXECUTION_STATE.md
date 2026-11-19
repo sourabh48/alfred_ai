@@ -29,6 +29,14 @@ a polished UI; AI Memory off Settings with the OpenAI key beside the other keys;
   0 skipped (driver-backed, local).
 - Career email per person (owner decision 2026-11-19): each person ticks one of their own verified sign-in addresses under Settings > Online services > Career email; Google (gmail.send, and gmail.readonly if ticked) or Microsoft (Mail.Send, Mail.Read, offline_access) grants access on its own screen as that address. Only an encrypted refresh token is kept (`artifacts/career-mail/user-<id>.json`); no address or app password is typed. GitHub has no mailbox: a GitHub address sends only when it is a Gmail or Outlook address. The shared SMTP/IMAP mailbox (`ALFRED_SMTP_*`, `ALFRED_IMAP_HOST`) is removed; per-email review and Send are unchanged; reply watch reads the same person's inbox through the API, read-only. Outlook carries a CV up to 3 MB (one Graph request). Not tried against live Google or Microsoft: the Gmail API must be enabled in the owner's Google project, and the consent screen will warn that the app is unverified. Full backend: 3,223 PASS in 4 shards (734 + 904 + 908 + 677);
   a one-line error-routing tweak after it reran with its 21 sign-in and mail tests: PASS. Chrome: Settings and sign-in 3 PASS.
+- Phone opening (owner request 2026-11-19, "give QR, not IP"): Settings > Email and sign-in shows a QR code that
+  opens http://<this PC's home address>:<port>/phone/ on a phone on the same Wi-Fi, plus the PC's name
+  (http://<pc>.local:<port>/phone/) to type; `<pc>.local` added to the home-network host list. The QR code is made by
+  `alfred_ai/services/qr.py` (byte mode, level M, versions 1-6; no new dependency), read back exactly by OpenCV in
+  the tests. With home Wi-Fi access off it says how to turn it on. The Approve phone button is now a solid button
+  (it was nearly invisible in dark theme). Tests: sign-in, home and home-network 154 PASS (6 opt-in live-model
+  skips), Chrome sign-in and Settings 2 PASS. Not tried on a real phone; whether a phone opens `<pc>.local` depends
+  on the phone, so the QR code uses the address.
 - Owner action after merge: sign in with GitHub at http://localhost:8000 (user 1 is already linked by email).
 - Open: the owner's Google sign-in created a new empty account (user 14) because its email differs from user 1's; moving
   that Google identity to user 1 waits for the owner's approval (backup first, user 14 switched off, not deleted).

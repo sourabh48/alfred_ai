@@ -21,11 +21,27 @@
         <a class="provider-button" href="/auth/{{ provider.id }}/start/?connect=1">{% include "registration/provider_logo.html" with id=provider.id %}<span>Connect {{ provider.label }}</span></a>
         {% endfor %}
     </div>
+    {% if phone_qr %}
+    <div class="d-flex flex-wrap gap-3 align-items-center mt-3" id="phoneOpen">
+        <div style="width: 10rem; flex: 0 0 10rem;">{{ phone_qr|safe }}</div>
+        <div class="small">
+            <p class="fw-semibold mb-1"><i class="fa-solid fa-mobile-screen-button me-1" aria-hidden="true"></i>Open ALFRED on your phone</p>
+            <ol class="ps-3 mb-1">
+                <li>Connect the phone to the same home Wi-Fi as this PC.</li>
+                <li>Point the phone's camera at this code and open the link.</li>
+                <li>The phone shows a code: type it below and press Approve phone.</li>
+            </ol>
+            <p class="text-muted mb-0">No camera? Type <strong id="phoneOpenName">{{ phone_name }}</strong> in the phone's browser, or <span id="phoneOpenLink">{{ phone_link }}</span> if the name does not open.</p>
+        </div>
+    </div>
+    {% elif phone_lan_off %}
+    <p class="small text-muted mt-3 mb-0" id="phoneOpen">Phones cannot reach ALFRED yet: home Wi-Fi access is off. The person who manages ALFRED adds ALFRED_LAN_ACCESS=true to config/local.env and restarts ALFRED; then a code to scan appears here.</p>
+    {% endif %}
     <form class="row g-2 align-items-end mt-3" id="phoneApproveForm">
         <div class="col-sm-5"><label class="form-label small mb-1" for="phoneApproveCode">Sign in a phone: the code it shows</label>
             <input class="form-control form-control-sm text-uppercase" id="phoneApproveCode" maxlength="9" autocomplete="off" placeholder="ABCD-2345" required></div>
-        <div class="col-sm-3"><button class="btn btn-outline-dark btn-sm w-100" type="submit"><i class="fa-solid fa-mobile-screen-button me-1" aria-hidden="true"></i>Approve phone</button></div>
-        <p class="small text-muted mb-0">On the phone, open ALFRED's address on your home Wi-Fi and choose "Sign in with a code". Approve only a code you see on your own phone.</p>
+        <div class="col-sm-3"><button class="btn btn-primary btn-sm w-100" type="submit"><i class="fa-solid fa-mobile-screen-button me-1" aria-hidden="true"></i>Approve phone</button></div>
+        <p class="small text-muted mb-0">Approve only a code you see on your own phone.</p>
         <div id="phoneApproveStatus" class="small" role="status" aria-live="polite"></div>
     </form>
     <script src="/static/js/phone_sign_in.js?v=1"></script>

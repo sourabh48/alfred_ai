@@ -183,3 +183,45 @@ class PhoneCodeSignInTests(TestCase):
         self.assertEqual(int(phone.session["_auth_user_id"]), owner.pk)
         self.assertEqual(approve(code).status_code, 400)  # one use only
         self.assertEqual(Client().get("/phone/?check=1").json(), {"state": "expired"})  # another device cannot borrow it
+
+    def test_settings_shows_a_code_to_scan_that_opens_the_phone_page_on_the_home_wi_fi(self):
+        """Owner request 2026-11-19: open ALFRED on a phone by scanning, not by typing an IP address."""
+        import re
+        from django.test import override_settings
+        self.sign_in("google")
+        with override_settings(ALFRED_LAN_ACCESS=False):
+            page = self.client.get("/settings/").content.decode()
+        self.assertIn("home Wi-Fi access is off", page)
+        self.assertNotIn("<svg", page.split('id="phoneOpen"')[1][:300])
+        with override_settings(ALFRED_LAN_ACCESS=True), patch("alfred_ai.services.native_web.phone_address", return_value="192.168.1.23"), \
+                patch("socket.gethostname", return_value="Synthetic-PC"):
+            page = self.client.get("/settings/", HTTP_HOST="localhost:8000", SERVER_PORT="8000").content.decode()
+        self.assertIn('aria-label="QR code that opens ALFRED&#x27;s phone sign-in"', page.replace("'", "&#x27;"))
+        self.assertIn("http://synthetic-pc.local:8000/phone/", page)
+        self.assertIn("http://192.168.1.23:8000/phone/", page)
+        self.assertTrue(re.search(r'<svg [^>]*viewBox="0 0 37 37"', page))  # 29 modules and the quiet zone
+
+
+class QRCodeTests(TestCase):
+    """The built-in QR maker: each code reads back exactly with OpenCV's decoder (installed with ALFRED's OCR stack)."""
+
+    def test_codes_read_back_exactly(self):
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            self.skipTest("OpenCV is not installed")
+        from alfred_ai.services import qr
+        for text in ("http://192.168.1.23:8000/phone/", "http://desktop-synthetic.local:8000/phone/", "a" * 14, "b" * 26,
+                     "http://10.0.0.5:8000/phone/" + "c" * 40, "d" * 84, "e" * 104):
+            with self.subTest(length=len(text)):
+                m = qr.matrix(text)
+                image = np.full((len(m) + 8, len(m) + 8), 255, np.uint8)
+                for r, row in enumerate(m):
+                    for c, dark in enumerate(row):
+                        if dark:
+                            image[r + 4, c + 4] = 0
+                image = cv2.resize(image, None, fx=8, fy=8, interpolation=cv2.INTER_NEAREST)
+                self.assertIn(text, (cv2.QRCodeDetector().detectAndDecode(image)[0], cv2.QRCodeDetectorAruco().detectAndDecode(image)[0]))
+        with self.assertRaises(ValueError):
+            qr.matrix("f" * 107)

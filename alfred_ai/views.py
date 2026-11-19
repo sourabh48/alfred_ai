@@ -431,12 +431,28 @@ def dashboard_view(request):
     return render(request, "dashboard.html", _home_context(request.user))
 
 
+def _phone_open_context(request) -> dict:
+    """A QR code (and the PC's name) that opens the phone sign-in page from a phone on the same home Wi-Fi."""
+    import socket
+    from .services import qr
+    from .services.native_web import phone_address
+    if not getattr(settings, "ALFRED_LAN_ACCESS", False):
+        return {"phone_lan_off": True}
+    address, port = phone_address(), request.get_port()
+    if not address:
+        return {"phone_lan_off": True}
+    link = f"http://{address}:{port}/phone/"
+    return {"phone_link": link, "phone_name": f"http://{socket.gethostname().lower()}.local:{port}/phone/",
+            "phone_qr": qr.svg(link, label="QR code that opens ALFRED's phone sign-in")}
+
+
 @login_required
 def account_settings_view(request):
     from .services import social_login
     profile = CareerProfile.objects.filter(user=request.user).first()
     return render(request, "settings/account.html", {
         **_sign_in_context(request),
+        **_phone_open_context(request),
         "email_verified": social_login.is_verified(request.user),
         "email_identities": request.user.email_identities.order_by("provider"),
         "income_conflict": build_employment_income_signals(user=request.user, profile=profile)["income_conflict"],

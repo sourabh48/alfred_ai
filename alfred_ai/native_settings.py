@@ -16,7 +16,7 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]"]
 ALFRED_LAN_ACCESS = env.bool("ALFRED_LAN_ACCESS", default=False)
 if ALFRED_LAN_ACCESS:
     from alfred_ai.services.native_web import lan_addresses
-    ALLOWED_HOSTS += [*lan_addresses(), socket.gethostname().lower()]
+    ALLOWED_HOSTS += [*lan_addresses(), socket.gethostname().lower(), f"{socket.gethostname().lower()}.local"]
 CORS_ALLOW_ALL_ORIGINS = False
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False

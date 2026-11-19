@@ -26,6 +26,18 @@ def lan_addresses():
     return sorted(a for a in found if home_network_client(a) and not ipaddress.ip_address(a).is_loopback)
 
 
+def phone_address():
+    """The home address a phone on the same Wi-Fi opens: the one this PC's own traffic leaves from, else the first."""
+    found = lan_addresses()
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("192.0.2.1", 9))  # a UDP connect sends nothing; it only picks the outgoing network card
+            mine = probe.getsockname()[0]
+    except OSError:
+        mine = ""
+    return mine if mine in found else (found[0] if found else "")
+
+
 def private_clients_only(application):
     def guarded(environ, start_response):
         if home_network_client(environ.get("REMOTE_ADDR", "")):
