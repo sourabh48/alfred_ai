@@ -1,9 +1,11 @@
 """ALFRED starts the installed Ollama app again when the local model stops answering (owner, 2026-11-20)."""
 import os
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 
 from alfred_ai.services import ollama_keeper
@@ -42,6 +44,16 @@ class OllamaKeeperTests(SimpleTestCase):
             self.assertEqual(ollama.call_count, 1)  # nothing is downloaded or loaded
         with override_settings(ALFRED_TRAVEL_LOCAL_READING=False):
             self.assertEqual(ollama_keeper.warm_reading_model(), "off")
+
+    def test_nightly_fine_tuning_starts_only_when_set_up(self):
+        with patch("subprocess.Popen") as start:
+            self.assertEqual(ollama_keeper.start_brain_finetune(), "off")
+            with override_settings(ALFRED_BRAIN_FINETUNE_USER="owner", ALFRED_BRAIN_FINETUNE_PYTHON="Z:/missing/python.exe"):
+                self.assertEqual(ollama_keeper.start_brain_finetune(), "python_missing")
+            start.assert_not_called()
+            with override_settings(ALFRED_BRAIN_FINETUNE_USER="owner", ALFRED_BRAIN_FINETUNE_PYTHON=sys.executable):
+                self.assertEqual(ollama_keeper.start_brain_finetune(), "started")
+        self.assertEqual(start.call_args.args[0][1:], [str(Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py"), "--user", "owner"])
 
     @override_settings(ALFRED_OLLAMA_HOST="192.168.0.50")
     def test_an_ollama_on_another_lan_pc_is_never_started_from_here(self):

@@ -1,5 +1,24 @@
 # ALFRED execution state
 
+## Smarter local AI — 2026-11-20
+
+Local commits after `c0b519f` (pushed), same worktree and branch, not pushed: owner approved eight upgrades ("make it
+smarter"). IMPLEMENTED_NOT_ACCEPTED; unit tests and live checks against the owner's Ollama (qwen3.5:9b) only.
+
+- `a787cef` the Travel reading model stays loaded (keep_alive 60m, refreshed by the two-minute Ollama keeper).
+- `d627ed9` the reader sees the last four chat turns ("the second one" = the place ALFRED offered).
+- `cca0d4e` short everyday general Ask questions go to `ALFRED_QUICK_OLLAMA_MODEL` (qwen3.5:9b); the main model answers
+  when the fast one is not installed.
+- `d4d6c0e` central brain (`apps/ml_engine/services/brain.py`): examples encrypted per owner in the private memory vault
+  (inside the encrypted recovery archive that goes to R2); a correction right after "I understood" is saved and fed back.
+- `ae9df8c` public Gemini answers are kept in the brain and given to the local model for similar questions.
+- `be62248` festival and holiday dates (fixed Indian dates, plus Nager.Date or Google) for the reader.
+- Travel questions about a planned trip are answered by the local model from that trip's saved research only
+  (`travel/answers.py`), with a "not in this trip's research" reply otherwise.
+- Nightly fine-tuning (`scripts/brain_finetune.py`, `requirements-brain.txt`): off until the owner names a user, a
+  separate Python and a local base model in config/local.env. BLOCKED_APPROVAL: needs the owner's OK to download the
+  CPU PyTorch stack and a base model; training has not run.
+
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 
 PUSHED to master at `5766899` with the owner's OK (merged into the owner's app and restarted; CI_PASSED: Browser

@@ -29,6 +29,20 @@ def ensure_running():
     return "started"
 
 
+def start_brain_finetune():
+    """Start scripts/brain_finetune.py in the background at low priority when it is set up; it decides if there is enough to learn."""
+    user, python = settings.ALFRED_BRAIN_FINETUNE_USER, settings.ALFRED_BRAIN_FINETUNE_PYTHON
+    if not user or not python:
+        return "off"
+    if not Path(python).is_file():
+        return "python_missing"
+    script = Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py"
+    flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.BELOW_NORMAL_PRIORITY_CLASS
+             if os.name == "nt" else 0)
+    subprocess.Popen([python, str(script), "--user", user], cwd=settings.BASE_DIR, creationflags=flags, close_fds=True)
+    return "started"
+
+
 WARM_FOR = "60m"  # refreshed every two minutes while ALFRED runs, so the model stays loaded
 
 

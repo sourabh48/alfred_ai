@@ -567,6 +567,12 @@ ALFRED_ASSISTANT_AUTO_WEB = env.bool('ALFRED_ASSISTANT_AUTO_WEB', default=sys.ar
 ALFRED_TRAVEL_LOCAL_READING = env.bool('ALFRED_TRAVEL_LOCAL_READING', default=sys.argv[1:2] != ['test'])
 ALFRED_TRAVEL_READING_MODEL = env('ALFRED_TRAVEL_READING_MODEL', default='qwen3.5:9b')
 ALFRED_TRAVEL_READING_SECONDS = env.int('ALFRED_TRAVEL_READING_SECONDS', default=45)
+# Nightly fine-tuning from the central brain (owner approval 2026-11-20); off until a user, a base model folder and a
+# separate Python with requirements-brain.txt are named in config/local.env. Nothing is downloaded automatically.
+ALFRED_BRAIN_FINETUNE_USER = env('ALFRED_BRAIN_FINETUNE_USER', default='')
+ALFRED_BRAIN_FINETUNE_PYTHON = env('ALFRED_BRAIN_FINETUNE_PYTHON', default='')
+ALFRED_BRAIN_BASE_MODEL_DIR = env('ALFRED_BRAIN_BASE_MODEL_DIR', default=str(BASE_DIR / 'ml_models' / 'brain-base'))
+ALFRED_BRAIN_FINETUNE_MIN_EXAMPLES = env.int('ALFRED_BRAIN_FINETUNE_MIN_EXAMPLES', default=50)
 
 
 # ---------------------------------------------------------

@@ -34,6 +34,13 @@ def native_travel_research_recovery():
     return resume_travel_research()
 
 
+@db_periodic_task(crontab(hour="2", minute="30"))
+def native_brain_finetune():
+    """Owner approval 2026-11-20: fine-tune a small local model overnight from the central brain, on this PC only."""
+    from alfred_ai.services.ollama_keeper import start_brain_finetune
+    return start_brain_finetune()
+
+
 @db_periodic_task(crontab(minute="*/2"))
 def native_ollama_keeper():
     """Ollama stopped on the owner PC on 2026-11-20 and local answers failed until it was started again."""

@@ -1,0 +1,8 @@
+# Optional: only for the nightly fine-tuning (scripts/brain_finetune.py), installed into a separate Python on the
+# owner's approval. The app itself never imports these. CPU build of PyTorch.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers
+peft
+accelerate
+safetensors
