@@ -2,8 +2,8 @@
 
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 
-PUSHED to master at `5766899` with the owner's OK (merged into the owner's app and restarted; CI_PENDING: Browser
-Regression 44472348277, Pages 44472347012). Same worktree and branch, after `397b5e2` (pushed to master with the owner's OK; CI on
+PUSHED to master at `5766899` with the owner's OK (merged into the owner's app and restarted; CI_PASSED: Browser
+Regression 44472348277 and Pages 44472347012 success on `5766899` only). Local, not pushed, after it: `3c784cd` light-theme sign-in contrast, `9db3a82` the home address shows every provider and refuses passwords, `c198cc5` and `b8b7f39` a Microsoft Secret ID (GUID) is named on the sign-in page, `453d201` keys per person (owner decision 2026-11-19: paid and limited services take each person's own key, encrypted per person; free keys built in and no longer listed in Settings), and the Career email change below. Same worktree and branch, after `397b5e2` (pushed to master with the owner's OK; CI on
 `397b5e2`: Browser Regression and Pages build both success). Owner decisions this day: offline-first retired (only
 sensitive data stays offline); sign-in only through Google, GitHub or Microsoft with a verified email, a phone signs in
 with a code approved on the PC; free keys that never charge ship inside the installer, encrypted; Font Awesome icons and
@@ -27,7 +27,12 @@ a polished UI; AI Memory off Settings with the OpenAI key beside the other keys;
   Full backend on `fa4a978`: 3,215 PASS in 4 shards (761 + 836 + 806 + 812); the 55 tests hit by a leftover
   earlier run sharing the shard folders were rerun alone on `d7542bd`: 55 PASS. Full Chrome gate on `d7542bd`: 240 PASS,
   0 skipped (driver-backed, local).
+- Career email per person (owner decision 2026-11-19): each person ticks one of their own verified sign-in addresses under Settings > Online services > Career email; Google (gmail.send, and gmail.readonly if ticked) or Microsoft (Mail.Send, Mail.Read, offline_access) grants access on its own screen as that address. Only an encrypted refresh token is kept (`artifacts/career-mail/user-<id>.json`); no address or app password is typed. GitHub has no mailbox: a GitHub address sends only when it is a Gmail or Outlook address. The shared SMTP/IMAP mailbox (`ALFRED_SMTP_*`, `ALFRED_IMAP_HOST`) is removed; per-email review and Send are unchanged; reply watch reads the same person's inbox through the API, read-only. Outlook carries a CV up to 3 MB (one Graph request). Not tried against live Google or Microsoft: the Gmail API must be enabled in the owner's Google project, and the consent screen will warn that the app is unverified. Full backend: 3,223 PASS in 4 shards (734 + 904 + 908 + 677);
+  a one-line error-routing tweak after it reran with its 21 sign-in and mail tests: PASS. Chrome: Settings and sign-in 3 PASS.
 - Owner action after merge: sign in with GitHub at http://localhost:8000 (user 1 is already linked by email).
+- Open: the owner's Google sign-in created a new empty account (user 14) because its email differs from user 1's; moving
+  that Google identity to user 1 waits for the owner's approval (backup first, user 14 switched off, not deleted).
+  The Microsoft secret is now changed only in config/local.env (Value, not Secret ID), then restart.
 
 ## Completion sprint — 2026-11-19
 

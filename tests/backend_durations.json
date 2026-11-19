@@ -211,6 +211,7 @@
  "tests.test_career_projection_simulation": 2.36,
  "tests.test_career_salary_evidence": 0.01,
  "tests.test_career_send": 2.58,
+ "tests.test_career_mail": 1.5,
  "tests.test_cashflow_forecast_acceptance": 0.35,
  "tests.test_celery_startup": 0.03,
  "tests.test_chatgpt_imports": 6.23,

@@ -1,29 +1,19 @@
 """Reply watch (career-ops fe9cb888, MIT, modes/reply-watch.md; owner approval 2026-11-18 to read the mailbox).
 
-ALFRED reads the owner's own inbox read-only over IMAP with the mail login Career already uses for sending (an app
-password), sorts recent employer replies into Interview, Offer, Rejected, Assessment, Need action, Auto-confirmation or
+ALFRED reads the person's own inbox read-only through the Gmail or Outlook permission they gave with their Career email
+address (career_mail; owner decision 2026-11-19, no app password), sorts recent employer replies into Interview, Offer, Rejected, Assessment, Need action, Auto-confirmation or
 Responded, and matches them to saved opportunities. Nothing is marked read, moved, stored or sent, and no mail reaches
 any model: the sorting is plain rules. A suggested stage change applies only when the owner presses Apply, through the
 same stage endpoint the tracker uses.
 """
 from __future__ import annotations
 
-import email
-import imaplib
 import re
-from datetime import timedelta
-from email.header import decode_header, make_header
-from email.utils import parseaddr, parsedate_to_datetime
 
-from django.conf import settings
-from django.utils import timezone
-
+from . import career_mail
 from .application_tracker import CLOSED_STAGES, STAGES, _clean
 
-IMAP_HOSTS = {"smtp.gmail.com": "imap.gmail.com", "smtp.office365.com": "outlook.office365.com",
-              "smtp-mail.outlook.com": "outlook.office365.com", "smtp.mail.yahoo.com": "imap.mail.yahoo.com",
-              "smtp.zoho.com": "imap.zoho.com", "smtp.zoho.in": "imap.zoho.in"}
-DAYS, MAX_MESSAGES, BODY_BYTES = 30, 200, 20_000
+DAYS = 30
 # First match wins; each rule quotes the phrase that triggered it.
 RULES = (
     ("Offer", "offer", re.compile(r"\b(offer letter|pleased to (?:offer|extend)|extend(?:ing)? (?:you )?an offer|job offer)\b", re.I)),
@@ -41,57 +31,8 @@ SUFFIX = re.compile(r"\b(inc|llc|ltd|limited|pvt|private|corp|corporation|co|com
                     r"solutions|india|group|holdings|plc|gmbh)\b\.?", re.I)
 
 
-def imap_host() -> str:
-    return getattr(settings, "ALFRED_IMAP_HOST", "") or IMAP_HOSTS.get((settings.ALFRED_SMTP_HOST or "").lower(), "")
-
-
-def configured() -> bool:
-    return bool(imap_host() and settings.ALFRED_SMTP_USER and settings.ALFRED_SMTP_PASSWORD)
-
-
-def _text(value) -> str:
-    try:
-        return " ".join(str(make_header(decode_header(value or ""))).split())
-    except (UnicodeError, LookupError, ValueError):
-        return " ".join(str(value or "").split())
-
-
-def _body(message) -> str:
-    for part in message.walk() if message.is_multipart() else [message]:
-        if part.get_content_type() == "text/plain":
-            raw = part.get_payload(decode=True) or b""
-            return " ".join(raw.decode(part.get_content_charset() or "utf-8", "replace").split())[:4000]
-    return ""
-
-
-def read_inbox(*, days: int = DAYS) -> list:
-    """Recent inbox messages (sender, subject, date, a plain-text excerpt), fetched with PEEK so nothing is marked read."""
-    since = (timezone.localdate() - timedelta(days=days)).strftime("%d-%b-%Y")
-    box = imaplib.IMAP4_SSL(imap_host(), 993, timeout=30)
-    try:
-        box.login(settings.ALFRED_SMTP_USER, settings.ALFRED_SMTP_PASSWORD)
-        box.select("INBOX", readonly=True)
-        status, found = box.search(None, "SINCE", since)
-        ids = (found[0] or b"").split()[-MAX_MESSAGES:] if status == "OK" else []
-        messages = []
-        for number in reversed(ids):
-            status, parts = box.fetch(number, f"(BODY.PEEK[]<0.{BODY_BYTES}>)")
-            raw = next((p[1] for p in parts or [] if isinstance(p, tuple)), None) if status == "OK" else None
-            if raw:
-                message = email.message_from_bytes(raw)
-                try:
-                    on = parsedate_to_datetime(message.get("Date")).date().isoformat()
-                except (TypeError, ValueError, IndexError):
-                    on = ""
-                name, address = parseaddr(_text(message.get("From")))
-                messages.append({"from_name": name[:120], "from": address[:200], "subject": _text(message.get("Subject"))[:300],
-                                 "on": on, "body": _body(message)})
-        return messages
-    finally:
-        try:
-            box.logout()
-        except (imaplib.IMAP4.error, OSError):
-            pass
+def configured(user) -> bool:
+    return career_mail.status(user)["reads_replies"]
 
 
 def _company_words(company: str) -> list:
@@ -137,10 +78,13 @@ def sort_replies(messages: list, analyses: list) -> list:
 def check(user) -> dict:
     from apps.career.models import CareerJobAnalysis
 
-    if not configured():
-        raise ValueError("Set up Career email first (Settings, your mail app password); reply watch reads the same mailbox.")
+    if not configured(user):
+        raise ValueError("Choose your Career email address in Settings and tick \"read email\" on its screen; reply watch reads that inbox.")
     analyses = list(CareerJobAnalysis.objects.filter(user=user).order_by("-updated_at", "-id")[:300])
-    replies = sort_replies(read_inbox(), analyses)
-    return {"replies": replies, "checked_days": DAYS, "mailbox": settings.ALFRED_SMTP_USER,
+    try:
+        replies = sort_replies(career_mail.read_inbox(user, days=DAYS), analyses)
+    except career_mail.MailError as exc:
+        raise ValueError(str(exc)) from None
+    return {"replies": replies, "checked_days": DAYS, "mailbox": career_mail.status(user)["address"],
             "basis": f"Read just now from your inbox (last {DAYS} days), read-only: nothing was marked read, moved or kept. "
                      "Sorted by plain rules; no AI read your mail. A change applies only when you press Apply."}

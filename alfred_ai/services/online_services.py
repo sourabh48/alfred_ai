@@ -31,14 +31,7 @@ KEYS = {
 # name: (value written when on, what the switch means). Google is the only travel source (owner decision 2026-11-14).
 SWITCHES = {"ALFRED_PRICES_ALPHA_VANTAGE_FIRST": ("true", "Research desk: read daily share prices from Alpha Vantage first, and Yahoo Finance "
                                                           "only if that fails (needs the Alpha Vantage key; 25 requests a day on the free key).")}
-# Mail for Career emails you approve one at a time: an address and an app password; the server is filled in for known providers.
-MAIL_PROVIDERS = {"gmail.com": ("smtp.gmail.com", 587, False), "googlemail.com": ("smtp.gmail.com", 587, False),
-                  "yahoo.com": ("smtp.mail.yahoo.com", 465, True), "yahoo.co.in": ("smtp.mail.yahoo.com", 465, True),
-                  "zoho.com": ("smtp.zoho.com", 465, True), "zoho.in": ("smtp.zoho.in", 465, True)}
-MAIL = ("ALFRED_SMTP_HOST", "ALFRED_SMTP_PORT", "ALFRED_SMTP_SSL", "ALFRED_SMTP_USER", "ALFRED_SMTP_PASSWORD", "ALFRED_SMTP_FROM")
 VALUE = re.compile(r"^[\x21-\x26\x28-\x7e]{8,512}$")  # printable, no spaces or quotes, so the env file stays one value a line
-EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,24}$")
-HOST = re.compile(r"^(?=.{4,253}$)([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,24}$")
 
 
 def config_path() -> Path:
@@ -47,8 +40,8 @@ def config_path() -> Path:
 
 
 def can_manage(user) -> bool:
-    """The superuser, or on a PC with none, the first account (the person who set ALFRED up). The free-service switch and
-    Career email are shared app-wide; service keys are each person's own (personal_keys)."""
+    """The superuser, or on a PC with none, the first account (the person who set ALFRED up). The free-service switch is
+    shared app-wide; service keys (personal_keys) and Career email (career_mail) are each person's own."""
     if not getattr(user, "is_authenticated", False) or not user.is_active:
         return False
     if user.is_superuser:
@@ -59,7 +52,7 @@ def can_manage(user) -> bool:
 
 def status(user) -> dict:
     # Only the person's own key is hinted at; a shared PC-wide or built-in key is never shown, not even its last characters.
-    mail_user = os.environ.get("ALFRED_SMTP_USER", "")
+    from apps.career.services import career_mail
     keys = []
     for name, (label, use, url) in KEYS.items():
         mine = personal_keys.own(user, name)
@@ -69,28 +62,8 @@ def status(user) -> dict:
         "can_manage": can_manage(user),
         "keys": keys,
         "switches": [{"name": name, "detail": detail, "on": os.environ.get(name) == value} for name, (value, detail) in SWITCHES.items()],
-        "mail": {"address": mail_user if can_manage(user) else "", "ready": bool(mail_user and os.environ.get("ALFRED_SMTP_PASSWORD")),
-                 "host": os.environ.get("ALFRED_SMTP_HOST", "")},
+        "mail": career_mail.status(user),
     }
-
-
-def _mail_values(data) -> dict:
-    address = str(data.get("address") or "").strip()
-    password = "".join(str(data.get("password") or "").split())  # app passwords are often shown in groups of four
-    if not address and not password:
-        return {name: "" for name in MAIL}  # both empty: mail sending off
-    if not EMAIL.fullmatch(address) or not VALUE.fullmatch(password):
-        raise ValueError("Enter your email address and its app password (at least 8 characters, no quotes).")
-    known = MAIL_PROVIDERS.get(address.rsplit("@", 1)[1].lower())
-    host = str(data.get("host") or "").strip().lower() or (known[0] if known else "")
-    if not HOST.fullmatch(host):
-        raise ValueError("ALFRED does not know this email provider's server. Enter its SMTP server name.")
-    port = str(data.get("port") or (known[1] if known and host == known[0] else 587))
-    port = int(port) if port.isdigit() and len(port) < 6 else 0
-    if port not in (25, 465, 587, 2525):
-        raise ValueError("Use SMTP port 465 or 587.")
-    return {"ALFRED_SMTP_HOST": host, "ALFRED_SMTP_PORT": str(port), "ALFRED_SMTP_SSL": "true" if port == 465 else "false",
-            "ALFRED_SMTP_USER": address, "ALFRED_SMTP_PASSWORD": password, "ALFRED_SMTP_FROM": address}
 
 
 def key_changes(data: dict) -> dict:
@@ -107,14 +80,12 @@ def key_changes(data: dict) -> dict:
 
 
 def changes_from(data: dict) -> dict:
-    """{name: value or ''} of the shared settings (switches, Career email); '' removes the line. Raises ValueError first."""
+    """{name: value or ''} of the shared switches; '' removes the line. Raises ValueError before anything is written."""
     changes = {}
     for name, on in (data.get("switches") or {}).items():
         if name not in SWITCHES or not isinstance(on, bool):
             raise ValueError("Unknown switch.")
         changes[name] = SWITCHES[name][0] if on else ""
-    if "mail" in data:
-        changes |= _mail_values(data["mail"] if isinstance(data["mail"], dict) else {})
     return changes
 
 
@@ -134,7 +105,3 @@ def save(changes: dict) -> None:
         else:
             os.environ.pop(name, None)
             bundled_keys.restore(name)
-        if name in MAIL:  # settings.py read these at start-up; refresh the running copy
-            default = {"ALFRED_SMTP_PORT": 587, "ALFRED_SMTP_SSL": False}.get(name, "")
-            typed = int(value) if name == "ALFRED_SMTP_PORT" and value else value == "true" if name == "ALFRED_SMTP_SSL" and value else value
-            setattr(settings, name, typed if value else default)

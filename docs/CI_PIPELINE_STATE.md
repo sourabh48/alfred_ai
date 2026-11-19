@@ -2,8 +2,9 @@
 
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 
-CI_PENDING on `5766899` (Browser Regression 44472348277, Pages 44472347012), pushed with the owner's OK after the local gates
-passed. Was LOCAL_TESTING. Same branch after `397b5e2`: `a8400ae` built-in keys and rule change, `81eca4e` provider-only sign-in and phone
+CI_PASSED on `5766899` (Browser Regression 44472348277 success, Pages 44472347012 success; applies to `5766899` only), pushed
+with the owner's OK after the local gates passed. LOCAL_TESTING after it: Local, not pushed, after it: `3c784cd` light-theme sign-in contrast, `9db3a82` the home address shows every provider and refuses passwords, `c198cc5` and `b8b7f39` a Microsoft Secret ID (GUID) is named on the sign-in page, `453d201` keys per person (owner decision 2026-11-19: paid and limited services take each person's own key, encrypted per person; free keys built in and no longer listed in Settings), and the Career email change below. Full backend and Chrome gates run on the
+final local commit before asking for the next push. Was LOCAL_TESTING. Same branch after `397b5e2`: `a8400ae` built-in keys and rule change, `81eca4e` provider-only sign-in and phone
 code, `a54e0b0` Font Awesome UI, memory card moved, OpenAI key with the other keys, sessions without countdown or expiry.
 Backend on `81eca4e`: 3,217 PASS in 4 shards. Then `fa4a978` Ask ALFRED chat and automatic public lookup, `d7542bd`
 navigation names; backend on `fa4a978`: 3,215 PASS, and 55 tests rerun alone on `d7542bd` PASS; full Chrome gate on `d7542bd`: 240 PASS, 0 skipped. Final gates run on the last

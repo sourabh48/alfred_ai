@@ -1,4 +1,4 @@
-"""Career emails the owner approves one at a time (CAREER2-002), sent from the owner's own mailbox.
+"""Career emails the owner approves one at a time (CAREER2-002), sent from the person's own sign-in address (career_mail).
 
 The owner approved sending on 2026-11-12 on one condition: ALFRED shows the exact recipient, subject, body
 and attachment, and sends only when the owner confirms that one email. So a send needs a signed review of
@@ -9,20 +9,18 @@ after the email was handed over) is sent again only after the owner says they ch
 """
 import hashlib
 import re
-import smtplib
 
-from django.conf import settings
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.core.mail import EmailMessage, get_connection
+from django.core.mail import EmailMessage
 from django.core.validators import validate_email
 from django.utils import timezone
+
+from . import career_mail
 
 REVIEW_SECONDS = 15 * 60
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 UNCONFIRMED = ("sending", "unknown")
-# The server answered with a refusal, so it did not take the email; anything else mid-send may have delivered it.
-REFUSED = (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused, smtplib.SMTPDataError, smtplib.SMTPAuthenticationError)
 PLACEHOLDER_RE = re.compile(r"\[[^\]\n]{1,80}\]")
 SALT = "career-send-review"
 
@@ -31,10 +29,6 @@ class SendRefused(Exception):
     def __init__(self, message, status=400):
         super().__init__(message)
         self.status = status
-
-
-def mail_configured() -> bool:
-    return bool(settings.ALFRED_SMTP_HOST and settings.ALFRED_SMTP_USER and settings.ALFRED_SMTP_PASSWORD)
 
 
 def _attachment(resume):
@@ -108,8 +102,11 @@ def review(user, analysis, resume, *, to, subject, body, attach_cv) -> dict:
         blockers.append(problem)
     if attach_cv and resume is not None and resume.parser_status != "parsed":
         warnings.append("Your CV extraction still needs review; check the file you are attaching.")
-    if not mail_configured():
-        blockers.append("Sending is off: add your email address and app password in Settings > Online services > Career email.")
+    sender = career_mail.status(user)
+    if not sender["ready"]:
+        blockers.append("Sending is off: choose your Career email address in Settings > Online services > Career email.")
+    elif attachment and sender["via"] == "microsoft" and attachment["bytes"] > career_mail.OUTLOOK_MAX_BYTES:
+        blockers.append("Outlook sends a CV of up to 3 MB from ALFRED. Attach a smaller PDF, or send from a Gmail address.")
     triage = _payload(analysis).get("triage")
     if isinstance(triage, dict) and isinstance(triage.get("score"), (int, float)) and triage["score"] < 4.0:
         warnings.append(f"Triage score {triage['score']}/5 is below 4.0, where Career Ops advises against applying.")
@@ -122,9 +119,8 @@ def review(user, analysis, resume, *, to, subject, body, attach_cv) -> dict:
     previous = [item for item in _sent_log(analysis) if item.get("status") == "sent" and item.get("to", "").casefold() == to.casefold()]
     if previous and not blockers:
         warnings.append(f"You emailed {to} about this job on {previous[-1].get('sent_at', '')[:10]}.")
-    sender = settings.ALFRED_SMTP_FROM or settings.ALFRED_SMTP_USER
     return {
-        "to": to, "from": sender, "subject": subject, "body": body,
+        "to": to, "from": sender["address"], "subject": subject, "body": body,
         "attachments": [{key: attachment[key] for key in ("name", "bytes", "sha256")}] if attachment else [],
         "blockers": blockers, "warnings": warnings, "ready": not blockers, "unconfirmed_send": bool(interrupted),
         "confirmation": signing.TimestampSigner(salt=SALT).sign(digest) if not blockers else "",
@@ -165,7 +161,7 @@ def send(user, analysis, resume, *, to, subject, body, attach_cv, confirmation, 
     message = EmailMessage(current["subject"], current["body"], current["from"], [current["to"]])
     if attachment:
         message.attach(attachment["name"], attachment["content"])
-    status = _deliver(message)
+    status = _deliver(user, message)
     record = {**record, "status": status, "sent_at": timezone.now().isoformat() if status == "sent" else ""}
     for _ in range(5):  # keep other edits made during the send; if all attempts lose, the safe "sending" record stays
         analysis.refresh_from_db()
@@ -176,27 +172,10 @@ def send(user, analysis, resume, *, to, subject, body, attach_cv, confirmation, 
     if status == "unknown":
         raise SendRefused(_unconfirmed_text(record) + " If it is not there, review it and tick that you checked.", 502)
     if status != "sent":
-        raise SendRefused("Your mail server did not accept the email. Nothing was sent; check the mailbox settings and try again.", 502)
+        raise SendRefused("Your mail service did not accept the email. Nothing was sent; check Career email in Settings and try again.", 502)
     return record, True
 
 
-def _deliver(message) -> str:
-    """'sent', 'failed' (the server never took it) or 'unknown' (the connection broke once the email was handed over)."""
-    try:
-        connection = get_connection(settings.ALFRED_SMTP_BACKEND, host=settings.ALFRED_SMTP_HOST, port=settings.ALFRED_SMTP_PORT,
-                                    username=settings.ALFRED_SMTP_USER, password=settings.ALFRED_SMTP_PASSWORD,
-                                    use_tls=not settings.ALFRED_SMTP_SSL, use_ssl=settings.ALFRED_SMTP_SSL, timeout=30)
-        connection.open()
-    except Exception:  # connect, TLS and login errors: nothing was handed over
-        return "failed"
-    try:
-        return "sent" if connection.send_messages([message]) == 1 else "failed"
-    except REFUSED:
-        return "failed"
-    except Exception:  # disconnect or timeout mid-send: the server may already have taken it
-        return "unknown"
-    finally:
-        try:
-            connection.close()
-        except Exception:  # an error saying goodbye does not undo a send
-            pass
+def _deliver(user, message) -> str:
+    """'sent', 'failed' (the provider never took it) or 'unknown' (the connection broke once the email was handed over)."""
+    return career_mail.deliver(user, message)

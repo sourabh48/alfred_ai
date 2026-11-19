@@ -552,17 +552,6 @@ ALFRED_DOCUMENT_KNOWLEDGE_MAX_STORAGE_BYTES = env.int('ALFRED_DOCUMENT_KNOWLEDGE
 # Upper bound only: copies also follow the owner's shorter Memory retention choice.
 ALFRED_DOCUMENT_KNOWLEDGE_RETENTION_DAYS = env.int('ALFRED_DOCUMENT_KNOWLEDGE_RETENTION_DAYS', default=365)
 ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT = env.int('ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT', default=24)
-# Owner's own mailbox for Career emails the owner approves one at a time (CAREER2-002). Empty means sending is off.
-# Keep the password (an app password, not the account password) only in the untracked config/local.env.
-ALFRED_SMTP_HOST = env('ALFRED_SMTP_HOST', default='')
-ALFRED_SMTP_PORT = env.int('ALFRED_SMTP_PORT', default=587)
-ALFRED_SMTP_SSL = env.bool('ALFRED_SMTP_SSL', default=False)
-ALFRED_SMTP_USER = env('ALFRED_SMTP_USER', default='')
-ALFRED_SMTP_PASSWORD = env('ALFRED_SMTP_PASSWORD', default='')
-ALFRED_SMTP_FROM = env('ALFRED_SMTP_FROM', default='')
-# Career reply watch reads the same mailbox read-only; blank derives it from the SMTP host (Gmail, Outlook, Yahoo, Zoho).
-ALFRED_IMAP_HOST = env('ALFRED_IMAP_HOST', default='')
-ALFRED_SMTP_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
 ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)
 # Owner decision 2026-11-14: keep chats like a chat app, each person can delete them; set false to switch history off for everyone.

@@ -1,29 +1,39 @@
 """CAREER2-002: attachment manifest, explicit per-email confirmation, stale review rejection and retry without resending."""
 import hashlib
-import smtplib
+import json
+import os
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
+from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.career.models import CareerJobAnalysis, CareerResume
-from apps.career.services import application_send
+from apps.career.services import application_send, career_mail
 from tests.test_career_application_kit import CV, JD, analysis
 
-MAILBOX = dict(ALFRED_SMTP_HOST="smtp.example.test", ALFRED_SMTP_USER="owner@example.test", ALFRED_SMTP_PASSWORD="app-password",
-               ALFRED_SMTP_FROM="", ALFRED_SMTP_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 EMAIL = {"to": "hr@synthetic.example.test", "subject": "Application: Senior Backend Engineer",
          "body": "Hello,\n\nI would like to apply.\n\nRegards,\nAsha", "attach_cv": True}
-SMTP = {**MAILBOX, "ALFRED_SMTP_BACKEND": "django.core.mail.backends.smtp.EmailBackend", "ALFRED_SMTP_SSL": False}
+REAL_DELIVER = career_mail.deliver
 
 
-@override_settings(**MAILBOX)
+def connected(test, user, email="owner@example.test", provider="google"):
+    """A synthetic Career email sender for this person, as if they had allowed Gmail or Outlook to send."""
+    from apps.integrations.models import _encrypt_token
+    test.enterContext(mock.patch.dict(os.environ, {"ALFRED_DATA_DIR": test.enterContext(TemporaryDirectory(prefix="alfred-career-mail-synthetic-"))}))
+    career_mail._store(user, {"email": email, "provider": provider, "refresh": _encrypt_token("synthetic-refresh-token"), "read": True})
+
+
 class SendTests(TestCase):
     def setUp(self):
         users = get_user_model()
         self.owner, self.other = users.objects.create_user("send-owner"), users.objects.create_user("send-other")
+        connected(self, self.owner)
+        # Each send lands in Django's test outbox instead of reaching Gmail; api_send below runs the real delivery.
+        self.enterContext(mock.patch.object(career_mail, "deliver", side_effect=lambda user, message: mail.outbox.append(message) or "sent"))
         self.resume = CareerResume.objects.create(user=self.owner, uploaded_file=SimpleUploadedFile("cv.pdf", b"%PDF-synthetic"),
                                                   file_name="cv.pdf", parser_status="parsed", extracted_text=CV, extracted_payload={})
         self.item = CareerJobAnalysis.objects.create(user=self.owner, job_url="https://jobs.example.test/1", job_title="Senior Backend Engineer",
@@ -52,8 +62,8 @@ class SendTests(TestCase):
         self.assertEqual(review["confirmation"], "")
         self.assertTrue(any("valid recipient" in item for item in review["blockers"]))
         self.assertTrue(any("[name]" in item for item in review["blockers"]))
-        with override_settings(ALFRED_SMTP_PASSWORD=""):
-            self.assertTrue(any("Sending is off" in item for item in self.reviewed()["blockers"]))
+        career_mail._path(self.owner).unlink()
+        self.assertTrue(any("Sending is off" in item for item in self.reviewed()["blockers"]))
 
     def test_send_needs_explicit_confirm_and_a_matching_fresh_review(self):
         token = self.reviewed()["confirmation"]
@@ -93,7 +103,7 @@ class SendTests(TestCase):
 
     def test_mail_server_failure_is_recorded_and_can_be_retried(self):
         token = self.reviewed(attach_cv=False)["confirmation"]
-        with mock.patch("django.core.mail.backends.locmem.EmailBackend.open", side_effect=OSError("refused")):
+        with mock.patch.object(career_mail, "deliver", return_value="failed"):
             failed = self.post("send", **{**EMAIL, "attach_cv": False}, confirmation=token, confirm=True)
         self.assertEqual(failed.status_code, 502)
         self.item.refresh_from_db()
@@ -159,7 +169,7 @@ class SendTests(TestCase):
         class Stopped(BaseException):
             """ALFRED stopping mid-send: the mail server may or may not have taken the email."""
         token = self.reviewed()["confirmation"]
-        with mock.patch("django.core.mail.backends.locmem.EmailBackend.send_messages", side_effect=Stopped()):
+        with mock.patch.object(career_mail, "deliver", side_effect=Stopped()):
             with self.assertRaises(Stopped):
                 self.post("send", **EMAIL, confirmation=token, confirm=True)
         self.item.refresh_from_db()
@@ -179,25 +189,36 @@ class SendTests(TestCase):
         self.assertEqual([item["status"] for item in self.item.extracted_payload["sent_messages"]], ["sent"])
         self.assertFalse(self.reviewed(subject="Another subject")["unconfirmed_send"])
 
-    def smtp_send(self, **failures):
-        """Django's real SMTP backend against a fake smtplib.SMTP; no connection leaves the machine."""
-        server = mock.MagicMock()
-        for method, error in failures.items():
-            getattr(server, method).side_effect = error
+    def api_send(self, error=None):
+        """The real delivery through Gmail's API against a fake transport; no connection leaves the machine."""
+        calls = []
+
+        def fake(method, url, **kwargs):
+            calls.append((method, url, kwargs))
+            if url == "https://oauth2.googleapis.com/token":
+                return PublicResponse(json.dumps({"access_token": "synthetic-access"}).encode(), "application/json")
+            if error:
+                raise PublicHTTPError(error)
+            return PublicResponse(b'{"id": "synthetic"}', "application/json")
         token = self.reviewed()["confirmation"]
-        with override_settings(**SMTP), mock.patch("smtplib.SMTP", return_value=server):
+        with mock.patch.object(career_mail, "deliver", REAL_DELIVER), mock.patch.object(career_mail.public_http, "request", side_effect=fake):
             response = self.post("send", **EMAIL, confirmation=token, confirm=True)
         self.item.refresh_from_db()
-        return response, server, [item["status"] for item in self.item.extracted_payload["sent_messages"]]
+        return response, calls, [item["status"] for item in self.item.extracted_payload["sent_messages"]]
 
-    def test_an_error_after_the_server_took_the_email_still_counts_as_sent(self):
-        response, server, statuses = self.smtp_send(quit=smtplib.SMTPResponseException(421, b"closing"))
+    def test_gmail_takes_the_whole_email_once_from_the_person_s_own_address(self):
+        response, calls, statuses = self.api_send()
         self.assertEqual((response.status_code, statuses), (201, ["sent"]))
-        self.assertEqual(server.sendmail.call_count, 1)
+        method, url, kwargs = calls[-1]
+        self.assertEqual((method, url), ("POST", "https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media"))
+        self.assertEqual(kwargs["headers"], {"Authorization": "Bearer synthetic-access", "Content-Type": "message/rfc822"})
+        self.assertIn(b"From: owner@example.test", kwargs["data"])
+        self.assertIn(b"To: hr@synthetic.example.test", kwargs["data"])
+        self.assertIn(b'filename="cv.pdf"', kwargs["data"])
         self.assertTrue(any("already sent" in item for item in self.reviewed()["blockers"]))
 
     def test_a_connection_lost_mid_send_is_not_called_nothing_sent(self):
-        response, _, statuses = self.smtp_send(sendmail=smtplib.SMTPServerDisconnected("lost"))
+        response, _, statuses = self.api_send("network_error")
         self.assertEqual((response.status_code, statuses), (502, ["unknown"]))
         self.assertNotIn("Nothing was sent", response.json()["detail"])
         self.assertIn("Sent folder", response.json()["detail"])
@@ -210,15 +231,17 @@ class SendTests(TestCase):
         self.assertEqual(sent.status_code, 201, sent.content)
 
     def test_a_refusal_is_failed_and_can_be_retried(self):
-        response, _, statuses = self.smtp_send(sendmail=smtplib.SMTPRecipientsRefused({"hr@synthetic.example.test": (550, b"no")}))
-        self.assertEqual((response.status_code, statuses), (502, ["failed"]))
-        self.assertIn("Nothing was sent", response.json()["detail"])
-        self.assertFalse(self.reviewed()["unconfirmed_send"])
+        for refusal in ("api_error", "authorization_failed", "quota_exhausted"):
+            with self.subTest(refusal=refusal):
+                response, _, statuses = self.api_send(refusal)
+                self.assertEqual((response.status_code, statuses), (502, ["failed"]))
+                self.assertIn("Nothing was sent", response.json()["detail"])
+                self.assertFalse(self.reviewed()["unconfirmed_send"])
 
     def test_edits_made_during_the_send_are_kept(self):
         from datetime import timedelta
 
-        def notes_saved_meanwhile(message):
+        def notes_saved_meanwhile(user, message):
             row = CareerJobAnalysis.objects.get(pk=self.item.pk)
             CareerJobAnalysis.objects.filter(pk=row.pk).update(
                 extracted_payload={**row.extracted_payload, "interview_notes": {"stories": ["kept"]}},

@@ -1,20 +1,18 @@
-"""Settings > Online services: each person's own keys for paid or limited services; the manager's switches and Career email."""
+"""Settings > Online services: each person's own keys for paid or limited services and Career email; the manager's switches."""
 import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from alfred_ai.local_config import load_local_environment
 from alfred_private_storage import private_directory
 from alfred_ai.services import online_services as online
 
-SMTP = dict(ALFRED_SMTP_HOST="", ALFRED_SMTP_PORT=587, ALFRED_SMTP_SSL=False, ALFRED_SMTP_USER="", ALFRED_SMTP_PASSWORD="", ALFRED_SMTP_FROM="")
-NAMES = [*online.KEYS, *online.SWITCHES, *online.MAIL]
+NAMES = [*online.KEYS, *online.SWITCHES]
 
 
 class OnlineServicesTests(TestCase):
@@ -23,7 +21,6 @@ class OnlineServicesTests(TestCase):
         self.enterContext(patch.dict(os.environ, {"ALFRED_DATA_DIR": str(self.root)}))  # restores every variable afterwards
         for name in NAMES:
             os.environ.pop(name, None)
-        self.enterContext(override_settings(**SMTP))
         users = get_user_model().objects
         self.owner = users.create_user(username="synthetic-online-owner", password="pw-synthetic-1")
         self.family = users.create_user(username="synthetic-online-family", password="pw-synthetic-2")
@@ -33,14 +30,13 @@ class OnlineServicesTests(TestCase):
         return self.client.post("/api/settings/online-services/", json.dumps(body), content_type="application/json")
 
     def test_every_person_saves_their_own_keys_but_only_the_manager_changes_shared_settings(self):
-        """Owner decision 2026-11-19: paid or limited services take each person's own key; switches and Career email stay with the manager."""
+        """Owner decision 2026-11-19: paid or limited services take each person's own key; only the switches stay with the manager."""
         from alfred_ai.services import personal_keys
         self.assertTrue(online.can_manage(self.owner))
         self.assertFalse(online.can_manage(self.family))
         admin = get_user_model().objects.create_superuser(username="synthetic-online-admin", password="pw-synthetic-3")
         self.assertEqual((online.can_manage(admin), online.can_manage(self.owner)), (True, False))
         self.assertEqual(self.post(self.family, {"switches": {"ALFRED_PRICES_ALPHA_VANTAGE_FIRST": True}}).status_code, 403)
-        self.assertEqual(self.post(self.family, {"mail": {"address": "synthetic@gmail.com", "password": "abcdefghij"}}).status_code, 403)
         response = self.post(self.family, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "synthetic-family-sky-5678"}})
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("synthetic-family-sky-5678", response.content.decode())
@@ -59,8 +55,7 @@ class OnlineServicesTests(TestCase):
     def test_input_is_checked_before_anything_is_written(self):
         for bad in ({"keys": {"DJANGO_SECRET_KEY": "x" * 20}}, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "has space inside"}},
                     {"keys": {"TRAVEL_SKYSCANNER_API_KEY": "quote'injected\nDJANGO_SECRET_KEY=x"}}, {"switches": {"TRAVEL_VALHALLA_URL": True}},
-                    {"switches": {"ALFRED_MEMORY_CLOUD_AUTHORIZED": True}}, {"mail": {"address": "me@unknown-provider.example", "password": "abcdefghij"}},
-                    {"mail": {"address": "me@gmail.com", "password": "abcdefghij", "port": "99999"}}, {"mail": {"address": "not-an-email", "password": "abcdefghij"}},
+                    {"switches": {"ALFRED_MEMORY_CLOUD_AUTHORIZED": True}},
                     # Free keys are built in and never changed in Settings (owner decision 2026-11-19).
                     {"keys": {"ALFRED_MICROSOFT_CLIENT_SECRET": "synthetic-value-12345"}}, {"keys": {"ALFRED_FRED_API_KEY": "synthetic-fred-123"}},
                     {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-maps-1234"}, "switches": {"TRAVEL_VALHALLA_URL": True}}):
@@ -77,24 +72,18 @@ class OnlineServicesTests(TestCase):
         path.write_text("DJANGO_SECRET_KEY=keep-this-synthetic\nTRAVEL_SKYSCANNER_API_KEY=shared-synthetic-key\n# a comment\n", encoding="utf-8")
         load_local_environment(self.root)
         key = "synthetic-sky-key-1234"
-        response = self.post(self.owner, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": key},
-                                          "mail": {"address": "synthetic.owner@gmail.com", "password": "abcd efgh ijkl mnop"}})
+        response = self.post(self.owner, {"keys": {"TRAVEL_SKYSCANNER_API_KEY": key}})
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(key, response.content.decode())
-        self.assertNotIn("abcdefghijklmnop", response.content.decode())
         self.assertNotIn("shared-synthetic-key", response.content.decode())
         body = response.json()
         self.assertEqual([k["hint"] for k in body["keys"] if k["saved"]], ["…1234"])
-        self.assertTrue(body["mail"]["ready"])
+        self.assertEqual((body["mail"]["ready"], body["mail"]["choices"]), (False, []))  # no sign-in address yet, so nothing to send from
         # in use straight away: the owner's own key for the owner, the shared PC-wide key for everyone else
         with personal_keys.acting_for(self.owner):
             self.assertEqual(personal_keys.get("TRAVEL_SKYSCANNER_API_KEY"), key)
         with personal_keys.acting_for(self.family):
             self.assertEqual(personal_keys.get("TRAVEL_SKYSCANNER_API_KEY"), "shared-synthetic-key")
-        self.assertEqual((settings.ALFRED_SMTP_HOST, settings.ALFRED_SMTP_PORT, settings.ALFRED_SMTP_SSL, settings.ALFRED_SMTP_PASSWORD),
-                         ("smtp.gmail.com", 587, False, "abcdefghijklmnop"))
-        from apps.career.services.application_send import mail_configured
-        self.assertTrue(mail_configured())
         text = path.read_text(encoding="utf-8")
         self.assertIn("DJANGO_SECRET_KEY=keep-this-synthetic", text)
         self.assertIn("# a comment", text)
@@ -104,26 +93,22 @@ class OnlineServicesTests(TestCase):
             os.environ.pop(name, None)
         personal_keys._cache.clear()
         load_local_environment(self.root)
-        self.assertEqual(os.environ["ALFRED_SMTP_USER"], "synthetic.owner@gmail.com")
         with personal_keys.acting_for(self.owner.pk):
             self.assertEqual(personal_keys.get("TRAVEL_SKYSCANNER_API_KEY"), key)
-        # family members see that a shared key exists, but no part of it, and not the address
+        # family members see that a shared key exists, but no part of it
         self.client.force_login(self.family)
         family_view = self.client.get("/api/settings/online-services/").json()
-        self.assertEqual((family_view["can_manage"], family_view["mail"]["address"]), (False, ""))
+        self.assertFalse(family_view["can_manage"])
         sky = next(k for k in family_view["keys"] if k["name"] == "TRAVEL_SKYSCANNER_API_KEY")
         self.assertEqual((sky["saved"], sky["shared"], sky["hint"]), (False, True, ""))
 
     def test_switching_off_and_removing_clears_the_line_and_the_running_value(self):
         from alfred_ai.services import personal_keys
-        self.post(self.owner, {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google-key"},
-                               "mail": {"address": "synthetic@yahoo.com", "password": "abcdefghij"}})
-        self.assertEqual((settings.ALFRED_SMTP_PORT, settings.ALFRED_SMTP_SSL), (465, True))
-        self.post(self.owner, {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": ""}, "mail": {}})
+        self.post(self.owner, {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google-key"}})
+        self.post(self.owner, {"keys": {"TRAVEL_GOOGLE_MAPS_API_KEY": ""}})
         with personal_keys.acting_for(self.owner):
             self.assertEqual(personal_keys.get("TRAVEL_GOOGLE_MAPS_API_KEY"), "")
         self.assertNotIn("TRAVEL_GOOGLE_MAPS_API_KEY", os.environ)
-        self.assertEqual((settings.ALFRED_SMTP_HOST, settings.ALFRED_SMTP_PORT), ("", 587))
 
     def test_a_page_and_a_background_job_use_their_own_person_s_key(self):
         from alfred_ai.services import personal_keys

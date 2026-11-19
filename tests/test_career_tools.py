@@ -125,39 +125,30 @@ class CareerToolsTests(TestCase):
         self.assertEqual(self.post(operation="retro_apply", corrections=words, rules=forged).status_code, 400)
 
 
-def _mail(sender, subject, body, on="Mon, 10 Nov 2026 10:00:00 +0530"):
-    return (f"From: {sender}\r\nSubject: {subject}\r\nDate: {on}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n{body}\r\n").encode()
+class FakeGmail:
+    """A synthetic Gmail inbox behind a fake transport; records every call so the test can prove it only read."""
 
+    def __init__(self, inbox):
+        self.inbox, self.calls = inbox, []
 
-class FakeImap:
-    """A synthetic mailbox; records every command so the test can prove it stayed read-only."""
-    inbox, commands = [], []
-
-    def __init__(self, host, port, timeout):
-        FakeImap.commands = [("connect", host, port)]
-
-    def login(self, user, password):
-        self.commands.append(("login", user))
-
-    def select(self, box, readonly=False):
-        self.commands.append(("select", box, readonly))
-        return "OK", [b"3"]
-
-    def search(self, charset, *criteria):
-        self.commands.append(("search",) + criteria)
-        return "OK", [" ".join(str(i + 1) for i in range(len(self.inbox))).encode()]
-
-    def fetch(self, number, parts):
-        self.commands.append(("fetch", parts))
-        return "OK", [(b"header", self.inbox[int(number) - 1]), b")"]
-
-    def logout(self):
-        self.commands.append(("logout",))
+    def __call__(self, method, url, params=None, **kwargs):
+        import base64
+        from alfred_ai.services.public_http import PublicResponse
+        self.calls.append((method, url, params))
+        if url == "https://oauth2.googleapis.com/token":
+            body = {"access_token": "synthetic-access"}
+        elif url.endswith("/messages"):
+            body = {"messages": [{"id": str(i)} for i in reversed(range(len(self.inbox)))]}  # newest first
+        else:
+            sender, subject, text = self.inbox[int(url.rsplit("/", 1)[1])]
+            body = {"internalDate": "1794290400000", "payload": {
+                "mimeType": "multipart/alternative", "headers": [{"name": "From", "value": sender}, {"name": "Subject", "value": subject}],
+                "parts": [{"mimeType": "text/html", "body": {"data": ""}},
+                          {"mimeType": "text/plain", "body": {"data": base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")}}]}}
+        return PublicResponse(json.dumps(body).encode(), "application/json")
 
 
 class ReplyWatchTests(TestCase):
-    MAIL = {"ALFRED_SMTP_HOST": "smtp.gmail.com", "ALFRED_SMTP_USER": "owner@example.test", "ALFRED_SMTP_PASSWORD": "synthetic-app-pass"}
-
     def setUp(self):
         self.owner = get_user_model().objects.create_user("synthetic-reply-owner", password="Test12345!")
         self.client.force_login(self.owner)
@@ -167,30 +158,37 @@ class ReplyWatchTests(TestCase):
         self.done = CareerJobAnalysis.objects.create(user=self.owner, job_url="https://jobs.example.test/2", job_title="Data Engineer",
                                                      company="Closed Corp", extracted_text="x",
                                                      extracted_payload={"application": {"stage": "rejected", "history": [{"stage": "rejected", "on": "2026-11-02"}]}})
-        FakeImap.inbox = [
-            _mail("Priya <priya@syntheticpay.com>", "Next steps", "We would like to schedule an interview. Share your availability."),
-            _mail("jobs@closedcorp.io", "Closed Corp update", "We regret to inform you the position has been filled."),
-            _mail("alerts@jobboard.test", "SyntheticPay jobs you may like", "Recommended jobs. Unsubscribe."),
-            _mail("friend@example.test", "Dinner", "See you at 8."),
-        ]
+        self.gmail = FakeGmail([
+            ("Priya <priya@syntheticpay.com>", "Next steps", "We would like to schedule an interview. Share your availability."),
+            ("jobs@closedcorp.io", "Closed Corp update", "We regret to inform you the position has been filled."),
+            ("alerts@jobboard.test", "SyntheticPay jobs you may like", "Recommended jobs. Unsubscribe."),
+            ("friend@example.test", "Dinner", "See you at 8."),
+        ])
 
     def test_without_mail_setup_it_says_so_and_reads_nothing(self):
+        from tests.test_career_send import connected
         self.assertFalse(self.client.get(URL).json()["replies_ready"])
-        with patch("apps.career.services.reply_watch.imaplib.IMAP4_SSL") as imap:
+        with patch("apps.career.services.career_mail.public_http.request", self.gmail):
             self.assertEqual(self.client.post(URL, {"operation": "replies"}, content_type="application/json").status_code, 400)
-        imap.assert_not_called()
+            connected(self, self.owner)
+            from apps.career.services import career_mail
+            career_mail._store(self.owner, {**career_mail._load(self.owner), "read": False})  # sending allowed, reading not ticked
+            self.assertFalse(self.client.get(URL).json()["replies_ready"])
+            self.assertEqual(self.client.post(URL, {"operation": "replies"}, content_type="application/json").status_code, 400)
+        self.assertEqual(self.gmail.calls, [])
 
     def test_replies_are_sorted_read_only_and_never_change_a_stage_by_themselves(self):
-        from django.test import override_settings
-        with override_settings(**self.MAIL), patch("apps.career.services.reply_watch.imaplib.IMAP4_SSL", FakeImap):
+        from tests.test_career_send import connected
+        connected(self, self.owner)
+        with patch("apps.career.services.career_mail.public_http.request", self.gmail):
             self.assertTrue(self.client.get(URL).json()["replies_ready"])
             replies = self.client.post(URL, {"operation": "replies"}, content_type="application/json").json()["result"]["replies"]
         self.assertEqual([(r["company"], r["category"], r["suggested_stage"]) for r in replies],
                          [("Closed Corp", "Rejected", None), ("SyntheticPay Technologies", "Interview", "interview")])  # noise and personal mail skipped
         self.assertEqual(replies[1]["because"], "interview")
-        self.assertIn(("connect", "imap.gmail.com", 993), FakeImap.commands)
-        self.assertIn(("select", "INBOX", True), FakeImap.commands)  # read-only
-        self.assertTrue(all("PEEK" in c[1] for c in FakeImap.commands if c[0] == "fetch"))  # nothing marked read
+        reads = self.gmail.calls[1:]
+        self.assertEqual(reads[0][2], {"q": "in:inbox newer_than:30d", "maxResults": 200})
+        self.assertEqual({method for method, *_ in reads}, {"GET"})  # read-only: nothing is marked read, moved or sent
         self.pay.refresh_from_db()
         self.assertEqual(self.pay.extracted_payload["application"]["stage"], "applied")  # unchanged until the owner applies
         self.assertNotIn("Share your availability", json.dumps(replies))  # the mail body is not passed on

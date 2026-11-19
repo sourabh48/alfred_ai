@@ -243,8 +243,8 @@ def index_view(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def online_services_api_view(request):
-    """Settings > Online services: each person saves their own keys for paid or limited services; the person who manages
-    ALFRED also switches free services on and sets Career email, without editing files."""
+    """Settings > Online services: each person saves their own keys for paid or limited services and can turn off their
+    Career email; the person who manages ALFRED also switches free services on, without editing files."""
     from alfred_private_storage import PrivateStorageUnavailable
     from .services import online_services, personal_keys
     if request.method == "POST":
@@ -254,17 +254,22 @@ def online_services_api_view(request):
                 raise AttributeError
             own, shared = online_services.key_changes(data), online_services.changes_from(data)
             if shared and not online_services.can_manage(request.user):
-                return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can change free services and Career email."}, status=403)
+                return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can change free services."}, status=403)
             if shared:  # the shared settings file is rewritten only when a shared setting changes
                 online_services.save(shared)
             personal_keys.save(request.user, own)
+            if data.get("mail_off") is True:
+                from apps.career.services import career_mail
+                career_mail.disconnect(request.user)
         except (ValueError, AttributeError) as exc:
             detail = str(exc) if isinstance(exc, ValueError) and not isinstance(exc, json.JSONDecodeError) else "Send the settings as JSON."
             return JsonResponse({"detail": detail}, status=400)
         except (OSError, PrivateStorageUnavailable):
             logging.getLogger(__name__).exception("Online services could not be saved")
             return JsonResponse({"detail": "ALFRED could not save its settings file. Nothing was changed."}, status=500)
-    return JsonResponse(online_services.status(request.user))
+    result = online_services.status(request.user)
+    result["mail"]["error"] = request.session.pop("alfred_career_mail_error", "")
+    return JsonResponse(result)
 
 
 @login_required
@@ -320,13 +325,21 @@ def _safe_next(request, value):
 def social_start_view(request, provider):
     from .services import social_login
     connect = request.user.is_authenticated and request.GET.get("connect") == "1"
-    purpose = "sync" if request.user.is_authenticated and request.GET.get("purpose") == "sync" else ""
-    back = "/settings/#settingsGoogleSync" if purpose else "/settings/#settingsSignIn" if connect else "/login/"
+    purpose = request.GET.get("purpose") if request.user.is_authenticated and request.GET.get("purpose") in ("sync", "mail") else ""
+    hint = ""
+    if purpose == "mail":
+        from apps.career.services import career_mail
+        hint = str(request.GET.get("email") or "").strip().lower()
+        if not career_mail.can_start(request.user, provider, hint):
+            request.session["alfred_career_mail_error"] = "Choose one of your own sign-in addresses that Google or Outlook can send from."
+            return redirect("/settings/#settingsCareerMail")
+    back = {"sync": "/settings/#settingsGoogleSync", "mail": "/settings/#settingsCareerMail"}.get(purpose) or (
+        "/settings/#settingsSignIn" if connect else "/login/")
     try:
         url = social_login.start(request.session, provider, request.build_absolute_uri(social_login.callback_path(provider)),
-                                 _safe_next(request, request.GET.get("next")), connect, purpose)
+                                 _safe_next(request, request.GET.get("next")), connect, purpose, hint)
     except social_login.SignInError as exc:
-        request.session["alfred_sign_in_error"] = str(exc)
+        request.session["alfred_career_mail_error" if purpose == "mail" else "alfred_sign_in_error"] = str(exc)
         return redirect(back)
     return redirect(url)
 
@@ -344,6 +357,14 @@ def social_callback_view(request, provider):
         except (social_login.SignInError, google_sync.SyncError) as exc:
             request.session["alfred_google_sync_error"] = str(exc)
         return redirect("/settings/#settingsGoogleSync")
+    if started.get("purpose") == "mail" and request.user.is_authenticated:
+        from apps.career.services import career_mail
+        try:
+            identity, pending = social_login.finish(request.session, provider, request.GET)
+            career_mail.connect(request.user, pending.get("hint"), identity, pending.get("refresh_token"), pending.get("granted", ""))
+        except (social_login.SignInError, career_mail.MailError) as exc:
+            request.session["alfred_career_mail_error"] = str(exc)
+        return redirect("/settings/#settingsCareerMail")
     try:
         identity, pending = social_login.finish(request.session, provider, request.GET)
         user = social_login.user_for(identity, request.user if connect else None)

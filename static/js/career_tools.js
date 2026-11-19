@@ -31,7 +31,7 @@
             <p class="small muted mt-2 mb-0">${e(p.basis)}${p.saved_at ? ` Saved ${e(new Date(p.saved_at).toLocaleString())}.` : ""}</p>`;
         if (!$("careerGithubUser").value && data.github) $("careerGithubUser").value = data.github;
         $("careerRepliesCheck").disabled = !data.replies_ready;
-        if (!data.replies_ready && !$("careerRepliesBody").innerHTML) $("careerRepliesBody").innerHTML = '<p class="small mb-0">Set up Career email first (your mail app password in Settings); reply watch reads the same mailbox.</p>';
+        if (!data.replies_ready && !$("careerRepliesBody").innerHTML) $("careerRepliesBody").innerHTML = '<p class="small mb-0">Choose your Career email address in Settings first; reply watch reads that inbox, only if you allowed reading.</p>';
         const s = data.sponsor || {};
         $("careerSponsorStatus").innerHTML = `Folder: <code>${e(s.imports_folder || "")}</code>. ${s.built_at
             ? `Read ${e(s.files.map(f => f.file).join(", "))} on ${e(new Date(s.built_at).toLocaleString())}: ${Alfred.formatNumber(s.employers)} employers.`

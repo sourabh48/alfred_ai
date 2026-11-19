@@ -1355,7 +1355,7 @@ class CareerToolsView(APIView):
         from .services import career_tools
         from .services import h1b_sponsor, reply_watch
         return {"profile": career_tools.master_profile(user, resume), "companies": career_tools.watched(user),
-                "github": career_tools.github_username(resume), "replies_ready": reply_watch.configured(),
+                "github": career_tools.github_username(resume), "replies_ready": reply_watch.configured(user),
                 "sponsor": h1b_sponsor.status()}
 
     def get(self, request):

@@ -145,7 +145,7 @@ def request(method, url, *, params=None, headers=None, json_body=None, data=None
         if response.status not in accepted_statuses:
             raise PublicHTTPError("api_error")
         mime = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
-        if response.status != 204 and mime not in content_types:
+        if response.status != 204 and mime not in content_types and not (response.status == 202 and not mime):
             raise PublicHTTPError("unexpected_content_type")
         encoding = response.headers.get("Content-Encoding", "identity").lower()
         if encoding not in {"", "identity"}:
