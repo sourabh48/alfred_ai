@@ -173,6 +173,7 @@ class LocalStreamAPITests(TransactionTestCase):
         self.alice = get_user_model().objects.create_user(username='synthetic-stream-alice')
         self.bob = get_user_model().objects.create_user(username='synthetic-stream-bob')
         self.client.force_login(self.alice)
+        self.enterContext(override_settings(ALFRED_QUICK_OLLAMA_MODEL=''))  # the fake Ollama below serves one model
         self.raw = wire(OllamaReasoner().model,'Synthetic ','local hypothesis.')
         self.hook = None; self.connections = []; self.streams = []
         def connection(*args,**kwargs):

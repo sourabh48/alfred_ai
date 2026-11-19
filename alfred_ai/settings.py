@@ -533,6 +533,8 @@ ALFRED_MEMORY_REASONING_DAILY_MICROUSD = env.int('ALFRED_MEMORY_REASONING_DAILY_
 # Optional cloud answers to public questions use each person's own free Gemini key (owner decision 2026-11-19; OpenAI dropped).
 ALFRED_GEMINI_MODEL = env('ALFRED_GEMINI_MODEL', default='gemini-3.5-flash-lite')
 ALFRED_MEMORY_OLLAMA_MODEL = env('ALFRED_MEMORY_OLLAMA_MODEL', default='qwen3.5:4b')
+# Short everyday general questions go to this faster model (owner request 2026-11-20); empty sends every question to the one above.
+ALFRED_QUICK_OLLAMA_MODEL = env('ALFRED_QUICK_OLLAMA_MODEL', default='qwen3.5:9b')
 # Local AI limits (owner decision 2026-11-12): configurable in config/local.env with generous defaults.
 # The host must be this PC or a private LAN address; a public or cloud host is refused.
 ALFRED_OLLAMA_HOST = env('ALFRED_OLLAMA_HOST', default='127.0.0.1')

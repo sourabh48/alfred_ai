@@ -55,8 +55,22 @@ def wants_thinking(query, scope):
     return mode == 'on' or bool(HARD_QUESTION.search(query)) or len(re.findall(r'\d+', query)) >= 6 or len(query) >= 600
 
 
+def easy_question(query, scope):
+    """A short everyday general question the fast model answers well; hard, long or record questions keep the main model."""
+    return scope == 'general' and isinstance(query, str) and len(query) <= 300 and not wants_thinking(query, scope)
+
+
 class OllamaReasoner(OllamaEmbeddings):
     name='ollama'
+
+    def use_quick_model(self):
+        """Switch to the fast model only when it is installed here, checked before any answer text is streamed."""
+        quick, main = settings.ALFRED_QUICK_OLLAMA_MODEL, self.model
+        if not isinstance(quick, str) or not re.fullmatch(r'[\w.:-]{1,100}', quick) or 'cloud' in quick.lower() or quick == main:
+            return
+        self.model = quick
+        try: OllamaEmbeddings._digest(self, deadline=time.monotonic()+5)
+        except Exception: self.model = main  # missing or not answering: the main model answers
 
     def __init__(self, *, stream=None):
         self.cancellation = stream
@@ -460,6 +474,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
                 for key,value in source['data']['amounts'].items()}}} for source in tools]
     try: reasoner=local if local is not None else OllamaReasoner()
     except EmbeddingUnavailable: reasoner=None
+    if hasattr(type(reasoner), 'use_quick_model') and easy_question(query, scope): reasoner.use_quick_model()  # not test doubles
     limit=context_bytes(context_tokens(reasoner),output_limit)  # the window learned by an earlier call, else the safe fallback
     payload={'query':query,'sources':model_tools.copy(),'response_style':style}; included=[]
     if payload_bytes(payload)>limit: raise ValueError('Select smaller local source context.')

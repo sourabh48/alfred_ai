@@ -122,6 +122,24 @@ class HybridAnswerThinkingTests(TestCase):
         self.assertIs(self.local.reason.call_args.kwargs['think'], True); self.assertTrue(result['local_thinking'])
         self.assertEqual(result['local_output_token_limit'], 384)  # the answer budget itself is unchanged
 
+    @override_settings(ALFRED_MEMORY_OLLAMA_MODEL='qwen3.5:35b-a3b', ALFRED_QUICK_OLLAMA_MODEL='qwen3.5:9b')
+    def test_easy_questions_use_the_fast_model_and_fall_back_to_the_main_one(self):
+        used, installed = [], {'models': [{'name': 'qwen3.5:9b', 'digest': 'a' * 64}]}
+
+        def reason(reasoner, payload, **kwargs):
+            used.append(reasoner.model)
+            return 'Synthetic AI hypothesis.'
+        with patch.object(OllamaReasoner, 'reason', autospec=True, side_effect=reason), \
+                patch.object(OllamaReasoner, '_request', side_effect=lambda *a, **k: installed):
+            hybrid_answer(self.store, self.user, 'What is a monsoon?', local=OllamaReasoner())
+            hybrid_answer(self.store, self.user, PUZZLE, local=OllamaReasoner())
+            installed = {'models': []}  # the fast model is not installed: checked before answering
+            hybrid_answer(self.store, self.user, 'What is a dosa?', local=OllamaReasoner())
+            installed = {'models': [{'name': 'qwen3.5:9b', 'digest': 'a' * 64}]}
+            with override_settings(ALFRED_QUICK_OLLAMA_MODEL=''):
+                hybrid_answer(self.store, self.user, 'What is a monsoon?', local=OllamaReasoner())
+        self.assertEqual(used, ['qwen3.5:9b', 'qwen3.5:35b-a3b', 'qwen3.5:35b-a3b', 'qwen3.5:35b-a3b'])
+
 
 class StreamThinkingTests(SimpleTestCase):
     def setUp(self):
