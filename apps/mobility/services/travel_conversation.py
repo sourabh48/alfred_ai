@@ -8,6 +8,7 @@ from copy import deepcopy
 from datetime import date, timedelta
 import re
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -311,9 +312,25 @@ def read_message(session_id, user, text):
     session = TravelPlanningSession.objects.filter(pk=session_id, user=user).only("state", "itinerary").first()
     if session is None or str(text).casefold().strip() in {"show more destinations", "previous destinations"}:
         return {}
+    from apps.ml_engine.services.brain import try_examples
     recent = reversed(session.messages.order_by("-id").values_list("role", "text")[:4])
     return read(without_itinerary_commands(str(text)) if session.itinerary else text, pending=value(session.state, "pending_question"),
-                recent=list(recent))
+                recent=list(recent), lessons=try_examples(user, "travel_reading", limit=8) if settings.ALFRED_TRAVEL_LOCAL_READING else ())
+
+
+def learn_correction(session, user, old_state):
+    """Right after "I understood: ...", a message that changes one of those values teaches the reader (central brain)."""
+    from apps.ml_engine.services.brain import try_remember
+    from .travel.understanding import FIELDS
+    corrected = {FIELDS[key]: value(session.state, key) for key in FIELDS
+                 if old_state.get(key, {}).get("source") == "local_ai_reading" and key in session.state
+                 and value(session.state, key) != value(old_state, key)}
+    if not corrected:
+        return False
+    last = list(session.messages.order_by("-id").values_list("role", "text")[:2])
+    if len(last) < 2 or last[0][0] != "assistant" or "I understood:" not in last[0][1] or last[1][0] != "user":
+        return False
+    return try_remember(user, "travel_reading", {"message": last[1][1][:400], "meant": corrected})
 
 
 @transaction.atomic
@@ -355,6 +372,7 @@ def _send_message(session, user, text, reading=None):
     old_state = deepcopy(session.state)
     discovery_text = without_itinerary_commands(text) if session.itinerary else text
     session.state, notes = extract(session.state, discovery_text, reading)
+    learn_correction(session, user, old_state)
     for stop in value(session.state, "_itinerary_stops", []):
         if any(str(term).casefold() in stop["name"].casefold() for term in value(session.state, "must_avoid", [])):
             raise ValidationError("Remove the destination from your ordered stops before excluding it from the trip.")

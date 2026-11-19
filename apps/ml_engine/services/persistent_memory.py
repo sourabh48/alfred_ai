@@ -99,6 +99,9 @@ class MemoryStore:
                 CREATE TABLE IF NOT EXISTS document_corpus (
                     id TEXT PRIMARY KEY, owner TEXT NOT NULL, wrapped BLOB NOT NULL, record BLOB NOT NULL);
                 CREATE INDEX IF NOT EXISTS document_corpus_owner ON document_corpus(owner);
+                CREATE TABLE IF NOT EXISTS brain_examples (
+                    id TEXT PRIMARY KEY, owner TEXT NOT NULL, kind TEXT NOT NULL, created REAL NOT NULL, record BLOB NOT NULL);
+                CREATE INDEX IF NOT EXISTS brain_examples_owner ON brain_examples(owner, kind, created);
                 CREATE TABLE IF NOT EXISTS events (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
                     owner TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'save', ciphertext BLOB NOT NULL);
@@ -289,6 +292,7 @@ class MemoryStore:
             from .document_corpus import DocumentCorpus
             DocumentCorpus(self)._clear(db, owner)
             db.execute('DELETE FROM knowledge_packs WHERE owner=?', (owner,))
+            db.execute('DELETE FROM brain_examples WHERE owner=?', (owner,))  # what ALFRED learned goes with the reset
             state=self._sync_state(db,owner)
             state['knowledge_hub'] = {'enabled': False, 'remote_consent': False}
             state.pop('investment_record_review',None)
