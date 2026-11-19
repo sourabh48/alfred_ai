@@ -40,13 +40,16 @@
                     <h2 class="h3 fw-bold mb-2">{{ ui_config.auth.login.title }}</h2>
                     <p class="text-muted mb-0">{{ ui_config.auth.login.description }}</p>
                 </div>
+                {% if password_sign_in %}
                 <a href="{% url 'signup' %}" class="btn btn-outline-dark btn-sm rounded-pill px-3">{{ ui_config.auth.login.secondary_cta }}</a>
+                {% endif %}
             </div>
 
             {% if protection_message %}
             <div class="alert alert-warning" role="alert">{{ protection_message }}</div>
             {% endif %}
             {% include "registration/providers.html" %}
+            {% if password_sign_in %}
             {% if form.errors %}
             <div class="alert alert-danger" role="alert">
                 Invalid username or password.
@@ -89,6 +92,10 @@
                     <button type="submit" class="btn btn-dark btn-lg rounded-pill">{{ ui_config.auth.login.primary_cta }}</button>
                 </div>
             </form>
+            {% else %}
+            <p class="small text-muted text-center mb-0" id="signInPrivacy">Google, GitHub or Microsoft checks who you are and confirms your email; ALFRED never sees your password there. New here? The same buttons create your account. Your records stay on this PC.</p>
+            <p class="small text-center mt-2 mb-0"><a href="/phone/">On a phone on your home Wi-Fi? Sign in with a code</a></p>
+            {% endif %}
 
             <div class="auth-panel-note mt-4">
                 <div class="auth-panel-note-kicker">Ready when you are</div>

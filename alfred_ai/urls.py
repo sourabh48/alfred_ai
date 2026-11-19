@@ -44,6 +44,9 @@ from .views import (
     social_callback_view,
     google_sync_api_view,
     AlfredLoginView,
+    admin_login_view,
+    phone_sign_in_view,
+    phone_approve_view,
 )
 
 from apps.career.views import career_tailored_cv_print
@@ -51,6 +54,7 @@ from apps.investments.research_views import research_desk_report
 
 urlpatterns = [
     path("media/<path:path>", private_media, name="private_media"),
+    path("admin/login/", admin_login_view),
     path("admin/", admin.site.urls),
     path("health/", health_api_view, name="health"),
     path("health/live/", health_live_api_view, name="health_live"),
@@ -59,6 +63,8 @@ urlpatterns = [
     path("", index_view, name="index"),
     path("signup/", signup_view, name="signup"),
     path("login/", AlfredLoginView.as_view(), name="login"),
+    path("phone/", phone_sign_in_view, name="phone_sign_in"),
+    path("phone/approve/", phone_approve_view, name="phone_approve"),
     path("auth/<str:provider>/start/", social_start_view, name="social_start"),
     path("auth/<str:provider>/callback/", social_callback_view, name="social_callback"),
     path("signin/", RedirectView.as_view(pattern_name="login", permanent=False), name="signin"),

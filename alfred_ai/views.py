@@ -313,6 +313,7 @@ def _sign_in_context(request, next_url=""):
     from .services import social_login
     providers = social_login.configured()
     return {"sign_in_providers": providers, "google_sign_in_ready": any(p["id"] == "google" for p in providers),
+            "password_sign_in": not providers,
             "sign_in_error": request.session.pop("alfred_sign_in_error", ""), "next": next_url}
 
 
@@ -364,8 +365,25 @@ def social_callback_view(request, provider):
 class AlfredLoginView(LoginView):
     extra_context = {"hide_sidebar": True, "hide_nav_auth_actions": True}
 
+    def post(self, request, *args, **kwargs):
+        from .services import social_login
+        if social_login.configured():  # sign-in is only through Google, GitHub or Microsoft (owner 2026-11-19)
+            request.session["alfred_sign_in_error"] = "Sign in with Google, GitHub or Microsoft. Passwords are not used."
+            return redirect("login")
+        return super().post(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         return super().get_context_data(**kwargs) | _sign_in_context(self.request, self.get_redirect_url())
+
+
+def admin_login_view(request):
+    """The admin site signs in like everyone else once a provider is set up."""
+    from django.contrib import admin
+    from django.utils.http import urlencode
+    from .services import social_login
+    if social_login.configured():
+        return redirect("/login/?" + urlencode({"next": _safe_next(request, request.GET.get("next") or "/admin/")}))
+    return admin.site.login(request)
 
 
 def not_found_view(request, exception):
@@ -840,3 +858,63 @@ def google_sync_api_view(request):
     response = JsonResponse({**google_sync.status(request.user), "error": request.session.pop("alfred_google_sync_error", "")})
     response["Cache-Control"] = "no-store, private"
     return response
+
+
+# Phone sign-in with a code (owner decision 2026-11-19): Google and Microsoft never send a sign-in back to a home-network
+# address, so a phone on the Wi-Fi shows a short code and a signed-in person approves it on this PC, like a TV sign-in.
+PHONE_CODE_SECONDS = 300
+PHONE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I to misread
+
+
+def _phone_key(code):
+    return "phone-sign-in:" + "".join(ch for ch in str(code).upper() if ch in PHONE_ALPHABET)[:8]
+
+
+@require_http_methods(["GET"])
+def phone_sign_in_view(request):
+    """The phone's page: a fresh code, then a check every few seconds until this PC approves it or it expires."""
+    import secrets
+    if request.user.is_authenticated and request.GET.get("check") != "1":
+        return redirect("/")
+    if request.GET.get("check") == "1":
+        code = request.session.get("alfred_phone_code", "")
+        entry = cache.get(_phone_key(code)) if code else None
+        if not entry or entry.get("session") != request.session.session_key:
+            return JsonResponse({"state": "expired"})
+        if entry.get("user"):
+            from django.contrib.auth import get_user_model
+            user = get_user_model().objects.filter(pk=entry["user"], is_active=True).first()
+            cache.delete(_phone_key(code))
+            if not user:
+                return JsonResponse({"state": "expired"})
+            request.session.pop("alfred_phone_code", None)
+            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+            return JsonResponse({"state": "approved", "next": "/"})
+        return JsonResponse({"state": "waiting"})
+    request.session.save()  # the code is bound to this phone's session
+    for _ in range(5):
+        code = "".join(secrets.choice(PHONE_ALPHABET) for _ in range(8))
+        if cache.add(_phone_key(code), {"session": request.session.session_key, "user": None}, PHONE_CODE_SECONDS):
+            break
+    request.session["alfred_phone_code"] = code
+    return render(request, "registration/phone.html", {"hide_sidebar": True, "hide_nav_auth_actions": True,
+                                                        "code": f"{code[:4]}-{code[4:]}", "minutes": PHONE_CODE_SECONDS // 60})
+
+
+@require_http_methods(["POST"])
+def phone_approve_view(request):
+    """This PC's signed-in person approves the code a phone shows; the phone then signs in as them."""
+    from .services import social_login
+    user = request.user
+    if not user.is_authenticated or (social_login.configured() and not user.email_identities.exists()):
+        return JsonResponse({"detail": "Sign in on this PC first."}, status=401)
+    try:
+        code = json.loads(request.body or b"{}").get("code", "")
+    except (ValueError, AttributeError):
+        code = ""
+    key = _phone_key(code)
+    entry = cache.get(key)
+    if len(key) != len("phone-sign-in:") + 8 or not entry or entry.get("user"):
+        return JsonResponse({"detail": "That code is wrong or expired. Open the sign-in page on the phone again for a new one."}, status=400)
+    cache.set(key, {**entry, "user": user.pk}, 60)
+    return JsonResponse({"detail": "Approved. The phone signs in within a few seconds."})

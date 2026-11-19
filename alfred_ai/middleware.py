@@ -50,3 +50,36 @@ class UserDataCacheMiddleware:
             if wrote:
                 bump_data_version(user.id)
         return response
+
+
+class VerifiedSignInMiddleware:
+    """Owner decision 2026-11-19: once Google, GitHub or Microsoft sign-in is set up, only people with an email one of
+    them verified can use ALFRED, and this PC is reached as localhost, the address those providers send people back to."""
+
+    OPEN = ("/login/", "/logout/", "/auth/", "/static/", "/favicon.ico", "/phone/")
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from django.contrib.auth import logout
+        from django.http import JsonResponse
+        from django.shortcuts import redirect
+        from alfred_ai.services import social_login
+
+        if not social_login.configured():
+            return self.get_response(request)
+        host, _, port = request.get_host().rpartition(":")
+        if not host or not port.isdigit():  # no port given
+            host, port = request.get_host(), ""
+        if host in ("127.0.0.1", "[::1]") and request.method in ("GET", "HEAD"):
+            # Google and Microsoft only return sign-ins to localhost, and a cookie set on one name is unknown to the other.
+            return redirect(f"http://localhost{':' + port if port else ''}{request.get_full_path()}")
+        user = request.user
+        if user.is_authenticated and not request.path.startswith(self.OPEN) and not user.email_identities.exists():
+            logout(request)
+            if request.path.startswith("/api/"):
+                return JsonResponse({"detail": "Sign in with Google, GitHub or Microsoft to continue."}, status=401)
+            request.session["alfred_sign_in_error"] = "Sign in with Google, GitHub or Microsoft to continue. Passwords are no longer used."
+            return redirect("login")
+        return self.get_response(request)

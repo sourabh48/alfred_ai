@@ -63,6 +63,8 @@ class ConnectedGoogle(TestCase):
             p.start()
             self.addCleanup(p.stop)
         self.owner = get_user_model().objects.create_user("sync-owner", email="owner@example.org", password="pw-12345678")
+        # With sign-in set up, everyone signed in has a provider-verified email (owner decision 2026-11-19).
+        self.owner.email_identities.create(provider="google", subject="g-1", email="owner@example.org")
         self.client.force_login(self.owner)
 
     def connect(self, google=None):

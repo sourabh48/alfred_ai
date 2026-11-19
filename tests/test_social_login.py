@@ -79,25 +79,51 @@ class SocialLoginTests(TestCase):
         self.sign_in("github", refuse)
         self.assertIn("did not accept", self.client.get("/login/").context["sign_in_error"])
 
-    def test_password_signup_closes_once_a_provider_is_set_up_and_settings_connect_verifies_the_email(self):
-        owner = self.users.create_user("owner", "old@example.org", "x-synthetic-1")
+    def test_password_signup_closes_once_a_provider_is_set_up_and_settings_connect_adds_another_provider(self):
         page = self.client.get("/signup/")
         self.assertFalse(page.context["password_signup_open"])
         self.assertEqual(self.client.post("/signup/", {"username": "late", "email": "l@example.org"}).status_code, 403)
-        self.client.force_login(owner)
-        self.assertFalse(self.client.get("/settings/").context["email_verified"])
+        self.sign_in("google")  # a provider sign-in creates the account with a verified email
+        owner = self.users.get()
+        self.assertTrue(self.client.get("/settings/").context["email_verified"])
         response, _ = self.sign_in("microsoft", start_query="?connect=1")
         self.assertEqual(response["Location"], "/settings/#settingsSignIn")
-        owner.refresh_from_db()
-        self.assertEqual((owner.email, self.users.count()), ("me@outlook.com", 1))
-        self.assertTrue(self.client.get("/settings/").context["email_verified"])
+        self.assertEqual((self.users.count(), sorted(owner.email_identities.values_list("provider", flat=True))), (1, ["google", "microsoft"]))
         # The same Microsoft account cannot then be connected to someone else.
-        other = self.users.create_user("other", "o@example.org", "x-synthetic-2")
-        self.client.force_login(other)
+        self.client.logout()
+        self.sign_in("github")
+        other = self.users.get(email="dev@example.org")
         self.sign_in("microsoft", start_query="?connect=1")
-        self.assertEqual(EmailIdentity.objects.get().user, owner)
+        self.assertEqual(EmailIdentity.objects.get(provider="microsoft").user, owner)
+        self.assertNotEqual(other, owner)
         with patch.dict(os.environ, {k: "" for k in KEYS}):
             self.assertTrue(social_login.password_signup_open())
+
+    def test_only_provider_sign_in_once_set_up_and_old_password_accounts_keep_their_records(self):
+        """Owner decision 2026-11-19: no passwords once a provider exists; only a provider-verified email gets in."""
+        old = self.users.create_user("old-owner", "Owner@example.org", "x-synthetic-1")
+        refused = self.client.post("/login/", {"username": "old-owner", "password": "x-synthetic-1"})
+        self.assertEqual((refused.status_code, refused["Location"]), (302, "/login/"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        page = self.client.get("/login/").content.decode()
+        self.assertIn("Passwords are not used", page)
+        self.assertNotIn('name="password"', page)
+        self.assertNotIn('href="/signup/"', page)
+        self.assertEqual(self.client.get("/admin/login/?next=/admin/")["Location"], "/login/?next=%2Fadmin%2F")
+        # A session from before the change, without a verified email, is ended at the next page or API call.
+        self.client.force_login(old)
+        self.assertEqual(self.client.get("/settings/")["Location"], "/login/")
+        self.client.force_login(old)
+        self.assertEqual(self.client.get("/api/session/ping/").status_code, 401)
+        # Signing in with a provider whose verified email matches reaches the same account and its records.
+        self.sign_in("google")
+        self.assertEqual((self.users.count(), int(self.client.session["_auth_user_id"])), (1, old.pk))
+        self.assertEqual(self.client.get("/settings/").status_code, 200)
+        # This PC is reached as localhost, the only local address Google and Microsoft send sign-ins back to.
+        moved = self.client.get("/travel/?x=1", HTTP_HOST="127.0.0.1:8000")
+        self.assertEqual(moved["Location"], "http://localhost:8000/travel/?x=1")
+        with patch.dict(os.environ, {k: "" for k in KEYS}):  # a copy with no provider at all still uses passwords
+            self.assertEqual(self.client.get("/login/", HTTP_HOST="127.0.0.1:8000").status_code, 200)
 
     def test_a_verified_email_from_another_provider_reaches_the_same_person(self):
         self.sign_in("google", Provider(google={"sub": "g-9", "email": "dev@example.org", "email_verified": True}))
@@ -118,3 +144,28 @@ class GoogleButtonTests(TestCase):
                 html = self.client.get(page).content.decode()
             self.assertIn('href="/auth/google/start/"', html)
             self.assertNotIn("not set up yet", html)
+
+
+class PhoneCodeSignInTests(TestCase):
+    """Owner decision 2026-11-19: a phone on the home Wi-Fi shows a code and the signed-in PC approves it."""
+    setUp, sign_in = SocialLoginTests.setUp, SocialLoginTests.sign_in
+
+    def test_phone_code_is_approved_only_by_a_verified_person_once_and_signs_the_phone_in_as_them(self):
+        import json
+        from django.test import Client
+        phone = Client()
+        code = phone.get("/phone/").context["code"]
+        self.assertRegex(code, r"^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$")
+        self.assertEqual(phone.get("/phone/?check=1").json(), {"state": "waiting"})
+        approve = lambda c: self.client.post("/phone/approve/", json.dumps({"code": c}), content_type="application/json")
+        unverified = self.users.create_user("no-provider", "", "x-synthetic-1")
+        self.client.force_login(unverified)
+        self.assertEqual(approve(code).status_code, 401)
+        self.sign_in("google")
+        owner = self.users.get(email="owner@example.org")
+        self.assertEqual(approve("ZZZZ-ZZZZ").status_code, 400)
+        self.assertEqual(approve(code.lower()).status_code, 200)
+        self.assertEqual(phone.get("/phone/?check=1").json()["state"], "approved")
+        self.assertEqual(int(phone.session["_auth_user_id"]), owner.pk)
+        self.assertEqual(approve(code).status_code, 400)  # one use only
+        self.assertEqual(Client().get("/phone/?check=1").json(), {"state": "expired"})  # another device cannot borrow it

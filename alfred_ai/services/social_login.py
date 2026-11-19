@@ -134,7 +134,9 @@ def user_for(identity, connect_to=None):
             user = linked.user
         else:
             verified = EmailIdentity.objects.select_related("user").filter(email__iexact=identity["email"]).first()
-            user = verified.user if verified else _new_user(users, identity["email"])
+            # An account made with a password before sign-in became provider-only keeps its records (owner 2026-11-19).
+            same_email = list(users.filter(email__iexact=identity["email"], is_active=True)[:2])
+            user = verified.user if verified else same_email[0] if len(same_email) == 1 else _new_user(users, identity["email"])
         if not user.is_active:
             raise SignInError("This ALFRED account is switched off.")
         EmailIdentity.objects.update_or_create(provider=identity["provider"], subject=identity["subject"],
@@ -162,5 +164,5 @@ def is_verified(user) -> bool:
 
 
 def password_signup_open() -> bool:
-    """New accounts need a verified email once a provider is set up; before that, the first account uses a password."""
-    return not configured() or not get_user_model().objects.exists()
+    """Passwords work only on a copy with no sign-in provider at all (a source checkout or test run); owner 2026-11-19."""
+    return not configured()

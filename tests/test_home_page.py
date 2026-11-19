@@ -31,9 +31,12 @@ class HomePageTests(TestCase):
 
     def test_missing_keys_are_asked_for_only_from_the_manager_and_only_while_missing(self):
         keys = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google", "ALFRED_GOOGLE_CLIENT_ID": "synthetic-id", "ALFRED_GOOGLE_CLIENT_SECRET": "synthetic-secret"}
+        # Once sign-in is set up, only provider-verified people get in (owner decision 2026-11-19).
+        self.user.email_identities.create(provider="google", subject="g-home-1", email="home1@example.org")
         with patch.dict(os.environ, keys):
             self.assertNotContains(self.home(), "Needs your attention")
         other = get_user_model().objects.create_user("synthetic-home-2", password="synthetic-pass-123")
+        other.email_identities.create(provider="google", subject="g-home-2", email="home2@example.org")
         self.client.force_login(other)
         self.assertNotContains(self.home(), "Add your Google Maps Platform key")
 

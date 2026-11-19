@@ -5311,8 +5311,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def test_settings_google_phone_sync_section(self):
         import os
         from unittest.mock import patch
+        from apps.users.models import EmailIdentity
+        # Sign-in is provider-only once set up (owner decision 2026-11-19): sign in first, as a verified person.
+        EmailIdentity.objects.create(user=self.scenario['user'], provider='google', subject='synthetic-sync-sub', email='sync@example.org')
+        self.login()
         self.enterContext(patch.dict(os.environ, {'ALFRED_GOOGLE_CLIENT_ID': 'x-id', 'ALFRED_GOOGLE_CLIENT_SECRET': 'x-secret'}))
-        self.login(); self.browser.get(self.live_server_url + '/settings/')
+        self.browser.get(self.live_server_url + '/settings/')
         self.wait.until(lambda _: 'Not connected.' in self.text('googleSyncStatus'))
         link = self.browser.find_element(self.By.ID, 'googleSyncConnect')
         self.assertTrue(link.is_displayed())
@@ -5366,6 +5370,40 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("document.getElementById('tripToolsSection').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('trip-tools')
         self.run_axe_light_dark('trip-tools')
+
+    def test_provider_only_sign_in_page_and_phone_code_approved_on_the_pc(self):
+        """Owner decision 2026-11-19: no password form once providers are set up; a phone signs in with a PC-approved code."""
+        from django.test import Client
+        from apps.users.models import EmailIdentity
+        keys = {f"ALFRED_{p}_CLIENT_{k}": f"synthetic-{p.lower()}-{k.lower()}" for p in ("GOOGLE", "GITHUB", "MICROSOFT") for k in ("ID", "SECRET")}
+        self.enterContext(patch.dict(os.environ, keys))
+        self.browser.delete_all_cookies()
+        self.browser.get(self.live_server_url + '/login/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'signInPrivacy'))
+        self.assertFalse(self.browser.find_elements(self.By.NAME, 'password'))
+        self.assertEqual([a.text for a in self.browser.find_elements(self.By.CSS_SELECTOR, '#signInProviders a')],
+                         ['Continue with Google', 'Continue with GitHub', 'Continue with Microsoft (Outlook)'])
+        self.capture('sign-in-providers-only')
+        self.run_axe_light_dark('sign-in-providers-only')
+        phone = Client()
+        code = phone.get('/phone/').context['code']
+        owner = self.scenario['user']
+        EmailIdentity.objects.create(user=owner, provider='google', subject='synthetic-sub', email=owner.email or 'owner@example.org')
+        self.client.force_login(owner)
+        self.browser.add_cookie({'name': 'sessionid', 'value': self.client.cookies['sessionid'].value, 'path': '/'})
+        self.browser.get(self.live_server_url + '/settings/#settingsSignIn')
+        self.browser.find_element(self.By.ID, 'phoneApproveCode').send_keys(code.lower())
+        self.memory_click('#phoneApproveForm button[type=submit]')
+        self.wait.until(lambda _: 'Approved' in self.text('phoneApproveStatus'))
+        self.assertEqual(phone.get('/phone/?check=1').json()['state'], 'approved')
+        self.assertEqual(int(phone.session['_auth_user_id']), owner.pk)
+        self.browser.delete_all_cookies()
+        self.browser.get(self.live_server_url + '/phone/')
+        self.wait.until(lambda _: self.text('phoneCode'))
+        self.browser.set_window_size(390, 900)
+        self.assertTrue(self.browser.execute_script("return document.documentElement.scrollWidth <= innerWidth+1"))
+        self.capture('phone-sign-in-code')
+        self.run_axe_light_dark('phone-sign-in-code')
 
     def test_online_services_are_switched_on_from_settings_without_editing_files(self):
         from alfred_ai.services import online_services
