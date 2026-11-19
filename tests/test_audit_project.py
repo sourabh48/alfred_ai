@@ -37,7 +37,6 @@ class AuditProjectTests(unittest.TestCase):
             env = isolated_environment(directory)
             self.assertNotIn("OPENAI_API_KEY", env)
             self.assertEqual(env["ALFRED_MEMORY_CLOUD_AUTHORIZED"], "false")
-            self.assertEqual(env["ALFRED_MEMORY_OPENAI_AUTHORIZED"], "false")
             self.assertTrue(env["DATABASE_URL"].startswith("sqlite:///"))
             self.assertEqual(Path(env["ALFRED_DATA_DIR"]), Path(directory).resolve())
 

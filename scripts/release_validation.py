@@ -250,7 +250,7 @@ def environment(sandbox):
                ALFRED_MEDIA_ROOT=str(sandbox / "media"),
                ALFRED_REGISTRY_PATH=str(sandbox / "registry"),
                ALFRED_MEMORY_CLOUD_AUTHORIZED="false", ALFRED_MEMORY_SYNC_PROVIDER="",
-               ALFRED_MEMORY_OPENAI_AUTHORIZED="false", ALFRED_MEMORY_SYNC_MOCK_DIR="",
+               ALFRED_MEMORY_SYNC_MOCK_DIR="",
                ALFRED_RUN_BROWSER_TESTS="false", DJANGO_SECRET_KEY=uuid.uuid4().hex,
                DATABASE_URL="sqlite:///" + (sandbox / "db.sqlite3").as_posix(),
                CACHE_BACKEND="django.core.cache.backends.locmem.LocMemCache", CACHE_LOCATION="release-synthetic",

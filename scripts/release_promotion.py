@@ -78,7 +78,7 @@ class NativeOperator:
             raise release.GateError("existing_native_secret_file_required")
         for line in config.read_text(encoding="utf-8-sig").splitlines():
             name, separator, value = line.removeprefix("export ").partition("=")
-            if separator and name.strip() in ("ALFRED_MEMORY_OPENAI_AUTHORIZED", "ALFRED_MEMORY_CLOUD_AUTHORIZED",
+            if separator and name.strip() in ("ALFRED_MEMORY_CLOUD_AUTHORIZED",
                                               "ALFRED_MEMORY_SYNC_PROVIDER", "ALFRED_MEMORY_SYNC_MOCK_DIR"):
                 value = value.strip().strip("\"'").lower()
                 allowed_value = (value in ("", "false", "0", "no", "off") if name.strip().endswith("AUTHORIZED") else value == "")
@@ -91,7 +91,7 @@ class NativeOperator:
         self.env.update(ALFRED_DATA_DIR=str(self.runtime), ALFRED_LOCAL_RUNTIME="true",
                         ALFRED_AUTO_TRAIN_ON_STARTUP="false", DJANGO_SETTINGS_MODULE="alfred_ai.native_settings",
                         ALFRED_TASK_BACKEND="huey",
-                        ALFRED_MEMORY_OPENAI_AUTHORIZED="false", ALFRED_MEMORY_CLOUD_AUTHORIZED="false",
+                        ALFRED_MEMORY_CLOUD_AUTHORIZED="false",
                         ALFRED_MEMORY_SYNC_PROVIDER="", ALFRED_MEMORY_SYNC_MOCK_DIR="", PYTHONDONTWRITEBYTECODE="1")
 
     def command(self, name, arguments):

@@ -259,7 +259,6 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.assertNotIn("OPENAI_API_KEY", env)
         self.assertNotIn("AWS_SECRET_ACCESS_KEY", env)
         self.assertEqual(env["ALFRED_MEMORY_CLOUD_AUTHORIZED"], "false")
-        self.assertEqual(env["ALFRED_MEMORY_OPENAI_AUTHORIZED"], "false")
         self.assertEqual(env["ALFRED_MEMORY_SYNC_PROVIDER"], "")
         self.assertEqual(env["ALFRED_MEMORY_SYNC_MOCK_DIR"], "")
         self.assertEqual(env["ALFRED_MEDIA_ROOT"], str(self.root / "sandbox/media"))

@@ -37,7 +37,6 @@ class BrowserRegressionRunnerTests(TestCase):
             self.assertNotIn('OPENAI_API_KEY',env)
             self.assertNotIn('synthetic-production',json.dumps(env))
             self.assertEqual(env['ALFRED_MEMORY_CLOUD_AUTHORIZED'],'false')
-            self.assertEqual(env['ALFRED_MEMORY_OPENAI_AUTHORIZED'],'false')
             self.assertTrue(Path(env['ALFRED_DATA_DIR']).is_relative_to(Path(directory).resolve()))
             self.assertEqual(Path(env['ALFRED_MEDIA_ROOT']).parent,Path(env['ALFRED_DATA_DIR']))
             with patch.object(run_browser_regressions,'parse_args',return_value=args), \

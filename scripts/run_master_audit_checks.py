@@ -28,7 +28,7 @@ def isolated_environment(directory):
                   ALFRED_DATA_DIR=str(directory), ALFRED_LOCAL_ENV_FILE=str(directory / "absent.env"),
                   ALFRED_REGISTRY_PATH=str(directory / "registry"),
                   ALFRED_MEMORY_CLOUD_AUTHORIZED="false", ALFRED_MEMORY_SYNC_PROVIDER="",
-                  ALFRED_MEMORY_OPENAI_AUTHORIZED="false", ALFRED_RUN_BROWSER_TESTS="false",
+                  ALFRED_RUN_BROWSER_TESTS="false",
                   DJANGO_SECRET_KEY=uuid.uuid4().hex,
                   DATABASE_URL="sqlite:///" + (directory / "db.sqlite3").as_posix(),
                   CACHE_BACKEND="django.core.cache.backends.locmem.LocMemCache",

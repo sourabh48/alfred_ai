@@ -244,10 +244,9 @@ class ReleasePromotionTests(ReleaseRepositoryFixture, unittest.TestCase):
     def test_native_operator_never_injects_new_signing_key_or_real_provider(self):
         native = promotion.NativeOperator(self.target, self.runtime, self.output, 8150)
         self.assertNotIn("DJANGO_SECRET_KEY", native.env)
-        self.assertEqual(native.env["ALFRED_MEMORY_OPENAI_AUTHORIZED"], "false")
         self.assertEqual(native.env["ALFRED_MEMORY_CLOUD_AUTHORIZED"], "false")
         self.assertEqual(native.env["ALFRED_TASK_BACKEND"], "huey")
-        (self.runtime / "config/native.env").write_text("ALFRED_MEMORY_OPENAI_AUTHORIZED=true")
+        (self.runtime / "config/native.env").write_text("ALFRED_MEMORY_CLOUD_AUTHORIZED=true")
         with self.assertRaisesRegex(release.GateError, "external_provider_config_must_be_disabled"):
             promotion.NativeOperator(self.target, self.runtime, self.output, 8150)
 
