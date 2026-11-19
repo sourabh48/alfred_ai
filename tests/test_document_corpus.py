@@ -326,7 +326,7 @@ class DocumentCorpusTests(TestCase):
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0], 0)
         self.embedder.embed.assert_not_called()
 
-    def test_general_pdf_uses_bounded_text_only_extraction_and_scans_abstain(self):
+    def test_general_pdf_uses_its_text_layer_and_scans_are_read_by_local_ocr(self):
         import fitz
         from tests.test_document_knowledge import text_pdf, image_pdf
         raw = text_pdf()
@@ -339,7 +339,16 @@ class DocumentCorpusTests(TestCase):
             scanned_bytes = raster.tobytes(deflate=True)
         self.assertLess(len(scanned_bytes), corpus.MAX_UPLOAD_BYTES)
         scanned = self.corpus.upload(self.owner, SimpleUploadedFile('Synthetic scan.pdf', scanned_bytes), consent=True, days=1)
-        self.assertFalse(scanned['stored']); self.assertEqual(self.count(), 1)
+        self.assertTrue(scanned['stored']); self.assertEqual(self.count(), 2)  # a scan is read by local OCR, never a cloud service
+        found = self.search([scanned['document']['id']], 'maintenance')['results'][0]
+        self.assertEqual(found['text_origin'], 'scanned_pdf_local_ocr')
+        self.assertIn('maintenance', found['excerpt'].lower())
+        self.assertEqual(self.corpus.original(self.owner, scanned['document']['id'])[1], scanned_bytes)
+        with fitz.open() as blank:
+            blank.new_page().insert_image(fitz.Rect(0, 0, 200, 200), pixmap=fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50), 0))
+            empty = blank.tobytes()
+        self.assertFalse(self.corpus.upload(self.owner, SimpleUploadedFile('Synthetic blank.pdf', empty), consent=True, days=1)['stored'])
+        self.assertEqual(self.count(), 2)  # nothing readable: nothing kept
 
     def test_general_upload_validates_consent_encoding_format_and_size_without_storage(self):
         from alfred_ai.services.upload_limits import UploadLimitExceeded

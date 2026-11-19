@@ -119,7 +119,7 @@ function initDocumentCorpus(getSelected) {
         data.delete('csrfmiddlewaretoken');
         perform(async signal=>{
             const saved=await Alfred.fetchJSON(base+'upload/',{method:'POST',body:data,signal});
-            if (!saved.stored) return {message:'No copy stored: no searchable text layer or supported text was found. Scanned PDFs require a separate reviewed extraction.'};
+            if (!saved.stored) return {message:'No copy stored: no readable text was found, even with local OCR.'};
             uploadForm.reset();
             return {listing:await Alfred.fetchJSON(base,{signal}),message:'Original and searchable extraction stored encrypted. Explicitly select the private document below.'};
         });

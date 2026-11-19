@@ -83,7 +83,7 @@
         {% csrf_token %}
         <fieldset>
             <legend class="h6">Add another private document</legend>
-            <p class="small">PDFs with selectable text, or plain .txt files, up to the limits shown below. Scanned pictures of pages are not read. The original and its searchable copy are stored encrypted for your Windows account and deleted together. Storing a file never changes your money records or checks the text.</p>
+            <p class="small">PDFs with selectable text, or plain .txt files, up to the limits shown below. Scanned PDFs are read on this PC by local OCR (first six pages); check misread numbers against the original. The original and its searchable copy are stored encrypted for your Windows account and deleted together. Storing a file never changes your money records or checks the text.</p>
             <label for="documentCorpusFile" class="form-label">Private PDF or text file</label>
             <input id="documentCorpusFile" name="file" type="file" class="form-control mb-2" accept=".pdf,.txt,application/pdf,text/plain" required>
             <label for="documentCorpusUploadDays" class="form-label">Keep for days (up to the limit shown below, or your shorter Memory retention)</label>

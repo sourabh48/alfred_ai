@@ -36,7 +36,7 @@ LIMITATION = (EVIDENCE_LIMITATION + 'Only explicitly selected local encrypted co
     'With no selection, the most relevant passages across all your retained copies are searched. '
     'No model, verified memory, conversation history or cloud sync is used. Missing matches do not prove absence. '
     'Linked financial sources are checked again on access; changed/unavailable copies are removed. '
-    'Uploaded originals remain encrypted with their index until deletion or expiry. Scanned/image-only PDFs remain unsupported.')
+    'Uploaded originals remain encrypted with their index until deletion or expiry. Scanned PDFs are read by local OCR on this PC (first six pages), which can misread characters.')
 
 
 def source_revision(user, kind, document_id):
@@ -195,8 +195,11 @@ class DocumentCorpus:
         upload.seek(0); raw = upload.read(MAX_UPLOAD_BYTES + 1)
         if len(raw) > MAX_UPLOAD_BYTES:
             raise UploadLimitExceeded()
+        origin = 'uploaded_pdf_text_layer' if extension == '.pdf' else 'uploaded_utf8_text'
         if extension == '.pdf':
             parsed = run_bounded_parser('document_text_layer', raw, name)
+            if not parsed['text'].strip():  # a scanned PDF: read it with the same local OCR, in the same bounded worker
+                parsed, origin = run_bounded_parser('document', raw, name), 'scanned_pdf_local_ocr'
             text, method = parsed['text'], parsed['method']
         else:
             try:
@@ -213,7 +216,7 @@ class DocumentCorpus:
         identity = uuid4().hex; fingerprint = sha256(raw).hexdigest()
         source = dict(status='searched', kind='upload', document_id=identity, document_name=name,
             source_fingerprint=fingerprint, source_url=f'/api/ai/document-corpus/{identity}/original/',
-            text_origin='uploaded_pdf_text_layer' if extension == '.pdf' else 'uploaded_utf8_text',
+            text_origin=origin,
             original_format=extension[1:], extraction_method=method)
         return self._save(user, source, text, {'original': fingerprint}, days, epoch, original=raw)
 
