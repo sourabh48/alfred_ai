@@ -247,14 +247,21 @@ class TravelSessionDetail(PrivateTravelSessionAPI):
         session.delete()  # A saved plan stays: the link to it is SET_NULL.
         return Response(status=204)
 
-    @transaction.atomic
     def post(self, request, pk):
+        reading = None
+        if isinstance(request.data, dict) and request.data.get("action", "message") == "message":
+            from .services.travel_conversation import read_message
+            reading = read_message(pk, request.user, request.data.get("text", ""))  # outside the lock: the local model takes seconds
+        return self._post(request, pk, reading)
+
+    @transaction.atomic
+    def _post(self, request, pk, reading):
         if not isinstance(request.data, dict):
             return Response({"detail": "Choose a supported trip action."}, status=400)
         session = get_object_or_404(TravelPlanningSession.objects.select_for_update(), pk=pk, user=request.user)
         action = request.data.get("action", "message")
         if action == "message":
-            session = send_message(pk, request.user, request.data.get("text", ""))
+            session = send_message(pk, request.user, request.data.get("text", ""), reading)
         elif action == "itinerary_edit":
             apply_edit(session, request.data)
         elif action == "packing":

@@ -1,7 +1,7 @@
-"""Local, deterministic travel intent extraction with explicit provenance.
+"""Travel intent extraction with explicit provenance: word rules, plus the local model's reading of each message.
 
-No private conversation, history, vehicle record or media is sent to a model
-provider. Unrecognised edits ask for clarification instead of inventing changes.
+No private conversation, history, vehicle record or media is sent to a cloud model provider; the reading model runs on
+this PC (travel/understanding.py). Unrecognised edits ask for clarification instead of inventing changes.
 """
 import calendar
 from copy import deepcopy
@@ -76,8 +76,9 @@ def new_session(user, plan=None):
     return session
 
 
-def extract(state, text):
+def extract(state, text, reading=None):
     prior_mode = deepcopy(state.get("transport_mode"))
+    incoming = deepcopy(state)
     state = deepcopy(state)
     lower = text.lower().strip().replace("’", "'")
     notes = []
@@ -219,12 +220,41 @@ def extract(state, text):
             put(interest+"_interest", interest in styles)
     from .travel.intent import augment
     state = augment(state, text)
+    understood = []
+    for key, found in (reading or {}).items():  # the local model fills only what the rules did not read from this message
+        if key in ("preferred_trip_style", "must_avoid"):  # lists add up with what the rules found
+            found = sorted(set(value(state, key, [])) | set(found))
+            if found == sorted(value(state, key, [])):
+                continue
+        elif state.get(key) != incoming.get(key) or (key == "transport_mode" and value(state, "compare_modes")):
+            continue
+        put(key, found, "local_ai_reading", True, .8)
+        understood.append(key)
+    if understood:
+        notes.append("I understood: " + "; ".join(describe(key, value(state, key)) for key in understood) + ". Tell me if any of that is wrong.")
     if value(state,"compare_modes") and re.search(r"\b(?:compare|vs|versus)\b",lower):
         if prior_mode:
             state["transport_mode"] = prior_mode
         else:
             state.pop("transport_mode",None)
     return state, notes
+
+
+LABELS = {"requested_destination": "going to {}", "origin": "starting from {}", "available_start_date": "from {}",
+          "available_end_date": "to {}", "trip_duration": "{} days", "budget": "budget ₹{:,.0f}", "budget_scope": "budget is {}",
+          "number_of_travelers": "{} travellers", "transport_mode": "travelling by {}", "preferred_trip_style": "you like {}",
+          "must_avoid": "avoid {}", "food_preferences": "{} food", "preferred_accommodation": "stay in a {}"}
+MODE_WORDS = {"ride": "motorbike", "roadtrip": "car", "train": "train", "bus": "bus", "flight": "flight"}
+
+
+def describe(key, found):
+    if key == "transport_mode":
+        found = MODE_WORDS.get(found, found)
+    elif key == "budget_scope":
+        found = found.replace("_", " ")
+    elif isinstance(found, list):
+        found = ", ".join(found)
+    return LABELS.get(key, key + " {}").format(found)
 
 
 def vehicle_state(session):
@@ -275,12 +305,21 @@ def ready_prompt(session, prefix=""):
     session.save()
 
 
+def read_message(session_id, user, text):
+    """The local model's reading of a message, taken before the chat is locked: it can take several seconds."""
+    from .travel.understanding import read
+    session = TravelPlanningSession.objects.filter(pk=session_id, user=user).only("state", "itinerary").first()
+    if session is None or str(text).casefold().strip() in {"show more destinations", "previous destinations"}:
+        return {}
+    return read(without_itinerary_commands(str(text)) if session.itinerary else text, pending=value(session.state, "pending_question"))
+
+
 @transaction.atomic
-def send_message(session_id, user, text):
+def send_message(session_id, user, text, reading=None):
     session = TravelPlanningSession.objects.select_for_update().get(pk=session_id, user=user)
     before, revision = deepcopy(session.itinerary), session.revision
     destination = value(session.state, "selected_destination")
-    session = _send_message(session, user, text)
+    session = _send_message(session, user, text, reading)
     if session.itinerary != before and session.revision == revision:
         session.revision += 1
         session.save(update_fields=["revision", "updated_at"])
@@ -289,7 +328,7 @@ def send_message(session_id, user, text):
     return session
 
 
-def _send_message(session, user, text):
+def _send_message(session, user, text, reading=None):
     text = str(text).strip()
     if not text or len(text) > 2000:
         raise ValidationError("Send a message of 1–2,000 characters.")
@@ -313,7 +352,7 @@ def _send_message(session, user, text):
         return session
     old_state = deepcopy(session.state)
     discovery_text = without_itinerary_commands(text) if session.itinerary else text
-    session.state, notes = extract(session.state, discovery_text)
+    session.state, notes = extract(session.state, discovery_text, reading)
     for stop in value(session.state, "_itinerary_stops", []):
         if any(str(term).casefold() in stop["name"].casefold() for term in value(session.state, "must_avoid", [])):
             raise ValidationError("Remove the destination from your ordered stops before excluding it from the trip.")
