@@ -311,7 +311,9 @@ def read_message(session_id, user, text):
     session = TravelPlanningSession.objects.filter(pk=session_id, user=user).only("state", "itinerary").first()
     if session is None or str(text).casefold().strip() in {"show more destinations", "previous destinations"}:
         return {}
-    return read(without_itinerary_commands(str(text)) if session.itinerary else text, pending=value(session.state, "pending_question"))
+    recent = reversed(session.messages.order_by("-id").values_list("role", "text")[:4])
+    return read(without_itinerary_commands(str(text)) if session.itinerary else text, pending=value(session.state, "pending_question"),
+                recent=list(recent))
 
 
 @transaction.atomic

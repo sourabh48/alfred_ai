@@ -44,6 +44,13 @@ class CleanTests(TestCase):
         self.assertEqual(clean({"destination": "Mysuru"}, "mysuru", pending="origin"), {"origin": "Mysuru"})
         self.assertEqual(clean({"destination": "Coorg"}, "can we do coorg instead?"), {"requested_destination": "Coorg"})
 
+    def test_a_place_alfred_just_offered_counts_only_when_the_message_points_back(self):
+        offered = "Three ideas: Coorg, Chikmagalur or Wayanad."
+        self.assertEqual(clean({"destination": "Chikmagalur"}, "lets do the second one", alfred_said=offered),
+                         {"requested_destination": "Chikmagalur"})
+        self.assertEqual(clean({"destination": "Chikmagalur"}, "3 days please", alfred_said=offered), {})
+        self.assertEqual(clean({"destination": "Ooty"}, "go there", alfred_said=offered), {})  # never offered
+
 
 class MergeTests(TestCase):
     def test_rules_win_where_they_matched_and_the_model_fills_the_rest(self):
@@ -79,6 +86,12 @@ class ReadTests(TestCase):
             self.assertEqual(understanding.read("a goa trip", pending="duration"), {"requested_destination": "Goa"})
         system, payload = ask.call_args.args[:2]
         self.assertEqual(payload, {"message": "a goa trip", "alfred_last_asked": "duration"})
+        with override_settings(ALFRED_TRAVEL_LOCAL_READING=True), \
+                patch("apps.career.services.bullet_rewrite.LocalChat.ask", return_value={"destination": "Wayanad"}) as ask:
+            self.assertEqual(understanding.read("that one", recent=[("user", "somewhere green"), ("assistant", "Coorg or Wayanad?")]),
+                             {"requested_destination": "Wayanad"})
+        self.assertEqual(ask.call_args.args[1]["earlier_chat"], [{"from": "traveller", "text": "somewhere green"},
+                                                                 {"from": "ALFRED", "text": "Coorg or Wayanad?"}])
         self.assertIn(timezone.localdate().isoformat(), system)
         today = timezone.localdate()
         saturday = today + timedelta(days=(5 - today.weekday()) % 7)
@@ -96,6 +109,7 @@ class ChatTests(TestCase):
                                         content_type="application/json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(read.call_args.args[0], "me and 2 buddies on a bike")
+        self.assertEqual([role for role, _ in read.call_args.kwargs["recent"]], ["assistant"])  # ALFRED's greeting
         session.refresh_from_db()
         self.assertEqual(session.state["transport_mode"]["source"], "user_message")  # the rules read "bike" themselves
         self.assertEqual(session.state["number_of_travelers"]["source"], "local_ai_reading")
