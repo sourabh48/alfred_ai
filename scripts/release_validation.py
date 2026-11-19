@@ -122,6 +122,10 @@ PUBLIC_TEST_IDENTIFIERS = {
     ("tests/test_global_abuse_limits.py", "c3e1e29fc822d0b9a3e12bb120c19b9aeccdc5ea47169a4f4ff6b123e3a6ec22"),
     # The made-up Google key "synthetic-google-key-9876" the dashboard key-entry browser test saves, 2026-11-14.
     ("tests/test_user_data_browser.py", "b75fcfd2204f98345c4d2cc1af4b255109d6e368d93e1a81bfc765ba919d22e4"),
+    # Made-up per-person keys and a made-up Microsoft secret (GUID shape) in the key and sign-in tests, 2026-11-19.
+    ("tests/test_online_services.py", "3b10a0c6ee8556890d87044b879bac760887e7b5413c6d7db76996b888513ed8"),
+    ("tests/test_online_services.py", "3afa16d706581c127becfb57fed6514f48fa8652cf45aaa335e50b6c7baf2e57"),
+    ("tests/test_social_login.py", "f83dcc7784d3fca6972cdfc50b1b0975ccc5b834900c5d6b398024f5cf1a70b1"),
 }
 SOURCE_SCAN_BATCH_BYTES = 64 * 1024 * 1024
 SOURCE_SCAN_TOTAL_BYTES = 128 * 1024 * 1024

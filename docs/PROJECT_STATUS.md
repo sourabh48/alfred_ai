@@ -2573,6 +2573,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: bounded local synthetic workflow PASS: 169 integration backend, six overlapping final pool tests and one actual Chrome; see active 2026-10-25 checkpoint. Source availability may yield fewer than 20 candidates; this is not live destination accuracy, booking or permit acceptance.
 - Limitations/dependencies: At most 20 distinct available source candidates are persisted; only three are enriched/displayed per batch. Existing owner/session controls; canonical data availability; acceptance plan.
 - Accepted: existing session JSON retains a deduplicated 20-item pool with three-item worker batches, cursor/reopen/Previous, current-batch comparison, explicit selection, rejection revalidation, context invalidation and supersession. [Pool regressions](../tests/test_travel_candidate_pool.py). No new schema/provider or currency arithmetic. Next: TRAVEL-04 ordered multi-stop itinerary foundation; cross-batch shortlists and live inventory remain outside this bounded acceptance.
+- Open owner check (2026-11-19, `docs/OWNER_ACCEPTANCE_2026-11-19.md` row 1): the destination cards from `e6fa006` FAILED (the same place listed twice; only one card had a photo). Fix `e345369` is in the running app; retest pending. The accepted scope above was not what failed; if the retest fails again this entry drops to IMPLEMENTED_NOT_ACCEPTED.
 
 ### TRAVEL-04 — Multiple destinations and day-wise itineraries
 
@@ -2761,6 +2762,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: Generated private JPEG/PNG, EXIF date/GPS, explicit owner association and gallery accepted: 56 backend integration + ten final focused (eight overlap), one actual Chrome PASS, zero skips. Receipts `artifacts/media-0dc9e66/`; both theme/mobile screenshots inspected. Source-only; no public upload/provider or packaged claim.
 - Limitations/dependencies: TripPhoto and EXIF review exist; inferred locations need user confirmation. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Preserve private/confirmed associations and opt-ins. Evaluate additional authorized camera/EXIF layouts separately; unknown EXIF timezones use the disclosed application timezone and do not establish location authenticity.
+- Open owner check (2026-11-19, `docs/OWNER_ACCEPTANCE_2026-11-19.md` row 1): the destination cards from `e6fa006` FAILED (the same place listed twice; only one card had a photo). Fix `e345369` is in the running app; retest pending. The accepted scope above was not what failed; if the retest fails again this entry drops to IMPLEMENTED_NOT_ACCEPTED.
 
 ### TRAVEL-20 — Video management and social Travel profile
 
@@ -4168,7 +4170,7 @@ reasoning, encrypted memory, registry and consented training remain.
 Legacy interactive Gmail/Outlook setup, plaintext CWD token writer, unreachable
 Gmail transport and counter-only fake auto-import method were removed. Existing
 encrypted EmailConnection models and historical token/recovery files are untouched.
-The IMAP portfolio service retains inline attachment parsing; standalone refetch
+The IMAP portfolio service was later removed (2026-11-12; nothing called it); standalone refetch
 is explicitly unsupported. Each import gets its own connection, with a deterministic
 two-owner concurrency regression. Connection/scan/cleanup failures use existing
 safe diagnostic references/classification, never raw server/credential contents;

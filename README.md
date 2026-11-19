@@ -93,16 +93,19 @@ For developers: [development setup](docs/DEVELOPMENT.md), [repository map](docs/
 Keep secrets in ignored `config/local.env`; use the configured Python SDK and
 isolated synthetic test data.
 
-Keys ALFRED asks for (Settings > Online services; the dashboard reminds the manager until Google is set):
+Keys (owner decision 2026-11-19):
 
-1. **Google Maps Platform key** (`TRAVEL_GOOGLE_MAPS_API_KEY`), with Map Tiles API, Places API (New),
-   Routes API and Weather API enabled. It is the one travel data source.
-2. **Google OAuth client ID and secret** for "Continue with Google"; redirect URI
-   `http://localhost:8000/auth/google/callback/`. Sign-in confirms each person's email; there is no phone check.
-3. **Gmail app password** for Career emails you approve one at a time.
-4. **Skyscanner Travel API key**, once Skyscanner approves the partner account; live flight prices then start
-   with no other change. See [Travel providers](docs/TRAVEL_PROVIDERS.md#skyscanner-once-the-key-is-approved).
-5. Optional: GitHub and Microsoft OAuth clients for those sign-in buttons. No cloud deployment wiring or AWS runtime activation.
+1. **Each person's own keys** in Settings > Online services, encrypted per person: Google Maps Platform
+   (`TRAVEL_GOOGLE_MAPS_API_KEY`, with Map Tiles, Places (New), Routes and Weather enabled; the one travel data source),
+   Skyscanner once the partner account is approved (see [Travel providers](docs/TRAVEL_PROVIDERS.md#skyscanner-once-the-key-is-approved)),
+   and optionally their own Alpha Vantage key.
+2. **Built-in free keys** (Google, GitHub and Microsoft sign-in clients, FRED, Alpha Vantage, Reddit, OpenRouteService) are sealed into
+   the installer at build time from the builder's private `config/local.env`; never committed. Sign-in redirect URI:
+   `http://localhost:8000/auth/<google|github|microsoft>/callback/`. Sign-in confirms each person's email; there is no password or phone check.
+3. **Career email**: each person ticks one of their own sign-in addresses (Gmail or Outlook) and grants send access on Google's or
+   Microsoft's own screen; no address or app password is typed. Every email still needs its own review and Send.
+
+No cloud deployment wiring or AWS runtime activation.
 
 Check generated inventory views with the configured SDK:
 
