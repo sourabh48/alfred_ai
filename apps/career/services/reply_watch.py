@@ -75,6 +75,28 @@ def sort_replies(messages: list, analyses: list) -> list:
     return found
 
 
+# CAREER-04: new recruiter outreach, about no saved opportunity yet; the person chooses which ones to analyse.
+LEAD = re.compile(r"\b(job description|jd|recruit(?:er|ing|ment)?|hiring|opening|job opportunity|career opportunity|"
+                  r"position|your profile|role at)\b", re.I)
+LEADS = 20
+
+
+def new_leads(messages: list, analyses: list) -> list:
+    """Unmatched emails that read like recruiter outreach (plain rules), newest first, with the phrase that decided it."""
+    open_ones = [a for a in analyses if isinstance(a.extracted_payload, dict) and a.company]
+    found = []
+    for message in messages:
+        text = f"{message['subject']} {message['body'][:1500]}"
+        hit = LEAD.search(text)
+        if not hit or not message.get("id") or NOISE.search(text) or _match(message, open_ones) is not None:
+            continue
+        found.append({"mail_id": message["id"], "from": message["from"], "from_name": message["from_name"], "subject": message["subject"],
+                      "on": message["on"], "because": hit.group(0), "attachment": bool(message.get("attachment"))})
+        if len(found) == LEADS:
+            break
+    return found
+
+
 def check(user) -> dict:
     from apps.career.models import CareerJobAnalysis
 
@@ -82,9 +104,11 @@ def check(user) -> dict:
         raise ValueError("Choose your Career email address in Settings and tick \"read email\" on its screen; reply watch reads that inbox.")
     analyses = list(CareerJobAnalysis.objects.filter(user=user).order_by("-updated_at", "-id")[:300])
     try:
-        replies = sort_replies(career_mail.read_inbox(user, days=DAYS), analyses)
+        messages = career_mail.read_inbox(user, days=DAYS)
     except career_mail.MailError as exc:
         raise ValueError(str(exc)) from None
-    return {"replies": replies, "checked_days": DAYS, "mailbox": career_mail.status(user)["address"],
+    return {"replies": sort_replies(messages, analyses), "leads": new_leads(messages, analyses), "checked_days": DAYS,
+            "mailbox": career_mail.status(user)["address"],
             "basis": f"Read just now from your inbox (last {DAYS} days), read-only: nothing was marked read, moved or kept. "
-                     "Sorted by plain rules; no AI read your mail. A change applies only when you press Apply."}
+                     "Sorted by plain rules; no AI read your mail. A change applies only when you press Apply, and a new "
+                     "recruiter email is analysed and saved only when you press Analyse."}

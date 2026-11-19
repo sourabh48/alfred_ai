@@ -500,6 +500,16 @@ class CareerRecruiterMatchView(APIView):
     def post(self, request):
         message_text = (request.data.get("message_text") or "").strip()
         attachment = request.FILES.get("attachment")
+        mail_id = request.data.get("mail_id")
+        if mail_id is not None:  # CAREER-04: an inbox email the person chose in reply watch, with its JD file if attached
+            if message_text or attachment is not None:
+                return Response({"detail": "Analyse either a chosen email or pasted text, not both."}, status=status.HTTP_400_BAD_REQUEST)
+            from .services import career_mail
+            try:
+                mail = career_mail.read_message(request.user, mail_id)
+            except career_mail.MailError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            message_text, attachment = mail["text"], mail["attachment"]
         if not message_text and attachment is None:
             return Response({"detail": "Paste recruiter mail text or upload a JD attachment first."}, status=status.HTTP_400_BAD_REQUEST)
 

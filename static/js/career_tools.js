@@ -90,6 +90,13 @@
                 .then(() => { stage.textContent = "Applied"; say(`Stage set to ${stage.dataset.stage}.`); })
                 .catch(error => { stage.disabled = false; say(error.message, "danger"); });
         }
+        const lead = event.target.closest("[data-lead-analyse]");
+        if (lead) {  // CAREER-04: the chosen inbox email and its JD file go through the same recruiter intake as a paste
+            lead.disabled = true;
+            Alfred.fetchJSON("/api/career/recruiter-match/", { method: "POST", body: JSON.stringify({ mail_id: lead.dataset.leadAnalyse }) })
+                .then(() => { lead.textContent = "Analysed and saved"; say("Saved as an opportunity. Triage, evaluation, CV and email drafts now work on it."); })
+                .catch(error => { lead.disabled = false; say(error.message, "danger"); });
+        }
         const apply = event.target.closest("#careerRetroApply");
         if (apply) {
             const rules = [...document.querySelectorAll("[data-retro]:checked")].map(b => retroRules[Number(b.dataset.retro)]);
@@ -123,7 +130,11 @@
             <span class="fw-semibold">${e(m.category)}</span> · ${e(m.company)}${m.role ? `, ${e(m.role)}` : ""} <span class="muted">(${e(m.on)}, now ${e(m.current_stage)})</span><br>
             <span class="muted">${e(m.subject)} · ${e(m.from)}${m.because ? ` · because it says “${e(m.because)}”` : ""}</span>
             ${m.suggested_stage ? `<br><button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-reply-apply="${e(m.opportunity_id)}" data-stage="${e(m.suggested_stage)}" data-on="${e(m.on)}">Apply: set stage to ${e(m.suggested_stage)}</button>` : ""}</li>`).join("")}</ul>`
-            : '<p class="small mb-2">No replies about your saved opportunities in the last 30 days.</p>'}<p class="small muted mb-0">${e(r.basis)}</p>`;
+            : '<p class="small mb-2">No replies about your saved opportunities in the last 30 days.</p>'}
+            ${(r.leads || []).length ? `<p class="small fw-semibold mb-1">New recruiter emails</p><ul class="list-unstyled small mb-2">${r.leads.map(m => `<li class="mb-2">
+            ${e(m.subject)} <span class="muted">(${e(m.on)}, ${e(m.from_name || m.from)}${m.attachment ? ", has an attachment" : ""}; because it says “${e(m.because)}”)</span><br>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-lead-analyse="${e(m.mail_id)}">Analyse${m.attachment ? " email and job description" : " this email"}</button></li>`).join("")}</ul>` : ""}
+            <p class="small muted mb-0">${e(r.basis)}</p>`;
     }));
     $("careerSponsorImport").addEventListener("click", event => {
         say("Reading the LCA files. A full year can take a few minutes.", "info");

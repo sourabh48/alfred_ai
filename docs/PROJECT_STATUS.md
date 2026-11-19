@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 34 | PARTIALLY_IMPLEMENTED: 17 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 35 | PARTIALLY_IMPLEMENTED: 16 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -819,7 +819,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | INV | 3 | 8 | 37.5 | 5 | 0 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
-| CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
+| CAREER | 5 | 8 | 62.5 | 2 | 1 | 0 | 0 | 0 |
 | TRAVEL | 12 | 23 | 52.2 | 4 | 3 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
@@ -2882,8 +2882,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: Keep these guards; live providers need separate approval and evidence.
 ### CAREER-04 — Recruiter email/attachment processing
 
-**PARTIALLY_IMPLEMENTED** · Career · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
 
+- 2026-11-19 (mailbox intake, under the 2026-11-18 owner approval to read the mailbox read-only): reply watch now also lists new recruiter emails that match no saved opportunity (plain rules quote the deciding phrase; newsletters and job alerts are skipped; at most 20) and says when one has an attachment. Pressing Analyse sends only that email's id to the existing recruiter intake (`POST /api/career/recruiter-match/` with `mail_id`), which reads the email and its first PDF, DOCX or TXT job-description file (up to 10 MB) through the person's own Gmail or Outlook read permission ([career_mail.py](../apps/career/services/career_mail.py) `read_message`) and saves the opportunity exactly as a pasted email and uploaded JD would be. The mailbox is only read (GET); nothing is marked read, moved or sent, no model reads the mail, and nothing is saved until the person presses Analyse. Tests: `test_new_recruiter_email_with_a_jd_file_is_listed_and_analysed_only_on_request` with career tools, mail, recruiter and send suites 68 PASS; Chrome `test_career_reply_watch_lists_a_new_recruiter_email_and_analyses_it_on_request` PASS (an HTML-laden subject renders as text). Career Ops was resolved on 2026-11-12, so that earlier limitation no longer applies.
+- Next: owner check with their real Gmail or Outlook inbox: one recruiter email with a JD attachment, Analyse, then compare the saved opportunity with the email.
 - Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
 - APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
 - Tests: [tests/test_career_resume_upload.py](../tests/test_career_resume_upload.py), [tests/test_career_recruiter_and_evidence.py](../tests/test_career_recruiter_and_evidence.py), [tests/test_career_matching_acceptance.py](../tests/test_career_matching_acceptance.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py). Fresh scoped evidence: 81 backend and 5 integrated actual Chrome PASS, zero skips; see manual recruiter checkpoint above.

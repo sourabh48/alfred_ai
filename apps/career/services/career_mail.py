@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 
@@ -204,20 +205,74 @@ def read_inbox(user, *, days: int) -> list:
                 head = {h.get("name", "").lower(): h.get("value", "") for h in (found.get("payload") or {}).get("headers", [])}
                 name, address = parseaddr(head.get("from", ""))
                 on = datetime.fromtimestamp(int(found.get("internalDate") or 0) / 1000, dt_timezone.utc).date().isoformat()
-                messages.append({"from_name": name[:120], "from": address[:200], "subject": _clip(head.get("subject"))[:300],
-                                 "on": on, "body": _clip(_gmail_text(found.get("payload") or {}))})
+                messages.append({"id": str(found.get("id") or item["id"]), "from_name": name[:120], "from": address[:200],
+                                 "subject": _clip(head.get("subject"))[:300], "on": on, "body": _clip(_gmail_text(found.get("payload") or {})),
+                                 "attachment": bool(_gmail_files(found.get("payload") or {}))})
         else:
             since = (timezone.now() - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
             url, params = f"{GRAPH}/mailFolders/inbox/messages", {"$filter": f"receivedDateTime ge {since}", "$top": 50,
-                                                                    "$select": "from,subject,receivedDateTime,body", "$orderby": "receivedDateTime desc"}
+                                                                    "$select": "id,from,subject,receivedDateTime,body,hasAttachments",
+                                                                    "$orderby": "receivedDateTime desc"}
             while url and len(messages) < MAX_MESSAGES:
                 page = _get(token, url, params, {"Prefer": 'outlook.body-content-type="text"'})
                 for item in page.get("value") or []:
                     sender = (item.get("from") or {}).get("emailAddress") or {}
-                    messages.append({"from_name": str(sender.get("name") or "")[:120], "from": str(sender.get("address") or "")[:200],
-                                     "subject": _clip(item.get("subject"))[:300], "on": str(item.get("receivedDateTime") or "")[:10],
-                                     "body": _clip((item.get("body") or {}).get("content"))})
+                    messages.append({"id": str(item.get("id") or ""), "from_name": str(sender.get("name") or "")[:120],
+                                     "from": str(sender.get("address") or "")[:200], "subject": _clip(item.get("subject"))[:300],
+                                     "on": str(item.get("receivedDateTime") or "")[:10], "body": _clip((item.get("body") or {}).get("content")),
+                                     "attachment": item.get("hasAttachments") is True})
                 url, params = page.get("@odata.nextLink"), None
     except PublicHTTPError:
         raise MailError(f"Could not read your inbox at {LABEL[data['provider']]} right now. Try again later.") from None
     return messages[:MAX_MESSAGES]
+
+
+JOB_FILES, MAX_ATTACHMENT_BYTES = (".pdf", ".docx", ".txt"), 10 * 1024 * 1024
+MAIL_ID = re.compile(r"[A-Za-z0-9_=+-]{1,512}")
+
+
+def _gmail_files(part) -> list:
+    """(filename, attachment id, size) of every attached job-description file in a Gmail payload."""
+    body, name = part.get("body") or {}, str(part.get("filename") or "")
+    found = [(name, body["attachmentId"], int(body.get("size") or 0))] if name.lower().endswith(JOB_FILES) and body.get("attachmentId") else []
+    return found + [file for child in part.get("parts") or [] for file in _gmail_files(child)]
+
+
+def read_message(user, mail_id) -> dict:
+    """One inbox email the person chose, for the recruiter intake: its text and its first job-description file, if any.
+
+    Read-only, like reply watch: nothing is marked read, moved or kept here; the intake stores what the person analyses.
+    """
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from urllib.parse import quote
+    if not isinstance(mail_id, str) or not MAIL_ID.fullmatch(mail_id):
+        raise MailError("Choose an email from the reply watch list.")
+    data = _load(user)
+    if not (data.get("refresh") and data.get("read")):
+        raise MailError("Choose your Career email address in Settings and tick \"read email\" on its screen first.")
+    token, ident, file = _access(user, data), quote(mail_id, safe=""), None
+    try:
+        if data["provider"] == "google":
+            found = _get(token, f"{GMAIL}/gmail/v1/users/me/messages/{ident}", {"format": "full"})
+            head = {h.get("name", "").lower(): h.get("value", "") for h in (found.get("payload") or {}).get("headers", [])}
+            text = f"{head.get('subject', '')}\n{_gmail_text(found.get('payload') or {})}"
+            for name, attachment, size in _gmail_files(found.get("payload") or {}):
+                if size <= MAX_ATTACHMENT_BYTES:
+                    raw = _get(token, f"{GMAIL}/gmail/v1/users/me/messages/{ident}/attachments/{quote(attachment, safe='')}")
+                    file = (name, base64.urlsafe_b64decode(str(raw.get("data") or "") + "=="))
+                    break
+        else:
+            found = _get(token, f"{GRAPH}/messages/{ident}", {"$select": "subject,body"}, {"Prefer": 'outlook.body-content-type="text"'})
+            text = f"{found.get('subject') or ''}\n{(found.get('body') or {}).get('content') or ''}"
+            listing = _get(token, f"{GRAPH}/messages/{ident}/attachments", {"$select": "id,name,size"})
+            for item in listing.get("value") or []:
+                name = str(item.get("name") or "")
+                if name.lower().endswith(JOB_FILES) and int(item.get("size") or 0) <= MAX_ATTACHMENT_BYTES:
+                    raw = _get(token, f"{GRAPH}/messages/{ident}/attachments/{quote(str(item.get('id') or ''), safe='')}")
+                    file = (name, base64.b64decode(str(raw.get("contentBytes") or "")))
+                    break
+    except PublicHTTPError:
+        raise MailError(f"Could not read that email at {LABEL[data['provider']]} right now. Try again later.") from None
+    except (ValueError, TypeError):
+        raise MailError("That email's attachment could not be read. Save it and upload it instead.") from None
+    return {"text": text.strip()[:20000], "attachment": SimpleUploadedFile(file[0][:180], file[1]) if file else None}

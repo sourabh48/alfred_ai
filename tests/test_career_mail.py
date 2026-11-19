@@ -117,7 +117,7 @@ class CareerMailTests(TestCase):
         method, url, kwargs = outlook.calls[-3]
         self.assertEqual((method, url, kwargs["headers"]["Content-Type"]), ("POST", "https://graph.microsoft.com/v1.0/me/sendMail", "text/plain"))
         self.assertIn(b"To: hr@synthetic.example.test", base64.b64decode(kwargs["data"]))
-        self.assertEqual(inbox, [{"from_name": "Priya", "from": "priya@syntheticpay.com", "subject": "Next steps", "on": "2026-11-18",
+        self.assertEqual(inbox, [{"id": "", "attachment": False, "from_name": "Priya", "from": "priya@syntheticpay.com", "subject": "Next steps", "on": "2026-11-18",
                                   "body": "Please share your availability."}])
         self.assertEqual(outlook.calls[-1][2]["headers"]["Prefer"], 'outlook.body-content-type="text"')
         from apps.integrations.models import _decrypt_token

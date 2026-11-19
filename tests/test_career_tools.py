@@ -196,6 +196,45 @@ class ReplyWatchTests(TestCase):
                                     content_type="application/json")
         self.assertEqual(response.status_code, 200)
 
+    def test_new_recruiter_email_with_a_jd_file_is_listed_and_analysed_only_on_request(self):
+        import base64
+        from alfred_ai.services.public_http import PublicResponse
+        from tests.test_career_send import connected
+        jd = b"Senior Python Developer at NovaSynth Labs. Required: Python, Django, SQL. 5+ years. Bengaluru."
+        self.gmail.inbox.append(("Asha <asha@talentfirm.example>", "Senior Python Developer opening at NovaSynth",
+                                 "Hi, I am recruiting for a Senior Python Developer role. JD attached."))
+        lead = str(len(self.gmail.inbox) - 1)
+        plain = self.gmail
+
+        def gmail(method, url, params=None, **kwargs):
+            if url.endswith(f"/messages/{lead}/attachments/att-1"):
+                plain.calls.append((method, url, params))
+                return PublicResponse(json.dumps({"data": base64.urlsafe_b64encode(jd).decode()}).encode(), "application/json")
+            response = plain(method, url, params, **kwargs)
+            if url.endswith(f"/messages/{lead}"):
+                body = response.json()
+                body["payload"]["parts"].append({"filename": "jd.txt", "mimeType": "text/plain", "body": {"attachmentId": "att-1", "size": len(jd)}})
+                return PublicResponse(json.dumps(body).encode(), "application/json")
+            return response
+
+        connected(self, self.owner)
+        with patch("apps.career.services.career_mail.public_http.request", gmail):
+            result = self.client.post(URL, {"operation": "replies"}, content_type="application/json").json()["result"]
+            self.assertEqual([(m["mail_id"], m["attachment"], m["because"]) for m in result["leads"]], [(lead, True, "opening")])
+            self.assertEqual(CareerJobAnalysis.objects.filter(user=self.owner).count(), 2)  # listing saves nothing
+            for bad in ({"mail_id": "../1"}, {"mail_id": lead, "message_text": "also this"}):
+                self.assertEqual(self.client.post("/api/career/recruiter-match/", bad, content_type="application/json").status_code, 400)
+            with patch("apps.career.views.verified_intelligence.macro_context", return_value={"payload": {}, "evidence": []}), \
+                    patch("apps.career.views.job_intelligence.market_outlook", return_value={"risk_score": 30, "evidence": [], "insights": []}), \
+                    patch("apps.career.views.job_intelligence.suggest_openings", return_value={"openings": [], "evidence": {}}):
+                response = self.client.post("/api/career/recruiter-match/", {"mail_id": lead}, content_type="application/json")
+        self.assertIn(response.status_code, (200, 201), response.content[:300])
+        saved = CareerJobAnalysis.objects.filter(user=self.owner).latest("id")
+        self.assertEqual(saved.source_document_name, "jd.txt")
+        self.assertIn("Django", saved.extracted_text)
+        self.assertIn("recruiting for a Senior Python Developer", saved.extracted_text)
+        self.assertEqual({method for method, url, _ in self.gmail.calls if "gmail.googleapis.com" in url}, {"GET"})  # the mailbox is only read
+
 
 def _xlsx(path, rows):
     """A minimal xlsx written by hand: shared strings for text, a bare number for the date serial."""

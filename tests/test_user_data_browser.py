@@ -6880,6 +6880,51 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.text('investmentReviewItems'),'')
         holding.refresh_from_db(); self.assertEqual(str(holding.current_value),'123.45')
 
+    def test_career_reply_watch_lists_a_new_recruiter_email_and_analyses_it_on_request(self):
+        import base64
+        from alfred_ai.services.public_http import PublicResponse
+        from apps.career.models import CareerJobAnalysis
+        from tests.test_career_matching_acceptance import offline_career
+        from tests.test_career_send import connected
+        offline_career(self)
+        owner = self.scenario["user"]
+        connected(self, owner)
+        jd = b"Senior Python Developer at NovaSynth Labs. Required: Python, Django, SQL. 5+ years. Bengaluru."
+        text = base64.urlsafe_b64encode(b"I am recruiting for a Python role. JD attached.").decode()
+
+        def gmail(method, url, params=None, **kwargs):  # one synthetic inbox email with a JD file; no network
+            if url == "https://oauth2.googleapis.com/token":
+                body = {"access_token": "synthetic-access"}
+            elif url.endswith("/messages"):
+                body = {"messages": [{"id": "lead1"}]}
+            elif url.endswith("/attachments/att-1"):
+                body = {"data": base64.urlsafe_b64encode(jd).decode()}
+            else:
+                body = {"id": "lead1", "internalDate": "1794290400000", "payload": {"mimeType": "multipart/mixed", "headers": [
+                    {"name": "From", "value": "Asha <asha@talentfirm.example>"},
+                    {"name": "Subject", "value": 'Python opening <img src=x onerror="window.__leadXss=1">'}],
+                    "parts": [{"mimeType": "text/plain", "body": {"data": text}},
+                              {"filename": "jd.txt", "mimeType": "text/plain", "body": {"attachmentId": "att-1", "size": len(jd)}}]}}
+            return PublicResponse(json.dumps(body).encode(), "application/json")
+
+        self.enterContext(patch("apps.career.services.career_mail.public_http.request", gmail))
+        self.login(); self.browser.get(self.live_server_url + "/career/")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "careerRoot").get_attribute("data-page-busy") == "false")
+        self.browser.execute_script("const tool = document.getElementById('careerRepliesTool'); tool.open = true; "
+                                    "for (let up = tool.parentElement; up; up = up.parentElement) if (up.tagName === 'DETAILS') up.open = true;")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "careerRepliesCheck").is_enabled())
+        self.memory_click("#careerRepliesCheck")
+        self.wait.until(lambda _: "New recruiter emails" in self.text("careerRepliesBody"))
+        self.assertIn("has an attachment", self.text("careerRepliesBody"))
+        self.assertFalse(self.browser.execute_script("return Boolean(window.__leadXss)"))
+        count = CareerJobAnalysis.objects.filter(user=owner).count()
+        self.memory_click('[data-lead-analyse="lead1"]')
+        self.wait.until(lambda _: "Analysed and saved" in self.text("careerRepliesBody"))
+        self.assertEqual(CareerJobAnalysis.objects.filter(user=owner).count(), count + 1)
+        self.assertEqual(CareerJobAnalysis.objects.filter(user=owner).latest("id").source_document_name, "jd.txt")
+        self.browser.execute_script("document.getElementById('careerRepliesTool').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture("career-reply-watch-new-recruiter-email")
+
     def test_investment_value_alerts_limit_crossing_and_removal(self):
         from selenium.webdriver.support.ui import Select
         from apps.investments.models import Investment
