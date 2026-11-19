@@ -84,6 +84,18 @@ class TravelPhotoTests(TestCase):
             with self.subTest(places=[p["displayName"]["text"] for p in places]), self.assertRaisesRegex(ProviderError, "place_identity_unconfirmed"):
                 GooglePlacePhoto().fetch({"name": "Sakleshpur", "latitude": 12.944, "longitude": 75.788, "index": 0})
 
+    def test_a_local_spelling_of_the_same_name_still_finds_the_photo(self):
+        """Owner check 2026-11-20: Sakleshpur still had no photo because Google names the town "Sakleshpura"."""
+        from apps.mobility.services.travel.providers.photos import same_place
+        self.assertTrue(all(same_place(a, "Sakleshpur") for a in ("Sakleshpura", "SAKLESHPUR", "Sakleshpur ")))
+        self.assertFalse(any(same_place(a, "Sakleshpur") for a in ("Sakleshpur Bus Stand", "Sakle", "Hassan")))
+        self.assertFalse(same_place("Goas", "Goa"))  # too short to guess
+        town = {"id": "town", "displayName": {"text": "Sakleshpura"}, "location": {"latitude": 12.95, "longitude": 75.79},
+                "photos": [{"name": "places/town/photos/ref", "authorAttributions": []}]}
+        self.api.side_effect = [({"places": [town]}, ""), ({"photoUri": "https://lh3.googleusercontent.com/photo"}, "")]
+        payload, _ = GooglePlacePhoto().fetch({"name": "Sakleshpur", "latitude": 12.944, "longitude": 75.788, "index": 0})
+        self.assertEqual(payload["count"], 1)
+
     def test_a_photo_turned_away_while_another_loads_says_busy_so_the_page_retries(self):
         from apps.mobility.services.travel.providers.base import ProviderResult
         owner = get_user_model().objects.create_user("photo-busy-owner")

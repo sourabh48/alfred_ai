@@ -21,6 +21,12 @@ PLACE_ID = re.compile(r"[A-Za-z0-9_-]{1,200}\Z")
 IMAGE_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif")
 
 
+def same_place(found, wanted):
+    """Same name, or a local spelling that only adds a letter or two (Google says "Sakleshpura" for Sakleshpur)."""
+    short, long = sorted((found.casefold().strip(), wanted.casefold().strip()), key=len)
+    return short == long or (len(short) >= 5 and long.startswith(short) and len(long) - len(short) <= 2)
+
+
 class GooglePlacePhoto(Provider):
     name = "google_place_photos"
     category = "photos"
@@ -66,7 +72,7 @@ class GooglePlacePhoto(Provider):
             # that has photos, rather than showing none.
             matches = []
             for item in raw.get("places", []):
-                if (item.get("displayName", {}).get("text") or "").casefold() != p["name"].casefold():
+                if not same_place(item.get("displayName", {}).get("text") or "", p["name"]):
                     continue
                 distance = km_between((p["latitude"], p["longitude"]),
                                       (number(item["location"]["latitude"], low=-90, high=90),
