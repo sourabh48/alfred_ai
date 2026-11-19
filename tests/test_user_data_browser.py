@@ -363,7 +363,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.get(self.live_server_url+'/investments/')
         self.browser.find_element(self.By.ID, 'investmentPdfFiles').send_keys(str(source.resolve()))
         self.memory_click('#uploadInvestmentPdfBtn')
-        self.wait.until(lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=source.name).exists())
+        from selenium.webdriver.support.ui import WebDriverWait  # the upload waits for the parser, as settle_page allows
+        WebDriverWait(self.browser, max(20, settings.ALFRED_UPLOAD_PARSER_SECONDS) + 10).until(
+            lambda _: InvestmentImportDocument.objects.filter(user=owner, file_name=source.name).exists())
         document = InvestmentImportDocument.objects.get(user=owner, file_name=source.name)
         self.assertEqual(Investment.objects.filter(user=owner).count(), before)
         link = f'a[href="/investments/import-uploads/{document.pk}/review/"]'
