@@ -130,6 +130,7 @@ function loadInvestmentDashboard() {
             renderAllocationChart(allocationData);
             renderGrowthChart(growthData);
             renderInvestmentRecommendations(summaryData.analysis?.recommendations || [], summaryData.market_context?.suggestions || []);
+            if (summaryData.analysis?.risk_basis) document.getElementById("investmentGuidanceBasis").textContent = summaryData.analysis.risk_basis;
             renderInvestmentGrounding(summaryData.grounding || {});
             renderInvestmentWatchlist(summaryData.watchlist || {});
             renderBeginnerGuide(summaryData.beginner || {});

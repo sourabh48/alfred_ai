@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 32 | PARTIALLY_IMPLEMENTED: 19 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 33 | PARTIALLY_IMPLEMENTED: 18 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -816,7 +816,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
-| INV | 3 | 8 | 37.5 | 3 | 2 | 0 | 0 | 0 |
+| INV | 3 | 8 | 37.5 | 4 | 1 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
 | AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
 | CAREER | 5 | 8 | 62.5 | 1 | 2 | 0 | 0 | 0 |
@@ -1965,8 +1965,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### INV-04 — Risk classification and recommendations
 
-**PARTIALLY_IMPLEMENTED** · Investments · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
 
+- 2026-11-19 (risk evidence by fund category): a mutual fund with an AMFI scheme code now weighs by its official AMFI (SEBI) scheme category instead of the one Mutual Fund weight 60: sectoral/thematic 95, small or mid cap 90, large & mid cap 85, overseas FoF 85, other equity, ELSS, index and ETF 80, hybrid 60, arbitrage and debt 20, liquid, overnight and money market 10, gold 30 ([portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py) `FUND_CATEGORY_RISK`). An unmapped category or an AMFI outage keeps 60, and Portfolio Guidance says how many funds were weighted by category. The Home risk state counts a fund weighted 80 or more as equity-like. The table is a fixed reading of SEBI categories, not each fund's own riskometer. Tests: `FundCategoryRiskTests` (2) with investment money, projection, baseline and beginner guide 61 PASS; investments Chrome PASS.
+- Next: owner reviews the weight table during the walkthrough; suitability stays out of scope without the owner's stated goals and horizon.
 - Source: [apps/investments/services/portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py), [apps/investments/models.py](../apps/investments/models.py), [apps/investments/urls.py](../apps/investments/urls.py).
 - APIs/UI/models: /investments/; /api/investments/ (see urls.py); Investment; optional external evidence.
 - Tests: [tests/test_investment_money.py](../tests/test_investment_money.py), [tests/test_investment_projection.py](../tests/test_investment_projection.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.

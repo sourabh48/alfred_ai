@@ -175,7 +175,7 @@ def _investment_summary_payload(user) -> dict:
             "monthly_sip": investment_total_float(total_sip),
             "annual_return": annual_return,
             "gain_loss": investment_total_float(gain_loss),
-            "risk": _portfolio_risk(investments),
+            "risk": _portfolio_risk(investments, {fund["id"] for fund in analysis.get("fund_categories", []) if fund["weight"] >= 80}),
             "positions": len(positions),
             "positions_in_rupee_totals": len(investments),
             "other_currencies": _other_currency_groups(positions),
@@ -266,7 +266,8 @@ def _investment_growth_payload(user, *, as_of: date | None = None) -> dict:
     }
 
 
-def _portfolio_risk(investments: list[Investment]) -> str:
+def _portfolio_risk(investments: list[Investment], equity_like_funds=frozenset()) -> str:
+    """equity_like_funds: holding ids whose AMFI category weighs as much as equity (INV-04)."""
     if not investments:
         return "No data"
 
@@ -274,7 +275,7 @@ def _portfolio_risk(investments: list[Investment]) -> str:
     high_risk_weight = sum(
         item.current_value
         for item in investments
-        if item.asset_type in {"equity", "crypto", "reit"} or item.risk_level.lower() == "high"
+        if item.asset_type in {"equity", "crypto", "reit"} or item.risk_level.lower() == "high" or item.pk in equity_like_funds
     )
     ratio = high_risk_weight / total_value
     if ratio >= Decimal("0.65"):

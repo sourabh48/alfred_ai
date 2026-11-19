@@ -177,3 +177,36 @@ class FundEvidenceTests(TestCase):
         self.assertEqual(self.interleave(untracked, price("9"))["updated"], 1)
         other.refresh_from_db()
         self.assertEqual(other.current_value, Decimal("40.00"))  # no longer a priced fund: left alone
+
+
+class FundCategoryRiskTests(TestCase):
+    """INV-04: a fund weighs by its AMFI category, not one Mutual Fund weight; unknown stays the old weight."""
+
+    def test_category_table(self):
+        from apps.investments.services.portfolio_intelligence import fund_category_risk
+        for category, weight in (("Open Ended Schemes(Equity Scheme - Small Cap Fund)", 90), ("Equity Scheme - Large & Mid Cap Fund", 85),
+                                 ("Equity Scheme - Sectoral/ Thematic", 95), ("Hybrid Scheme - Arbitrage Fund", 20),
+                                 ("Debt Scheme - Liquid Fund", 10), ("Other Scheme - Gold ETF", 30), ("Equity Scheme - ELSS", 80),
+                                 ("Solution Oriented Scheme - Retirement Fund", None), ("", None)):
+            self.assertEqual(fund_category_risk(category), weight, category)
+
+    def test_a_small_cap_fund_raises_the_score_and_amfi_outage_keeps_the_old_weight(self):
+        from apps.investments.services.portfolio_intelligence import portfolio_intelligence_service as service
+        from apps.investments.views import _portfolio_risk
+        user = get_user_model().objects.create_user("synthetic-risk-owner", password="pw-synthetic-1")
+        Investment.objects.create(user=user, asset_type="mutual_fund", asset_name="Synthetic Small", currency="INR",
+                                  current_value="100.00", amfi_scheme_code="120503", units="1")
+        Investment.objects.create(user=user, asset_type="cash", asset_name="Synthetic Cash", currency="INR", current_value="100.00")
+        small = report()
+        small["items"][0]["category"] = "Open Ended Schemes(Equity Scheme - Small Cap Fund)"
+        with patch.object(service, "_get_amfi_latest_nav_report", return_value=small):
+            risk = service.analyze_portfolio_risk(user)
+        self.assertEqual(risk["risk_score"], 50.0)  # 60 x 0.5 + 10 x 0.5, then the fund's 90 replaces its 60
+        self.assertIn("1 of 1 funds weighted by their AMFI category", risk["risk_basis"])
+        rows = list(Investment.objects.filter(user=user))
+        self.assertEqual(_portfolio_risk(rows, {f["id"] for f in risk["fund_categories"] if f["weight"] >= 80}), "Moderate")
+        with patch.object(service, "_get_amfi_latest_nav_report", side_effect=RuntimeError("offline")):
+            offline = service.analyze_portfolio_risk(user)
+        self.assertEqual((offline["risk_score"], offline["fund_categories"]), (35.0, []))
+        self.assertIn("0 of 1 funds", offline["risk_basis"])
+        self.assertEqual(_portfolio_risk(rows), "Conservative")

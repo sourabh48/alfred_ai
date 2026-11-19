@@ -60,6 +60,21 @@ WATCHLIST_FAMILY_MAP = {
     "Liquid Fund": "debt",
     "Arbitrage Fund": "debt",
 }
+# INV-04: a mutual fund's risk weight from its AMFI (SEBI) scheme category; the first word found wins.
+# shortcut: a fixed table, not each fund's own SEBI riskometer; the owner reviews these weights at acceptance.
+FUND_CATEGORY_RISK = (
+    ("SECTORAL", 95), ("THEMATIC", 95), ("SMALL CAP", 90), ("LARGE & MID CAP", 85), ("MID CAP", 90), ("FOF OVERSEAS", 85),
+    ("GOLD", 30), ("OVERNIGHT", 10), ("LIQUID", 10), ("MONEY MARKET", 10), ("ARBITRAGE", 20), ("DEBT SCHEME", 20),
+    ("HYBRID SCHEME", 60), ("EQUITY SCHEME", 80), ("INDEX FUNDS", 80), ("ETF", 80),
+)
+MUTUAL_FUND_RISK = 60  # a fund whose category is unknown or unmapped
+
+
+def fund_category_risk(category):
+    upper = str(category or "").upper()
+    return next((weight for word, weight in FUND_CATEGORY_RISK if word in upper), None)
+
+
 WATCHLIST_FAMILY_LABELS = {
     "equity_core": "Core equity",
     "equity_satellite": "Higher-beta equity",
@@ -211,8 +226,16 @@ class PortfolioIntelligenceService:
                     "percentage": float(round((type_value / total_value * 100), 2)),
                 }
 
-        # Risk scoring (0-100)
+        # Risk scoring (0-100); funds with a known AMFI category replace the one Mutual Fund weight with their own
+        funds = self.fund_categories(investments)
         risk_score = self._calculate_portfolio_risk_score(asset_breakdown, total_value)
+        if total_value:
+            risk_score += sum((fund["weight"] - MUTUAL_FUND_RISK) * float(fund["value"] / total_value) for fund in funds.values())
+            risk_score = min(100, max(0, risk_score))
+        held = sum(item.asset_type == "mutual_fund" for item in investments)
+        risk_basis = ("Rule-based checks of your recorded holdings using fixed asset-class risk weights"
+                      + (f"; {len(funds)} of {held} funds weighted by their AMFI category" if held else "")
+                      + ". General information, not personalised or certified investment advice.")
 
         # Diversification score (0-100)
         diversification_score = self._calculate_diversification_score(asset_breakdown)
@@ -231,7 +254,27 @@ class PortfolioIntelligenceService:
             "total_portfolio_value": investment_total_float(total_value),
             "asset_allocation": asset_breakdown,
             "recommendations": recommendations,
+            "risk_basis": risk_basis,
+            "fund_categories": [{"id": pk, "category": fund["category"], "weight": fund["weight"]} for pk, fund in funds.items()],
         }
+
+    def fund_categories(self, investments) -> dict:
+        """{holding pk: category, weight, value} for funds whose AMFI scheme code has a mapped category; {} when AMFI is unreachable."""
+        codes = {item.pk: item for item in investments if item.asset_type == "mutual_fund" and item.amfi_scheme_code}
+        if not codes:
+            return {}
+        from .fund_prices import _latest  # fund_prices imports this module
+        try:
+            latest = _latest()
+        except Exception:  # offline or a bad AMFI file: every fund keeps the one Mutual Fund weight
+            return {}
+        found = {}
+        for pk, item in codes.items():
+            category = (latest.get(item.amfi_scheme_code) or {}).get("category", "")
+            weight = fund_category_risk(category)
+            if weight is not None:
+                found[pk] = {"category": category, "weight": weight, "value": item.current_value}
+        return found
 
     def get_market_trends_and_suggestions(self, user) -> Dict[str, any]:
         """
@@ -1138,7 +1181,7 @@ class PortfolioIntelligenceService:
         """Calculate risk score based on asset allocation."""
         risk_weights = {
             "Equity": 80,
-            "Mutual Fund": 60,
+            "Mutual Fund": MUTUAL_FUND_RISK,
             "Crypto": 100,
             "REIT": 50,
             "Debt": 20,
