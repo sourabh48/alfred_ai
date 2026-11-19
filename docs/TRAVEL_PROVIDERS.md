@@ -180,7 +180,9 @@ keys in `config/local.env` are ignored and can be deleted.
 3. ALFRED sends only airport codes, dates, traveller count and cabin (`GET https://api.amadeus.com/api/v3/search/`,
    key in the `X-API-Key` header, at most five offers per airline) and shows the ten cheapest offers in INR, with
    local airport times as returned and the airline's own link. Offers in another currency are left out, never
-   converted. Results are kept 15 minutes; the terms allow only caching needed to run. Nothing is booked.
+   converted. Nothing is booked. The terms allow only caching needed to run, so offers expire after 15 minutes and
+   a 15-minute cleanup (`travel/short_keep.py`) removes expired ones from the provider cache, research evidence,
+   planning chats and saved plans, keeping only the search itself (airports, dates, travellers).
 4. The terms say access is free, may be limited or ended by Amadeus at any time, and forbid using the data to
    train AI. The adapter (`providers/transport.py::AmadeusFlights`) is tested against fixtures and UNVERIFIED
    against a live key until the live check below.

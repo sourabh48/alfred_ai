@@ -9,7 +9,9 @@ from alfred_ai.background import shared_task
 @shared_task
 def cleanup_travel_request_history():
     from .services.travel.cache import cleanup_request_history
-    return cleanup_request_history(apply=True)
+    from .services.travel.short_keep import purge
+    # Amadeus terms: its expired flight offers are not kept anywhere (short_keep).
+    return {**cleanup_request_history(apply=True), "short_keep_removed": purge()}
 
 
 @shared_task
