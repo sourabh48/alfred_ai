@@ -261,6 +261,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (review.comparison.models.includes(previous)) select.value = previous;
         });
         comparisonConfig=review.comparison;
+        const weekly=review.weekly_check, last=weekly.runs[weekly.runs.length-1], words={STABLE:"stable: no metric fell below its first run",DRIFT:"drift: a metric fell more than the policy allows",BELOW_POLICY:"below the quality floor",UNAVAILABLE:"could not run: the local model was unavailable"};
+        document.getElementById("memoryWeeklyCheck").textContent=!weekly.enabled ? "Weekly local search-quality check is switched off." : !last ? "Weekly local search-quality check: no run yet." : `Weekly local search-quality check (fictional data, ${last.model}) on ${new Date(last.at).toLocaleDateString()}: ${words[last.decision] || last.decision}.`;
         const previousSuite=comparisonSuite.value, previousProtocol=candidateProtocol.value;
         comparisonSuite.replaceChildren(); candidateProtocol.replaceChildren();
         comparisonConfig.suite_options.forEach(item => { const option=new Option(item.label+(item.available ? '' : ' — blocked: frozen policy unavailable'),item.id); option.disabled=!item.available; comparisonSuite.append(option); });

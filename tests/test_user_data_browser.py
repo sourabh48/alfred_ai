@@ -1359,6 +1359,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#memoryComparisonResults details summary')
         self.assertIn('Expected: trail, corrected',self.text('memoryComparisonResults'))
         self.assertIn('24 questions per model',self.text('memoryComparisonPolicy'))
+        self.assertIn('Weekly local search-quality check',self.text('memoryWeeklyCheck'))  # AI-16, on by default
         self.assertIn('candidate 100.0%',self.text('memoryComparisonResults'))
         self.assertIn('stale source rejected: true',self.text('memoryComparisonResults'))
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#memoryComparisonResults article')),2)

@@ -267,10 +267,11 @@ class KnowledgeHubAPI(MemoryAPI):
 
 class MemoryLearningAPI(MemoryAPI):
     def get(self,request):
-        from ..services.retrieval_quality import configuration
+        from ..services.retrieval_quality import configuration, weekly_history
         return Response({'candidates':MemoryLearning(memory_store()).candidates(request.user),
             'evaluation_min_score':settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE,
-            'comparison':dict(configuration(), enabled=settings.ALFRED_SYNTHETIC_QUALITY_ENABLED)})
+            'comparison':dict(configuration(), enabled=settings.ALFRED_SYNTHETIC_QUALITY_ENABLED),
+            'weekly_check':dict(enabled=settings.ALFRED_WEEKLY_QUALITY_CHECK, runs=weekly_history()['runs'][-8:])})
 
     def post(self,request):
         data=self.payload(('action','text','provenance','sensitivity','id','ids','content','verified','cases','min_score','baseline_model','candidate_model','suite','baseline_protocol','candidate_protocol'))

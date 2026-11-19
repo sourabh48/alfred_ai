@@ -554,6 +554,8 @@ ALFRED_DOCUMENT_KNOWLEDGE_RETENTION_DAYS = env.int('ALFRED_DOCUMENT_KNOWLEDGE_RE
 ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT = env.int('ALFRED_DOCUMENT_KNOWLEDGE_RESULT_LIMIT', default=24)
 ALFRED_MEMORY_RELEVANCE_MIN_SCORE = env.float('ALFRED_MEMORY_RELEVANCE_MIN_SCORE', default=0.20)
 ALFRED_SYNTHETIC_QUALITY_ENABLED = env.bool('ALFRED_SYNTHETIC_QUALITY_ENABLED', default=False)
+# Owner decision 2026-11-19 (AI-16): a weekly local search-quality check on fictional data; set false to stop it.
+ALFRED_WEEKLY_QUALITY_CHECK = env.bool('ALFRED_WEEKLY_QUALITY_CHECK', default=True)
 # Owner decision 2026-11-14: keep chats like a chat app, each person can delete them; set false to switch history off for everyone.
 ALFRED_CONVERSATION_HISTORY_AUTHORIZED = env.bool('ALFRED_CONVERSATION_HISTORY_AUTHORIZED', default=True)
 # Owner decision 2026-11-14: Ask ALFRED decides itself when a question needs the web. Off while the test suite runs,

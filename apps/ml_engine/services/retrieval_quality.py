@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 from math import isfinite
+import os
+from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 from types import SimpleNamespace
@@ -233,3 +235,57 @@ def compare(baseline_model, candidate_model, *, adapters=None, baseline_protocol
         candidate_execution='baseline_reference_reused' if reused else 'independent_protocol_run' if baseline_model==candidate_model else 'independent_model_run',
         baseline_protocol=baseline_protocol,candidate_protocol=candidate_protocol,
         baseline_model=baseline_model, candidate_model=candidate_model, runtime_changed=False)
+
+
+WEEKLY_RUNS, WEEKLY_DAYS = 52, 7
+METRICS = ('precision', 'recall', 'abstention_rate', 'citation_correctness')
+
+
+def _weekly_file():
+    from django.conf import settings
+    return Path(settings.ALFRED_MEMORY_DIR).parent / 'retrieval-quality-weekly.json'
+
+
+def weekly_history():
+    try:
+        return json.loads(_weekly_file().read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {'references': {}, 'runs': []}
+
+
+def weekly_due(now=None):
+    runs = weekly_history()['runs']
+    now = now or datetime.now(timezone.utc)
+    return not runs or (now - datetime.fromisoformat(runs[-1]['at'])).days >= WEEKLY_DAYS
+
+
+def weekly_check(*, adapters=None, now=None):
+    """AI-16 drift watch (owner decision 2026-11-19): once a week the in-use local embedding model answers the fixed
+    fictional cohorts, and the result is compared with that model's first recorded run. Nothing private is read,
+    nothing is trained and no model is switched; DRIFT means a metric fell more than the policy allows."""
+    model, history = OllamaEmbeddings.model, weekly_history()
+    run = dict(at=(now or datetime.now(timezone.utc)).isoformat(), model=model)
+    try:
+        current = compare(model, model, adapters=adapters)['baseline']
+    except (EmbeddingUnavailable, OSError):
+        current = None
+    if current is None:
+        run.update(decision='UNAVAILABLE', reasons=['local_model_unavailable_or_source_changed'])
+    else:
+        reference = history['references'].get(model)
+        result = assess(reference['measurement'], current) if reference else {'decision': 'BLOCKED'}
+        if result['decision'] == 'BLOCKED':  # first run, or the fictional cohorts changed version: this run is the new reference
+            reference = history['references'][model] = {'at': run['at'], 'measurement': current}
+            result = assess(current, current)
+        reasons = result['reasons']
+        run.update(decision='STABLE' if not reasons else 'DRIFT' if any('regression' in r for r in reasons) else 'BELOW_POLICY',
+                   reasons=reasons, reference_at=reference['at'],
+                   embedding_identity=current['results'][0]['context'].get('embedding_identity'),
+                   metrics={r['cohort']: {m: r[m] for m in METRICS} for r in current['results']})
+    history['runs'] = (history['runs'] + [run])[-WEEKLY_RUNS:]
+    path = _weekly_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(history), encoding='utf-8')
+    os.replace(temporary, path)
+    return run

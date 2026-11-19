@@ -109,6 +109,13 @@ def _research_desk():
     return run_scheduled()
 
 
+def _retrieval_quality():
+    from django.conf import settings
+    from apps.ml_engine.services.retrieval_quality import weekly_check, weekly_due
+    # Daily slot, weekly work: catch-up still runs it when the PC was off on the day.
+    return weekly_check() if settings.ALFRED_WEEKLY_QUALITY_CHECK and weekly_due() else {"status": "not_due"}
+
+
 DAILY_JOBS = {
     "budget-publication-check": _budget_publication_check,
     "intelligence-cleanup": lambda: cleanup_verified_external_intelligence(retention_days=90),
@@ -116,6 +123,7 @@ DAILY_JOBS = {
     "nightly-training": lambda: run_global_training_cycle(),
     "task-bots": _task_bots,
     "research-desk": _research_desk,
+    "retrieval-quality": _retrieval_quality,
 }
 MISSED_AFTER = 25 * 3600  # A daily job with no success for this long missed its slot, usually because the PC was off.
 RETRY_AFTER = 3600
@@ -175,6 +183,11 @@ def native_daily_catch_up():
 @db_periodic_task(crontab(minute="0", hour="13"))  # after Indian markets close (UTC)
 def native_research_desk():
     return _run_daily("research-desk")
+
+
+@db_periodic_task(crontab(minute="30", hour="4"))
+def native_retrieval_quality():
+    return _run_daily("retrieval-quality")
 
 
 @db_periodic_task(crontab(minute="*/5"))

@@ -223,3 +223,43 @@ class RetrievalQualityTests(TestCase):
             with patch.object(adapter,'embed') as embed, self.assertRaises(EmbeddingUnavailable):
                 _BudgetedEmbeddings(adapter,120).embed('Not sent to model')
             embed.assert_not_called()
+
+
+class WeeklyQualityCheckTests(TestCase):
+    """AI-16 (owner decision 2026-11-19): a weekly local check on fictional data notices when the model gets worse."""
+
+    def setUp(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        self.root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-weekly-quality-synthetic-')))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(self.root / 'private-memory-v2')))
+
+    def test_first_run_is_the_reference_a_worse_model_is_drift_and_an_offline_model_is_recorded(self):
+        from datetime import datetime, timedelta, timezone
+        from apps.ml_engine.services import retrieval_quality as quality
+        model, start = quality.OllamaEmbeddings.model, datetime(2026, 11, 22, tzinfo=timezone.utc)
+        self.assertTrue(quality.weekly_due(start))
+        first = quality.weekly_check(adapters={model: ContractEmbeddings()}, now=start)
+        self.assertEqual((first['decision'], first['reasons'], first['reference_at']), ('STABLE', [], start.isoformat()))
+        self.assertFalse(quality.weekly_due(start + timedelta(days=6)))
+        self.assertTrue(quality.weekly_due(start + timedelta(days=7)))
+        worse = quality.weekly_check(adapters={model: ContractEmbeddings('contract-baseline-v1', True)}, now=start + timedelta(days=7))
+        self.assertEqual(worse['decision'], 'DRIFT')
+        self.assertTrue(any(reason.endswith('recall_regression') for reason in worse['reasons']))
+        self.assertEqual(worse['reference_at'], start.isoformat())  # still compared with the first run
+        class Offline:
+            def embed(self, text, *, deadline=None):
+                raise EmbeddingUnavailable('Local embedding service is unavailable.')
+        self.assertEqual(quality.weekly_check(adapters={model: Offline()}, now=start + timedelta(days=14))['decision'], 'UNAVAILABLE')
+        runs = quality.weekly_history()['runs']
+        self.assertEqual([run['decision'] for run in runs], ['STABLE', 'DRIFT', 'UNAVAILABLE'])
+
+    def test_the_daily_slot_runs_it_only_when_a_week_has_passed_and_the_switch_is_on(self):
+        from alfred_ai import native_tasks
+        with patch('apps.ml_engine.services.retrieval_quality.weekly_check', return_value={'decision': 'STABLE'}) as check:
+            self.assertEqual(native_tasks.DAILY_JOBS['retrieval-quality'](), {'decision': 'STABLE'})
+            with patch('apps.ml_engine.services.retrieval_quality.weekly_due', return_value=False):
+                self.assertEqual(native_tasks.DAILY_JOBS['retrieval-quality'](), {'status': 'not_due'})
+            with override_settings(ALFRED_WEEKLY_QUALITY_CHECK=False):
+                self.assertEqual(native_tasks.DAILY_JOBS['retrieval-quality'](), {'status': 'not_due'})
+        check.assert_called_once()
