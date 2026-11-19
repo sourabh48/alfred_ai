@@ -38,8 +38,8 @@ a polished UI; AI Memory off Settings with the OpenAI key beside the other keys;
   skips), Chrome sign-in and Settings 2 PASS. Not tried on a real phone; whether a phone opens `<pc>.local` depends
   on the phone, so the QR code uses the address.
 - Owner action after merge: sign in with GitHub at http://localhost:8000 (user 1 is already linked by email).
-- Open: the owner's Google sign-in created a new empty account (user 14) because its email differs from user 1's; moving
-  that Google identity to user 1 waits for the owner's approval (backup first, user 14 switched off, not deleted).
+- Done with the owner's OK (2026-11-19): the Google sign-in that had made a new empty account (user 14) now signs in to
+  user 1; user 14 is switched off, not deleted; backup `backups/before-google-move-user14-to-user1-20261119`.
   The Microsoft secret is now changed only in config/local.env (Value, not Secret ID), then restart.
 
 ## Completion sprint — 2026-11-19
