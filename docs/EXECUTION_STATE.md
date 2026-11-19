@@ -2,7 +2,8 @@
 
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 
-LOCAL_TESTING; not pushed. Same worktree and branch, after `397b5e2` (pushed to master with the owner's OK; CI on
+PUSHED to master at `5766899` with the owner's OK (merged into the owner's app and restarted; CI_PENDING: Browser
+Regression 44472348277, Pages 44472347012). Same worktree and branch, after `397b5e2` (pushed to master with the owner's OK; CI on
 `397b5e2`: Browser Regression and Pages build both success). Owner decisions this day: offline-first retired (only
 sensitive data stays offline); sign-in only through Google, GitHub or Microsoft with a verified email, a phone signs in
 with a code approved on the PC; free keys that never charge ship inside the installer, encrypted; Font Awesome icons and
