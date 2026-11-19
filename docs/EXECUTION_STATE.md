@@ -17,6 +17,15 @@ a polished UI; AI Memory off Settings with the OpenAI key beside the other keys;
   AI Memory card removed from Settings (tools stay in App health; old `/settings/#memory-<id>` links forward there);
   OpenAI key and limits under Online services; session countdown, idle sign-out and browser-close sign-out removed
   (a session lasts a year from the last visit or until Sign out; old `ALFRED_SESSION_*` settings are ignored).
+- `fa4a978` Ask ALFRED as one clean chat (header, suggestion cards, Send inside the box, options and tips folded);
+  general and current public questions are looked up online by themselves when saved data has nothing; a question
+  that may be about someone's private life (a name, a relation, a health, legal or money-trouble word) still waits
+  for a tap, and owner-personal questions or ones with amounts, numbers, emails or keys never leave the PC.
+- `d7542bd` navigation: plain sentence-case Travel section names, Settings links for Online services and keys,
+  OpenAI key and Offline maps, and the sidebar group renamed "Taxes, risk and more".
+  Full backend on `fa4a978`: 3,215 PASS in 4 shards (761 + 836 + 806 + 812); the 55 tests hit by a leftover
+  earlier run sharing the shard folders were rerun alone on `d7542bd`: 55 PASS. Full Chrome gate on `d7542bd`: 240 PASS,
+  0 skipped (driver-backed, local).
 - Owner action after merge: sign in with GitHub at http://localhost:8000 (user 1 is already linked by email).
 
 ## Completion sprint — 2026-11-19
@@ -347,7 +356,7 @@ states/progress remain unchanged; no whole-repository or real-world accuracy cla
 
 - Pushed to master at a4c8a64 on 2026-11-14 at the owner's request, merged with the route optimiser (a1e96ef) and
   think-before-answering (cf90877). The owner approved users 0007 and investments 0009; both ran on the owner's app
-  after a database copy in restored-runtimeackupsefore-migrations-users0007-investments0009-20261114. Local full
+  after a database copy in restored-runtime\backups\before-migrations-users0007-investments0009-20261114. Local full
   backend run: 3,020 tests OK, 14 calendar-parser skips (tool missing on this PC). Exact-HEAD CI: see CI_PIPELINE_STATE.
 - NEW-1 map: when Google tiles fail, the map now says why (for example "Map Tiles API is not enabled for this key")
   and stops asking Google for 10 minutes. Not checked live with the owner's key.

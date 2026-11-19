@@ -4,7 +4,9 @@
 
 LOCAL_TESTING. Same branch after `397b5e2`: `a8400ae` built-in keys and rule change, `81eca4e` provider-only sign-in and phone
 code, `a54e0b0` Font Awesome UI, memory card moved, OpenAI key with the other keys, sessions without countdown or expiry.
-Backend on `81eca4e`: 3,217 PASS in 4 shards. Final gates run on the last local commit before asking. Not pushed; push needs
+Backend on `81eca4e`: 3,217 PASS in 4 shards. Then `fa4a978` Ask ALFRED chat and automatic public lookup, `d7542bd`
+navigation names; backend on `fa4a978`: 3,215 PASS, and 55 tests rerun alone on `d7542bd` PASS; full Chrome gate on `d7542bd`: 240 PASS, 0 skipped. Final gates run on the last
+local commit before asking. Not pushed; push needs
 the owner's OK for that push. The docs delta publishes to Pages.
 
 CI_PASSED on `397b5e2` (Browser Regression 44427069114 success; pages build and deployment 44427068050 success), pushed with
