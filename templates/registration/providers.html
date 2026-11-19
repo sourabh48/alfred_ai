@@ -12,5 +12,5 @@
 {% if google_sign_in_ready %}
 {% if password_sign_in %}<p class="text-muted small text-center mb-3">Signing in this way confirms your email address.</p>{% endif %}
 {% else %}
-<p class="text-muted small text-center mb-3" id="googleSignInHint">Google sign-in is not set up yet. The person who manages ALFRED adds Google's client ID and secret under Settings &gt; Online services.</p>
+<p class="text-muted small text-center mb-3" id="googleSignInHint">Google sign-in is not set up yet. The person who manages ALFRED adds Google's client ID and secret to config/local.env and restarts ALFRED.</p>
 {% endif %}

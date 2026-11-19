@@ -174,17 +174,17 @@ def _attention_items(user, sources):
     """What needs the owner now, read from the services each page already uses. Reading writes nothing."""
     from apps.budgets.services.budget_intelligence import budget_spent, current_budget_plan
     from apps.mobility.services.bike_service_intelligence import bike_service_intelligence
-    from .services import online_services, social_login
+    from .services import online_services, personal_keys, social_login
 
     items = []
+    # Each person may add their own Google Maps key; asked only when neither theirs nor a PC-wide one exists (owner 2026-11-14, 2026-11-19).
+    if not personal_keys.own(user, "TRAVEL_GOOGLE_MAPS_API_KEY") and not os.environ.get("TRAVEL_GOOGLE_MAPS_API_KEY"):
+        items.append(dict(tone="warning", text="Add your Google Maps Platform key so Travel can show maps, places, hotels, routes and weather.",
+                          action="Add key", url="/settings/#settingsOnline"))
     if online_services.can_manage(user):
-        # Keys are shared app-wide, so only the person who manages ALFRED is asked; Google first (owner decision 2026-11-14).
-        if not os.environ.get("TRAVEL_GOOGLE_MAPS_API_KEY"):
-            items.append(dict(tone="warning", text="Add your Google Maps Platform key so Travel can show maps, places, hotels, routes and weather.",
-                              action="Add key", url="/settings/#settingsOnline"))
         if not social_login.configured():
-            items.append(dict(tone="warning", text="Add a Google sign-in client so everyone signs in with a confirmed email.",
-                              action="Add sign-in", url="/settings/#settingsOnline"))
+            items.append(dict(tone="warning", text="Sign-in is not set up: add the Google client ID and secret to config/local.env in ALFRED's data folder and restart ALFRED, so everyone signs in with a confirmed email.",
+                              action="Sign-in settings", url="/settings/#settingsSignIn"))
     for source in sources:
         if source["state"] in ("Review needed", "Import needs attention", "Unavailable") and source.get("next_action"):
             items.append(dict(tone="warning", text=f"{source['label']}: {source['state'].lower()}.",
@@ -243,17 +243,21 @@ def index_view(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def online_services_api_view(request):
-    """Settings > Online services: the owner adds service keys and switches free services on, without editing files."""
+    """Settings > Online services: each person saves their own keys for paid or limited services; the person who manages
+    ALFRED also switches free services on and sets Career email, without editing files."""
     from alfred_private_storage import PrivateStorageUnavailable
-    from .services import online_services
+    from .services import online_services, personal_keys
     if request.method == "POST":
-        if not online_services.can_manage(request.user):
-            return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can change online services."}, status=403)
         try:
             data = json.loads(request.body or b"{}")
             if not isinstance(data, dict):
                 raise AttributeError
-            online_services.save(online_services.changes_from(data))
+            own, shared = online_services.key_changes(data), online_services.changes_from(data)
+            if shared and not online_services.can_manage(request.user):
+                return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can change free services and Career email."}, status=403)
+            if shared:  # the shared settings file is rewritten only when a shared setting changes
+                online_services.save(shared)
+            personal_keys.save(request.user, own)
         except (ValueError, AttributeError) as exc:
             detail = str(exc) if isinstance(exc, ValueError) and not isinstance(exc, json.JSONDecodeError) else "Send the settings as JSON."
             return JsonResponse({"detail": detail}, status=400)

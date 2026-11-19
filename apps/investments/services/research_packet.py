@@ -8,6 +8,7 @@ daily closes, through ALFRED's pinned public HTTPS boundary. No rating, price ta
 """
 from __future__ import annotations
 
+from alfred_ai.services import personal_keys
 import math
 import re
 from datetime import datetime, timedelta, timezone as dt_timezone
@@ -78,7 +79,7 @@ def fetch_prices(symbol: str, *, years: int = 1) -> dict:
     sources = [_yahoo_prices, alpha_vantage_prices]
     if os.environ.get("ALFRED_PRICES_ALPHA_VANTAGE_FIRST") == "true":
         sources.reverse()
-    if not os.environ.get("ALFRED_ALPHA_VANTAGE_API_KEY", "").strip():
+    if not personal_keys.get("ALFRED_ALPHA_VANTAGE_API_KEY"):
         sources = [_yahoo_prices]
     for index, source in enumerate(sources):
         try:

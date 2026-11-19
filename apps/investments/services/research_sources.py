@@ -7,6 +7,7 @@ own email (the SEC asks every automated client for a contact address; owner deci
 """
 from __future__ import annotations
 
+from alfred_ai.services import personal_keys
 import os
 import re
 from datetime import date, timedelta, timezone as dt_timezone
@@ -38,7 +39,7 @@ def us_listed(symbol: str) -> bool:
 
 
 def _key(name: str) -> str:
-    return os.environ.get(name, "").strip()
+    return personal_keys.get(name)  # the person's own key for a limited service, else the shared one
 
 
 def _cached(key: str, fetch, seconds: int):

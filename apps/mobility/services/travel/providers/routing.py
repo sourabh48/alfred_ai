@@ -1,3 +1,4 @@
+from alfred_ai.services import personal_keys
 from datetime import timedelta
 from decimal import Decimal
 from hashlib import sha256
@@ -59,7 +60,7 @@ class GoogleRoutes(Provider):
     MODES = {"motorcycle": "TWO_WHEELER", "ride": "TWO_WHEELER", "car": "DRIVE", "roadtrip": "DRIVE", "walking": "WALK"}
 
     def unavailable_reason(self):
-        return "" if os.getenv(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
+        return "" if personal_keys.get(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
 
     def fetch(self, p):
         travel_mode = self.MODES.get(p.get("mode", "car"))
@@ -79,7 +80,7 @@ class GoogleRoutes(Provider):
         if travel_mode != "WALK":
             body["routeModifiers"] = {"avoidHighways": bool(p.get("avoid_expressways")), "avoidTolls": bool(p.get("avoid_tolls"))}
         return request_json("POST", "https://routes.googleapis.com/directions/v2:computeRoutes", json=body,
-            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY], "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.description,routes.polyline.encodedPolyline",
+            headers={"X-Goog-Api-Key": personal_keys.get(GOOGLE_KEY), "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.description,routes.polyline.encodedPolyline",
                      "Content-Type": "application/json"})
 
     def normalize(self, raw, p):
@@ -131,7 +132,7 @@ class GoogleTransit(Provider):
               "routes.legs.steps.navigationInstruction.instructions")
 
     def unavailable_reason(self):
-        return "" if os.getenv(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
+        return "" if personal_keys.get(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
 
     def fetch(self, p):
         body = {"origin": {"address": str(p["origin"])[:200]}, "destination": {"address": str(p["destination"])[:200]},
@@ -139,7 +140,7 @@ class GoogleTransit(Provider):
         if p.get("departure"):
             body["departureTime"] = p["departure"]
         return request_json("POST", "https://routes.googleapis.com/directions/v2:computeRoutes", json=body,
-            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY], "X-Goog-FieldMask": self.FIELDS, "Content-Type": "application/json"})
+            headers={"X-Goog-Api-Key": personal_keys.get(GOOGLE_KEY), "X-Goog-FieldMask": self.FIELDS, "Content-Type": "application/json"})
 
     @staticmethod
     def _minutes(value):

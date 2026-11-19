@@ -1,3 +1,4 @@
+from alfred_ai.services import personal_keys
 from datetime import timedelta
 import os
 
@@ -8,11 +9,11 @@ GOOGLE_KEY = "TRAVEL_GOOGLE_MAPS_API_KEY"
 
 
 def google_headers(field_mask):
-    return {"X-Goog-Api-Key": os.environ[GOOGLE_KEY], "Content-Type": "application/json", "X-Goog-FieldMask": field_mask}
+    return {"X-Goog-Api-Key": personal_keys.get(GOOGLE_KEY), "Content-Type": "application/json", "X-Goog-FieldMask": field_mask}
 
 
 def google_unavailable():
-    return "" if os.getenv(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
+    return "" if personal_keys.get(GOOGLE_KEY) else "missing_TRAVEL_GOOGLE_MAPS_API_KEY"
 
 
 class GooglePlaceSearch(Provider):

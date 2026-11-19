@@ -1,5 +1,6 @@
 """Home: plain figures from the canonical baseline, first-run steps and a read-only attention list."""
 import os
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -27,9 +28,9 @@ class HomePageTests(TestCase):
         self.assertEqual([tile["amount"] for tile in response.context["glance"]], [None, None, None, None])
         self.assertContains(response, "Not added yet", count=4)
         self.assertContains(response, "Get started: 0 of 6 done")
-        self.assertEqual([item["action"] for item in response.context["attention"]], ["Add key", "Add sign-in"])  # this account manages ALFRED
+        self.assertEqual([item["action"] for item in response.context["attention"]], ["Add key", "Sign-in settings"])  # this account manages ALFRED
 
-    def test_missing_keys_are_asked_for_only_from_the_manager_and_only_while_missing(self):
+    def test_missing_keys_are_asked_for_only_while_missing_and_maps_from_everyone(self):
         keys = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-google", "ALFRED_GOOGLE_CLIENT_ID": "synthetic-id", "ALFRED_GOOGLE_CLIENT_SECRET": "synthetic-secret"}
         # Once sign-in is set up, only provider-verified people get in (owner decision 2026-11-19).
         self.user.email_identities.create(provider="google", subject="g-home-1", email="home1@example.org")
@@ -38,7 +39,14 @@ class HomePageTests(TestCase):
         other = get_user_model().objects.create_user("synthetic-home-2", password="synthetic-pass-123")
         other.email_identities.create(provider="google", subject="g-home-2", email="home2@example.org")
         self.client.force_login(other)
-        self.assertNotContains(self.home(), "Add your Google Maps Platform key")
+        # Every person may add their own Maps key (owner decision 2026-11-19); sign-in setup is asked only of the manager.
+        page = self.home().content.decode()
+        self.assertIn("Add your Google Maps Platform key", page)
+        self.assertNotIn("Sign-in is not set up", page)
+        with patch.dict(os.environ, {"ALFRED_DATA_DIR": self.enterContext(TemporaryDirectory(prefix="alfred-home-keys-synthetic-"))}):
+            from alfred_ai.services import personal_keys
+            personal_keys.save(other, {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-own-maps-key"})
+            self.assertNotContains(self.home(), "Add your Google Maps Platform key")
 
     def test_figures_are_the_canonical_ones_and_reading_home_writes_nothing(self):
         self.user.monthly_income, self.user.monthly_income_basis = 100000, "monthly"

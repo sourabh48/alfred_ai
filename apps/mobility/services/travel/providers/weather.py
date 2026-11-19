@@ -1,3 +1,4 @@
+from alfred_ai.services import personal_keys
 from datetime import date, timedelta
 import os
 from statistics import mean
@@ -37,7 +38,7 @@ class GoogleWeather(Provider):
         params = {"location.latitude": number(p["latitude"], low=-90, high=90),
                   "location.longitude": number(p["longitude"], low=-180, high=180), "days": days, "pageSize": days}
         return request_json("GET", "https://weather.googleapis.com/v1/forecast/days:lookup", params=params,
-                            headers={"X-Goog-Api-Key": os.environ[GOOGLE_KEY]})
+                            headers={"X-Goog-Api-Key": personal_keys.get(GOOGLE_KEY)})
 
     def normalize(self, raw, p):
         start, end = date.fromisoformat(p["start_date"]), date.fromisoformat(p["end_date"])

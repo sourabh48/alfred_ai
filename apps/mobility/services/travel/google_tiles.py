@@ -1,4 +1,5 @@
 """Google map tiles as the travel map's backup background. The server fetches them, so the Google key never reaches the browser."""
+from alfred_ai.services import personal_keys
 import os
 
 from django.core.cache import cache
@@ -18,11 +19,11 @@ DAILY_TILES = 3000  # shortcut: one fixed cap for the whole app, kept under Goog
 
 
 def available():
-    return bool(os.getenv("TRAVEL_GOOGLE_MAPS_API_KEY"))
+    return bool(personal_keys.get("TRAVEL_GOOGLE_MAPS_API_KEY"))
 
 
 def _headers():
-    return {"X-Goog-Api-Key": os.environ["TRAVEL_GOOGLE_MAPS_API_KEY"]}
+    return {"X-Goog-Api-Key": personal_keys.get("TRAVEL_GOOGLE_MAPS_API_KEY")}
 
 
 def _session():

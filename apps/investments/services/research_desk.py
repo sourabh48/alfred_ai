@@ -12,6 +12,7 @@ Suggestions and settings live in OperationalLog, like the task-bot proposals, so
 """
 from __future__ import annotations
 
+from alfred_ai.services import personal_keys
 import hashlib
 import json
 import logging
@@ -758,14 +759,15 @@ def run_scheduled(today=None) -> dict:
     for user in get_user_model().objects.filter(is_active=True).order_by("id"):
         if not desk_settings(user)["enabled"]:
             continue  # paused by the owner
-        try:
-            run_now(user, today, resume=True)
-            ran += 1
-        except Exception as error:
-            failed += 1
-            logger.warning("Research desk failed for one account (%s)", type(error).__name__)
-        try:
-            discover(user, today)  # weekly; off when the owner switches ideas off
-        except Exception as error:
-            logger.warning("Research desk ideas failed for one account (%s)", type(error).__name__)
+        with personal_keys.acting_for(user):  # this person's own Alpha Vantage key, if they saved one
+            try:
+                run_now(user, today, resume=True)
+                ran += 1
+            except Exception as error:
+                failed += 1
+                logger.warning("Research desk failed for one account (%s)", type(error).__name__)
+            try:
+                discover(user, today)  # weekly; off when the owner switches ideas off
+            except Exception as error:
+                logger.warning("Research desk ideas failed for one account (%s)", type(error).__name__)
     return {"status": "completed", "processed": ran, "failed": failed, "settled": settle_due(today)}

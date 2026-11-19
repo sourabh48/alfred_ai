@@ -179,6 +179,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "alfred_ai.middleware.VerifiedSignInMiddleware",
+    "alfred_ai.middleware.PersonalKeysMiddleware",
     "alfred_ai.services.upload_limits.UploadProtectionMiddleware",
     "alfred_ai.services.abuse_protection.AbuseProtectionMiddleware",
     "alfred_ai.middleware.UserDataCacheMiddleware",

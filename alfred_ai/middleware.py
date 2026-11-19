@@ -52,6 +52,18 @@ class UserDataCacheMiddleware:
         return response
 
 
+class PersonalKeysMiddleware:
+    """Each page uses the signed-in person's own keys for paid or limited services (owner decision 2026-11-19)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from alfred_ai.services import personal_keys
+        personal_keys.use_for(getattr(request, "user", None))
+        return self.get_response(request)
+
+
 class VerifiedSignInMiddleware:
     """Owner decision 2026-11-19: once Google, GitHub or Microsoft sign-in is set up, only people with an email one of
     them verified can use ALFRED, and this PC is reached as localhost, the address those providers send people back to."""

@@ -1,3 +1,4 @@
+from alfred_ai.services import personal_keys
 from datetime import date, timedelta
 from decimal import Decimal
 import os
@@ -34,7 +35,7 @@ class SkyscannerFlights(Provider):
     allowed_parameters = {"origin", "destination", "departure_date", "return_date", "adults", "cabin_class"}
 
     def unavailable_reason(self):
-        return "" if os.getenv("TRAVEL_SKYSCANNER_API_KEY") else "missing_TRAVEL_SKYSCANNER_API_KEY"
+        return "" if personal_keys.get("TRAVEL_SKYSCANNER_API_KEY") else "missing_TRAVEL_SKYSCANNER_API_KEY"
 
     def fetch(self, p):
         origin, destination = str(p["origin"]).upper(), str(p["destination"]).upper()
@@ -56,7 +57,7 @@ class SkyscannerFlights(Provider):
         query = {"market": "IN", "locale": "en-GB", "currency": "INR", "adults": int(number(p.get("adults", 1), low=1, high=8)),
                  "cabinClass": cabin, "queryLegs": [{"originPlaceId": {"iata": a}, "destinationPlaceId": {"iata": b},
                                                     "date": {"year": d.year, "month": d.month, "day": d.day}} for a, b, d in legs]}
-        headers = {"x-api-key": os.environ["TRAVEL_SKYSCANNER_API_KEY"], "Content-Type": "application/json"}
+        headers = {"x-api-key": personal_keys.get("TRAVEL_SKYSCANNER_API_KEY"), "Content-Type": "application/json"}
         raw, digest = request_json("POST", f"{SKYSCANNER}/create", json={"query": query}, headers=headers)
         for _ in range(2):  # a search fills in over a few seconds; two polls keep the request short
             if raw.get("status") != "RESULT_STATUS_INCOMPLETE" or not raw.get("sessionToken"):

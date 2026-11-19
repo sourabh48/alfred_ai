@@ -1,4 +1,5 @@
 """GeoJSON map contract shared by any browser renderer; no map API keys here."""
+from alfred_ai.services import personal_keys
 import os
 
 
@@ -32,7 +33,7 @@ def map_configuration():
     # Country maps the owner downloaded in Settings show when Google tiles are missing or fail (offline).
     from .offline_maps import ATTRIBUTION, installed
     offline = {"offline_url": "/mobility/offline-tiles/{z}/{x}/{y}.mvt" if installed() else "", "offline_attribution": ATTRIBUTION}
-    if not os.getenv("TRAVEL_GOOGLE_MAPS_API_KEY"):
+    if not personal_keys.get("TRAVEL_GOOGLE_MAPS_API_KEY"):
         return {"provider": "google", "tile_url": "", "attribution": "", "attribution_url": "", **offline}
     return {"provider": "google", "tile_url": "/mobility/map-tiles/{z}/{x}/{y}.png", "attribution": "Map data © Google",
             "attribution_url": "https://www.google.com/intl/en_in/help/terms_maps/", **offline}

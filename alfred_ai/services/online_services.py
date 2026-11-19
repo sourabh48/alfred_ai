@@ -14,32 +14,19 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from alfred_ai import bundled_keys
-from alfred_ai.services import social_login
+from alfred_ai.services import personal_keys
 from alfred_private_storage import private_directory
 
-# name: (label, what ALFRED uses it for, where to get one)
+# Paid services and free ones with a usage limit: every person may save their own key (owner decision 2026-11-19).
+# name: (label, what ALFRED uses it for, where to get one). Free keys without a practical limit are built in and not listed.
 KEYS = {
     "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps Platform", "Travel: the map, places, hotels, routes, place names and weather. Enable Map Tiles, Places (New), Routes and Weather for this key.",
                                    "https://console.cloud.google.com/google/maps-apis/credentials"),
-    "ALFRED_GOOGLE_CLIENT_ID": ("Sign in with Google: client ID", "Sign-in that confirms each person's email. Google Cloud > Credentials > OAuth client ID (Web application); add the redirect URI http://localhost:8000/auth/google/callback/.",
-                                "https://console.cloud.google.com/apis/credentials"),
-    "ALFRED_GOOGLE_CLIENT_SECRET": ("Sign in with Google: client secret", "Shown with the client ID above.", "https://console.cloud.google.com/apis/credentials"),
     "TRAVEL_SKYSCANNER_API_KEY": ("Skyscanner", "Travel: live flight prices, once Skyscanner approves your partner account. Until then each trip has a Google Flights link.",
                                   "https://www.partners.skyscanner.net/product/travel-api"),
-    "ALFRED_GITHUB_CLIENT_ID": ("Sign in with GitHub (optional): client ID", "GitHub > Settings > Developer settings > OAuth Apps; callback URL http://localhost:8000/auth/github/callback/.",
-                                "https://github.com/settings/developers"),
-    "ALFRED_GITHUB_CLIENT_SECRET": ("Sign in with GitHub (optional): client secret", "Generated on the same OAuth App page.", "https://github.com/settings/developers"),
-    "ALFRED_MICROSOFT_CLIENT_ID": ("Sign in with Microsoft (optional): application ID", "Azure portal > App registrations, personal Microsoft accounts only; Web redirect URI http://localhost:8000/auth/microsoft/callback/.",
-                                   "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
-    "ALFRED_MICROSOFT_CLIENT_SECRET": ("Sign in with Microsoft (optional): client secret", "Certificates & secrets on the same app registration: copy the Value column, not the Secret ID.",
-                                       "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"),
-    "ALFRED_FRED_API_KEY": ("FRED (St. Louis Fed)", "Investments research desk: interest rates and inflation for India and the US, shown as context on each call.",
-                            "https://fred.stlouisfed.org/docs/api/api_key.html"),
-    "ALFRED_ALPHA_VANTAGE_API_KEY": ("Alpha Vantage", "Investments research desk: the latest earnings against forecasts and insider trading for US shares (free key: 25 requests a day).",
+    "ALFRED_ALPHA_VANTAGE_API_KEY": ("Alpha Vantage", "Investments research desk: the latest earnings against forecasts and insider trading for US shares. "
+                                     "The shared free key allows 25 requests a day for everyone; your own key gives you your own 25.",
                                      "https://www.alphavantage.co/support/#api-key"),
-    "ALFRED_REDDIT_CLIENT_ID": ("Reddit app: client ID", "Investments research desk: the mood of Reddit's investing communities about each share. "
-                                "Create a 'script' app at reddit.com/prefs/apps (free for personal use).", "https://www.reddit.com/prefs/apps"),
-    "ALFRED_REDDIT_CLIENT_SECRET": ("Reddit app: secret", "Shown with the client ID on the same Reddit app page.", "https://www.reddit.com/prefs/apps"),
 }
 # name: (value written when on, what the switch means). Google is the only travel source (owner decision 2026-11-14).
 SWITCHES = {"ALFRED_PRICES_ALPHA_VANTAGE_FIRST": ("true", "Research desk: read daily share prices from Alpha Vantage first, and Yahoo Finance "
@@ -60,7 +47,8 @@ def config_path() -> Path:
 
 
 def can_manage(user) -> bool:
-    """The superuser, or on a PC with none, the first account (the person who set ALFRED up). Keys are shared app-wide."""
+    """The superuser, or on a PC with none, the first account (the person who set ALFRED up). The free-service switch and
+    Career email are shared app-wide; service keys are each person's own (personal_keys)."""
     if not getattr(user, "is_authenticated", False) or not user.is_active:
         return False
     if user.is_superuser:
@@ -70,17 +58,19 @@ def can_manage(user) -> bool:
 
 
 def status(user) -> dict:
-    # A built-in key is never hinted at, not even its last characters.
-    hint = lambda name: "built in" if bundled_keys.is_built_in(name) else ("…" + os.environ[name][-4:]) if os.environ.get(name) else ""
+    # Only the person's own key is hinted at; a shared PC-wide or built-in key is never shown, not even its last characters.
     mail_user = os.environ.get("ALFRED_SMTP_USER", "")
+    keys = []
+    for name, (label, use, url) in KEYS.items():
+        mine = personal_keys.own(user, name)
+        keys.append({"name": name, "label": label, "use": use, "signup": url, "saved": bool(mine), "hint": "…" + mine[-4:] if mine else "",
+                     "shared": not mine and bool(os.environ.get(name))})
     return {
         "can_manage": can_manage(user),
-        "keys": [{"name": name, "label": label, "use": use, "signup": url, "saved": bool(os.environ.get(name)), "hint": hint(name)}
-                 for name, (label, use, url) in KEYS.items()],
+        "keys": keys,
         "switches": [{"name": name, "detail": detail, "on": os.environ.get(name) == value} for name, (value, detail) in SWITCHES.items()],
         "mail": {"address": mail_user if can_manage(user) else "", "ready": bool(mail_user and os.environ.get("ALFRED_SMTP_PASSWORD")),
                  "host": os.environ.get("ALFRED_SMTP_HOST", "")},
-        "openai": "Saved per person under Memory and AI below: each person can add their own OpenAI key.",
     }
 
 
@@ -103,8 +93,8 @@ def _mail_values(data) -> dict:
             "ALFRED_SMTP_USER": address, "ALFRED_SMTP_PASSWORD": password, "ALFRED_SMTP_FROM": address}
 
 
-def changes_from(data: dict) -> dict:
-    """{name: value or ''} from a request; '' removes the line. Raises ValueError before anything is written."""
+def key_changes(data: dict) -> dict:
+    """{name: value or ''} of the person's own keys from a request; '' removes theirs. Raises ValueError before anything is written."""
     changes = {}
     for name, value in (data.get("keys") or {}).items():
         if name not in KEYS:
@@ -112,9 +102,13 @@ def changes_from(data: dict) -> dict:
         value = str(value or "").strip()
         if value and not VALUE.fullmatch(value):
             raise ValueError(f"That {KEYS[name][0]} key does not look right: paste it without spaces or quotes.")
-        if name == "ALFRED_MICROSOFT_CLIENT_SECRET" and social_login.GUID.fullmatch(value):
-            raise ValueError(social_login.SECRET_ID_MESSAGE)
         changes[name] = value
+    return changes
+
+
+def changes_from(data: dict) -> dict:
+    """{name: value or ''} of the shared settings (switches, Career email); '' removes the line. Raises ValueError first."""
+    changes = {}
     for name, on in (data.get("switches") or {}).items():
         if name not in SWITCHES or not isinstance(on, bool):
             raise ValueError("Unknown switch.")

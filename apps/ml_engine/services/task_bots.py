@@ -6,6 +6,7 @@ a travel recheck and filing a spend under a category; every money, booking, trad
 """
 from __future__ import annotations
 
+from alfred_ai.services import personal_keys
 import calendar
 import json
 import logging
@@ -664,7 +665,8 @@ def run_scheduled(today=None):
                     last = _records(user).filter(payload__bot=bot, payload__trigger="schedule").order_by("-created_at").first()
                     if last and last.payload.get("for_date", "") > (today - timedelta(days=every)).isoformat():
                         continue
-                run(user, bot, today, trigger="schedule")
+                with personal_keys.acting_for(user):  # weather and maps bots use this person's own keys, if saved
+                    run(user, bot, today, trigger="schedule")
                 ran += 1
             except Exception as error:
                 failed += 1

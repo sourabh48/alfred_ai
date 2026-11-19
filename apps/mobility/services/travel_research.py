@@ -1,4 +1,5 @@
 """Bounded, resumable research through the existing verified public-source cache."""
+from alfred_ai.services import personal_keys
 from datetime import date, timedelta
 from copy import deepcopy
 import logging
@@ -108,6 +109,13 @@ def store_provider_evidence(run, destination, result):
 
 
 def run_research(run_id):
+    """Background research for one trip, with its owner's own Google Maps key when they saved one."""
+    owner = TravelResearchSession.objects.filter(pk=run_id).values_list("session__user", flat=True).first()
+    with personal_keys.acting_for(owner):
+        return _run_research(run_id)
+
+
+def _run_research(run_id):
     token = str(uuid4())
     now = timezone.now()
     # Conditional UPDATE provides a cross-process lease on SQLite and Postgres.
