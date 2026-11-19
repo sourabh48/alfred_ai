@@ -150,6 +150,7 @@ and Weather API**; Geocoding is not needed because Places text search finds plac
 | Routing | `google_routes`: Routes API | 1 hour | Two-wheeler, car or walking; up to three alternatives; distance and time only, no line on a non-Google map (Google terms); motorcycle legality and closures unverified |
 | Weather | `google_weather`: Weather API daily forecast | 2 hours | Today and the next nine days only; trips further out show "not checked"; official warnings unavailable |
 | Flights | `skyscanner`: Flights Live Prices v3; `TRAVEL_SKYSCANNER_API_KEY` | 15 minutes | Waiting for Skyscanner partner approval; until then each trip shows a Google Flights link |
+| Flights (when no Skyscanner key) | `amadeus`: free Amadeus Travel Builder beta, `GET /api/v3/search/`; `TRAVEL_AMADEUS_API_KEY` | 15 minutes | Some airlines only (Amadeus publishes no list; Indian carriers unverified); search only, the airline's own link to buy |
 | Permits | Dated official references | 6 hours near departure, otherwise 24 hours | No authorized live permit inventory API verified; opening remains unverified |
 | Indian rail | Unavailable boundary | None | Authorized agreement/API required; timetable never implies seats, waitlist or fare |
 | Bus | Reviewed state-operator links and a search link | None | No live inventory integration; availability unknown |
@@ -169,6 +170,20 @@ keys in `config/local.env` are ignored and can be deleted.
    itineraries in INR with the agent's own link. Prices are quotes to recheck; nothing is booked.
 4. The adapter (`providers/transport.py::SkyscannerFlights`) follows Skyscanner's v3 documentation and is
    tested against fixtures; it is UNVERIFIED against a live key until the first real search.
+
+### Amadeus Travel Builder (free beta, added 2026-11-19)
+
+1. Request a key with Amadeus's [access form](https://eu1.ironcladapp.com/public-launch/6aaa463f6f95614fe0f6db9d)
+   (accepts the [Travel Builder terms](https://amadeus.com/en/policies/travel-builder/terms)); the key arrives by
+   email. Beta seats are limited.
+2. Paste it in Settings > Online services > Amadeus Travel Builder. It is used only while no Skyscanner key is set.
+3. ALFRED sends only airport codes, dates, traveller count and cabin (`GET https://api.amadeus.com/api/v3/search/`,
+   key in the `X-API-Key` header, at most five offers per airline) and shows the ten cheapest offers in INR, with
+   local airport times as returned and the airline's own link. Offers in another currency are left out, never
+   converted. Results are kept 15 minutes; the terms allow only caching needed to run. Nothing is booked.
+4. The terms say access is free, may be limited or ended by Amadeus at any time, and forbid using the data to
+   train AI. The adapter (`providers/transport.py::AmadeusFlights`) is tested against fixtures and UNVERIFIED
+   against a live key; which Indian airlines answer is known only after the first real search.
 
 Choose a displayed route explicitly before using it in a draft. Selection checks
 the owned session revision, route identity and source timestamps. An expired or

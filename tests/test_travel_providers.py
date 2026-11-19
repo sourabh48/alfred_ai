@@ -25,7 +25,7 @@ from apps.mobility.services.travel.money import quoted_amount
 from apps.mobility.services.travel.bike import bike_context
 from apps.mobility.services.travel_discovery import fact
 from apps.mobility.models import BikeProfile, BikeDocument, BikeIssueReport, BikeServiceRecord, FuelRefillLog
-from apps.mobility.services.travel.providers.transport import IndianRailProvider, SkyscannerFlights
+from apps.mobility.services.travel.providers.transport import AmadeusFlights, IndianRailProvider, SkyscannerFlights
 
 GOOGLE = {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-g-0000"}
 
@@ -625,3 +625,69 @@ class SkyscannerFlightTests(TestCase):
                       {"origin": "BLR", "destination": "GOI", "departure_date": "2020-01-01"},
                       {"origin": "BLR", "destination": "GOI", "departure_date": self.day.isoformat(), "cabin_class": "deluxe"}):
                 self.assertFalse(query(SkyscannerFlights(), p).success)
+
+
+class AmadeusFlightTests(TestCase):
+    """The free Amadeus Travel Builder beta: off without a key, only airports, dates, travellers and cabin sent, offers
+    in INR sorted by price with local airport times and the airline's link; anything else is left out, never converted."""
+    def setUp(self):
+        self.day = timezone.localdate() + timedelta(days=20)
+        self.back = timezone.localdate() + timedelta(days=24)
+
+    def test_off_without_a_key_and_nothing_is_sent(self):
+        with patch("apps.mobility.services.travel.providers.base.request") as sent, patch.dict("os.environ", {"TRAVEL_AMADEUS_API_KEY": ""}):
+            result = query(AmadeusFlights(), {"origin": "BLR", "destination": "DEL", "departure_date": self.day.isoformat()})
+        self.assertEqual(result.error, "missing_TRAVEL_AMADEUS_API_KEY")
+        sent.assert_not_called()
+
+    @patch.dict("os.environ", {"TRAVEL_AMADEUS_API_KEY": "synthetic-amadeus-0000"})
+    def test_offers_sorted_by_price_with_local_times_and_odd_ones_left_out(self):
+        d = self.day.isoformat()
+        def offer(total, flights, currency="INR", link="https://airline.example.test/book"):
+            return {"bounds": [{"flights": flights}], "fare": {"currency": currency, "itinerary_price": {"total_fare": total}},
+                    "merchant": "XX", "deep_link": link}
+        direct = [{"marketing_airline": "XX", "origin": {"airport": "BLR"}, "destination": {"airport": "DEL"},
+                   "departs_at": f"{d}T06:05:00+05:30", "arrives_at": f"{d}T08:50:00+05:30"}]
+        via = [{"marketing_airline": "XX", "origin": {"airport": "BLR"}, "destination": {"airport": "BOM"},
+                "departs_at": f"{d}T05:00:00+05:30", "arrives_at": f"{d}T06:45:00+05:30"},
+               {"marketing_airline": "YY", "origin": {"airport": "BOM"}, "destination": {"airport": "DEL"},
+                "departs_at": f"{d}T08:00:00+05:30", "arrives_at": f"{d}T10:10:00+05:30"}]
+        answer = {"results": [offer(9100.5, direct), offer(7450, via, link="javascript:alert(1)"), offer(5000, direct, currency="EUR"),
+                              offer(None, direct), offer("not-a-number", direct)],
+                  "errors": {"ZZ": "120 - No flight found on this route for merchant ZZ"},
+                  "meta": {"carriers": {"XX": {"name": "Synthetic Air"}}}}
+        with patch("apps.mobility.services.travel.providers.base.request",
+                   return_value=Mock(response_hash="h", **{"json.return_value": answer})) as sent:
+            result = query(AmadeusFlights(), {"origin": "blr", "destination": "DEL", "departure_date": d,
+                                              "return_date": self.back.isoformat(), "adults": 2})
+        self.assertTrue(result.success, result.error)
+        cheap, dear = result.payload["options"]  # EUR, missing and bad prices are left out
+        self.assertEqual((cheap["fare"], cheap["carrier"], cheap["transfers"], cheap["duration"], cheap["booking_url"]),
+                         ("7450", "Synthetic Air, YY", 1, 310, None))
+        self.assertEqual((dear["fare"], dear["departure"], dear["arrival"], dear["destination"], dear["booking_url"]),
+                         ("9100.5", f"{d}T06:05", f"{d}T08:50", "DEL", "https://airline.example.test/book"))
+        call = sent.call_args
+        self.assertEqual((call.args[0], call.args[1]), ("GET", "https://api.amadeus.com/api/v3/search/"))
+        self.assertEqual(call.kwargs["headers"], {"X-API-Key": "synthetic-amadeus-0000"})
+        sent_params = call.kwargs["params"]
+        self.assertEqual((sent_params["origins"], sent_params["destinations"], sent_params["dates"], sent_params["adults"]),
+                         ("BLR,DEL", "DEL,BLR", f"{d},{self.back.isoformat()}", 2))
+        self.assertEqual(set(sent_params), {"origins", "destinations", "dates", "locale", "flow", "currency", "adults", "travel_class", "number_of_results"})
+        self.assertNotIn("synthetic-amadeus", str(sent_params))
+
+    @patch.dict("os.environ", {"TRAVEL_AMADEUS_API_KEY": "synthetic-amadeus-0000"})
+    def test_bad_input_makes_no_call(self):
+        with patch("apps.mobility.services.travel.providers.base.request", side_effect=AssertionError("no call")):
+            for p in ({"origin": "Bangalore", "destination": "DEL", "departure_date": self.day.isoformat()},
+                      {"origin": "BLR", "destination": "BLR", "departure_date": self.day.isoformat()},
+                      {"origin": "BLR", "destination": "DEL", "departure_date": "2020-01-01"},
+                      {"origin": "BLR", "destination": "DEL", "departure_date": self.day.isoformat(), "return_date": "2020-01-01"},
+                      {"origin": "BLR", "destination": "DEL", "departure_date": self.day.isoformat(), "cabin_class": "deluxe"}):
+                self.assertFalse(query(AmadeusFlights(), p).success)
+
+    def test_trip_research_uses_amadeus_only_when_skyscanner_has_no_key(self):
+        from apps.mobility.services.travel.research import flight_provider
+        for sky, amadeus, expected in (("", "", "skyscanner"), ("", "synthetic-amadeus-0000", "amadeus"),
+                                       ("synthetic-sky-0000", "synthetic-amadeus-0000", "skyscanner")):
+            with patch.dict("os.environ", {"TRAVEL_SKYSCANNER_API_KEY": sky, "TRAVEL_AMADEUS_API_KEY": amadeus}):
+                self.assertEqual(flight_provider().name, expected)

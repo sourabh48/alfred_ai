@@ -446,9 +446,9 @@ class TravelProviderUsage(APIView):
         from .services.travel.providers.holidays import NagerHolidays
         from .services.travel.providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
         from .services.travel.providers.photos import GooglePlacePhoto
-        from .services.travel.providers.transport import IndianRailProvider, SkyscannerFlights
+        from .services.travel.providers.transport import AmadeusFlights, IndianRailProvider, SkyscannerFlights
         providers = [GooglePlaceSearch(),GoogleWeather(),GoogleRoutes(),GooglePlacesNearby(),GoogleLodging(),GoogleDestinations(),
-                     SkyscannerFlights(),IndianRailProvider(),GooglePlacePhoto(),GoogleTransit(),NagerHolidays()]
+                     SkyscannerFlights(),AmadeusFlights(),IndianRailProvider(),GooglePlacePhoto(),GoogleTransit(),NagerHolidays()]
         return Response({"usage":usage_summary(),"configuration":[{"provider":p.name,"category":p.category,
             "unavailable_reason":p.unavailable_reason(),"application_limits":p.limits,"application_budget":budget_status(p)} for p in providers]})
 

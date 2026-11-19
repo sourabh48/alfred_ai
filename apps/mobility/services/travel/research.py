@@ -16,7 +16,7 @@ from .providers.routing import routing_chain
 from .providers.weather import FORECAST_DAYS, GoogleWeather, replan_proposals
 from .providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
 from .providers.permits import PermitProvider
-from .providers.transport import IndianRailProvider, SkyscannerFlights
+from .providers.transport import AmadeusFlights, IndianRailProvider, SkyscannerFlights
 from .links import external_links, hotel_price_links
 
 
@@ -244,7 +244,7 @@ def enrich_candidate(user, state, destination):
     attach("hotels_result",hotels)
     flight = ProviderResult("skyscanner","flights",error="origin_and_destination_airport_codes_and_dates_required")
     if value(state,"origin_airport") and value(state,"destination_airport") and start:
-        flight = fetch(SkyscannerFlights(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
+        flight = fetch(flight_provider(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
                                             "departure_date":start,"return_date":end,"adults":people})
     attach("flights_result",flight)  # without a Skyscanner key, the Google Flights link carries the live prices
     attach("trains_result",fetch(IndianRailProvider(),{"origin":value(state,"origin"),"destination":d["name"],"date":start}))
@@ -257,6 +257,12 @@ def enrich_candidate(user, state, destination):
     d["map"] = map_features(d)
     d["quality"] = quality_contract(results)
     return d, results
+
+
+def flight_provider():
+    """Skyscanner when its key is set, otherwise Amadeus if that key is; with neither, Skyscanner reports the missing key."""
+    sky, amadeus = SkyscannerFlights(), AmadeusFlights()
+    return amadeus if sky.unavailable_reason() and not amadeus.unavailable_reason() else sky
 
 
 def quality_contract(results):

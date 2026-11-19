@@ -5451,13 +5451,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()  # Google sign-in is set up only after the synthetic password login, so Career email can offer the Gmail address
         self.enterContext(patch.dict(os.environ, {'ALFRED_GOOGLE_CLIENT_ID': 'synthetic-google-id', 'ALFRED_GOOGLE_CLIENT_SECRET': 'synthetic-google-secret'}))
         self.browser.get(self.live_server_url + '/settings/')
-        self.wait.until(lambda _: '0 of 3 of your own keys saved' in self.text('onlineServicesStatus'))
+        self.wait.until(lambda _: '0 of 4 of your own keys saved' in self.text('onlineServicesStatus'))
         self.assertIn('0 of 1 free services on', self.text('onlineServicesStatus'))  # Alpha Vantage prices first (2026-11-18)
         self.browser.find_element(self.By.CSS_SELECTOR, '[data-switch="ALFRED_PRICES_ALPHA_VANTAGE_FIRST"]').click()
         self.browser.find_element(self.By.ID, 'online-TRAVEL_GOOGLE_MAPS_API_KEY').send_keys('synthetic-google-key-9876')
         self.memory_click('#onlineServicesForm button[type=submit]')
         self.wait.until(lambda _: 'using these settings now' in self.text('onlineServicesFeedback'))
-        self.assertIn('1 of 1 free services on · 1 of 3 of your own keys saved · Career email off', self.text('onlineServicesStatus'))
+        self.assertIn('1 of 1 free services on · 1 of 4 of your own keys saved · Career email off', self.text('onlineServicesStatus'))
         # Career email: tick one of your own sign-in addresses; a GitHub-only address that no mail service sends from is shown but cannot be ticked.
         gmail, github = self.browser.find_elements(self.By.CSS_SELECTOR, '#careerMailChoices input[type=radio]')
         self.assertEqual((gmail.get_attribute('value'), gmail.is_enabled(), github.is_enabled()), ('synthetic.owner@gmail.com', True, False))

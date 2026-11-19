@@ -24,6 +24,9 @@ KEYS = {
                                    "https://console.cloud.google.com/google/maps-apis/credentials"),
     "TRAVEL_SKYSCANNER_API_KEY": ("Skyscanner", "Travel: live flight prices, once Skyscanner approves your partner account. Until then each trip has a Google Flights link.",
                                   "https://www.partners.skyscanner.net/product/travel-api"),
+    "TRAVEL_AMADEUS_API_KEY": ("Amadeus Travel Builder", "Travel: live flight prices with a link to the airline's site, from the free Amadeus beta "
+                               "(some airlines only). Used when no Skyscanner key is set.",
+                               "https://eu1.ironcladapp.com/public-launch/6aaa463f6f95614fe0f6db9d"),
     "ALFRED_ALPHA_VANTAGE_API_KEY": ("Alpha Vantage", "Investments research desk: the latest earnings against forecasts and insider trading for US shares. "
                                      "The shared free key allows 25 requests a day for everyone; your own key gives you your own 25.",
                                      "https://www.alphavantage.co/support/#api-key"),

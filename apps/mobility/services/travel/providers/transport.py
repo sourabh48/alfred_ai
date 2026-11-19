@@ -1,5 +1,5 @@
 from alfred_ai.services import personal_keys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import os
 import re
@@ -90,6 +90,83 @@ class SkyscannerFlights(Provider):
                 "fare_scope": "all requested travellers; the agent's page shows the final price",
                 "availability": "price_returned_recheck_before_purchase", "booking_url": link})
         return {"options": options, "coverage": "Airlines and agents in Skyscanner's search; not every fare on the market."}
+
+
+AMADEUS = "https://api.amadeus.com/api/v3/search/"
+AMADEUS_CABINS = {"economy": "ECONOMY", "premium_economy": "PREMIUM_ECONOMY", "business": "BUSINESS", "first": "FIRST"}
+
+
+def _minutes(start, end):
+    """Elapsed minutes between two of Amadeus's local times with offsets (the bound's own duration can be an hour off)."""
+    try:
+        return int((datetime.fromisoformat(end.replace("Z", "+00:00")) - datetime.fromisoformat(start.replace("Z", "+00:00"))).total_seconds() // 60)
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+class AmadeusFlights(Provider):
+    """Live flight prices from the free Amadeus Travel Builder beta (each person's own key; owner request 2026-11-19).
+    Search only: every offer links to the airline's own site, where the person buys. Amadeus covers a subset of airlines;
+    which Indian carriers are included is UNVERIFIED until a live key is tried. Its terms allow only short caching."""
+    name = "amadeus"
+    category = "flights"
+    source_url = "https://github.com/AmadeusITGroup/amadeus-travel-toolkit"
+    attribution = "Live airline prices; check the airline's site before you book"
+    ttl = timedelta(minutes=15)
+    limits = {"minute": 5, "hour": 30, "day": 100, "month": 2000}
+    allowed_parameters = SkyscannerFlights.allowed_parameters
+
+    def unavailable_reason(self):
+        return "" if personal_keys.get("TRAVEL_AMADEUS_API_KEY") else "missing_TRAVEL_AMADEUS_API_KEY"
+
+    def fetch(self, p):
+        origin, destination = str(p["origin"]).upper(), str(p["destination"]).upper()
+        if not re.fullmatch(r"[A-Z]{3}", origin) or not re.fullmatch(r"[A-Z]{3}", destination) or origin == destination:
+            raise ProviderError("airport_codes_required")
+        departure = date.fromisoformat(p["departure_date"])
+        if departure < timezone.localdate():
+            raise ProviderError("invalid_departure_date")
+        legs = [(origin, destination, departure)]
+        if p.get("return_date"):
+            returning = date.fromisoformat(p["return_date"])
+            if returning < departure:
+                raise ProviderError("invalid_return_date")
+            legs.append((destination, origin, returning))
+        cabin = AMADEUS_CABINS.get(p.get("cabin_class", "economy"))
+        if not cabin:
+            raise ProviderError("invalid_cabin_class")
+        # Only airports, dates, traveller count and cabin are sent; the key goes in a header. Lists are positional, one per leg.
+        params = {"origins": ",".join(a for a, _, _ in legs), "destinations": ",".join(b for _, b, _ in legs),
+                  "dates": ",".join(d.isoformat() for _, _, d in legs), "locale": "en-IN", "flow": "NETWORK", "currency": "INR",
+                  "adults": int(number(p.get("adults", 1), low=1, high=9)), "travel_class": cabin, "number_of_results": 5}
+        return request_json("GET", AMADEUS, params=params, headers={"X-API-Key": personal_keys.get("TRAVEL_AMADEUS_API_KEY")})
+
+    def normalize(self, raw, p):
+        names = {code: str((item or {}).get("name") or code) for code, item in ((raw.get("meta") or {}).get("carriers") or {}).items()}
+        options = []
+        for result in raw.get("results") or []:
+            fare = result.get("fare") or {}
+            first = (((result.get("bounds") or [{}])[0]) or {}).get("flights") or []
+            total = (fare.get("itinerary_price") or {}).get("total_fare")
+            if total in (None, "") or isinstance(total, bool) or fare.get("currency") != "INR" or not first:
+                continue  # no price, or a currency other than the one asked for: left out, never converted
+            try:
+                amount = quoted_amount(Decimal(str(total)))
+            except (ArithmeticError, ValueError):
+                continue
+            link = str(result.get("deep_link") or "")
+            options.append({"provider": "Amadeus",
+                "carrier": ", ".join(dict.fromkeys(names.get(f.get("marketing_airline"), str(f.get("marketing_airline") or "")) for f in first))[:120],
+                "origin": str((first[0].get("origin") or {}).get("airport") or p["origin"])[:3],
+                "destination": str((first[-1].get("destination") or {}).get("airport") or p["destination"])[:3],
+                # local airport times as returned, never shifted to the viewer's zone
+                "departure": str(first[0].get("departs_at") or "")[:16] or None, "arrival": str(first[-1].get("arrives_at") or "")[:16] or None,
+                "duration": _minutes(first[0].get("departs_at"), first[-1].get("arrives_at")), "transfers": len(first) - 1,
+                "fare": amount, "currency": "INR",
+                "fare_scope": "all requested travellers; the airline's page shows the final price",
+                "availability": "price_returned_recheck_before_purchase", "booking_url": link if link.startswith("https://") else None})
+        options.sort(key=lambda o: Decimal(o["fare"]))
+        return {"options": options[:10], "coverage": "Airlines in the Amadeus Travel Builder beta, a subset of airlines; not every fare on the market."}
 
 
 class IndianRailProvider(Provider):
