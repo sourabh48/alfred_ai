@@ -691,3 +691,75 @@ class AmadeusFlightTests(TestCase):
                                        ("synthetic-sky-0000", "synthetic-amadeus-0000", "skyscanner")):
             with patch.dict("os.environ", {"TRAVEL_SKYSCANNER_API_KEY": sky, "TRAVEL_AMADEUS_API_KEY": amadeus}):
                 self.assertEqual(flight_provider().name, expected)
+
+
+class AutomaticAirportsAndUndatedWeatherTests(TestCase):
+    """Owner request 2026-11-19: fewer unknowns. Flights find the main airport near each end through Amadeus when the plan
+    names none, short road trips are not flight-searched (and not called missing data), and a plan without dates gets
+    the next five days of weather, labelled as such."""
+
+    def run_enrich(self, origin, dated=True):
+        from copy import deepcopy
+        from apps.mobility.services.travel.research import enrich_candidate
+        from apps.mobility.services.travel_catalog import DESTINATIONS
+        from apps.mobility.services.travel_discovery import candidates_for
+        now, self.calls = timezone.now(), []
+        def ok(provider, payload):
+            return ProviderResult(provider.name, provider.category, success=True, status="ok", freshness="LIVE", confidence="LIKELY",
+                source_url=provider.source_url, attribution=provider.attribution, retrieved_at=now.isoformat(),
+                expires_at=(now+timedelta(hours=1)).isoformat(), payload=payload)
+        def fake_query(provider, parameters, **kwargs):
+            self.calls.append((provider.name, dict(parameters)))
+            if provider.category == "geocoding":
+                return ok(provider, {"locations": [{"name": "Synthetic Origin", "lat": origin[0], "lon": origin[1]}]})
+            if provider.name == "amadeus_airports":
+                return ok(provider, {"airports": [{"code": "SYO" if parameters["latitude"] == origin[0] else "SYD"}]})
+            if provider.category in ("flights", "weather"):
+                return ok(provider, {"options": [], "days": [], "summary": "Synthetic mild days."})
+            return ProviderResult(provider.name, provider.category, error="offline")
+        owner = get_user_model().objects.create_user(f"airports-{len(origin)}-{dated}-{origin[0]}", password="x-Unused-12345")
+        destination = candidates_for(owner, {"origin": fact("Bengaluru")}, destinations=[deepcopy(DESTINATIONS[0])])[0]
+        start = timezone.localdate() + timedelta(days=3)
+        state = {"origin": fact("Synthetic Origin")}
+        if dated:
+            state |= {"available_start_date": fact(start.isoformat()), "available_end_date": fact((start+timedelta(days=2)).isoformat())}
+        with patch("apps.mobility.services.travel.research.query", side_effect=fake_query),              patch("apps.mobility.services.travel.cache.query", side_effect=fake_query),              patch.dict("os.environ", {"TRAVEL_AMADEUS_API_KEY": "synthetic-amadeus-0000"}):
+            d, _ = enrich_candidate(owner, state, destination)
+        return d, destination
+
+    def test_a_long_trip_searches_flights_between_the_airports_amadeus_finds(self):
+        d, _ = self.run_enrich((28.6, 77.2))  # far from the destination
+        flights = [params for name, params in self.calls if name in ("amadeus", "skyscanner")]
+        self.assertEqual([(p["origin"], p["destination"]) for p in flights], [("SYO", "SYD")])
+        self.assertEqual((d["flight_airports"]["origin"], d["flight_airports"]["destination"]), ("SYO", "SYD"))
+        self.assertTrue(d["flights_result"]["success"])
+
+    def test_a_short_road_trip_is_not_flight_searched_and_not_called_missing(self):
+        _, destination = self.run_enrich((0, 0))  # placeholder to read the destination's own coordinates
+        d, _ = self.run_enrich((destination["lat"] + 0.05, destination["lon"]))
+        self.assertFalse([name for name, _ in self.calls if name in ("amadeus", "amadeus_airports", "skyscanner")])
+        self.assertEqual(d["flights_result"]["error"], "short_trip_no_flight_searched")
+        self.assertNotIn("flights", [x["category"] for x in d["quality"]["unavailable"]])
+        self.assertIn("flights", [x["category"] for x in d["quality"]["not_needed"]])
+
+    def test_without_dates_the_next_five_days_of_weather_are_shown_and_labelled(self):
+        d, _ = self.run_enrich((28.6, 77.2), dated=False)
+        weather = [params for name, params in self.calls if name == "google_weather"]
+        today = timezone.localdate()
+        self.assertEqual((weather[0]["start_date"], weather[0]["end_date"]), (today.isoformat(), (today+timedelta(days=4)).isoformat()))
+        self.assertTrue(d["weather_result"]["payload"]["no_trip_dates"])
+        self.assertIn("next five days", d["weather"]["summary"])
+        self.assertFalse([name for name, _ in self.calls if name in ("amadeus", "amadeus_airports")])  # no dates: no flight search
+
+    @patch.dict("os.environ", {"TRAVEL_AMADEUS_API_KEY": "synthetic-amadeus-0000"})
+    def test_nearby_airports_send_only_coordinates_and_keep_valid_codes(self):
+        from apps.mobility.services.travel.providers.transport import AmadeusAirports
+        answer = {"data": [{"iataCode": "IXE", "name": "MANGALORE", "address": {"cityName": "MANGALORE", "countryCode": "IN"},
+                            "distance": {"value": 98}}, {"iataCode": "bad1"}]}
+        with patch("apps.mobility.services.travel.providers.base.request",
+                   return_value=Mock(response_hash="h", **{"json.return_value": answer})) as sent:
+            result = query(AmadeusAirports(), {"latitude": 12.94, "longitude": 75.78})
+        self.assertTrue(result.success, result.error)
+        self.assertEqual(result.payload["airports"], [{"code": "IXE", "name": "MANGALORE", "city": "MANGALORE", "country": "IN", "straight_line_km": 98}])
+        self.assertEqual(sent.call_args.args[1], "https://api.amadeus.com/v1/reference-data/locations/airports")
+        self.assertEqual(sent.call_args.kwargs["params"], {"latitude": "12.9400", "longitude": "75.7800", "radius": 150, "page[limit]": 3})

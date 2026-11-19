@@ -93,6 +93,7 @@ class SkyscannerFlights(Provider):
 
 
 AMADEUS = "https://api.amadeus.com/api/v3/search/"
+AMADEUS_AIRPORTS = "https://api.amadeus.com/v1/reference-data/locations/airports"
 AMADEUS_CABINS = {"economy": "ECONOMY", "premium_economy": "PREMIUM_ECONOMY", "business": "BUSINESS", "first": "FIRST"}
 
 
@@ -169,6 +170,34 @@ class AmadeusFlights(Provider):
         # Checked live 2026-11-19 (BLR-DEL, BLR-GOI, DEL-BOM, BLR-CCU): Air India is the only Indian airline in the beta.
         return {"options": options[:10], "coverage": "Some airlines only. Of Indian airlines only Air India is included; IndiGo, Akasa, "
                                                       "SpiceJet and Air India Express are not, so cheaper domestic fares may exist."}
+
+
+class AmadeusAirports(Provider):
+    """Airports near a place (Amadeus Travel Builder), so flights can be searched when the plan names no airport codes.
+    Busier airports rank first (Amadeus relevance); distance is straight-line, not travel distance."""
+    name = "amadeus_airports"
+    category = "airports"
+    source_url = AmadeusFlights.source_url
+    attribution = "Nearby airports from Amadeus Travel Builder"
+    ttl = timedelta(days=1)
+    limits = AmadeusFlights.limits
+    allowed_parameters = {"latitude", "longitude"}
+    unavailable_reason = AmadeusFlights.unavailable_reason
+
+    def fetch(self, p):
+        latitude, longitude = number(p["latitude"], low=-90, high=90), number(p["longitude"], low=-180, high=180)
+        return request_json("GET", AMADEUS_AIRPORTS, params={"latitude": f"{latitude:.4f}", "longitude": f"{longitude:.4f}",
+                            "radius": 150, "page[limit]": 3}, headers={"X-API-Key": personal_keys.get("TRAVEL_AMADEUS_API_KEY")})
+
+    def normalize(self, raw, p):
+        airports = []
+        for item in raw.get("data") or []:
+            code = str(item.get("iataCode") or "")
+            if re.fullmatch(r"[A-Z]{3}", code):
+                address = item.get("address") or {}
+                airports.append({"code": code, "name": str(item.get("name") or "")[:60], "city": str(address.get("cityName") or "")[:60],
+                                 "country": str(address.get("countryCode") or "")[:2], "straight_line_km": (item.get("distance") or {}).get("value")})
+        return {"airports": airports[:3]}
 
 
 class IndianRailProvider(Provider):

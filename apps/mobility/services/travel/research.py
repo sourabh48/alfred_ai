@@ -16,7 +16,7 @@ from .providers.routing import routing_chain
 from .providers.weather import FORECAST_DAYS, GoogleWeather, OpenMeteoClimate, replan_proposals
 from .providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
 from .providers.permits import PermitProvider
-from .providers.transport import AmadeusFlights, IndianRailProvider, SkyscannerFlights
+from .providers.transport import AmadeusAirports, AmadeusFlights, IndianRailProvider, SkyscannerFlights
 from .links import external_links, hotel_price_links
 
 
@@ -118,8 +118,14 @@ def research_candidates(user, state, preliminary):
 
 def weather_result(destination, state, *, force=False, cache_only=False):
     start, end = value(state,"available_start_date"), value(state,"available_end_date")
-    if not start or not end:
-        return ProviderResult("google_weather","weather",error="dates_required")
+    if not start or not end:  # no trip dates yet: the next five days here, clearly labelled, instead of nothing
+        today = timezone.localdate()
+        result = query(GoogleWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":today.isoformat(),
+                                        "end_date":(today+timedelta(days=4)).isoformat()},force=force,cache_only=cache_only)
+        if result.success:
+            result.payload = {**result.payload, "no_trip_dates": True,
+                              "summary": "No trip dates yet, so this is the next five days here. " + result.payload.get("summary", "")}
+        return result
     if not timezone.localdate() <= date.fromisoformat(start) <= date.fromisoformat(end) < timezone.localdate()+timedelta(days=FORECAST_DAYS):
         return ProviderResult("google_weather","weather",error="outside_forecast_window")
     return query(GoogleWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force,cache_only=cache_only)
@@ -259,8 +265,19 @@ def enrich_candidate(user, state, destination):
         option.update(hotel_price_links(state,option.get("name",""),d.get("name","")))
     attach("hotels_result",hotels)
     flight = ProviderResult("skyscanner","flights",error="origin_and_destination_airport_codes_and_dates_required")
-    if value(state,"origin_airport") and value(state,"destination_airport") and start:
-        flight = fetch(flight_provider(),{"origin":value(state,"origin_airport"),"destination":value(state,"destination_airport"),
+    airports = [value(state,"origin_airport"), value(state,"destination_airport")]
+    if not all(airports) and coords and origin and start and (d.get("distance_km") or 0) < SHORT_TRIP_KM:
+        flight = ProviderResult("skyscanner","flights",error="short_trip_no_flight_searched")
+    elif not all(airports) and coords and origin and start and not AmadeusAirports().unavailable_reason():
+        for index, (lat, lon) in enumerate((origin, (d["lat"], d["lon"]))):  # the main airport near each end
+            found = fetch(AmadeusAirports(),{"latitude":lat,"longitude":lon})
+            results.append(found)
+            airports[index] = airports[index] or next(iter(found.payload.get("airports") or []), {}).get("code")
+        d["flight_airports"] = {"origin": airports[0], "destination": airports[1], "basis": "Main airport near each end (Amadeus)"}
+        if airports[0] and airports[0] == airports[1]:
+            flight = ProviderResult("skyscanner","flights",error="same_airport_at_both_ends")
+    if all(airports) and airports[0] != airports[1] and start:
+        flight = fetch(flight_provider(),{"origin":airports[0],"destination":airports[1],
                                             "departure_date":start,"return_date":end,"adults":people})
     attach("flights_result",flight)  # without a Skyscanner key, the Google Flights link carries the live prices
     attach("trains_result",fetch(IndianRailProvider(),{"origin":value(state,"origin"),"destination":d["name"],"date":start}))
@@ -275,6 +292,10 @@ def enrich_candidate(user, state, destination):
     return d, results
 
 
+NOT_NEEDED = {"short_trip_no_flight_searched", "same_airport_at_both_ends"}  # not a gap in the data: nothing to search
+SHORT_TRIP_KM = 350  # closer than this by road, flights are not searched (the airport run would eat the time saved)
+
+
 def flight_provider():
     """Skyscanner when its key is set, otherwise Amadeus if that key is; with neither, Skyscanner reports the missing key."""
     sky, amadeus = SkyscannerFlights(), AmadeusFlights()
@@ -285,6 +306,7 @@ def quality_contract(results):
     return {"verified":[r.category for r in results if r.success and not r.stale and r.status == "ok" and r.category not in {"web","destinations","permits","stays_guide"}],
             "research_leads":[r.category for r in results if r.success and r.category in {"web","destinations","stays_guide"}],
             "estimated":["budget", "travel duration", "local travel allowance"],
-            "unavailable":[{"category":r.category,"reason":r.error or "unverified"} for r in results if not r.success or r.error],
+            "unavailable":[{"category":r.category,"reason":r.error or "unverified"} for r in results if (not r.success or r.error) and r.error not in NOT_NEEDED],
+            "not_needed":[{"category":r.category,"reason":r.error} for r in results if r.error in NOT_NEEDED],
             "freshness":[{"category":r.category,"freshness":r.freshness,"retrieved_at":r.retrieved_at,"expires_at":r.expires_at} for r in results],
             "recheck":["Weather and official warnings", "Road closures and vehicle legality", "Hotel/transport price and availability", "Permits, opening hours and entry requirements"]}

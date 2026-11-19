@@ -12,7 +12,7 @@ from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-SHORT_KEEP = ("amadeus",)
+SHORT_KEEP = ("amadeus", "amadeus_airports")
 NOTE = "Live fares from this source are kept only briefly; search again for current fares."
 
 

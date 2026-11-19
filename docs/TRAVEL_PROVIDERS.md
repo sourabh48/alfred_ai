@@ -190,6 +190,11 @@ keys in `config/local.env` are ignored and can be deleted.
    airline links and correct local times. Domestic (BLR-DEL, BLR-GOI, DEL-BOM, BLR-CCU): Air India non-stops plus
    Qatar Airways and Saudia offers routed through their hubs; IndiGo, Akasa, SpiceJet and Air India Express are not
    Amadeus merchants. International: BLR-DXB answered by 7 airlines, DEL-LHR by 11. About 22 airlines were queried.
+6. Automatic airports (2026-11-19): when a plan names no airport codes, ALFRED asks Amadeus for the main airport within
+   150 km of the start and of the destination (`GET /v1/reference-data/locations/airports`, coordinates only, `amadeus_airports`,
+   kept one day and removed by the same short-keep cleanup) and searches flights between them. Trips under 350 km by
+   road are not flight-searched and are listed as "not searched", not as missing data. Amadeus Travel Builder has no
+   hotel search, so hotels stay on Google.
 
 Choose a displayed route explicitly before using it in a draft. Selection checks
 the owned session revision, route identity and source timestamps. An expired or
