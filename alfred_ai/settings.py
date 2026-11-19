@@ -530,8 +530,8 @@ ALFRED_MEMORY_MOCK_REASONING = env.bool('ALFRED_MEMORY_MOCK_REASONING', default=
 ALFRED_GEMINI_DEV_ENABLED = env.bool('ALFRED_GEMINI_DEV_ENABLED', default=False)
 ALFRED_MEMORY_REASONING_DAILY_TOKENS = env.int('ALFRED_MEMORY_REASONING_DAILY_TOKENS', default=65536)
 ALFRED_MEMORY_REASONING_DAILY_MICROUSD = env.int('ALFRED_MEMORY_REASONING_DAILY_MICROUSD', default=1000000)
-ALFRED_MEMORY_OPENAI_AUTHORIZED = env.bool('ALFRED_MEMORY_OPENAI_AUTHORIZED', default=False)
-ALFRED_MEMORY_OPENAI_PRICING_DATE = env('ALFRED_MEMORY_OPENAI_PRICING_DATE', default='')
+# Optional cloud answers to public questions use each person's own free Gemini key (owner decision 2026-11-19; OpenAI dropped).
+ALFRED_GEMINI_MODEL = env('ALFRED_GEMINI_MODEL', default='gemini-3.5-flash-lite')
 ALFRED_MEMORY_OLLAMA_MODEL = env('ALFRED_MEMORY_OLLAMA_MODEL', default='qwen3.5:4b')
 # Local AI limits (owner decision 2026-11-12): configurable in config/local.env with generous defaults.
 # The host must be this PC or a private LAN address; a public or cloud host is refused.

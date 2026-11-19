@@ -22,7 +22,7 @@ class HybridIntelligenceTests(TestCase):
     def setUp(self):
         self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-hybrid-synthetic-')))
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(self.root/'vault'),ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'limits'),
-            ALFRED_MEMORY_MOCK_REASONING=False,ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_RELEVANCE_MIN_SCORE=0.20))
+            ALFRED_MEMORY_MOCK_REASONING=False,ALFRED_MEMORY_RELEVANCE_MIN_SCORE=0.20))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.store=MemoryStore(self.root/'vault'); self.alice=get_user_model().objects.create_user(username='synthetic-hybrid-alice')
         self.bob=get_user_model().objects.create_user(username='synthetic-hybrid-bob')

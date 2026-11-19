@@ -1165,7 +1165,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_memory_evaluation import synthetic_embedding
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-evaluation-browser-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),
             ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER='',ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False))
         embedder=Mock(); embedder.embed.side_effect=synthetic_embedding
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=embedder))
@@ -1176,12 +1176,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: len(self.browser.find_element(self.By.ID,'memoryEvaluationExpected').find_elements(self.By.TAG_NAME,'option'))==4)
         return store,owner,identities
 
-    def test_own_openai_key_is_saved_from_settings_never_shown_and_removable(self):
+    def test_own_gemini_key_is_saved_from_settings_never_shown_and_removable(self):
         from unittest.mock import patch as mock_patch
         from tests.test_memory_reasoning import KEY
         store, owner, _ = self.memory_evaluation_fixture()
-        http = self.enterContext(mock_patch('apps.ml_engine.services.memory_reasoning.request', side_effect=AssertionError('No OpenAI call')))
-        self.browser.get(self.live_server_url + '/settings/#settingsOpenAI')  # with the other keys under Online services
+        http = self.enterContext(mock_patch('apps.ml_engine.services.memory_reasoning.request', side_effect=AssertionError('No Gemini call')))
+        self.browser.get(self.live_server_url + '/settings/#settingsGemini')  # with the other keys under Online services
         self.assertFalse(self.browser.find_elements(self.By.ID, 'privateMemoryPanel'))
         self.wait.until(lambda _: 'no key saved' in self.text('memoryReasoningStatus'))
         self.assertIn('No key saved', self.text('memoryReasoningKeyStatus'))
@@ -1192,7 +1192,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Tick the opt-in', self.text('memoryReasoningStatus'))
         self.assertNotIn(KEY, self.browser.page_source)
         self.browser.execute_script("document.getElementById('memoryReasoningKeyForm').scrollIntoView({behavior:'instant',block:'center'});")
-        self.capture('own-openai-key-saved')
+        self.capture('own-gemini-key-saved')
         self.browser.execute_script('window.confirm = () => true;')
         self.memory_click('#memoryReasoningKeyRemove')
         self.wait.until(lambda _: 'No key saved' in self.text('memoryReasoningKeyStatus'))
@@ -1785,7 +1785,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.loans.models import LoanClosureDocument,Loan
         from tests.test_persistent_memory import SyntheticEmbeddings
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-currency-browser-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         local=Mock(); local.reason.return_value='Your verified closure cost $99.00 USD.'
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
@@ -1927,7 +1927,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.ml_engine.services.memory_learning import MemoryLearning
         from tests.test_persistent_memory import SyntheticEmbeddings
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-review-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         store=MemoryStore(root/'vault'); owner=self.scenario['user']; learning=MemoryLearning(store)
         first=store.save_verified(owner,{'statement':'synthetic mountain hiking','category':'Travel'},{'source':'synthetic checked itinerary'},verified=True)
@@ -2015,7 +2015,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.budgets.models import SavingsGoal
         from tests.test_persistent_memory import SyntheticEmbeddings
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-action-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
         local = Mock(); local.reason.side_effect = AssertionError('An action request must not reach the model')
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
@@ -2116,7 +2116,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from tests.test_persistent_memory import SyntheticEmbeddings
         from tests.test_speech import wav_bytes
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-speech-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
         local = Mock(); local.reason.side_effect = AssertionError('A spoken action request must not reach the model')
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
@@ -2647,7 +2647,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         from tests.test_persistent_memory import SyntheticEmbeddings
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-ui-browser-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'), ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
         local = Mock(); local.reason.side_effect = EmbeddingUnavailable('private-file-secret')
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner', return_value=local))
@@ -2658,7 +2658,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.execute_script("localStorage.setItem('alfred.appearance','light')")
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: 'Ollama available' in self.text('intelligenceLocalStatus'))
-        self.assertEqual(self.text('intelligenceCloudStatus'), 'OpenAI disabled')
+        self.assertEqual(self.text('intelligenceCloudStatus'), 'Gemini disabled')
         self.open_answer_options()
         style = self.browser.find_element(self.By.ID, 'intelligenceAnswerStyle')
         self.assertEqual(Select(style).first_selected_option.get_attribute('value'), 'auto')
@@ -2725,7 +2725,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.ml_engine.services.persistent_memory import MemoryStore
         from tests.test_persistent_memory import SyntheticEmbeddings
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-hybrid-browser-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_MOCK_REASONING=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         local=Mock(); local.reason.return_value='Synthetic hypothesis <img src=x onerror="window.memoryLeak=true">'
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
@@ -2786,13 +2786,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'memorySyncNow').is_enabled())
         self.memory_click('#memorySyncNow')
         self.wait.until(lambda _: 'Revision 1;' in self.text('memorySyncStatus'))
-        self.browser.get(self.live_server_url+'/settings/#settingsOpenAI')
+        self.browser.get(self.live_server_url+'/settings/#settingsGemini')
         self.wait.until(lambda _: 'Billing measurements are unavailable' in self.text('memoryReasoningUsage'))
         self.memory_click('#memoryReasoningEnabled')
         tokens=self.browser.find_element(self.By.ID,'memoryReasoningTokens'); tokens.clear(); tokens.send_keys('4000')  # two answers, each reserving up to 1024 output tokens
         dollars=self.browser.find_element(self.By.ID,'memoryReasoningDollars'); dollars.clear(); dollars.send_keys('0.005')
         self.memory_click('#memoryReasoningForm button')
-        self.wait.until(lambda _: 'OpenAI settings saved.' in self.text('openaiFeedback'))
+        self.wait.until(lambda _: 'Gemini settings saved.' in self.text('geminiFeedback'))
         with store._transaction() as db:
             self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy']['daily_microusd'],5000)
         self.capture('memory-sync-reasoning-owner-policy')
@@ -2887,7 +2887,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from tests.test_persistent_memory import SyntheticEmbeddings
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-history-browser-synthetic-')))
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),
-            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=authorized, ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=authorized,
             ALFRED_MEMORY_MOCK_REASONING=False, ALFRED_MEMORY_SYNC_PROVIDER=''))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
         local = Mock(); local.reason.return_value = 'Synthetic historical hypothesis <img src=x onerror="window.historyLeak=true">'
@@ -3287,7 +3287,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         local.reason.side_effect = EmbeddingUnavailable('synthetic local outage')
         self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())
-        self.assertIn('OpenAI disabled', self.text('intelligenceCloudStatus'))
+        self.assertIn('Gemini disabled', self.text('intelligenceCloudStatus'))
         with patch('apps.ml_engine.api.views.hybrid_answer', wraps=hybrid_answer) as request, \
                 patch('apps.ml_engine.services.hybrid_intelligence.hybrid_answer',new=request):
             local.reason.side_effect = None
@@ -3325,7 +3325,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from tests.test_expense_money_identity import parsed_fixture
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-ground-browser-synthetic-')))
         self.enterContext(override_settings(MEDIA_ROOT=root/'media', ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-            ALFRED_MEMORY_DIR=str(root/'unused-vault'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_MEMORY_DIR=str(root/'unused-vault'),
             ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
         owner=self.scenario['user']
         account=BankAccount.objects.create(user=owner,account_number='TEST0001',current_balance='10.01')
@@ -3442,7 +3442,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.ask_history_question('Show statement period')
         self.wait.until(lambda _: 'Insufficient evidence.' in self.text('intelligenceFeedback'))
         self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'Show statement period')
-        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
         local.reason.assert_not_called(); cloud.assert_not_called()
 
     def test_career_outcomes_owner_history_save_correction_and_stale_draft(self):
@@ -3621,7 +3621,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
             self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceRetry').is_displayed())
             self.assertIn('no model used',self.text('intelligenceLocalStatus'))
-            self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+            self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
         self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
         self.capture('reviewed-transaction-classification')
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
@@ -3666,7 +3666,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertIn(expected,answer); self.assertIn('not independent bank authentication',answer)
             self.assertEqual(draft.get_property('value'),''); self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceRetry').is_displayed())
             self.assertIn('no model used',self.text('intelligenceLocalStatus'))
-            self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+            self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
             self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
             if expected=='2026-09-01':
                 status=self.browser.execute_async_script('''
@@ -3797,8 +3797,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.investments.models import Investment
         from tests.test_persistent_memory import SyntheticEmbeddings
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-canonical-browser-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-            ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         local=Mock(); local.reason.return_value='Synthetic recorded-value hypothesis. Review the owner source and limitations.'
         self.enterContext(patch('apps.ml_engine.services.hybrid_intelligence.OllamaReasoner',return_value=local))
@@ -4913,7 +4912,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: f'canonical-loan-{row.pk}' in self.text('intelligenceAnswers'))
         self.assertIn('100.01 · Currency not recorded',self.text('intelligenceAnswers'))
         self.assertNotIn('document sources: [',self.text('intelligenceAnswers'))
-        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
         self.capture('loan-grounded-field-citation')
         self.memory_click(f'#intelligenceAnswers a[href="{detail["citation_url"]}"]')
         self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
@@ -4944,7 +4943,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: f'canonical-loan-{row.pk}' in self.text('intelligenceAnswers'))
         self.assertNotIn('applied payment source:',self.text('intelligenceAnswers'))
         self.assertNotIn('/documents/statements/',json.dumps(local.reason.call_args.args[0]))
-        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
         self.memory_click(f'#intelligenceAnswers a[href="{citation}"]')
         self.wait.until(lambda _: 'owner_confirmed_statement_reference' in self.text('canonicalEvidence'))
         self.memory_click(f'#canonicalEvidence a[href="{bank_detail["citation_url"]}"]')
@@ -5014,7 +5013,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: f'canonical-investment-{row.pk}' in self.text('intelligenceAnswers'))
         self.assertIn('2,345.67 · Currency not recorded',self.text('intelligenceAnswers'))
         self.assertNotIn('document sources: [',self.text('intelligenceAnswers'))
-        self.assertEqual(self.text('intelligenceCloudStatus'),'OpenAI disabled')
+        self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
         self.capture('investment-grounded-field-citation')
         self.memory_click(f'#intelligenceAnswers a[href="{detail["citation_url"]}"]')
         self.wait.until(lambda _: 'owner_confirmed' in self.text('statementEvidence'))
@@ -8199,8 +8198,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         finance.TravelAffordabilityTests.setUp(self)
         self.user.city='Bengaluru';self.user.monthly_income='3100';self.user.set_password(PASSWORD);self.user.save()
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-d1-browser-synthetic-')))
-        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-            ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.enterContext(patch('apps.mobility.services.travel_research.dispatch'))
         self.enterContext(patch('apps.mobility.services.travel.research.weather_result',side_effect=weather_fixture))

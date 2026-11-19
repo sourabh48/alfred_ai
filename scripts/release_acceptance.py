@@ -102,7 +102,7 @@ def browser_acceptance(port, output):
             browser.get(base + path)
             wait.until(lambda d: d.find_element(By.CSS_SELECTOR, selector))
             if name == "conversation":
-                wait.until(lambda d: d.find_element(By.ID, "intelligenceCloudStatus").text == "OpenAI disabled")
+                wait.until(lambda d: d.find_element(By.ID, "intelligenceCloudStatus").text == "Gemini disabled")
             browser.save_screenshot(str(output / (name + ".png")))
             checks.append(name)
         theme = browser.find_element(By.ID, "workspaceTheme")

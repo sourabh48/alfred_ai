@@ -10,34 +10,33 @@ from django.core.management import call_command, CommandError
 from django.test import TestCase, override_settings, Client
 
 from alfred_ai.services.public_http import PublicResponse
-from apps.ml_engine.services.memory_reasoning import CLOUD_OUTPUT_TOKENS, OpenAIReasoner, MODEL, ReasoningBudgetExceeded, configure_reasoning, reason_with_memory, reasoning_provider, remove_key
+from apps.ml_engine.services.memory_reasoning import CLOUD_OUTPUT_TOKENS, GeminiReasoner, ReasoningBudgetExceeded, configure_reasoning, reason_with_memory, reasoning_provider, remove_key, save_key
 from apps.ml_engine.services.memory_sync import SyncUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
 from tests.test_persistent_memory import SyntheticEmbeddings
 
-KEY='sk-SYNTHETIC-ONLY-NEVER-A-REAL-PAID-CREDENTIAL-9001'
+KEY='AIza'+'SYNTHETIC-ONLY-NEVER-REAL-000009001'  # made-up, Gemini key shape
+MODEL='gemini-synthetic-lite'
 
 
 class MemoryReasoningTests(TestCase):
     def setUp(self):
-        self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-openai-synthetic-')))
+        self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-gemini-synthetic-')))
         self.alice=get_user_model().objects.create_user(username='synthetic-reason-alice')
         self.bob=get_user_model().objects.create_user(username='synthetic-reason-bob')
         self.store=MemoryStore(self.root/'vault',embedder=SyntheticEmbeddings()); self.owner=_owner(self.alice)
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(self.store.directory),ALFRED_MEMORY_MOCK_REASONING=False,
-            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'request-limits'),
-            ALFRED_MEMORY_OPENAI_AUTHORIZED=True,ALFRED_MEMORY_OPENAI_PRICING_DATE=datetime.now(timezone.utc).date().isoformat()))
+            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'request-limits'),ALFRED_GEMINI_MODEL=MODEL))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.http=self.enterContext(patch('apps.ml_engine.services.memory_reasoning.request',side_effect=self.response))
-        self.provider=OpenAIReasoner(KEY)
+        self.provider=GeminiReasoner(KEY)
         configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=4096,daily_microusd=10000)
         with self.store._transaction() as db:
-            state=self.store._sync_state(db,self.owner); state['openai_key']=KEY; self.store._write_sync_state(db,self.owner,state)
+            state=self.store._sync_state(db,self.owner); state['gemini_key']=KEY; self.store._write_sync_state(db,self.owner,state)
 
     def response(self,*args,**kwargs):
-        return PublicResponse(json.dumps({'model':MODEL,'service_tier':'default','status':'completed','error':None,
-            'usage':{'input_tokens':100,'output_tokens':12,'total_tokens':112},
-            'output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':'Synthetic public suggestion.'}]}]}).encode(),'application/json')
+        return PublicResponse(json.dumps({'modelVersion':MODEL,'usageMetadata':{'promptTokenCount':100,'candidatesTokenCount':12,'totalTokenCount':112},
+            'candidates':[{'finishReason':'STOP','content':{'role':'model','parts':[{'text':'Synthetic public suggestion.'}]}}]}).encode(),'application/json')
 
     def save(self,content=None,sensitivity='public'):
         return self.store.save_verified(self.alice,content or {'preference':'synthetic quiet mountain'}, {'source':'SYNTHETIC-PRIVATE-PROVENANCE'},sensitivity=sensitivity,verified=True)
@@ -53,6 +52,16 @@ class MemoryReasoningTests(TestCase):
         self.assertIsNone(reasoning_provider(self.store,self.alice))
         self.http.assert_not_called()
 
+    def test_a_leftover_openai_key_is_forgotten_and_its_consent_does_not_carry_to_gemini(self):
+        with self.store._transaction() as db:
+            state=self.store._sync_state(db,self.owner); state.pop('gemini_key'); state['openai_key']='sk-'+'S'*30; self.store._write_sync_state(db,self.owner,state)
+        self.assertIsNone(reasoning_provider(self.store,self.alice))
+        with self.store._transaction() as db: state=self.store._sync_state(db,self.owner)
+        self.assertNotIn('openai_key',state); self.assertFalse(state['reasoning_policy']['enabled'])
+        save_key(self.store,self.alice,KEY)
+        with self.assertRaises(PermissionError): self.reason()  # opts in again for Gemini first
+        self.http.assert_not_called()
+
     def test_settings_key_api_saves_encrypted_never_returns_it_and_remove_turns_off(self):
         client=Client(enforce_csrf_checks=True); url='/api/ai/memories/reason/key/'
         client.force_login(self.bob); client.get('/settings/'); csrf=client.cookies['csrftoken'].value
@@ -63,21 +72,21 @@ class MemoryReasoningTests(TestCase):
         self.assertEqual(saved.json(),{'key_saved':True,'key_hint':'…9001','policy_enabled':False})
         self.assertNotIn(KEY,saved.content.decode()+client.get('/api/ai/memories/reason/').content.decode())
         self.assertNotIn(KEY.encode(),(self.store.directory/'verified.sqlite3').read_bytes())
-        self.assertIsInstance(reasoning_provider(self.store,self.bob),OpenAIReasoner)
+        self.assertIsInstance(reasoning_provider(self.store,self.bob),GeminiReasoner)
         configure_reasoning(self.store,self.bob,enabled=True,consent=True,daily_tokens=4096,daily_microusd=10000)
         self.assertEqual(client.delete(url,HTTP_X_CSRFTOKEN=csrf).json(),{'key_saved':False,'key_hint':'','policy_enabled':False})
         self.assertIsNone(reasoning_provider(self.store,self.bob))
-        self.assertIsInstance(reasoning_provider(self.store,self.alice),OpenAIReasoner)  # other owners untouched
+        self.assertIsInstance(reasoning_provider(self.store,self.alice),GeminiReasoner)  # other owners untouched
         self.http.assert_not_called()
 
     def test_request_is_fixed_bounded_stateless_and_strips_private_provenance(self):
         self.save(); result=self.reason()
         method,url=self.http.call_args.args; options=self.http.call_args.kwargs; body=json.loads(options['data'])
-        self.assertEqual((method,url),('POST','https://api.openai.com/v1/responses'))
-        self.assertFalse(body['store']); self.assertFalse(body['background']); self.assertEqual(body['tools'],[]); self.assertEqual(body['tool_choice'],'none')
-        self.assertEqual(body['service_tier'],'default')
-        self.assertEqual(body['max_output_tokens'],CLOUD_OUTPUT_TOKENS); self.assertEqual(options['max_bytes'],65536)
+        self.assertEqual((method,url),('POST',f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent'))
+        self.assertEqual(options['headers']['x-goog-api-key'],KEY); self.assertNotIn('tools',body); self.assertNotIn('toolConfig',body)
+        self.assertEqual(body['generationConfig'],{'maxOutputTokens':CLOUD_OUTPUT_TOKENS,'candidateCount':1}); self.assertEqual(options['max_bytes'],65536)
         self.assertNotIn('PROVENANCE',str(body)); self.assertNotIn(self.owner,str(body)); self.assertNotIn(KEY,str(body))
+        self.assertEqual(result['answer'],'Synthetic public suggestion.'); self.assertEqual(result['provider'],'gemini')
         self.assertEqual(result['classification'],'ai_generated_hypothesis'); self.assertFalse(result['financial_authority'])
         self.assertGreater(result['reserved_microusd'],0)
 
@@ -118,9 +127,12 @@ class MemoryReasoningTests(TestCase):
         with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=65536):
             configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=65536,daily_microusd=100000)
         original=self.response().json()
-        changes=({'model':'different-model'},{'service_tier':'priority'},{'status':'incomplete'},{'usage':{'input_tokens':1,'output_tokens':CLOUD_OUTPUT_TOKENS+1,'total_tokens':CLOUD_OUTPUT_TOKENS+2}},
-            {'usage':{'input_tokens':True,'output_tokens':1,'total_tokens':2}}, {'output':[{'type':'function_call'}]},
-            {'output':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':'x'*16385}]}]})
+        def answer(**candidate):
+            return {'candidates':[{'finishReason':'STOP','content':{'role':'model','parts':[{'text':'ok'}]}}|candidate]}
+        changes=({'modelVersion':'different-model'},{'promptFeedback':{'blockReason':'SAFETY'}},answer(finishReason='MAX_TOKENS'),
+            {'usageMetadata':{'promptTokenCount':1,'candidatesTokenCount':CLOUD_OUTPUT_TOKENS+1}},{'usageMetadata':{'promptTokenCount':True}},
+            answer(content={'role':'model','parts':[{'functionCall':{'name':'x'}}]}),answer(content={'role':'model','parts':[{'text':'x'*16385}]}),
+            {'candidates':[]})
         for change in changes:
             with self.subTest(change=list(change)):
                 self.http.side_effect=None; self.http.return_value=PublicResponse(json.dumps(original|change).encode(),'application/json')

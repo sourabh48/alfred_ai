@@ -27,8 +27,7 @@ class CanonicalEvidenceTests(TestCase):
     def setUp(self):
         self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-canonical-synthetic-')))
         self.enterContext(override_settings(MEDIA_ROOT=self.root/'media',ALFRED_MEMORY_DIR=str(self.root/'unused-vault'),
-            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'limits'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-            ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
+            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'limits'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
         self.enterContext(_offline_fixture_patches())
         # Based outside India, so a record with no currency stays withheld from rupee sums (owner decision 2026-11-18).
         self.owner=get_user_model().objects.create_user(username='canonical-owner',monthly_income='12345.67',rent_or_emi='123.45',country='Germany')

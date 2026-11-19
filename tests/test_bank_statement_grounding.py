@@ -29,8 +29,7 @@ class BankStatementGroundingTests(TestCase):
     def setUp(self):
         self.root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-bank-ground-synthetic-')))
         self.enterContext(override_settings(MEDIA_ROOT=self.root/'media',ALFRED_MEMORY_DIR=str(self.root/'vault'),
-            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'limits'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-            ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
+            ALFRED_ABUSE_THROTTLE_DIR=str(self.root/'limits'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
         self.enterContext(_offline_fixture_patches())
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.owner=get_user_model().objects.create_user(username='bank-ground-owner')

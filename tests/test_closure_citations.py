@@ -20,7 +20,7 @@ class ClosureCitationTests(TestCase):
     def setUp(self):
         root=Path(self.enterContext(TemporaryDirectory(prefix='alfred-closure-citation-synthetic-')))
         self.enterContext(override_settings(MEDIA_ROOT=root/'media',ALFRED_MEMORY_DIR=str(root/'vault'),
-            ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits'),ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits'),
             ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER='',ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False))
         self.enterContext(_offline_fixture_patches())
         self.owner=get_user_model().objects.create_user(username='closure-citation-owner')

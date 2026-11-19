@@ -183,7 +183,7 @@ class CanonicalGroundingTests(TestCase):
         self.assertEqual(response.json()['grounding'],'canonical_record_overview')
         self.assertNotIn('SYNTHETIC-PRIVATE',response.content.decode())
         self.cloud.assert_not_called(); self.provider.assert_not_called()
-        self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED); self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
+        self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
 
     def test_owner_session_csrf_and_strict_selection_validation(self):
         self.client.force_login(self.other); self.assertEqual(self.post().status_code,404)

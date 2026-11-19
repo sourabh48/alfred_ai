@@ -69,7 +69,7 @@ class CanonicalOllamaAcceptance(TestCase):
         from apps.loans.models import LoanImportDocument
         from apps.loans.services.document_evidence import capture_import, evidence, review, FIELDS
         fixtures.CanonicalEvidenceTests.setUp(self)
-        self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED)
+        self.assertFalse(hasattr(settings, 'ALFRED_MEMORY_OPENAI_AUTHORIZED'))
         self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
         self.assertFalse(settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED)
         document=LoanImportDocument.objects.create(user=self.owner,file_name='synthetic-loan.pdf',
@@ -94,7 +94,7 @@ class CanonicalOllamaAcceptance(TestCase):
         from apps.investments.models import InvestmentImportDocument
         from apps.investments.services.document_evidence import capture_import, evidence, review, FIELDS
         fixtures.CanonicalEvidenceTests.setUp(self)
-        self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED)
+        self.assertFalse(hasattr(settings, 'ALFRED_MEMORY_OPENAI_AUTHORIZED'))
         self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
         self.assertFalse(settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED)
         document=InvestmentImportDocument.objects.create(user=self.owner,file_name='synthetic-portfolio.pdf',
@@ -116,7 +116,7 @@ class CanonicalOllamaAcceptance(TestCase):
 
     def test_real_local_inference_and_encrypted_memory_reopen_with_synthetic_record(self):
         fixtures.CanonicalEvidenceTests.setUp(self)
-        self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED)
+        self.assertFalse(hasattr(settings, 'ALFRED_MEMORY_OPENAI_AUTHORIZED'))
         self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
         self.assertFalse(settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED)
         store=MemoryStore(settings.ALFRED_MEMORY_DIR,embedder=OllamaEmbeddings())

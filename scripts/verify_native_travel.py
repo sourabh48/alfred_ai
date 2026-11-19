@@ -253,7 +253,7 @@ def main():
         probe.wait.until(lambda _: 'Reference:' in probe.text('intelligenceFeedback'))
         assert browser.find_element(By.ID, 'intelligenceRetry').is_displayed()
         assert draft.get_attribute('value') == 'Suggest a quiet holiday activity.'
-        assert probe.text('intelligenceCloudStatus') == 'OpenAI disabled'
+        assert probe.text('intelligenceCloudStatus') == 'Gemini disabled'
         assert not browser.find_elements(By.CSS_SELECTOR, '#intelligenceAnswers article')
         browser.save_screenshot(str(folder / 'model-unavailable.png'))
         browser.get(base + '/mobility/?session=' + str(trip.pk))

@@ -47,7 +47,7 @@ class TravelEndToEndTests(TestCase):
         self.directory=Path(self.enterContext(TemporaryDirectory(prefix='alfred-d1-synthetic-')))
         self.root=private_directory(self.directory/'private')
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(self.root/'vault'),
-            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
             ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALFRED_MEMORY_SYNC_PROVIDER=''))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.journeys=[]

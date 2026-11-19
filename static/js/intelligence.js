@@ -449,8 +449,8 @@ document.addEventListener("DOMContentLoaded", () => {
         cloudAvailable = Boolean(reasoning?.provider_available && reasoning.policy.enabled);
         setLocalStatus(insights.local_model_status === "available" ? "Ollama available" : "Ollama unavailable", insights.local_model_status === "available" ? "ready" : "unavailable");
         document.getElementById("intelligenceCloudStatus").textContent = !reasoning ? "Cloud policy unavailable · cloud disabled" : !reasoning.real_provider_enabled
-            ? (cloudAvailable ? "Synthetic cloud testing · OpenAI disabled" : "OpenAI disabled")
-            : (cloudAvailable ? "OpenAI · consent required per question" : "OpenAI · owner consent or configuration required");
+            ? (cloudAvailable ? "Synthetic cloud testing · Gemini disabled" : "Gemini disabled")
+            : (cloudAvailable ? "Gemini · consent required per question" : "Gemini · owner consent or configuration required");
         if (policy.error) feedback.textContent = `${policy.error.message} Cloud is disabled. Reload to recheck its policy; local sources remain available.`;
         updateScope();
     }
@@ -482,7 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const question = document.createElement("p"); question.textContent = payload.query; userMessage.append(userLabel, question);
         const assistantMessage = document.createElement("div"); assistantMessage.className = "conversation-message mt-3";
         const label = document.createElement("span"); label.className = "conversation-label";
-        label.textContent = result.grounding === "canonical_record_overview" ? "Recorded sources · AI unavailable" : result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : result.provider === "openai" ? "OpenAI (your key)" : "Approved cloud"}`;
+        label.textContent = result.grounding === "canonical_record_overview" ? "Recorded sources · AI unavailable" : result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : result.provider === "gemini" ? "Gemini (your key)" : "Approved cloud"}`;
         const answer = result.provider !== 'local_evidence' && !result.narrative_withheld
             ? Alfred.renderAnswerMarkdown(result.answer) : document.createElement('p');
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
@@ -745,7 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
         button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
-        if (consent.checked) payload.provider = "openai";
+        if (consent.checked) payload.provider = "gemini";
         if ((webSearch.checked || searchOnce) && scope.value === "general") payload.web_search = true;
         searchOnce = false;
         if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && pageDialogue.length) payload.page_context = pageDialogue;

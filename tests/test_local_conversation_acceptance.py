@@ -18,8 +18,7 @@ from apps.ml_engine.services.persistent_memory import MemoryStore
 class LocalConversationAcceptance(TestCase):
     def test_actual_local_page_followup_without_history_retention(self):
         with TemporaryDirectory(prefix='alfred-local-page-synthetic-') as directory, override_settings(
-                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-                ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
+                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
             owner = get_user_model().objects.create_user(username='synthetic-real-local-page')
             self.client.force_login(owner)
             first_query = 'In this fictional story the robot likes the color cobalt. Acknowledge briefly.'
@@ -39,8 +38,7 @@ class LocalConversationAcceptance(TestCase):
 
     def test_actual_local_answer_styles_respect_server_budgets(self):
         with TemporaryDirectory(prefix='alfred-local-styles-synthetic-') as directory, override_settings(
-                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'), ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-                ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
+                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'), ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False, ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
             owner = get_user_model().objects.create_user(username='synthetic-real-local-styles')
             self.client.force_login(owner)
             for style, limit in (('concise',192),('detailed',1024)):
@@ -63,8 +61,7 @@ class LocalConversationAcceptance(TestCase):
 
     def test_actual_local_model_remembers_synthetic_turn_after_vault_reopen(self):
         with TemporaryDirectory(prefix='alfred-local-dialogue-synthetic-') as directory, override_settings(
-                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'), ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True,
-                ALFRED_MEMORY_OPENAI_AUTHORIZED=False, ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
+                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'), ALFRED_CONVERSATION_HISTORY_AUTHORIZED=True, ALFRED_MEMORY_CLOUD_AUTHORIZED=False):
             owner = get_user_model().objects.create_user(username='synthetic-real-local-dialogue')
             history = ConversationHistory(MemoryStore(Path(directory)/'vault'))
             history.configure(owner, enabled=True, consent=True, days=1)

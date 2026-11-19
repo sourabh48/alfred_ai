@@ -300,13 +300,13 @@ Generated titles only; exact acceptance and evidence remain with each canonical 
 | AI-16 | Retrieval/model quality and drift monitoring |
 | AI-17 | Autonomous user task execution |
 | AI-18 | Voice assistant |
-| OPENAI-01 | Responses API request/response adapter |
+| OPENAI-01 | Gemini generateContent request/response adapter |
 | OPENAI-02 | Model compatibility and current price review |
 | OPENAI-03 | Encrypted key provisioning and owner consent |
 | OPENAI-04 | Privacy classification and sensitive-data filtering |
 | OPENAI-05 | Daily token and monetary spending caps |
 | OPENAI-06 | Fallback, timeout, redacted diagnostics and UI |
-| OPENAI-07 | Real paid-provider acceptance |
+| OPENAI-07 | Real provider acceptance with the owner's free Gemini key |
 | SYNC-01 | Provider-neutral mock sync protocol |
 | SYNC-02 | Non-AWS encrypted object adapter (AWS withdrawn) |
 | SYNC-03 | Startup/periodic/bounded shutdown sync |

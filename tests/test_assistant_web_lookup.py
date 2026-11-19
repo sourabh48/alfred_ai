@@ -9,7 +9,7 @@ from django.test import Client, SimpleTestCase, TestCase, override_settings
 from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.ml_engine.services import web_lookup
 from apps.ml_engine.services.hybrid_intelligence import hybrid_answer
-from apps.ml_engine.services.memory_reasoning import MockReasoner, OpenAIReasoner
+from apps.ml_engine.services.memory_reasoning import MockReasoner, GeminiReasoner
 from apps.ml_engine.services.persistent_memory import MemoryStore
 from tests.test_persistent_memory import SyntheticEmbeddings
 
@@ -100,11 +100,11 @@ class QuestionFilterTests(SimpleTestCase):
             web_lookup.search("my account 123456789012")
         request.assert_not_called()
 
-    def test_openai_gets_web_results_but_the_owner_part_is_still_checked(self):
-        reasoner = OpenAIReasoner("sk-" + "a" * 30)
+    def test_gemini_gets_web_results_but_the_owner_part_is_still_checked(self):
+        reasoner = GeminiReasoner("AIza" + "a" * 35)
         web = [{"ref": "web-1", "title": "Home loan rates", "snippet": "Loan EMI rates 8.5 percent, account offers"}]
         body = reasoner.body({"query": "home rates explained", "memories": [], "web_results": web}, 1024)
-        self.assertIn("web-1", body["input"])
+        self.assertIn("web-1", body["contents"][0]["parts"][0]["text"])
         with self.assertRaises(PermissionError):
             reasoner.body({"query": "my account 123456789012", "memories": [], "web_results": web}, 1024)
 
@@ -113,7 +113,7 @@ class HybridWebLookupTests(TestCase):
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix="alfred-web-lookup-synthetic-")))
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root / "vault"), ALFRED_ABUSE_THROTTLE_DIR=str(root / "limits"),
-            ALFRED_MEMORY_MOCK_REASONING=False, ALFRED_MEMORY_OPENAI_AUTHORIZED=False))
+            ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch("apps.ml_engine.services.persistent_memory.OllamaEmbeddings", return_value=SyntheticEmbeddings()))
         self.enterContext(patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request))
         self.store = MemoryStore(root / "vault")
@@ -168,21 +168,21 @@ class HybridWebLookupTests(TestCase):
             self.assertEqual({call.kwargs.get("params", {}).get("q", exact) for call in request.call_args_list}, {exact})
             self.assertNotIn("web_offer", confirmed)
             request.reset_mock()
-            cloud = self.ask("When did Anika leave Infosys?", provider="openai", cloud_consent=True, query_sensitivity="public")
+            cloud = self.ask("When did Anika leave Infosys?", provider="gemini", cloud_consent=True, query_sensitivity="public")
             request.assert_not_called()
             self.assertEqual(cloud["web_offer"], "When did Anika leave Infosys?")
             with self.assertRaises(PermissionError):  # the cloud path keeps its own stricter refusal for sensitive text
-                self.ask(question, provider="openai", cloud_consent=True, query_sensitivity="public")
+                self.ask(question, provider="gemini", cloud_consent=True, query_sensitivity="public")
         self.assertNotIn("web_offer", self.ask(question))  # automatic lookup switched off: no offer either
 
-    def test_openai_answers_directly_when_chosen_with_consent(self):
-        result = self.ask(web_search=True, provider="openai", cloud_consent=True, query_sensitivity="public")
+    def test_gemini_answers_directly_when_chosen_with_consent(self):
+        result = self.ask(web_search=True, provider="gemini", cloud_consent=True, query_sensitivity="public")
         self.local.reason.assert_not_called()
         self.assertEqual(result["provider"], "mock")
         self.assertEqual([s["ref"] for s in result["sources"]], ["web-1", "web-2"])
         for refused in ({}, {"cloud_consent": True}, {"cloud_consent": True, "query_sensitivity": "public", "scope": "travel"}):
             with self.subTest(refused=refused), self.assertRaises(ValueError):
-                self.ask(provider="openai", **refused)
+                self.ask(provider="gemini", **refused)
 
 
 @override_settings(ALFRED_MEMORY_MOCK_REASONING=False)

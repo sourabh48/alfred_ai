@@ -25,7 +25,7 @@ class NativeLocalStreamAcceptance(TransactionTestCase):
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-native-stream-synthetic-')))
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root/'vault'),ALFRED_ABUSE_THROTTLE_DIR=str(root/'limits'),
-            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_OPENAI_AUTHORIZED=False,
+            ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
             ALFRED_MEMORY_CLOUD_AUTHORIZED=False,ALLOWED_HOSTS=['127.0.0.1','testserver']))
         self.enterContext(_offline_fixture_patches())
         self.owner = get_user_model().objects.create_user(username='synthetic-native-stream')

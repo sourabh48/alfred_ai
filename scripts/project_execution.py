@@ -36,7 +36,7 @@ GATES = {
     'TRAVEL-15': 'BLOCKED_EXTERNAL: no verified live permit or closure service; dated references shown stale with UNKNOWN confidence',
     'BIKE-03': 'BLOCKED_EVIDENCE: part windows and evidence score labelled 2026-11-06; prediction quality needs real logged service outcomes',
     'BIKE-05': 'BLOCKED_EXTERNAL: cost figures labelled estimates 2026-11-06; authoritative part compatibility and live prices need a manufacturer or dealer source',
-    'OPENAI-02': 'BLOCKED_APPROVAL: owner allowed own-key OpenAI from Settings 2026-11-07 (opt-in, consent, privacy filter and daily caps apply); pinned model retires 2027-01-14 and its replacement waits for owner choice; live use unverified',
+    'OPENAI-02': 'OWNER_ACTION: OpenAI dropped 2026-11-19; Gemini with each person’s own free key; confirm the configured model and free-tier limits with a live key',
     'RUNTIME-12': 'BLOCKED_APPROVAL: CI runs on each master push; owner-approved ruleset 27070437 (2026-11-12) blocks master deletion and force push; required status checks are unset because finished work is pushed straight to master and need an owner decision',
     'FIN-15': 'BLOCKED_EVIDENCE: all six FIN-15 domains implemented and every currency migration (through users 0006) applied to the owner runtime; calculations never use FX, display-only approximate figures in the viewer currency added 2026-11-07 (ECB via Frankfurter); owner checks in the app pending',
     'FIN-06': 'BLOCKED_EVIDENCE: INR savings goals with Decimal progress implemented 2026-11-06; owner approved migration budgets 0003; owner check in the app remains',

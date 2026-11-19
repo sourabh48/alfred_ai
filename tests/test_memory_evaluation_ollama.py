@@ -17,7 +17,7 @@ from tests import test_memory_learning as fixtures
 class MemoryEvaluationOllamaAcceptance(TestCase):
     def test_real_local_multi_case_quality_and_reopened_encrypted_index(self):
         fixtures.MemoryLearningTests.setUp(self)
-        self.assertFalse(settings.ALFRED_MEMORY_OPENAI_AUTHORIZED)
+        self.assertFalse(hasattr(settings, 'ALFRED_MEMORY_OPENAI_AUTHORIZED'))
         self.assertFalse(settings.ALFRED_MEMORY_CLOUD_AUTHORIZED)
         self.assertFalse(settings.ALFRED_CONVERSATION_HISTORY_AUTHORIZED)
         store=MemoryStore(self.root/'real-vault',embedder=OllamaEmbeddings()); learning=MemoryLearning(store)

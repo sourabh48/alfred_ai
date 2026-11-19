@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from alfred_ai.services.api_errors import safe_error_response
 from apps.ml_engine.services.persistent_memory import MemoryStore, MemoryConflict
 from apps.ml_engine.services.memory_sync import SyncConflict, MemorySynchronizer
-from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, saved_key, save_key, remove_key, key_status
+from apps.ml_engine.services.memory_reasoning import ReasoningBudgetExceeded, reason_with_memory, reasoning_provider, configure_reasoning, saved_key, save_key, remove_key, key_status, forget_openai
 from apps.ml_engine.services.memory_learning import MemoryLearning
 from apps.ml_engine.services.memory_cloud import synchronizer, configured_provider
 from apps.ml_engine.services.conversation_history import ConversationConflict, ConversationPermission
@@ -158,11 +158,11 @@ class MemorySyncAPI(MemoryAPI):
 
 
 class MemoryReasoningKeyAPI(MemoryAPI):
-    """Save or forget the owner's own OpenAI key. The key is never sent back."""
+    """Save or forget the person's own Gemini key. The key is never sent back."""
     def post(self,request):
         try: save_key(memory_store(),request.user,self.payload(('key',)).get('key'))
         except Exception as exc:
-            return safe_error_response(exc,'That does not look like an OpenAI API key (it starts with sk-). Nothing was saved.',logger_name=__name__,status_code=400)
+            return safe_error_response(exc,'That does not look like a Gemini API key (it starts with AIza and is 39 characters). Nothing was saved.',logger_name=__name__,status_code=400)
         return Response(self._status(request))
 
     def delete(self,request):
@@ -178,9 +178,7 @@ class MemoryReasoningKeyAPI(MemoryAPI):
 
 class MemoryReasoningAPI(MemoryAPI):
     def get(self,request):
-        from apps.ml_engine.services.persistent_memory import _owner
-        store=memory_store()
-        with store._transaction() as db: state=store._sync_state(db,_owner(request.user))
+        state=forget_openai(memory_store(),request.user)
         policy=state.get('reasoning_policy',{'enabled':False,'public_only':True,
             'daily_tokens':settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,'daily_microusd':settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD})
         from datetime import datetime, timezone

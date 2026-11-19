@@ -30,8 +30,7 @@ class AnswerFormatAcceptance(StaticLiveServerTestCase):
             # Same in-memory SQLite request boundary as the existing browser suite.
             with lock: return original(handler,request)
         with TemporaryDirectory(prefix='alfred-format-real-synthetic-') as directory, override_settings(
-                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,
-                ALFRED_MEMORY_OPENAI_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False), \
+                ALFRED_MEMORY_DIR=str(Path(directory)/'vault'),ALFRED_CONVERSATION_HISTORY_AUTHORIZED=False,ALFRED_MEMORY_CLOUD_AUTHORIZED=False), \
                 _offline_fixture_patches(), patch.object(BaseHandler,'get_response',serialized):
             owner = get_user_model().objects.create_user(username='synthetic-format-real-model')
             self.client.force_login(owner)

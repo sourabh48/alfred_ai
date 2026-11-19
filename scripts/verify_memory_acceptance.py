@@ -106,7 +106,7 @@ def before_restart(base,session,owner,data,passed):
         passed('m15_packaged_chrome_banking_financial_filters_and_travel_navigation')
         browser.get(base+'/ai/insights/')
         wait.until(lambda _: 'Ollama available' in browser.find_element(By.ID,'intelligenceLocalStatus').text)
-        assert browser.find_element(By.ID,'intelligenceCloudStatus').text=='OpenAI disabled'
+        assert browser.find_element(By.ID,'intelligenceCloudStatus').text=='Gemini disabled'
         assert browser.execute_script("return Alfred.formatRecordedMoney({amount:'999999999999999.99',currency:'USD',evidence_status:'verified'})")=='$999,999,999,999,999.99 USD'
         if browser.execute_script('return document.documentElement.dataset.theme')!='dark': click('#workspaceTheme')
         browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
@@ -176,7 +176,7 @@ def during_model_outage(base,session,owner,data,passed):
         browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",retry); retry.click()
         wait.until(lambda _: not draft.get_attribute('readonly') and retry.is_displayed())
         assert draft.get_attribute('value')==question
-        assert browser.find_element(By.ID,'intelligenceCloudStatus').text=='OpenAI disabled'
+        assert browser.find_element(By.ID,'intelligenceCloudStatus').text=='Gemini disabled'
         assert not browser.find_element(By.ID,'intelligenceAnswers').find_elements(By.TAG_NAME,'article')
         browser.save_screenshot(str(data/'m15-model-outage.png'))
         after=session.get(base+path,timeout=15).json()

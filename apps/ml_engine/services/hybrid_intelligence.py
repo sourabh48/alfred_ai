@@ -313,10 +313,10 @@ def validate_dialogue(context, scope, cloud_consent):
 
 def hybrid_answer(store,user,query,*,scope='general',document_id=None,transaction_id=None,record_type=None,record_id=None,selected_documents=None,source_catalog=None,selected_records=None,cloud_consent=False,query_sensitivity='sensitive',local=None,conversation_context=None,answer_style='auto',web_search=False,provider='local'):
     from .canonical_evidence import KINDS, supported_question, requested_record_field
-    if type(web_search) is not bool or provider not in ('local','openai') or (web_search and scope!='general'):
+    if type(web_search) is not bool or provider not in ('local','gemini') or (web_search and scope!='general'):
         raise ValueError('Online lookup is for general questions only.')
-    if provider=='openai' and (scope!='general' or cloud_consent is not True or query_sensitivity!='public' or conversation_context):
-        raise ValueError('OpenAI answers only public general questions you allow for this question.')
+    if provider=='gemini' and (scope!='general' or cloud_consent is not True or query_sensitivity!='public' or conversation_context):
+        raise ValueError('Gemini answers only public general questions you allow for this question.')
     owner=_owner(user)
     validate_dialogue(conversation_context, scope, cloud_consent)
     if (not isinstance(query,str) or not query.strip() or len(query.encode())>1024 or scope not in ('general','finance','travel','career','documents','bank_statements','financial_records','financial_document')
@@ -413,10 +413,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     def offered(result):
         if web_offer: result['web_offer']=web_offer
         return result
-    if auto_web and provider=='openai':
+    if auto_web and provider=='gemini':
         if web_lookup.should_search(query): web=web_lookup.search(query)
         else: web_offer=web_lookup.offer(query)
-    if provider=='openai':
+    if provider=='gemini':
         return offered(present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query))
     retrieval_error=None

@@ -126,4 +126,4 @@ class CitedRecordFigureTests(SimpleTestCase):
                 result = self.present(answer)
                 self.assertTrue(result['narrative_withheld'])
                 self.assertNotIn('cited_record_figures', result)
-        self.assertTrue(self.present('It was 1,234.50 [loan-closure-1].', provider='openai')['narrative_withheld'])
+        self.assertTrue(self.present('It was 1,234.50 [loan-closure-1].', provider='gemini')['narrative_withheld'])

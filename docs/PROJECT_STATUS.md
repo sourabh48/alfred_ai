@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 89/143 (62.2%) verified.**
+**Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 5 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 89 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 25 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 4 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -824,7 +824,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
-| OPENAI | 5 | 7 | 71.4 | 0 | 1 | 0 | 1 | 0 |
+| OPENAI | 0 | 7 | 0.0 | 6 | 1 | 0 | 0 | 0 |
 | SYNC | 7 | 11 | 63.6 | 0 | 2 | 0 | 2 | 0 |
 | RUNTIME | 11 | 16 | 68.8 | 2 | 1 | 0 | 2 | 0 |
 <!-- END STATUS DASHBOARD -->
@@ -2335,10 +2335,12 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - REAL SPOKEN CHECK 2026-11-06 (synthetic sandbox, real Chrome with a fake microphone playing a Piper recording, real Whisper and Piper, no mocks): first runs found three defects, all fixed: crude 48→16 kHz downsampling garbled words (now a 16 kHz audio context), Whisper wrote "1-Lac by much 2027" (now a short vocabulary hint; offline check at four start offsets gave "1 lakh by March 2027" every time), and the page's Content Security Policy blocked `blob:` audio so Read aloud was silent (now Web Audio). The AI-17 parser also accepts spoken forms ("add the savings goal", "1-lac", "lakh rupees"). Final run twice: heard exactly, action card ₹100,000.00 by 31 Mar 2027 with no model, 8 s spoken reply, goal saved after Confirm. The browser's own noise suppression and echo cancellation are requested; a paid Krisp SDK was considered and not needed.
 - Limits: the installer build excludes Piper (GPL), so Read aloud works from a checkout only; the microphone needs `localhost` or HTTPS, so plain-HTTP LAN devices cannot use Speak. Next: owner check in the app.
 
-### OPENAI-01 — Responses API request/response adapter
+### OPENAI-01 — Gemini generateContent request/response adapter
 
-**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: one live public question with the owner's own free Gemini key (OPENAI-07).
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
@@ -2348,8 +2350,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-02 — Model compatibility and current price review
 
-**PARTIALLY_IMPLEMENTED** · Optional OpenAI · P1.
+**PARTIALLY_IMPLEMENTED** · Optional Gemini (OPENAI IDs kept) · P1.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: confirm the configured model name and free-tier limits on Google's official pages with a live key; the cost reservation (1 and 4 micro-USD per input/output token) only matters for a key with billing on.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2361,8 +2365,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-03 — Encrypted key provisioning and owner consent
 
-**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: owner saves their own Gemini key in Settings, opts in, and removes it again.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
@@ -2372,8 +2378,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-04 — Privacy classification and sensitive-data filtering
 
-**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: owner check that a personal question stays local. On Gemini's free tier Google may keep and review prompts; the Settings card and the consent line say so.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
@@ -2383,8 +2391,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-05 — Daily token and monetary spending caps
 
-**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: owner check of the daily limit in Settings with a live key.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
@@ -2394,8 +2404,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-06 — Fallback, timeout, redacted diagnostics and UI
 
-**COMPLETE_VERIFIED** · Optional OpenAI · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: owner check that a failed or refused Gemini call falls back to the local answer path without leaking details.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
@@ -2403,10 +2415,12 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Ollama-first, no uncontrolled automatic paid retries; UI availability is not billing authorization. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Accept actual configured provider only under approval.
 
-### OPENAI-07 — Real paid-provider acceptance
+### OPENAI-07 — Real provider acceptance with the owner's free Gemini key
 
-**BLOCKED_APPROVAL** · Optional OpenAI · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
+- 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
+- Next: owner saves a free Gemini key, opts in, asks one public question, sees the Gemini answer with its label; no paid plan or spending (owner wants it free).
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.

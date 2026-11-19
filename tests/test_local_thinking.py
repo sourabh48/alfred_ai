@@ -108,7 +108,7 @@ class HybridAnswerThinkingTests(TestCase):
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-thinking-synthetic-')))
         self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(root / 'vault'), ALFRED_ABUSE_THROTTLE_DIR=str(root / 'limits'),
-                                            ALFRED_MEMORY_MOCK_REASONING=False, ALFRED_MEMORY_OPENAI_AUTHORIZED=False))
+                                            ALFRED_MEMORY_MOCK_REASONING=False))
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings', return_value=SyntheticEmbeddings()))
         self.store = MemoryStore(root / 'vault')
         self.user = get_user_model().objects.create_user(username='synthetic-thinking-owner')
