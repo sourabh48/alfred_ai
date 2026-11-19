@@ -56,7 +56,11 @@ class PersonalKeysMiddleware:
     """Each page uses the signed-in person's own keys for paid or limited services (owner decision 2026-11-19)."""
 
     def __init__(self, get_response):
+        from django.core.signals import request_finished
+        from alfred_ai.services import personal_keys
         self.get_response = get_response
+        # Cleared once the response is fully sent (after any streaming), so the person never carries over on this thread.
+        request_finished.connect(personal_keys.forget, dispatch_uid="alfred-personal-keys-forget")
 
     def __call__(self, request):
         from alfred_ai.services import personal_keys

@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 25 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 4 | BLOCKED_EXTERNAL: 3 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 28 | PARTIALLY_IMPLEMENTED: 25 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -825,8 +825,8 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
 | OPENAI | 0 | 7 | 0.0 | 6 | 1 | 0 | 0 | 0 |
-| SYNC | 7 | 11 | 63.6 | 0 | 2 | 0 | 2 | 0 |
-| RUNTIME | 11 | 16 | 68.8 | 2 | 1 | 0 | 2 | 0 |
+| SYNC | 7 | 11 | 63.6 | 1 | 2 | 0 | 0 | 1 |
+| RUNTIME | 11 | 16 | 68.8 | 4 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
 
 ## Separate 2.0 acceptance ledger
@@ -2520,8 +2520,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-09 — Portable keys and independent multi-device/device-loss recovery
 
-**BLOCKED_APPROVAL** · Encrypted intelligence synchronization · P1.
+**IMPLEMENTED_NOT_ACCEPTED** · Encrypted intelligence synchronization · P1.
 
+- 2026-11-19 owner decision: recovery uses Google + passphrase. Settings > Backup key ([alfred_ai/services/backup_key.py](../alfred_ai/services/backup_key.py)) makes a portable Fernet backup key (an existing key is never replaced), locks a copy with the person's passphrase (scrypt n=2^17, r=8, p=1, then Fernet) and keeps only the locked copy in the hidden Google Drive app folder (drive.appdata, one-time access, no lasting token); upload is read back and compared. A new PC fetches the copy after Google sign-in and opens it with the passphrase. Manager-only, CSRF-checked, the passphrase is never stored, logged or returned. Restore steps in [NATIVE_WINDOWS.md](NATIVE_WINDOWS.md#off-pc-backup-cloudflare-r2-and-the-backup-key-owner-decision-2026-11-19). Synthetic tests: `tests.test_backup_key` 8 PASS (lock/open, wrong passphrase, save then new-PC restore, damaged upload, existing key kept, manager-only API, scope and callback); Chrome `test_settings_backup_key_is_made_and_locked_without_showing_the_passphrase` PASS with axe light/dark. Not run against live Google Drive: the owner turns on the Drive API and drive.appdata first.
+- Next: owner saves the locked copy, then a fetch-and-open drill into a new empty data folder.
 - Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
 - APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
 - Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -2531,8 +2533,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-10 — Real provider activation, costs and IAM acceptance
 
-**BLOCKED_APPROVAL** · Encrypted intelligence synchronization · P2.
+**BLOCKED_EXTERNAL** · Encrypted intelligence synchronization · P2.
 
+- 2026-11-19 owner decision: Cloudflare R2 free tier is the provider (no AWS, no paid plan). Approval is given; what remains is outside ALFRED: the owner creates the free account, one bucket and a bucket-only token and puts them in the data folder's config/local.env (never in chat). Then one live upload and read-back.
 - Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
 - APIs/UI/models: Memory sync/status/checkpoint endpoints in ML API; native lifecycle hooks; Encrypted MemoryStore, authenticated snapshots, owner journal, protected trusted checkpoint.
 - Tests: [tests/test_memory_sync.py](../tests/test_memory_sync.py), [tests/test_memory_cloud.py](../tests/test_memory_cloud.py), [tests/test_memory_checkpoint.py](../tests/test_memory_checkpoint.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -3229,8 +3232,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-08 — Off-device/device-loss disaster recovery
 
-**BLOCKED_APPROVAL** · Windows, deployment and release · P1.
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
 
+- 2026-11-19 owner decision: recovery uses Google + passphrase. Settings > Backup key ([alfred_ai/services/backup_key.py](../alfred_ai/services/backup_key.py)) makes a portable Fernet backup key (an existing key is never replaced), locks a copy with the person's passphrase (scrypt n=2^17, r=8, p=1, then Fernet) and keeps only the locked copy in the hidden Google Drive app folder (drive.appdata, one-time access, no lasting token); upload is read back and compared. A new PC fetches the copy after Google sign-in and opens it with the passphrase. Manager-only, CSRF-checked, the passphrase is never stored, logged or returned. Restore steps in [NATIVE_WINDOWS.md](NATIVE_WINDOWS.md#off-pc-backup-cloudflare-r2-and-the-backup-key-owner-decision-2026-11-19). Synthetic tests: `tests.test_backup_key` 8 PASS (lock/open, wrong passphrase, save then new-PC restore, damaged upload, existing key kept, manager-only API, scope and callback); Chrome `test_settings_backup_key_is_made_and_locked_without_showing_the_passphrase` PASS with axe light/dark. Not run against live Google Drive: the owner turns on the Drive API and drive.appdata first.
+- Next: owner's first R2 upload (SYNC-10/11) and a restore drill into a new empty data folder.
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
@@ -3326,8 +3331,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-16 — Real-account and manual accessibility acceptance
 
-**BLOCKED_APPROVAL** · Windows, deployment and release · P1.
+**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
 
+- 2026-11-19 owner decision: the owner will do the real-account sign-in and a Windows Narrator pass during the walkthrough (no password in chat). Waits for that check.
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.

@@ -250,7 +250,7 @@ class ReleasePrivacyTests(ReleaseRepositoryFixture, unittest.TestCase):
         self.manifest["candidate_sha"] = self.git("rev-parse", "HEAD")
         result = validation.privacy(self.repo, self.manifest)
         self.assertEqual(result["status"], "PASS")
-        self.assertEqual(result["evidence"]["reviewed_synthetic_identifiers"], 3)
+        self.assertEqual(result["evidence"]["reviewed_synthetic_identifiers"], 2)  # the mocked OpenAI key left the file 2026-11-19
 
     def test_profile_environment_and_logs_never_include_operator_secrets(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "synthetic-secret", "AWS_SECRET_ACCESS_KEY": "synthetic-secret",

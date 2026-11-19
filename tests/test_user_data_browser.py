@@ -5327,6 +5327,39 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('settings-google-sync')
         self.run_axe_light_dark('settings-google-sync')
 
+    def test_settings_backup_key_is_made_and_locked_without_showing_the_passphrase(self):
+        import os, tempfile
+        from unittest.mock import patch
+        from alfred_ai.services import backup_key
+        from apps.users.models import EmailIdentity
+        EmailIdentity.objects.create(user=self.scenario['user'], provider='google', subject='synthetic-key-sub', email='key@example.org')
+        self.login()
+        folder = self.enterContext(tempfile.TemporaryDirectory(prefix='alfred-backup-key-browser-'))
+        self.enterContext(patch.dict(os.environ, {'ALFRED_GOOGLE_CLIENT_ID': 'x-id', 'ALFRED_GOOGLE_CLIENT_SECRET': 'x-secret', 'ALFRED_DATA_DIR': folder}))
+        self.enterContext(patch.object(backup_key, 'SCRYPT_N', 2 ** 10))
+        self.browser.get(self.live_server_url + '/settings/#settingsBackupKey')
+        self.wait.until(lambda _: 'No backup key on this PC yet' in self.text('backupKeyStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'backupKeySave').is_displayed())
+        self.browser.find_element(self.By.ID, 'backupKeyPassphrase').send_keys('synthetic four word passphrase')
+        self.browser.find_element(self.By.ID, 'backupKeyRepeat').send_keys('synthetic four word mistake')
+        self.memory_click('#backupKeyMake')
+        self.wait.until(lambda _: 'differ' in self.text('backupKeyFeedback'))
+        self.browser.find_element(self.By.ID, 'backupKeyPassphrase').clear()
+        self.browser.find_element(self.By.ID, 'backupKeyRepeat').clear()
+        self.browser.find_element(self.By.ID, 'backupKeyPassphrase').send_keys('synthetic four word passphrase')
+        self.browser.find_element(self.By.ID, 'backupKeyRepeat').send_keys('synthetic four word passphrase')
+        self.memory_click('#backupKeyMake')
+        self.wait.until(lambda _: 'not yet in Google Drive' in self.text('backupKeyStatus'))
+        save = self.browser.find_element(self.By.ID, 'backupKeySave')
+        self.assertTrue(save.is_displayed())
+        self.assertTrue(save.get_attribute('href').endswith('/auth/google/start/?purpose=backupkey&mode=save'))
+        self.assertEqual(self.browser.find_element(self.By.ID, 'backupKeyPassphrase').get_property('value'), '')
+        self.assertNotIn('synthetic four word passphrase', self.browser.page_source)
+        self.assertTrue(backup_key.key_path().is_file())
+        self.browser.execute_script("document.getElementById('settingsBackupKey').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('settings-backup-key')
+        self.run_axe_light_dark('settings-backup-key')
+
     def test_trip_tools_bookings_recorded_ride_and_holidays(self):
         import tempfile
         from pathlib import Path

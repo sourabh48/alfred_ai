@@ -87,6 +87,11 @@ def use_for(user) -> None:
     _person.set(getattr(user, "pk", None) if getattr(user, "is_authenticated", False) else None)
 
 
+def forget(**_signal) -> None:
+    """No person once a page request has finished (connected to Django's request_finished)."""
+    _person.set(None)
+
+
 @contextlib.contextmanager
 def acting_for(user):
     """A background job working for one person (a user or their id) uses that person's own keys."""

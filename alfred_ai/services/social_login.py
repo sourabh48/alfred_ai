@@ -55,6 +55,8 @@ def start(session, provider, redirect_uri, next_url="/", connect=False, purpose=
 
     purpose="sync" (Google only) also asks for the phone-sync permissions and lasting (offline) access; see google_sync.
     purpose="mail" (Google or Microsoft) asks to send, and read for reply watch, as the address in hint; see career_mail.
+    purpose="backupkey" (Google only) asks for ALFRED's hidden Drive app folder once, to save ("save" in hint) or fetch
+    ("fetch") the passphrase-locked backup key; see backup_key. No lasting access is kept.
     """
     if provider not in PROVIDERS or not all(_client(provider)):
         raise SignInError("That sign-in is not set up. Add its client id and secret in Settings first.")
@@ -62,7 +64,9 @@ def start(session, provider, redirect_uri, next_url="/", connect=False, purpose=
         raise SignInError("Phone sync works with Google only.")
     if purpose == "mail" and provider not in ("google", "microsoft"):
         raise SignInError("Career email is sent through Google or Microsoft only.")
-    if purpose not in ("", "sync", "mail"):
+    if purpose == "backupkey" and (provider != "google" or hint not in ("save", "fetch")):
+        raise SignInError("The backup key copy is kept in Google Drive only.")
+    if purpose not in ("", "sync", "mail", "backupkey"):
         raise SignInError("That permission is not available.")
     state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(64)
     session[SESSION_KEY] = {"provider": provider, "state": state, "verifier": verifier, "next": next_url,
@@ -81,6 +85,9 @@ def start(session, provider, redirect_uri, next_url="/", connect=False, purpose=
         query.update(scope=f"{scope} {mail_scope(provider)}", login_hint=hint)
         if provider == "google":
             query.update(access_type="offline", prompt="consent")
+    if purpose == "backupkey":
+        from .backup_key import SCOPE as drive_scope
+        query["scope"] = f"{scope} {drive_scope}"
     return f"{authorize}?{urlencode(query)}"
 
 
@@ -103,6 +110,8 @@ def finish(session, provider, params) -> tuple[dict, dict]:
         identity = _identity(provider, {"Authorization": f"Bearer {access}", "Accept": "application/json"})
         if pending.get("purpose") in ("sync", "mail"):  # handed to google_sync or career_mail, never kept in the session
             pending = {**pending, "refresh_token": token.get("refresh_token"), "granted": token.get("scope", "")}
+        if pending.get("purpose") == "backupkey":  # used once by backup_key during this request, never stored
+            pending = {**pending, "access_token": access, "granted": token.get("scope", "")}
     except PublicHTTPError as exc:
         if exc.code in ("authorization_failed", "api_error"):  # a wrong secret or an expired code
             if provider == "microsoft" and GUID.fullmatch(secret):

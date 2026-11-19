@@ -45,7 +45,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_advisory_evidence_freshness", "test_ai_emotion_api", "test_application_smoke", "test_audit_project", "test_behavioral_linkage", "test_bike_profile_and_invoice_review",
     "test_budget_acceptance", "test_calculation_risk_snapshot", "test_career_adaptive_intelligence", "test_career_application_kit", "test_career_bullet_rewrite", "test_career_evaluation", "test_career_tools",
     "test_career_interview_notes", "test_career_layout_pilot", "test_career_outcome_workflow", "test_career_projection_confidence", "test_career_projection_simulation", "test_career_salary_evidence",
-    "test_career_send", "test_career_mail", "test_cashflow_forecast_acceptance", "test_celery_startup", "test_chatgpt_imports", "test_credit_score_drop_migration", "test_development_council",
+    "test_career_send", "test_career_mail", "test_backup_key", "test_cashflow_forecast_acceptance", "test_celery_startup", "test_chatgpt_imports", "test_credit_score_drop_migration", "test_development_council",
     "test_document_layouts", "test_durable_queue", "test_expense_chart_granularity", "test_expense_money_migration", "test_expense_money_rehearsal", "test_expense_timeline_window",
     "test_financial_health_acceptance", "test_financial_relationships", "test_financial_scenario_reconciliation", "test_fund_look_through", "test_investment_projection", "test_large_data_materialization",
     "test_live_data_version", "test_loan_balance_basis", "test_loan_money_migration", "test_loan_money_retention", "test_local_ai_limits", "test_local_thinking", "test_ml_readiness",
@@ -109,7 +109,7 @@ PRIVATE = re.compile(r"(?i)(^|/)(?:\.env(?:\..+)?|native\.env|local\.env|"
                      r"media|uploads|statement_uploads|career_resumes|credit_reports|"
                      r"backups|restored-runtime|embeddings_store|private-memory-v2)(?:/|$)")
 PUBLIC_TEST_IDENTIFIERS = {
-    # AWS documentation example and a mocked OpenAI key, reviewed at the M15 baseline.
+    # AWS documentation example and a mocked OpenAI key, reviewed at the M15 baseline (the OpenAI one stays for history scans).
     ("tests/memory_s3_fixture.py", "1a5d44a2dca19669d72edf4c4f1c27c4c1ca4b4408fbb17f6ce4ad452d78ddb3"),
     ("tests/memory_s3_fixture.py", "099ffd0e4ccd9ca5a43a7ff4255d0ce24231fa1776f934dd60361dfa0499c431"),
     ("tests/test_memory_reasoning.py", "3de18efc58026cb49080132b1b2c2a55776401162062b9d6c060951ddb93e626"),

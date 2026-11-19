@@ -110,6 +110,13 @@ class OnlineServicesTests(TestCase):
             self.assertEqual(personal_keys.get("TRAVEL_GOOGLE_MAPS_API_KEY"), "")
         self.assertNotIn("TRAVEL_GOOGLE_MAPS_API_KEY", os.environ)
 
+    def test_a_finished_page_leaves_no_person_behind_on_its_thread(self):
+        from alfred_ai.services import personal_keys
+        personal_keys.save(self.family, {"TRAVEL_GOOGLE_MAPS_API_KEY": "synthetic-family-maps-key"})
+        self.client.force_login(self.family)
+        self.client.get("/api/settings/online-services/")
+        self.assertEqual(personal_keys.get("TRAVEL_GOOGLE_MAPS_API_KEY"), "")  # no PC-wide key, and the page is over
+
     def test_a_page_and_a_background_job_use_their_own_person_s_key(self):
         from alfred_ai.services import personal_keys
         from apps.mobility.services.travel import google_tiles

@@ -249,6 +249,40 @@ The verification script demonstrates a SQLite backup-API snapshot, restored
 login/session, financial totals and private file download over real HTTP.
 It uses synthetic records in disposable folders, never the live account.
 
+### Off-PC backup (Cloudflare R2) and the backup key (owner decision 2026-11-19)
+
+One-time setup:
+
+1. Create a free Cloudflare account, an R2 bucket and an API token limited to that bucket (Object Read & Write).
+   Put `ALFRED_MEMORY_R2_ACCOUNT_ID`, `ALFRED_MEMORY_R2_BUCKET`, `ALFRED_MEMORY_R2_ACCESS_KEY` and
+   `ALFRED_MEMORY_R2_SECRET_KEY` in the data folder's `config/local.env`, and `ALFRED_CLOUD_BACKUP_AUTHORIZED=true`.
+   Never paste them in a chat.
+2. In the Google Cloud project used for sign-in, turn on the Google Drive API and add the `drive.appdata` permission.
+3. In ALFRED: Settings > Backup key. Choose a passphrase (12+ characters, kept on paper or in your head), press
+   "Make the key and lock it", then "Save the locked copy to Google Drive". The card shows the key file path.
+
+Each backup (ALFRED stopped first):
+
+```powershell
+.venv\Scripts\python.exe scripts\cloud_backup.py --data-dir F:\ALFRED\restored-runtime upload --create --backup-dir F:\ALFRED\backup-YYYYMMDD --key-file F:\ALFRED\restored-runtime\artifacts\backup-key\backup.key --recovery-copy-confirmed
+```
+
+The archive is encrypted on the PC, uploaded, read back from R2 and hash-checked. `list` shows what is in the bucket.
+
+New PC after a loss: install ALFRED, start it with a new empty data folder, sign in with Google, open Settings >
+Backup key, press "New PC: fetch the locked copy from Google Drive" and type the passphrase. Then download and restore
+into another new empty folder:
+
+```powershell
+.venv\Scripts\python.exe scripts\cloud_backup.py --data-dir <new data folder> download --archive <sha256 from list> --key-file <new data folder>\artifacts\backup-key\backup.key --to <download folder>
+```
+
+```powershell
+.venv\Scripts\python.exe scripts\release_recovery.py --backup <download folder> --key-file <key file> --restore <restored data folder>
+```
+
+Start ALFRED with `--data-dir <restored data folder>`, sign in and check totals before adopting it.
+
 ## Reproduce verification and build
 
 ```powershell

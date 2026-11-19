@@ -325,21 +325,28 @@ def _safe_next(request, value):
 def social_start_view(request, provider):
     from .services import social_login
     connect = request.user.is_authenticated and request.GET.get("connect") == "1"
-    purpose = request.GET.get("purpose") if request.user.is_authenticated and request.GET.get("purpose") in ("sync", "mail") else ""
+    purpose = request.GET.get("purpose") if request.user.is_authenticated and request.GET.get("purpose") in ("sync", "mail", "backupkey") else ""
     hint = ""
+    if purpose == "backupkey":
+        from .services.online_services import can_manage
+        hint = request.GET.get("mode") if request.GET.get("mode") in ("save", "fetch") else ""
+        if not can_manage(request.user) or not hint:
+            request.session["alfred_backup_key_error"] = "Only the person who manages ALFRED keeps its backup key."
+            return redirect("/settings/#settingsBackupKey")
     if purpose == "mail":
         from apps.career.services import career_mail
         hint = str(request.GET.get("email") or "").strip().lower()
         if not career_mail.can_start(request.user, provider, hint):
             request.session["alfred_career_mail_error"] = "Choose one of your own sign-in addresses that Google or Outlook can send from."
             return redirect("/settings/#settingsCareerMail")
-    back = {"sync": "/settings/#settingsGoogleSync", "mail": "/settings/#settingsCareerMail"}.get(purpose) or (
+    back = {"sync": "/settings/#settingsGoogleSync", "mail": "/settings/#settingsCareerMail",
+            "backupkey": "/settings/#settingsBackupKey"}.get(purpose) or (
         "/settings/#settingsSignIn" if connect else "/login/")
     try:
         url = social_login.start(request.session, provider, request.build_absolute_uri(social_login.callback_path(provider)),
                                  _safe_next(request, request.GET.get("next")), connect, purpose, hint)
     except social_login.SignInError as exc:
-        request.session["alfred_career_mail_error" if purpose == "mail" else "alfred_sign_in_error"] = str(exc)
+        request.session[{"mail": "alfred_career_mail_error", "backupkey": "alfred_backup_key_error"}.get(purpose, "alfred_sign_in_error")] = str(exc)
         return redirect(back)
     return redirect(url)
 
@@ -357,6 +364,20 @@ def social_callback_view(request, provider):
         except (social_login.SignInError, google_sync.SyncError) as exc:
             request.session["alfred_google_sync_error"] = str(exc)
         return redirect("/settings/#settingsGoogleSync")
+    if started.get("purpose") == "backupkey" and request.user.is_authenticated:
+        from .services import backup_key
+        from .services.online_services import can_manage
+        try:
+            identity, pending = social_login.finish(request.session, provider, request.GET)
+            if not can_manage(request.user):
+                raise backup_key.BackupKeyError("Only the person who manages ALFRED keeps its backup key.")
+            if backup_key.SCOPE not in pending.get("granted", "").split():
+                raise backup_key.BackupKeyError("Tick the Google Drive permission on Google's screen so ALFRED can keep its one file there.")
+            work = backup_key.upload if pending.get("hint") == "save" else backup_key.fetch
+            work(pending["access_token"], identity["email"])
+        except (social_login.SignInError, backup_key.BackupKeyError) as exc:
+            request.session["alfred_backup_key_error"] = str(exc)
+        return redirect("/settings/#settingsBackupKey")
     if started.get("purpose") == "mail" and request.user.is_authenticated:
         from apps.career.services import career_mail
         try:
@@ -887,6 +908,33 @@ def google_sync_api_view(request):
         except (ValueError, AttributeError) as exc:
             return JsonResponse({"detail": str(exc) if type(exc) is ValueError else "Send the choice as JSON."}, status=400)
     response = JsonResponse({**google_sync.status(request.user), "error": request.session.pop("alfred_google_sync_error", "")})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def backup_key_api_view(request):
+    """Settings > Backup key: make the key and its locked copy, or open a fetched copy with the passphrase.
+    Saving to or fetching from Google Drive goes through /auth/google/start/?purpose=backupkey&mode=save|fetch."""
+    from .services import backup_key
+    from .services.online_services import can_manage
+    if not can_manage(request.user):
+        return JsonResponse({"detail": "Only the person who manages ALFRED keeps its backup key."}, status=403)
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body or b"{}")
+            if data.get("action") == "make":
+                backup_key.make(data.get("passphrase"), data.get("repeat"))
+            elif data.get("action") == "restore":
+                backup_key.restore(data.get("passphrase"))
+            else:
+                raise ValueError("Choose to make the key or open the copy.")
+        except backup_key.BackupKeyError as exc:
+            return JsonResponse({"detail": str(exc), **backup_key.status()}, status=400)
+        except (ValueError, AttributeError) as exc:
+            return JsonResponse({"detail": str(exc) if type(exc) is ValueError else "Send the choice as JSON."}, status=400)
+    response = JsonResponse({**backup_key.status(), "error": request.session.pop("alfred_backup_key_error", "")})
     response["Cache-Control"] = "no-store, private"
     return response
 
