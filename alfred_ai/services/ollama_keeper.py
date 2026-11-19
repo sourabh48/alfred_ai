@@ -2,6 +2,7 @@
 import os
 import socket
 import subprocess
+import time
 from pathlib import Path
 
 from django.conf import settings
@@ -26,3 +27,19 @@ def ensure_running():
         return "not_installed"
     subprocess.Popen([str(app)], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP, close_fds=True)
     return "started"
+
+
+WARM_FOR = "60m"  # refreshed every two minutes while ALFRED runs, so the model stays loaded
+
+
+def warm_reading_model():
+    """Keep the Travel reading model loaded: a cold load took about 20 s on the owner PC, a warm reading about 3 s."""
+    if not settings.ALFRED_TRAVEL_LOCAL_READING:
+        return "off"
+    from apps.ml_engine.services.local_embeddings import OllamaEmbeddings
+    client, model, deadline = OllamaEmbeddings(), settings.ALFRED_TRAVEL_READING_MODEL, time.monotonic() + 90
+    installed = {item.get("name") for item in client._request("GET", "/api/tags", deadline=deadline).get("models", [])}
+    if model not in installed and f"{model}:latest" not in installed:
+        return "not_installed"
+    client._request("POST", "/api/generate", {"model": model, "keep_alive": WARM_FOR, "stream": False}, deadline=deadline)
+    return "warm"

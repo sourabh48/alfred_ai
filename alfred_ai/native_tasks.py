@@ -38,9 +38,15 @@ def native_travel_research_recovery():
 def native_ollama_keeper():
     """Ollama stopped on the owner PC on 2026-11-20 and local answers failed until it was started again."""
     from alfred_ai.services.ollama_keeper import ensure_running
+    from alfred_ai.services.ollama_keeper import warm_reading_model
     state = ensure_running()
     if state == "started":
         logger.warning("Local Ollama was not answering; started it again.")
+    elif state == "running":
+        try:
+            return state, warm_reading_model()
+        except Exception as exc:  # a busy or slow Ollama is retried two minutes later
+            logger.info("Travel reading model not warmed: %s", type(exc).__name__)
     return state
 
 
