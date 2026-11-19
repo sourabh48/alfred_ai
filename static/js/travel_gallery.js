@@ -20,10 +20,10 @@ window.TravelPhotos = (() => {
 
     function markup(sessionId, place) {
         if (!sessionId || !place?.name) return "";
-        const id = `${sessionId}|${place.key || place.name}`;
+        const id = `${sessionId}|${place.param || ""}${place.key || place.name}`;
         if (!cache.has(id)) {
             cache.set(id, {status: "loading"});
-            const query = place.key ? `place=${encodeURIComponent(place.key)}` : `name=${encodeURIComponent(place.name)}`;
+            const query = place.key ? `${place.param || "place"}=${encodeURIComponent(place.key)}` : `name=${encodeURIComponent(place.name)}`;
             const url = `/api/mobility/planner/sessions/${sessionId}/photos/?${query}&index=0`;
             queue = queue.then(() => Alfred.fetchJSON(url))
                 .then(data => data.busy ? wait(3000).then(() => Alfred.fetchJSON(url)) : data)

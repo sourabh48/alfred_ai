@@ -133,6 +133,11 @@ class TravelPlacePhotoView(PrivateTravelSessionAPI):
             from .services.travel_catalog import lookup
             guide = lookup(request.query_params["name"])
             place = guide and {"name": guide["name"], "lat": guide["lat"], "lon": guide["lon"]}
+        if place is None and request.query_params.get("hotel"):
+            # A stay from this trip's own hotel results; only its Google place id is looked up.
+            stays = [o for c in [*session.candidates, session.itinerary or {}] for o in ((c.get("hotels_result") or {}).get("payload") or {}).get("options", [])]
+            place = next(({"id": o["place_id"], "name": o["name"]} for o in stays
+                          if str(o.get("place_id", "")).startswith("google:") and o["place_id"] == request.query_params["hotel"]), None)
         if place is None:
             raise ValidationError("Choose a place from this trip before viewing its photos.")
         index = request.query_params.get("index", "0")

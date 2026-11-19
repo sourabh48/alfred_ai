@@ -59,6 +59,7 @@ class GooglePlacesTests(TestCase):
         self.assertEqual(len(options), 3)
         self.assertTrue(all(o["total_price"] is None and o["nightly_rate"] is None and o["availability"] == "UNKNOWN" for o in options))
         self.assertEqual(options[0]["booking_url"], "https://maps.google.com/?cid=1")
+        self.assertTrue(options[0]["place_id"].startswith("google:"))  # lets the hotel card show its Google photo
 
     def test_each_hotel_links_to_its_prices_with_the_trip_dates_where_the_site_accepts_them(self):
         fact = lambda v: {"value": v}

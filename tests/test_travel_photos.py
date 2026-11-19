@@ -96,6 +96,21 @@ class TravelPhotoTests(TestCase):
         payload, _ = GooglePlacePhoto().fetch({"name": "Sakleshpur", "latitude": 12.944, "longitude": 75.788, "index": 0})
         self.assertEqual(payload["count"], 1)
 
+    def test_a_hotel_photo_is_looked_up_only_for_a_stay_in_this_trip(self):
+        """Owner request 2026-11-20: hotel cards show a Google photo, like Google Hotels."""
+        owner = get_user_model().objects.create_user("photo-hotel-owner")
+        stay = {"name": "Synthetic Estate Stay", "place_id": "google:p1", "total_price": None}
+        session = TravelPlanningSession.objects.create(user=owner, candidates=[{"name": "Synthetic hills", "hotels_result": {"payload": {"options": [stay]}}}])
+        path = f"/api/mobility/planner/sessions/{session.pk}/photos/"
+        self.client.force_login(owner)
+        for other in ("google:not-this-trip", "p1"):
+            with self.subTest(hotel=other):
+                self.assertEqual(self.client.get(path, {"hotel": other}).status_code, 400)
+        self.api.assert_not_called()
+        data = self.client.get(path, {"hotel": "google:p1"}).json()
+        self.assertEqual((data["status"], data["place"]), ("ready", "Synthetic Estate Stay"))
+        self.assertIn("places/p1", str(self.api.call_args_list[0]))
+
     def test_a_photo_turned_away_while_another_loads_says_busy_so_the_page_retries(self):
         from apps.mobility.services.travel.providers.base import ProviderResult
         owner = get_user_model().objects.create_user("photo-busy-owner")

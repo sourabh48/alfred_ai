@@ -9171,6 +9171,36 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(session.messages.filter(role='user',text='Add one waterfall').count(),1)
         self.assertEqual(sum(i['title']=='Waterfall visit, subject to access and weather checks' for d in session.itinerary['days'] for i in d['items']),1)
 
+    def test_hotel_cards_show_a_photo_and_price_buttons_like_google_hotels(self):
+        """Owner request 2026-11-20: hotel cards with a Google photo and big price buttons; free Google fields only."""
+        from unittest.mock import patch
+        from apps.mobility.services.travel.providers.base import ProviderResult
+        from apps.mobility.services.travel_conversation import new_session
+        from apps.mobility.services.travel_discovery import candidates_for
+        session = new_session(self.scenario["user"])
+        candidate = candidates_for(self.scenario["user"], {})[0]
+        stay = {"name": "Synthetic Estate Stay", "place_id": "google:p1", "address": "1 Synthetic Road", "total_price": None,
+                "source_url": "https://maps.google.com/?cid=1", "google_hotels_url": "https://www.google.com/travel/search?q=Synthetic+Estate+Stay",
+                "dated_booking_url": "https://www.booking.com/searchresults.html?ss=Synthetic+Estate+Stay"}
+        candidate["hotels_result"] = {"success": True, "provider": "google_lodging", "payload": {"options": [stay]}}
+        session.candidates = [candidate]; session.save()
+        pixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        photo = ProviderResult("google_place_photos", "photos", success=True, payload={"count": 1, "index": 0, "image": pixel,
+                                                                                        "authors": [{"name": "Synthetic photographer", "url": "https://example.com/c"}]})
+        with patch("apps.mobility.planner_views.query", return_value=photo) as provider:
+            self.login(); self.browser.get(self.live_server_url + f"/mobility/?session={session.pk}")
+            card = "#plannerEvidenceBody .travel-stay-card"
+            self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, card + " .travel-card-photo img"))
+        self.assertEqual(provider.call_args.args[1]["place_id"], "p1")
+        buttons = self.browser.find_elements(self.By.CSS_SELECTOR, card + " .travel-actions a.btn")
+        self.assertEqual([b.text for b in buttons], ["View prices on Google Hotels", "Booking.com with your dates"])
+        self.assertTrue(all("noopener" in b.get_attribute("rel") for b in buttons))
+        text = self.browser.find_element(self.By.CSS_SELECTOR, card).text
+        self.assertIn("Synthetic photographer", text)  # Google requires the photo credit
+        self.assertIn("ALFRED does not see prices or free rooms.", text)
+        self.browser.execute_script("document.querySelector(arguments[0]).scrollIntoView({behavior:'instant',block:'center'})", card)
+        self.capture("travel-hotel-card-desktop")
+
     def test_travel_discovery_novelty_sources_expiry_and_offline_reference(self):
         from copy import deepcopy
         from datetime import timedelta

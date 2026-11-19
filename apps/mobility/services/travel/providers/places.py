@@ -70,7 +70,7 @@ class GoogleLodging(GooglePlacesNearby):
         return ["lodging"]
 
     def normalize(self, raw, p):
-        return {"options": [{"name": place["name"], "provider": "Google Maps", "address": place["address"], "lat": place["lat"],
+        return {"options": [{"name": place["name"], "place_id": place["id"], "provider": "Google Maps", "address": place["address"], "lat": place["lat"],
                              "lon": place["lon"], "category": "hotel", "source_url": place["source_url"], "booking_url": place["source_url"],
                              "total_price": None, "nightly_rate": None, "currency": None, "availability": "UNKNOWN"}
                             for place in self.listings(raw)]}
