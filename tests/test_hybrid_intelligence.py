@@ -248,8 +248,8 @@ class HybridIntelligenceTests(TestCase):
         TravelPreferenceProfile.objects.create(user=self.bob,preferences={'private':'SYNTHETIC-BOB'})
         result=self.answer(scope='travel')
         self.assertEqual(result['sources'][0]['data']['preferences'],{'terrain':'mountains'})
-        self.assertNotIn('SYNTHETIC-BOB',str(result))
-
+        self.assertNotIn('SYNTHETIC-BOB',str(result))
+
     def test_saved_trips_are_owner_scoped_and_leave_notes_out(self):
         from datetime import date
         from apps.mobility.models import TravelPlan
