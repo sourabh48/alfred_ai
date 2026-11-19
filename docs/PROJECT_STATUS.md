@@ -806,7 +806,7 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 <!-- BEGIN STATUS DASHBOARD -->
 **Baseline: 84/143 (58.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 35 | PARTIALLY_IMPLEMENTED: 16 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 36 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -814,7 +814,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 2 | 3 | 0 | 0 | 0 |
+| FIN | 11 | 17 | 64.7 | 3 | 2 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 5 | 0 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
@@ -1792,8 +1792,10 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-15 — Canonical currency persistence and multi-currency aggregation
 
-**PARTIALLY_IMPLEMENTED** · Personal finance · P1.
+**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P1.
 
+- 2026-11-19 status review: every part is built. Currency is recorded on investments, loans, bank accounts and transactions, income, budgets and goals, career salary, vehicles and travel (migrations approved and applied 2026-11-06/07). Canonical maths stay per currency with FX off (owner contract 2026-11-06). Totals across currencies show only in the person's display currency at each day's ECB reference rate (display-only FX, 2026-11-07; dated rates and home currency, 2026-11-18; `fx_rates` bot). The Limitations line below ("finance models generally lack currency codes") predates these slices and is historical. Currency suites re-run 2026-11-19: banking, budget, exchange rates, income, INR tokens, intelligence, investment, loan and mobility currency, 68 PASS. Nothing here is accepted until the owner checks it.
+- Next: owner check of the currency fields and the display-currency totals in the app.
 - Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
 - Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
