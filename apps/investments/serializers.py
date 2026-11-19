@@ -53,6 +53,7 @@ class InvestmentSerializer(serializers.ModelSerializer):
             "monthly_sip",
             "current_value",
             "amfi_scheme_code",
+            "coingecko_id",
             "units",
             "nav",
             "nav_date",
@@ -75,6 +76,13 @@ class InvestmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Pick the fund from the list so ALFRED has its AMFI code.")
         return value
 
+    def validate_coingecko_id(self, value):
+        from .services.crypto_prices import COIN
+        value = (value or "").strip()
+        if value and not COIN.fullmatch(value):
+            raise serializers.ValidationError("Pick the coin from the list so ALFRED has its CoinGecko id.")
+        return value
+
     def validate_units(self, value):
         if value is not None and value <= 0:
             raise serializers.ValidationError("Units must be more than zero.")
@@ -89,13 +97,13 @@ class InvestmentSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         """Keep units, fund identity, the retained NAV and the value consistent when a priced fund is edited."""
-        before = (instance.amfi_scheme_code, instance.currency, instance.units)
+        before = (instance.amfi_scheme_code, instance.coingecko_id, instance.currency, instance.units)
         with transaction.atomic():
             instance = super().update(instance, validated_data)
-            after = (instance.amfi_scheme_code, instance.currency, instance.units)
+            after = (instance.amfi_scheme_code, instance.coingecko_id, instance.currency, instance.units)
             if after != before and instance.nav is not None:
-                if after[:2] != before[:2] or not instance.units:
-                    instance.nav = instance.nav_date = None  # another fund or currency: this NAV proves nothing about it
+                if after[:3] != before[:3] or not instance.units:
+                    instance.nav = instance.nav_date = None  # another fund, coin or currency: this price proves nothing about it
                 else:  # same fund, different units: the value follows the retained NAV at once
                     try:
                         instance.current_value = investment_money(instance.units * instance.nav)

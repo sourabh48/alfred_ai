@@ -85,9 +85,9 @@ class InvestmentCurrencyMigrationTests(TransactionTestCase):
                 db.close()
                 after = read_database(candidate)[0]
                 self.assertEqual([row.pop("currency") for row in after["investments_investment"]], [None])
-                # 0009 adds fund-price columns; they start empty and leave the recorded money unchanged.
-                self.assertEqual([[row.pop(c) for c in ("amfi_scheme_code", "units", "nav", "nav_date", "value_before_nav")]
-                                  for row in after["investments_investment"]], [["", None, None, None, None]])
+                # 0009 adds fund-price columns and 0012 the crypto coin; they start empty and leave the recorded money unchanged.
+                self.assertEqual([[row.pop(c) for c in ("amfi_scheme_code", "units", "nav", "nav_date", "value_before_nav", "coingecko_id")]
+                                  for row in after["investments_investment"]], [["", None, None, None, None, ""]])
                 for table, rows in before.items():
                     if table != "django_migrations":
                         self.assertEqual(table_digest(rows), table_digest(after[table]), table)

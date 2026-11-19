@@ -20,7 +20,7 @@ from alfred_private_storage import private_directory
 # Paid services and free ones with a usage limit: every person may save their own key (owner decision 2026-11-19).
 # name: (label, what ALFRED uses it for, where to get one). Free keys without a practical limit are built in and not listed.
 KEYS = {
-    "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps Platform", "Travel: the map, places, hotels, routes, place names and weather. Enable Map Tiles, Places (New), Routes and Weather for this key.",
+    "TRAVEL_GOOGLE_MAPS_API_KEY": ("Google Maps Platform", "Travel: the map, places, hotels, routes, place names, weather and air quality. Enable Map Tiles, Places (New), Routes, Weather and Air Quality for this key.",
                                    "https://console.cloud.google.com/google/maps-apis/credentials"),
     "TRAVEL_SKYSCANNER_API_KEY": ("Skyscanner", "Travel: live flight prices, once Skyscanner approves your partner account. Until then each trip has a Google Flights link.",
                                   "https://www.partners.skyscanner.net/product/travel-api"),
@@ -30,6 +30,12 @@ KEYS = {
     "ALFRED_ALPHA_VANTAGE_API_KEY": ("Alpha Vantage", "Investments research desk: the latest earnings against forecasts and insider trading for US shares. "
                                      "The shared free key allows 25 requests a day for everyone; your own key gives you your own 25.",
                                      "https://www.alphavantage.co/support/#api-key"),
+    "ALFRED_FINNHUB_API_KEY": ("Finnhub", "Investments research desk: earnings against forecasts, analyst views, insider trading and this week's "
+                               "company news for US shares. The free key allows 60 requests a minute; when saved it is used instead of Alpha Vantage.",
+                               "https://finnhub.io/register"),
+    "ALFRED_AERODATABOX_API_KEY": ("AeroDataBox (RapidAPI)", "Travel: live status of flights you booked (delays, gate, terminal), shown on the trip the day "
+                                   "before and the day it leaves. Subscribe to AeroDataBox's free Basic plan on RapidAPI and paste your RapidAPI key; "
+                                   "ALFRED keeps to 250 lookups a month.", "https://rapidapi.com/aedbx-aedbx/api/aerodatabox/pricing"),
 }
 # name: (value written when on, what the switch means). Google is the only travel source (owner decision 2026-11-14).
 SWITCHES = {"ALFRED_PRICES_ALPHA_VANTAGE_FIRST": ("true", "Research desk: read daily share prices from Alpha Vantage first, and Yahoo Finance "

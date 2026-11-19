@@ -1,4 +1,4 @@
-"""Extra research sources the owner turned on (2026-11-18): FRED, Alpha Vantage and SEC EDGAR.
+"""Extra research sources the owner turned on (2026-11-18): FRED, Alpha Vantage and SEC EDGAR; Finnhub (2026-11-19).
 
 Each adds dated context lines to a research card and never changes a rating, so the past-calls check still replays
 exactly the rules the desk uses. Each is skipped quietly when its key (Settings > Online services) or the owner's
@@ -21,6 +21,7 @@ from alfred_ai.services import public_http
 FETCH_ERRORS = (public_http.PublicHTTPError, ValueError, KeyError, TypeError, AttributeError, ArithmeticError, OSError)
 FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 ALPHA_URL = "https://www.alphavantage.co/query"
+FINNHUB_URL = "https://finnhub.io/api/v1"
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SEC_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 POLYMARKET_URL = "https://gamma-api.polymarket.com/public-search"  # public, no key (owner approved 2026-11-18)
@@ -162,6 +163,94 @@ def alpha_vantage_lines(symbol: str, today: date | None = None) -> list:
         return [line for line in lines if line]
 
     return _cached(f"research-sources:alpha:{symbol}", fetch, 7 * 86400)
+
+
+# ---- Finnhub ----------------------------------------------------------------------------------------------------
+
+def _finnhub(path: str, params: dict, api_key: str):
+    # The key goes in a header, never into a URL that could be logged.
+    return public_http.request("GET", FINNHUB_URL + path, params=params, headers={"X-Finnhub-Token": api_key},
+                               max_bytes=4_000_000).json()
+
+
+def _finnhub_earnings(rows) -> dict | None:
+    latest = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else None
+    reported = _number(latest.get("actual")) if latest else None
+    if reported is None:
+        return None
+    expected = _number(latest.get("estimate"))
+    text = f"Last quarter (ended {latest.get('period')}): earnings per share {reported}"
+    if expected is not None and expected != 0:
+        gap = ((reported - expected) / abs(expected) * 100).quantize(Decimal("0.1"))
+        text += f" against an expected {expected} ({abs(gap)}% {'above' if gap >= 0 else 'below'})"
+    return {"text": text + " (Finnhub).", "url": None}
+
+
+def _finnhub_analysts(rows) -> dict | None:
+    latest = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else None
+    if not latest:
+        return None
+    counts = [int(_number(latest.get(key)) or 0) for key in ("strongBuy", "buy", "hold", "sell", "strongSell")]
+    if not sum(counts):
+        return None
+    return {"text": f"Analysts in {str(latest.get('period'))[:7]}: {counts[0] + counts[1]} buy, {counts[2]} hold, "
+                    f"{counts[3] + counts[4]} sell (Finnhub; opinions, not a forecast).", "url": None}
+
+
+def _finnhub_insiders(payload, today: date) -> dict | None:
+    since, bought, sold = today - timedelta(days=90), 0, 0
+    for row in (payload or {}).get("data") or []:
+        try:
+            day = date.fromisoformat(str(row["transactionDate"])[:10])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if day < since:
+            continue
+        # P and S are open-market purchases and sales; grants (A), option exercises (M) and tax sales (F) are left out.
+        bought += row.get("transactionCode") == "P"
+        sold += row.get("transactionCode") == "S"
+    if not bought and not sold:
+        return None
+    return {"text": f"Company insiders in the last 90 days: {bought} purchase(s) and {sold} sale(s) on the open market "
+                    "(Finnhub; grants left out; a sale is often for tax or diversification).", "url": None}
+
+
+def _finnhub_news(rows, limit: int = 3) -> list:
+    found = []
+    for row in rows if isinstance(rows, list) else []:
+        headline, url = str((row or {}).get("headline") or "").strip()[:200], public_http.normalized_link((row or {}).get("url"))
+        if headline and url:
+            found.append({"text": f"{headline} ({str(row.get('source') or 'news')[:40]}, via Finnhub).", "url": url})
+        if len(found) == limit:
+            break
+    return found
+
+
+def finnhub_lines(symbol: str, today: date | None = None) -> list:
+    """Earnings surprise, analyst views, insider trading and this week's company news for a US share.
+    Needs ALFRED_FINNHUB_API_KEY; the free key allows 60 requests a minute, so every share can be read daily."""
+    api_key = _key("ALFRED_FINNHUB_API_KEY")
+    if not api_key or not us_listed(symbol):
+        return []
+    today = today or timezone.localdate()
+
+    def fetch():
+        lines = []
+        for read in (lambda: _finnhub_earnings(_finnhub("/stock/earnings", {"symbol": symbol}, api_key)),
+                     lambda: _finnhub_analysts(_finnhub("/stock/recommendation", {"symbol": symbol}, api_key)),
+                     lambda: _finnhub_insiders(_finnhub("/stock/insider-transactions", {"symbol": symbol}, api_key), today)):
+            try:
+                lines.append(read())
+            except FETCH_ERRORS:
+                pass  # one closed endpoint should not hide the others
+        try:
+            lines += _finnhub_news(_finnhub("/company-news", {"symbol": symbol, "from": (today - timedelta(days=7)).isoformat(),
+                                                              "to": today.isoformat()}, api_key))
+        except FETCH_ERRORS:
+            pass
+        return [line for line in lines if line]
+
+    return _cached(f"research-sources:finnhub:{symbol}:{today.isoformat()}", fetch, 12 * 3600)
 
 
 # ---- SEC EDGAR --------------------------------------------------------------------------------------------------

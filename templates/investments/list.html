@@ -144,6 +144,13 @@
                         <input type="hidden" id="investmentFundCode" name="amfi_scheme_code">
                         <div id="investmentFundHelp" class="form-text">With the fund and your units, ALFRED updates the value every day from AMFI's official prices and tells you on Home.</div>
                     </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="investmentCoin">Crypto coin (optional)</label>
+                        <input id="investmentCoin" class="form-control" list="investmentCoinList" autocomplete="off" placeholder="Type the coin name or symbol, then pick it" aria-describedby="investmentCoinHelp">
+                        <datalist id="investmentCoinList"></datalist>
+                        <input type="hidden" id="investmentCoinCode" name="coingecko_id">
+                        <div id="investmentCoinHelp" class="form-text">With the coin, your units and the currency, ALFRED updates the value every few hours from CoinGecko. Only the coin's name leaves this PC.</div>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label" for="investmentUnits">Units</label>
                         <input id="investmentUnits" name="units" type="number" step="0.0001" min="0" class="form-control">
@@ -406,7 +413,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/investments.js?v=2.20.5"></script>
+<script src="/static/js/investments.js?v=2.20.6"></script>
 <script src="/static/js/research_history.js?v=1"></script>
 <script src="/static/js/research_desk.js?v=7"></script>
 {% endblock %}

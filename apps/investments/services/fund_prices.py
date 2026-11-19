@@ -36,10 +36,16 @@ def nav_is_fresh(nav_date, today=None):
 
 
 def nav_state(holding):
-    """'' for a holding ALFRED does not price; otherwise waiting (no price yet), current or stale."""
-    if not holding.amfi_scheme_code or not holding.units or holding.currency != "INR":
+    """'' for a holding ALFRED does not price; otherwise waiting (no price yet), current or stale. Crypto prices
+    (crypto_prices.py) count as current for a day, fund NAVs for the watchlist's limit."""
+    if holding.amfi_scheme_code and holding.units and holding.currency == "INR":
+        fresh = nav_is_fresh(holding.nav_date)
+    elif holding.coingecko_id and holding.units and holding.currency:
+        from .crypto_prices import price_is_fresh
+        fresh = price_is_fresh(holding.nav_date)
+    else:
         return ""
-    return "waiting" if holding.nav_date is None else "current" if nav_is_fresh(holding.nav_date) else "stale"
+    return "waiting" if holding.nav_date is None else "current" if fresh else "stale"
 
 
 def _usable(item):

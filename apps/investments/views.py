@@ -33,6 +33,15 @@ class FundSearchView(APIView):
         return Response({"funds": search_funds(request.query_params.get("q", "")[:80])})
 
 
+class CoinSearchView(APIView):
+    """CoinGecko coins by name or symbol; only the typed text leaves this PC."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .services.crypto_prices import search_coins
+        return Response({"coins": search_coins(request.query_params.get("q", "")[:60])})
+
+
 class InvestmentListCreateView(ListCreateAPIView):
     serializer_class = InvestmentSerializer
     permission_classes = [IsAuthenticated]

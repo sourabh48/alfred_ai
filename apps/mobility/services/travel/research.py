@@ -13,7 +13,7 @@ from .mapping import map_features
 from .providers.base import ProviderResult
 from .providers.geocoding import GooglePlaceSearch
 from .providers.routing import routing_chain
-from .providers.weather import FORECAST_DAYS, GoogleWeather, replan_proposals
+from .providers.weather import FORECAST_DAYS, GoogleWeather, OpenMeteoClimate, replan_proposals
 from .providers.places import GoogleDestinations, GoogleLodging, GooglePlacesNearby
 from .providers.permits import PermitProvider
 from .providers.transport import AmadeusFlights, IndianRailProvider, SkyscannerFlights
@@ -125,6 +125,12 @@ def weather_result(destination, state, *, force=False, cache_only=False):
     return query(GoogleWeather(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force,cache_only=cache_only)
 
 
+def climate_result(destination, state, *, force=False, cache_only=False):
+    """Past weather for the same dates, when the trip is too far off for a forecast."""
+    start, end = value(state,"available_start_date"), value(state,"available_end_date")
+    return query(OpenMeteoClimate(),{"latitude":destination["lat"],"longitude":destination["lon"],"start_date":start,"end_date":end},force=force,cache_only=cache_only)
+
+
 def enrich_candidate(user, state, destination):
     d = age_saved_facts({"candidates": [destination]})["candidates"][0]
     if destination.get("weather_proposals"):
@@ -216,6 +222,16 @@ def enrich_candidate(user, state, destination):
                     "confidence":weather.confidence,"freshness":weather.freshness}
     d["weather_proposals"] = replan_proposals(weather)
     d["factors"]["Weather"] = "Unknown"
+    if weather.error == "outside_forecast_window" and coords:
+        try:
+            climate = climate_result(d,state,force=force and not cached_only("climate"),cache_only=cached_only("climate"))
+        except Exception:
+            climate = ProviderResult("open_meteo_climate","climate",error="climate_unavailable")
+        attach("climate_result",climate)
+        if climate.success:
+            d["climate"] = climate.payload
+            d["weather"]["summary"] = climate.payload["summary"]
+            d["factors"]["Weather"] = f"Usually {climate.payload['average_min_temp']}–{climate.payload['average_max_temp']} °C, rain on {climate.payload['rainy_day_percent']}% of days"
     if d["weather_proposals"]:
         d["score"] -= 8
         d["factors"]["Weather"] = "Weather risks; review proposed changes"

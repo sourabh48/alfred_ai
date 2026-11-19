@@ -48,7 +48,7 @@ def check(row, alert):
     if not row.current_value:
         return "unknown", "No current value is recorded for this holding."
     if nav_state(row) in ("waiting", "stale"):
-        return "unknown", "The fund price is not current, so the limit was not checked."
+        return "unknown", "The price is not current, so the limit was not checked."
     if alert["below"] is not None and row.current_value < Decimal(alert["below"]):
         return "below", ""
     if alert["above"] is not None and row.current_value > Decimal(alert["above"]):

@@ -15,7 +15,8 @@ from pathlib import Path
 
 from django.conf import settings
 
-PERSONAL = ("TRAVEL_GOOGLE_MAPS_API_KEY", "TRAVEL_SKYSCANNER_API_KEY", "TRAVEL_AMADEUS_API_KEY", "ALFRED_ALPHA_VANTAGE_API_KEY")
+PERSONAL = ("TRAVEL_GOOGLE_MAPS_API_KEY", "TRAVEL_SKYSCANNER_API_KEY", "TRAVEL_AMADEUS_API_KEY", "ALFRED_ALPHA_VANTAGE_API_KEY",
+            "ALFRED_FINNHUB_API_KEY", "ALFRED_AERODATABOX_API_KEY")
 # Who the current page or background job works for; a page request always sets it, a new thread starts with none.
 _person = contextvars.ContextVar("alfred_key_person", default=None)
 _cache: dict[int, tuple[int, dict]] = {}
