@@ -571,6 +571,7 @@ ALFRED_TRAVEL_READING_SECONDS = env.int('ALFRED_TRAVEL_READING_SECONDS', default
 # separate Python with requirements-brain.txt are named in config/local.env. Nothing is downloaded automatically.
 ALFRED_BRAIN_FINETUNE_USER = env('ALFRED_BRAIN_FINETUNE_USER', default='')
 ALFRED_BRAIN_FINETUNE_PYTHON = env('ALFRED_BRAIN_FINETUNE_PYTHON', default='')
+ALFRED_BRAIN_CONVERTER = env('ALFRED_BRAIN_CONVERTER', default='')  # llama.cpp convert_hf_to_gguf.py
 ALFRED_BRAIN_BASE_MODEL_DIR = env('ALFRED_BRAIN_BASE_MODEL_DIR', default=str(BASE_DIR / 'ml_models' / 'brain-base'))
 ALFRED_BRAIN_FINETUNE_MIN_EXAMPLES = env.int('ALFRED_BRAIN_FINETUNE_MIN_EXAMPLES', default=50)
 

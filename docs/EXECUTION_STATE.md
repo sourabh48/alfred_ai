@@ -21,7 +21,9 @@ smarter"). IMPLEMENTED_NOT_ACCEPTED; unit tests and live checks against the owne
 - Nightly fine-tuning: owner approved the downloads (2026-11-20). CPU PyTorch 2.15.0 stack in `F:/ALFRED/brain/venv`
   (926 MB), Qwen2.5-1.5B-Instruct at revision 989aa79 in `F:/ALFRED/brain/qwen2.5-1.5b-instruct` (3.1 GB). A synthetic
   6-example run trained in about 90 s; Ollama 0.40.16 refused to import the Qwen2 safetensors ("unsupported MLX
-  architecture"). BLOCKED_APPROVAL: a GGUF conversion step needs the owner's OK for the llama.cpp converter download.
+  architecture"). The owner approved the llama.cpp v1.0.0 converter (MIT): the synthetic model converted to GGUF in
+  39 s, imported into Ollama in 63 s and answered. Fine-tuning stays off until config/local.env names the owner's user
+  and the paths; no training on the owner's examples has run.
 
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 

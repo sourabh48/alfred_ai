@@ -42,6 +42,9 @@ def start_brain_finetune():
         return "python_missing"
     if not (base / "config.json").is_file():
         return "base_model_missing"
+    converter = Path(settings.ALFRED_BRAIN_CONVERTER)
+    if not settings.ALFRED_BRAIN_CONVERTER or not converter.is_file():
+        return "converter_missing"
     user = get_user_model().objects.filter(username=name).first()
     if user is None:
         return "no_such_user"
@@ -64,7 +67,7 @@ def start_brain_finetune():
              if os.name == "nt" else 0)
     subprocess.Popen([python, str(Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py"), "--chats", str(exported),
                       "--base", str(base), "--out", str(work.parent / "brain-model"), "--status", str(status),
-                      "--ollama", str(ollama) if ollama.is_file() else "ollama"],
+                      "--ollama", str(ollama) if ollama.is_file() else "ollama", "--converter", str(converter)],
                      cwd=work, creationflags=flags, close_fds=True)
     return "started"
 

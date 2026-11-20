@@ -19,11 +19,16 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
 TORCH = "torch==2.15.0"  # CPU build, from download.pytorch.org/whl/cpu
-PACKAGES = ("transformers==5.23.0", "peft==0.22.0", "accelerate==1.16.0", "safetensors==0.8.0", "huggingface_hub==2.4.0")
+PACKAGES = ("transformers==5.23.0", "peft==0.22.0", "accelerate==1.16.0", "safetensors==0.8.0", "huggingface_hub==2.4.0",
+            "sentencepiece==0.2.3")
+# GGUF converter: llama.cpp v1.0.0 (MIT) source archive sha256 b8d90ec2be080e8834d05e4449793160d68d62518f614be4248d380f3b7c118b;
+# keep convert_hf_to_gguf.py, conversion/ and gguf-py/ (pip install gguf-py, gguf 0.19.0) and name the script in
+# ALFRED_BRAIN_CONVERTER.
 MODEL_NAME = "alfred-brain"
 EPOCHS = 2
 MAX_TOKENS = 1024
@@ -63,21 +68,26 @@ def train(chats, base, out_dir, *, epochs=EPOCHS):  # pragma: no cover - needs t
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    for name in ("--chats", "--base", "--out", "--status", "--ollama"):
+    for name in ("--chats", "--base", "--out", "--status", "--ollama", "--converter"):
         parser.add_argument(name, required=True)
     parser.add_argument("--model", default=MODEL_NAME)
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     args = parser.parse_args(argv)
-    chats_file = Path(args.chats)
+    chats_file, out = Path(args.chats), Path(args.out)
+    merged, gguf = out / "merged", out / f"{args.model}.gguf"
     try:
         chats = [json.loads(line) for line in chats_file.read_text(encoding="utf-8").splitlines() if line.strip()]
         write_status(args.status, state="training", examples=len(chats))
-        loss = train(chats, args.base, args.out, epochs=args.epochs)
-        (Path(args.out) / "Modelfile").write_text(f"FROM {Path(args.out).resolve()}\n", encoding="utf-8")
-        created = subprocess.run([args.ollama, "create", args.model, "-f", str(Path(args.out) / "Modelfile")],
-                                 capture_output=True, text=True, timeout=3600)
+        loss = train(chats, args.base, merged, epochs=args.epochs)
+        # Ollama 0.40.16 refused Qwen2 safetensors ("unsupported MLX architecture"); llama.cpp's GGUF imports (2026-11-20).
+        subprocess.run([sys.executable, args.converter, str(merged), "--outtype", "f16", "--outfile", str(gguf)],
+                       check=True, capture_output=True, encoding="utf-8", errors="replace", timeout=3600)
+        shutil.rmtree(merged, ignore_errors=True)  # the GGUF replaces it; about 3 GB
+        (out / "Modelfile").write_text(f"FROM {gguf.resolve()}\n", encoding="utf-8")
+        created = subprocess.run([args.ollama, "create", args.model, "-f", str(out / "Modelfile")],
+                                 capture_output=True, encoding="utf-8", errors="replace", timeout=3600)
         write_status(args.status, state="ready" if created.returncode == 0 else "ollama_import_failed", examples=len(chats),
-                     loss=loss, model=args.model if created.returncode == 0 else None, detail=created.stderr[-300:])
+                     loss=loss, model=args.model if created.returncode == 0 else None, detail=(created.stderr or "")[-300:])
         return 0 if created.returncode == 0 else 4
     except Exception as exc:
         write_status(args.status, state="failed", detail=type(exc).__name__)
