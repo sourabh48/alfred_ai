@@ -9,7 +9,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, Client, override_settings
+from django.test import SimpleTestCase, TestCase, Client, override_settings
 from django.utils import timezone
 
 from apps.expenses.models import Expense, BankAccount, StatementUpload, StatementTransactionEvidence
@@ -227,3 +227,14 @@ class StatementEvidenceTests(TestCase):
             with self.assertRaises(OperationalError):
                 confirm_statement(upload, token=token)
         self.assertEqual([list(model.objects.values()) for model in (Expense,BankAccount,StatementUpload,StatementTransactionEvidence)],before)
+
+
+class StatementKindTests(SimpleTestCase):
+    def test_a_bank_ledger_with_fund_card_or_emi_rows_stays_a_bank_statement(self):
+        from apps.expenses.services.statement_import import _detect_statement_kind
+        ledger = "STATEMENT OF ACCOUNT | Date Narration Chq./Ref.No. Value Dt Withdrawal Amt. Deposit Amt. Closing Balance | "
+        for row in ("ACH D- SYNTHETIC MUTUAL FUND SIP", "CREDIT CARD PAYMENT", "EMI AMOUNT DEBIT"):
+            with self.subTest(row=row):
+                self.assertEqual(_detect_statement_kind(ledger + row), "bank_statement")
+        self.assertEqual(_detect_statement_kind("CONSOLIDATED ACCOUNT STATEMENT | PORTFOLIO SUMMARY | MUTUAL FUND HOLDINGS"), "investment_statement")
+        self.assertEqual(_detect_statement_kind("CREDIT CARD STATEMENT | TOTAL AMOUNT DUE"), "credit_card_statement")

@@ -130,13 +130,15 @@
         </div>
         <div class="col-md-2">
             <label for="savingsGoalSaved" class="form-label">Saved so far</label>
-            <input id="savingsGoalSaved" name="saved_amount" type="text" inputmode="decimal" pattern="[0-9][0-9,]*(\.[0-9]{1,2})?" title="An amount such as 3,00,000 or 300000.50" class="form-control" value="0">
+            <input id="savingsGoalSaved" aria-describedby="savingsGoalSavedHelp" name="saved_amount" type="text" inputmode="decimal" pattern="[0-9][0-9,]*(\.[0-9]{1,2})?" title="An amount such as 3,00,000 or 300000.50" class="form-control" value="0">
         </div>
         <div class="col-md-3">
             <label for="savingsGoalDate" class="form-label">Target date (optional)</label>
             <input id="savingsGoalDate" name="target_date" type="date" class="form-control">
         </div>
-        <div class="col-12"><button class="btn btn-primary" type="submit">Add Goal</button></div>
+        <div class="col-12"><div class="form-text mt-0 mb-2" id="savingsGoalSavedHelp" aria-live="polite"></div>
+            <button class="btn btn-primary" type="submit">Add Goal</button>
+            <button class="btn btn-outline-secondary d-none" type="button" id="savingsGoalCancel">Cancel editing</button></div>
     </form>
     <div id="savingsGoalFeedback" class="d-none alert" role="status" aria-live="polite"></div>
     <div id="savingsGoalList" class="mini-list"></div>
@@ -144,5 +146,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/budgets.js?v=2.5.4"></script>
+<script src="/static/js/budgets.js?v=2.6.0"></script>
 {% endblock %}

@@ -7,7 +7,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("budgetPlanForm").addEventListener("submit", submitBudgetPlan);
     document.getElementById("savingsGoalForm").addEventListener("submit", submitSavingsGoal);
+    document.getElementById("savingsGoalCancel").addEventListener("click", stopEditingSavingsGoal);
+    document.getElementById("savingsGoalCurrency").addEventListener("change", suggestSavedFromBank);
+    document.getElementById("savingsGoalSaved").addEventListener("input", event => { event.target.dataset.typed = "1"; });
     loadSavingsGoals();
+    suggestSavedFromBank();
     setBudgetMonthDefault();
     loadBudgetDashboard();
     Alfred.enableLiveRefresh("budget-live", loadBudgetDashboard, { rootId: "budgetRoot" });
@@ -227,7 +231,57 @@ function loadSavingsGoals() {
         .catch(error => showSavingsGoalFeedback(error.message, "danger"));
 }
 
+let savingsGoals = [];
+
+// Owner 2026-11-20: a new goal starts from the cash ALFRED already knows; the person can change it before saving.
+function suggestSavedFromBank() {
+    const form = document.getElementById("savingsGoalForm");
+    const saved = document.getElementById("savingsGoalSaved");
+    const help = document.getElementById("savingsGoalSavedHelp");
+    const currency = document.getElementById("savingsGoalCurrency").value;
+    if (form.dataset.editing || saved.dataset.typed || !currency) { help.textContent = ""; return Promise.resolve(); }
+    return Alfred.fetchJSON(`/api/budgets/goals/cash/?currency=${encodeURIComponent(currency)}`).then(data => {
+        if (form.dataset.editing || saved.dataset.typed) return;
+        if (data.amount == null) {
+            help.textContent = data.skipped_non_cash
+                ? `Your bank balance is not known as cash: ${data.skipped_non_cash} account(s) are marked Investment or Credit. Fix the account type under Expenses, or type what you have saved.`
+                : "ALFRED has no bank balance in this currency yet; type what you have saved.";
+            return;
+        }
+        saved.value = data.amount;
+        help.textContent = `Filled from the balance of ${data.accounts} bank account(s) in ${data.currency}. Change it if part of that money is for something else.`;
+    }).catch(() => { help.textContent = ""; });
+}
+
+function editSavingsGoal(id) {
+    const goal = savingsGoals.find(item => String(item.id) === String(id));
+    const form = document.getElementById("savingsGoalForm");
+    if (!goal) return;
+    form.dataset.editing = goal.id;
+    form.elements.name.value = goal.name;
+    form.elements.target_amount.value = goal.target_amount;
+    form.elements.currency.value = goal.currency || "";
+    form.elements.saved_amount.value = goal.saved_amount;
+    form.elements.target_date.value = goal.target_date || "";
+    form.querySelector('button[type="submit"]').textContent = "Save changes";
+    document.getElementById("savingsGoalCancel").classList.remove("d-none");
+    document.getElementById("savingsGoalSavedHelp").textContent = `Editing "${goal.name}".`;
+    form.scrollIntoView({ block: "center" });
+    form.elements.name.focus();
+}
+
+function stopEditingSavingsGoal() {
+    const form = document.getElementById("savingsGoalForm");
+    delete form.dataset.editing;
+    form.reset();
+    delete form.elements.saved_amount.dataset.typed;
+    form.querySelector('button[type="submit"]').textContent = "Add Goal";
+    document.getElementById("savingsGoalCancel").classList.add("d-none");
+    return suggestSavedFromBank();
+}
+
 function renderSavingsGoals(goals) {
+    savingsGoals = goals;
     const target = document.getElementById("savingsGoalList");
     if (!goals.length) {
         target.innerHTML = `<div class="empty-state">No savings goals yet.</div>`;
@@ -256,6 +310,7 @@ function renderSavingsGoals(goals) {
                     <input class="form-control form-control-sm" id="savingsGoalUpdate${goal.id}" type="number" min="0" step="0.01" value="${Alfred.escapeHtml(String(goal.saved_amount))}">
                 </div>
                 <button type="button" class="btn btn-outline-primary btn-sm" data-goal-save="${goal.id}">Update</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-edit="${goal.id}">Edit</button>
                 <button type="button" class="btn btn-outline-danger btn-sm" data-goal-delete="${goal.id}">Delete</button>
             </div>
             ${p.status === "open" && p.months_left ? `
@@ -273,6 +328,7 @@ function renderSavingsGoals(goals) {
     }).join("");
     target.querySelectorAll("[data-goal-save]").forEach(button => button.addEventListener("click", () => updateSavingsGoal(button)));
     target.querySelectorAll("[data-goal-delete]").forEach(button => button.addEventListener("click", () => deleteSavingsGoal(button)));
+    target.querySelectorAll("[data-goal-edit]").forEach(button => button.addEventListener("click", () => editSavingsGoal(button.dataset.goalEdit)));
     target.querySelectorAll("[data-goal-plan]").forEach(button => button.addEventListener("click", () => planSavingsGoal(button)));
     target.querySelectorAll("[data-goal-invest]").forEach(button => button.addEventListener("click", () => projectGoalInvestments(button)));
 }
@@ -329,10 +385,11 @@ function submitSavingsGoal(event) {
     // Amounts may be typed with Indian or Western grouping (3,00,000); the API takes plain numbers.
     payload.target_amount = payload.target_amount.replaceAll(",", "");
     payload.saved_amount = payload.saved_amount.replaceAll(",", "") || "0";
-    if (!payload.target_date) delete payload.target_date;
+    const editing = form.dataset.editing;
+    if (!payload.target_date) { if (editing) payload.target_date = null; else delete payload.target_date; }
     button.disabled = true;
-    Alfred.fetchJSON("/api/budgets/goals/", { method: "POST", body: JSON.stringify(payload) })
-        .then(() => { form.reset(); showSavingsGoalFeedback("Goal saved.", "success"); return loadSavingsGoals(); })
+    Alfred.fetchJSON(editing ? `/api/budgets/goals/${editing}/` : "/api/budgets/goals/", { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) })
+        .then(() => { showSavingsGoalFeedback(editing ? "Goal updated." : "Goal saved.", "success"); stopEditingSavingsGoal(); return loadSavingsGoals(); })
         .catch(error => showSavingsGoalFeedback(error.message, "danger"))
         .finally(() => { button.disabled = false; });
 }

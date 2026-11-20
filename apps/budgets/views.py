@@ -40,6 +40,26 @@ class SavingsGoalDetailView(RetrieveUpdateDestroyAPIView):
         return SavingsGoal.objects.filter(user=self.request.user)
 
 
+class SavingsGoalCashView(APIView):
+    """Read-only: cash in the owner's bank accounts in one currency, offered as a new goal's Saved so far (owner 2026-11-20:
+    "it must fill automatically ... user can edit"). No account with a known cash balance gives null, never a guessed zero."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from alfred_ai.services.currency import CURRENCIES
+        from apps.expenses.models import BankAccount
+        from apps.expenses.services.financial_intelligence import NON_CASH_ACCOUNT_TYPES
+        currency = request.query_params.get("currency") or "INR"
+        if currency not in CURRENCIES:
+            return Response({"detail": "Choose a supported currency."}, status=status.HTTP_400_BAD_REQUEST)
+        accounts = [account for account in BankAccount.objects.filter(user=request.user, is_active=True, current_balance__isnull=False)
+                    .exclude(account_type__in=NON_CASH_ACCOUNT_TYPES) if (account.currency or "INR") == currency]
+        amount = sum((max(account.current_balance, Decimal("0")) for account in accounts), Decimal("0")) if accounts else None
+        return Response({"currency": currency, "amount": None if amount is None else format(amount.quantize(Decimal("0.01")), "f"),
+                         "accounts": len(accounts),
+                         "skipped_non_cash": BankAccount.objects.filter(user=request.user, is_active=True, account_type__in=NON_CASH_ACCOUNT_TYPES).count()})
+
+
 class SavingsGoalPlanView(APIView):
     """Read-only: the yearly return a goal needs if the owner saves a given amount each month. Nothing is saved."""
     permission_classes = [IsAuthenticated]

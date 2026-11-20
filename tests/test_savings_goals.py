@@ -76,3 +76,26 @@ class SavingsGoalApiTests(TestCase):
         SavingsGoal.objects.create(user=self.other, name="Theirs", target_amount="10.00")
         clear_user_fed_data(self.owner)
         self.assertEqual(list(SavingsGoal.objects.values_list("name", flat=True)), ["Theirs"])
+
+class GoalCashSuggestionTests(TestCase):
+    """Owner 2026-11-20: a new goal's Saved so far starts from known bank cash; unknown stays unknown."""
+
+    def test_only_the_owners_known_cash_accounts_in_that_currency_count(self):
+        from apps.expenses.models import BankAccount
+        owner = get_user_model().objects.create_user(username="synthetic-cash-owner")
+        other = get_user_model().objects.create_user(username="synthetic-cash-other")
+        self.client.force_login(owner)
+        cash = lambda: self.client.get("/api/budgets/goals/cash/?currency=INR").json()
+        self.assertEqual((cash()["amount"], cash()["accounts"]), (None, 0))  # nothing known is not zero
+        BankAccount.objects.create(user=owner, account_number="SYN-INV", account_type="investment", current_balance="9000.00", currency="INR")
+        self.assertEqual((cash()["amount"], cash()["skipped_non_cash"]), (None, 1))
+        BankAccount.objects.create(user=owner, account_number="SYN-SAV", account_type="savings", current_balance="1200.50", currency="INR")
+        BankAccount.objects.create(user=owner, account_number="SYN-OLD", account_type="savings", current_balance="-50.00")  # legacy, no currency
+        BankAccount.objects.create(user=owner, account_number="SYN-UNK", account_type="savings", current_balance=None, currency="INR")
+        BankAccount.objects.create(user=owner, account_number="SYN-USD", account_type="savings", current_balance="10.00", currency="USD")
+        BankAccount.objects.create(user=other, account_number="SYN-OTHER", account_type="savings", current_balance="5000.00", currency="INR")
+        self.assertEqual((cash()["amount"], cash()["accounts"]), ("1200.50", 2))  # an overdrawn account counts as nothing, not minus
+        self.assertEqual(self.client.get("/api/budgets/goals/cash/?currency=USD").json()["amount"], "10.00")
+        self.assertEqual(self.client.get("/api/budgets/goals/cash/?currency=XYZ").status_code, 400)
+        self.client.logout()
+        self.assertIn(self.client.get("/api/budgets/goals/cash/").status_code, (401, 403))

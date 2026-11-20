@@ -1252,6 +1252,10 @@ def _extract_bank_name(full_text: str) -> str:
 
 def _detect_statement_kind(full_text: str) -> str:
     text = full_text.upper()
+    # Withdrawal and deposit columns mean a bank account; its rows can say "MUTUAL FUND", "CREDIT CARD" or "EMI" (an owner's
+    # HDFC salary account was filed as an investment account, 2026-11-20, so its cash never counted).
+    if "WITHDRAWAL" in text and "DEPOSIT" in text:
+        return "bank_statement"
     for statement_kind, keywords in STATEMENT_KIND_RULES:
         if any(keyword in text for keyword in keywords):
             return statement_kind
