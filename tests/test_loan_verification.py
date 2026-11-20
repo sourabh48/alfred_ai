@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase
+from django.test import SimpleTestCase, TestCase, TransactionTestCase
 from django.utils import timezone
 
 from apps.expenses.models import Expense
@@ -305,3 +305,15 @@ class LoanVerificationMigrationTests(TransactionTestCase):
         self.assertEqual(snapshot, list(NewLoan.objects.order_by("pk").values_list("pk", "verification_status", "verified_at")))
         MigrationExecutor(connection).migrate([self.migrate_from])
         self.assertEqual(before, list(OldLoan.objects.order_by("pk").values_list(*retained_fields)))
+
+
+class InferredLoanTypeTests(SimpleTestCase):
+    def test_whole_words_decide_the_loan_type(self):
+        infer = loan_intelligence_service._infer_loan_type
+        # Owner statement 2026-11-20: a lender's auto-debit mandate had made a personal-finance EMI a car loan.
+        self.assertEqual(infer("Example Fincorp", "ACH D- EXAMPLE FINCORP AUTO DEBIT"), "other")
+        self.assertEqual(infer("Example Bank", "CREDIT CARD BILL"), "credit_card")
+        self.assertEqual(infer("Example Motors", "AUTO LOAN EMI"), "car")
+        self.assertEqual(infer("Example Housing Finance", "EMI"), "home")
+        self.assertEqual(infer("Example Bank", "PERSONAL LOAN EMI"), "personal")
+        self.assertEqual(infer("Example Homecentre", "PURCHASE"), "other")

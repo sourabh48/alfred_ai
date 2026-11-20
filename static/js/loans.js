@@ -230,7 +230,7 @@ function renderLoanTable(loans) {
                 </td>
                 <td class="text-end">${money(item.emi)}</td>
                 <td class="text-end">${money(item.estimated_balance)}${item.balance_label ? `<div class="muted small" data-balance-basis="estimated">${Alfred.escapeHtml(item.balance_label)}</div>` : ""}</td>
-                <td class="text-end">${item.months_remaining}</td>
+                <td class="text-end">${confirmed ? item.months_remaining : `<span class="muted" title="Worked out from guessed terms">-</span>`}</td>
                 <td class="small">
                     ${confirmed ? `<div>${money(item.recommended_prepayment)}</div>
                     <div class="muted">An example, not advice: check it in Prepayment what-if, which also shows the cash it leaves you.</div>

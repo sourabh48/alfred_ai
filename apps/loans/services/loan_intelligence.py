@@ -4,6 +4,7 @@ Automatically detects loan payments from expense transactions and tracks loan li
 """
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from uuid import uuid4
 from django.utils import timezone
@@ -258,21 +259,16 @@ class LoanIntelligenceService:
     def _infer_loan_type(self, lender: str, description: str) -> str:
         """Infer loan type from lender name and description."""
         text = f"{lender} {description}".upper()
-
-        if any(keyword in text for keyword in ["HOME", "HOUSING", "MORTGAGE"]):
-            return "home"
-        elif any(keyword in text for keyword in ["CAR", "AUTO", "VEHICLE"]):
-            return "car"
-        elif any(keyword in text for keyword in ["EDUCATION", "STUDENT"]):
-            return "education"
-        elif any(keyword in text for keyword in ["BUSINESS", "COMMERCIAL"]):
-            return "business"
-        elif any(keyword in text for keyword in ["PERSONAL", "PL "]):
-            return "personal"
-        elif any(keyword in text for keyword in ["CREDIT CARD", "CARD"]):
-            return "credit_card"
-
-        return "other"
+        # Whole words only: "CARD" is not a car and an "AUTO DEBIT" mandate is not an auto loan (owner data 2026-11-20).
+        rules = (
+            ("home", r"\b(?:HOME|HOUSING|MORTGAGE)\b"),
+            ("car", r"\b(?:CAR|VEHICLE|AUTO\s+LOAN)\b"),
+            ("education", r"\b(?:EDUCATION|STUDENT)\b"),
+            ("business", r"\b(?:BUSINESS|COMMERCIAL)\b"),
+            ("personal", r"\b(?:PERSONAL|PL)\b"),
+            ("credit_card", r"\bCARDS?\b"),
+        )
+        return next((loan_type for loan_type, pattern in rules if re.search(pattern, text)), "other")
 
     def consolidate_loans(
         self,
