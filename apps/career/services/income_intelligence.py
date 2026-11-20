@@ -111,7 +111,8 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
         )
         .order_by("-transaction_date", "-id")[:240]
     )
-    salary_candidates = _build_salary_credit_candidates(credits)
+    own_names = {_normalize_employer_key(name) for name in (user.get_full_name(), user.username) if name}
+    salary_candidates = _build_salary_credit_candidates(credits, own_names)
     current_salaries = _current_salary_candidates(salary_candidates, today)
     best_salary_signal = current_salaries[0] if current_salaries else None
 
@@ -178,7 +179,7 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
     }
 
 
-def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
+def _build_salary_credit_candidates(credits: list[Expense], own_names=frozenset()) -> list[dict]:
     buckets: dict[str, dict] = defaultdict(
         lambda: {
             "employer": "",
@@ -211,7 +212,7 @@ def _build_salary_credit_candidates(credits: list[Expense]) -> list[dict]:
         has_non_salary_marker = any(keyword in raw_text for keyword in NON_SALARY_CREDIT_KEYWORDS)
         if has_non_salary_marker and not has_salary_keyword:
             continue
-        employer = _extract_employer_label(item, raw_text)
+        employer = _extract_employer_label(item, raw_text, own_names)
         if not employer:
             continue
 
@@ -321,10 +322,32 @@ def _income_conflict(observed_salary: float, reported_monthly: float) -> dict | 
     }
 
 
-def _extract_employer_label(item: Expense, raw_text: str) -> str:
-    for value in (item.company_name, item.counterparty, item.merchant):
+# "NEFT CR-<ref>-TATA CONSULTANCY SER CITIN0123 VICES LIMITED-<beneficiary>-..." (owner statement, 2026-11-20): the remitter
+# is the third part; statement wrapping can put a reference inside a word, which is dropped and the word rejoined.
+BANK_CREDIT_RE = re.compile(r"\b(?:NEFT|RTGS|IMPS)\s*CR\s*-\s*[^-]*-\s*([^-]{3,120})-")
+ORGANISATION_WORDS = {"SERVICES", "TECHNOLOGIES", "CONSULTANCY", "CONSULTING", "SOLUTIONS", "SYSTEMS", "SOFTWARE", "LIMITED",
+                      "PRIVATE", "INFOTECH", "CORPORATION", "INDUSTRIES", "ENTERPRISES", "INTERNATIONAL"}
+
+
+def _bank_credit_remitter(raw_text: str) -> str:
+    match = BANK_CREDIT_RE.search(raw_text)
+    if not match:
+        return ""
+    tokens = [token for token in match.group(1).split() if not any(char.isdigit() for char in token)]
+    joined = []
+    for token in tokens:
+        if joined and joined[-1] + token in ORGANISATION_WORDS:
+            joined[-1] += token
+        else:
+            joined.append(token)
+    return " ".join(joined)
+
+
+def _extract_employer_label(item: Expense, raw_text: str, own_names=frozenset()) -> str:
+    # The statement often names the account holder, who is never their own employer.
+    for value in (item.company_name, item.counterparty, item.merchant, _bank_credit_remitter(raw_text)):
         label = _clean_employer_label(value)
-        if label:
+        if label and _normalize_employer_key(label) not in own_names:
             return label
 
     field_match = re.search(

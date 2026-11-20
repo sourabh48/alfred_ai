@@ -501,6 +501,18 @@ class UnknownIncomeIsNotZeroTests(SalaryEvidenceBase):
         self.assertEqual(spec.sample_counter(), 1)
 
 
+class OwnNameIsNotTheEmployerTests(SalaryEvidenceBase):
+    def test_a_salary_credit_naming_the_account_holder_takes_the_remitter_from_the_neft_text(self):
+        user = self.user("own_name", 0, "monthly")
+        type(user).objects.filter(pk=user.pk).update(first_name="Asha", last_name="Rao")
+        user.refresh_from_db()
+        for month in range(3):
+            self.credit(user, 45000, months_ago=month, employer="Asha Rao",
+                        text="NEFT CR-CITI0000001-EXAMPLE CONSULTANCY SER CITIN26000001 VICES LIMITED-ASHA RAO-CITIN26 SALARY")
+        signals = self.signals(user)
+        self.assertEqual(signals["current_employer"], "Example Consultancy Services")
+
+
 class TakeHomeFromCtcTests(SalaryEvidenceBase):
     """Owner check 2026-11-20: a CTC of 6,72,000 lands as about 49,000 a month, not CTC / 12 = 56,000."""
 
