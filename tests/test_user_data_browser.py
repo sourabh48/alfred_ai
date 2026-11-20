@@ -9339,7 +9339,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: "No savings goals yet" in self.text("savingsGoalList"))
         due = (timezone.localdate() + timedelta(days=95)).isoformat()
         for identity, value in (("savingsGoalName", '<img src=x onerror="window.__goalXss=1"> Synthetic fund'),
-                ("savingsGoalTarget", "50000.00"), ("savingsGoalSaved", "1000.50"), ("savingsGoalDate", due)):
+                ("savingsGoalTarget", "50,000.00"), ("savingsGoalSaved", "1,000.50"), ("savingsGoalDate", due)):  # grouping typed as people write it
             self.browser.execute_script("document.getElementById(arguments[0]).value=arguments[1]", identity, value)
         self.memory_click('#savingsGoalForm button[type="submit"]')
         self.wait.until(lambda _: SavingsGoal.objects.filter(user=owner).exists() and "a month for" in self.text("savingsGoalList"))

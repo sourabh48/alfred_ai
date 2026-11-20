@@ -326,7 +326,9 @@ function submitSavingsGoal(event) {
     const button = form.querySelector('button[type="submit"]');
     if (button.disabled) return;
     const payload = Object.fromEntries(new FormData(form).entries());
-    payload.saved_amount = payload.saved_amount || "0";
+    // Amounts may be typed with Indian or Western grouping (3,00,000); the API takes plain numbers.
+    payload.target_amount = payload.target_amount.replaceAll(",", "");
+    payload.saved_amount = payload.saved_amount.replaceAll(",", "") || "0";
     if (!payload.target_date) delete payload.target_date;
     button.disabled = true;
     Alfred.fetchJSON("/api/budgets/goals/", { method: "POST", body: JSON.stringify(payload) })
