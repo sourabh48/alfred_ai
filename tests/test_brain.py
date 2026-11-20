@@ -33,11 +33,10 @@ class BrainTests(TestCase):
         self.assertEqual(brain.examples(self.alice, "travel_reading"), [])
 
     def test_fine_tuning_gets_only_this_owners_examples_as_chats(self):
-        from scripts.brain_finetune import records
         brain.remember(self.alice, "travel_reading", {"message": "me n the gang", "meant": {"travellers": 5}})
         brain.remember(self.alice, "public_answer", {"question": "What is a dosa?", "answer": "A rice and lentil crepe."})
         brain.remember(self.bob, "public_answer", {"question": "Bob's question?", "answer": "Bob's answer."})
-        chats = records(self.alice)
+        chats = brain.training_chats(self.alice)
         self.assertEqual([chat["messages"][-1]["content"] for chat in chats], ['{"travellers": 5}', "A rice and lentil crepe."])
         self.assertEqual(chats[0]["messages"][1]["content"], '{"message": "me n the gang"}')
         self.assertNotIn("{today}", chats[0]["messages"][0]["content"])

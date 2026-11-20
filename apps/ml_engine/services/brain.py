@@ -71,6 +71,23 @@ def try_examples(user, kind, *, limit=PER_KIND, store=None):
         return []
 
 
+def training_chats(user, *, store=None):
+    """This owner's examples as chat records for fine-tuning, oldest first."""
+    import json
+    from apps.mobility.services.travel.understanding import SYSTEM
+    out = []
+    for item in reversed(examples(user, "travel_reading", store=store)):
+        if isinstance(item.get("message"), str) and isinstance(item.get("meant"), dict):
+            out.append({"messages": [{"role": "system", "content": SYSTEM.split(" Today is ")[0]},
+                                     {"role": "user", "content": json.dumps({"message": item["message"]}, ensure_ascii=False)},
+                                     {"role": "assistant", "content": json.dumps(item["meant"], ensure_ascii=False)}]})
+    for item in reversed(examples(user, "public_answer", store=store)):
+        if isinstance(item.get("question"), str) and isinstance(item.get("answer"), str):
+            out.append({"messages": [{"role": "user", "content": item["question"]},
+                                     {"role": "assistant", "content": item["answer"]}]})
+    return out
+
+
 STOP = set("the and for with from what which when where does how why who whose that this these those are was were has have "
            "can should would could about tell give explain mean means".split())
 

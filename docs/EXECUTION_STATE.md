@@ -15,9 +15,13 @@ smarter"). IMPLEMENTED_NOT_ACCEPTED; unit tests and live checks against the owne
 - `be62248` festival and holiday dates (fixed Indian dates, plus Nager.Date or Google) for the reader.
 - Travel questions about a planned trip are answered by the local model from that trip's saved research only
   (`travel/answers.py`), with a "not in this trip's research" reply otherwise.
-- Nightly fine-tuning (`scripts/brain_finetune.py`, `requirements-brain.txt`): off until the owner names a user, a
-  separate Python and a local base model in config/local.env. BLOCKED_APPROVAL: needs the owner's OK to download the
-  CPU PyTorch stack and a base model; training has not run.
+- Pushed as `07f5364` with the owner's OK; CI_FAILED: the release gate's dependency check refuses a new
+  requirements file (`requirements-brain.txt`) without review. Fix: the file is left unchanged and the tested versions
+  are pinned in `scripts/brain_finetune.py`; the app exports examples and the separate Python only trains.
+- Nightly fine-tuning: owner approved the downloads (2026-11-20). CPU PyTorch 2.15.0 stack in `F:/ALFRED/brain/venv`
+  (926 MB), Qwen2.5-1.5B-Instruct at revision 989aa79 in `F:/ALFRED/brain/qwen2.5-1.5b-instruct` (3.1 GB). A synthetic
+  6-example run trained in about 90 s; Ollama 0.40.16 refused to import the Qwen2 safetensors ("unsupported MLX
+  architecture"). BLOCKED_APPROVAL: a GGUF conversion step needs the owner's OK for the llama.cpp converter download.
 
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 

@@ -30,16 +30,42 @@ def ensure_running():
 
 
 def start_brain_finetune():
-    """Start scripts/brain_finetune.py in the background at low priority when it is set up; it decides if there is enough to learn."""
-    user, python = settings.ALFRED_BRAIN_FINETUNE_USER, settings.ALFRED_BRAIN_FINETUNE_PYTHON
-    if not user or not python:
+    """Export the owner's brain examples and start scripts/brain_finetune.py at low priority in its own Python."""
+    import json
+    from django.contrib.auth import get_user_model
+    from apps.ml_engine.services.brain import training_chats
+    from apps.ml_engine.services.memory_key import private_directory
+    name, python, base = settings.ALFRED_BRAIN_FINETUNE_USER, settings.ALFRED_BRAIN_FINETUNE_PYTHON, Path(settings.ALFRED_BRAIN_BASE_MODEL_DIR)
+    if not name or not python:
         return "off"
     if not Path(python).is_file():
         return "python_missing"
-    script = Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py"
+    if not (base / "config.json").is_file():
+        return "base_model_missing"
+    user = get_user_model().objects.filter(username=name).first()
+    if user is None:
+        return "no_such_user"
+    chats = training_chats(user)
+    work = Path(settings.ALFRED_MEMORY_DIR).parent / "brain-training"
+    private_directory(work.absolute())
+    status = work / "status.json"
+    try:
+        last = json.loads(status.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        last = {}
+    if len(chats) < settings.ALFRED_BRAIN_FINETUNE_MIN_EXAMPLES:
+        return "too_few_examples"
+    if last.get("state") == "training" or (last.get("state") == "ready" and last.get("examples") == len(chats)):
+        return "nothing_new"
+    exported = work / "chats.jsonl"  # deleted by the script when it ends; the vault keeps the encrypted copy
+    exported.write_text("".join(json.dumps(chat, ensure_ascii=False) + "\n" for chat in chats), encoding="utf-8")
+    ollama = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe"
     flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.BELOW_NORMAL_PRIORITY_CLASS
              if os.name == "nt" else 0)
-    subprocess.Popen([python, str(script), "--user", user], cwd=settings.BASE_DIR, creationflags=flags, close_fds=True)
+    subprocess.Popen([python, str(Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py"), "--chats", str(exported),
+                      "--base", str(base), "--out", str(work.parent / "brain-model"), "--status", str(status),
+                      "--ollama", str(ollama) if ollama.is_file() else "ollama"],
+                     cwd=work, creationflags=flags, close_fds=True)
     return "started"
 
 
