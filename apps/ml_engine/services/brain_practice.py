@@ -18,7 +18,7 @@ from .brain import examples, remember
 
 logger = logging.getLogger(__name__)
 GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent"
-PER_CALL = 25
+PER_CALL = 12  # 25 took about 4.9 s and often passed the web client's 5 s read limit; 12 took about 3.5 s (2026-11-20)
 # Training prompts carry no "this weekend" dates, so a message using such words would teach the model to ignore them.
 RELATIVE = re.compile(r"\b(?:today|tonight|tomorrow|tmrw|day after|(?:this|next|coming)\s+(?:week|weekend|month|mon|tue|wed|"
                       r"thu|fri|sat|sun)\w*)\b", re.I)
@@ -86,7 +86,7 @@ def generate(user, count=500, *, key, ask=ask_gemini, seconds=90):
     """Ask Gemini for practice examples until `count` new ones are kept; stops early when Gemini refuses or runs out of quota."""
     today, seen = timezone.localdate(), {item.get("message", "").casefold() for item in examples(user, "travel_practice")}
     kept = asked = rejected = 0
-    for call in range(max(1, count // 10)):  # shortcut: at most a tenth of the target in calls, to bound free-tier use
+    for call in range(max(1, count // 5)):  # shortcut: at most a fifth of the target in calls, to bound free-tier use
         if kept >= count:
             break
         try:
