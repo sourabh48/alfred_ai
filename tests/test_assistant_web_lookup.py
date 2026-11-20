@@ -192,7 +192,9 @@ class HybridWebLookupTests(TestCase):
         on = patch("apps.ml_engine.services.memory_reasoning.answers_by_itself", return_value=True)
         with on:
             self.assertEqual(self.ask("What is the capital of France?")["provider"], "mock")
+            self.assertEqual(self.ask("Latest repo rate in India", scope="finance")["provider"], "mock")  # public, from a topic scope
             self.local.reason.assert_not_called()
+            self.assertNotEqual(self.ask("what is my savings rate", scope="finance")["provider"], "mock")  # own records stay here
             for personal in ("what did I save about my trip", "Does Anika have cancer?"):
                 with self.subTest(personal=personal):
                     self.assertEqual(self.ask(personal)["provider"], "ollama")

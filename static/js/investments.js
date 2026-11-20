@@ -177,7 +177,7 @@ function renderInvestmentSummary(data) {
         { title: "Risk / Diversification", value: `${analysis.risk_level || summary.risk || "No data"}`, copy: `${Alfred.formatNumber(analysis.diversification_score || 0)} diversification score` },
         ...(summary.other_currencies || []).map(group => ({
             title: `${Alfred.escapeHtml(group.currency)} positions`,
-            value: Alfred.formatCurrency(group.total_value, group.currency),
+            value: group.approximate && Alfred.showHomeCurrency() ? `${Alfred.formatApproximate(group.approximate, "total_value")} <small class="text-muted">(${Alfred.formatCurrency(group.total_value, group.currency)})</small>` : Alfred.formatCurrency(group.total_value, group.currency),
             copy: `${group.positions} position(s), invested ${Alfred.formatCurrency(group.total_invested, group.currency)}. Kept out of rupee totals.${group.approximate ? ` ${Alfred.formatApproximate(group.approximate, "total_value")} in your currency.` : ""} ${Alfred.approximateNote(summary.display_currency)}`,
         })),
     ];

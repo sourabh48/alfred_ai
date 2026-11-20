@@ -507,7 +507,7 @@ class TakeHomeFromCtcTests(SalaryEvidenceBase):
     def test_annual_ctc_becomes_take_home_after_pf_professional_tax_and_income_tax(self):
         from apps.career.services.income_intelligence import take_home_from_ctc
         estimate = take_home_from_ctc(672000, today=date(2026, 11, 20))
-        self.assertEqual(estimate["monthly"], Decimal("49080.00"))  # 56,000 - PF 3,360 x 2 - professional tax 200; no income tax
+        self.assertEqual(estimate["monthly"], Decimal("47733.20"))  # 56,000 - PF 3,360 x 2 - gratuity 1,346.80 - professional tax 200; no income tax
         self.assertEqual((estimate["employee_pf_monthly"], estimate["income_tax_monthly"]), (Decimal("3360.00"), Decimal("0.00")))
         taxed = take_home_from_ctc(3000000, today=date(2026, 11, 20))
         self.assertGreater(taxed["income_tax_monthly"], 0)
@@ -516,7 +516,7 @@ class TakeHomeFromCtcTests(SalaryEvidenceBase):
         self.assertEqual(self.signals(user)["monthly_cash_income"], 56000.0)  # no employer on record: a yearly income, not a CTC
         self.credit(user, 49000, months_ago=5, employer="Tata Consultancy Services", text="SALARY TATA CONSULTANCY SERVICES")
         signals = self.signals(user)
-        self.assertEqual(signals["monthly_cash_income"], 49080.0)
+        self.assertEqual(signals["monthly_cash_income"], 47733.2)
         self.assertEqual(signals["annualized_compensation"], 672000.0)  # the career benchmark stays the CTC
 
     def test_entered_in_hand_pay_wins_and_a_bonus_is_left_out_of_the_monthly_estimate(self):
@@ -524,7 +524,7 @@ class TakeHomeFromCtcTests(SalaryEvidenceBase):
         self.credit(user, 49000, months_ago=5, employer="Tata Consultancy Services", text="SALARY TATA CONSULTANCY SERVICES")
         user.annual_bonus = 72000
         user.save()
-        self.assertEqual(self.signals(user)["monthly_cash_income"], 43800.0)  # 6,00,000: 50,000 - PF 3,000 x 2 - 200
+        self.assertEqual(self.signals(user)["monthly_cash_income"], 42597.5)  # 6,00,000: 50,000 - PF 3,000 x 2 - gratuity 1,202.50 - 200
         user.take_home_monthly = 49000
         user.save()
         signals = self.signals(user)

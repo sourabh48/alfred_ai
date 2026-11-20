@@ -81,7 +81,7 @@ function renderLoanSummary(payload) {
     ];
     (summary.other_currencies || []).forEach(group => cards.push({
         kicker: `Loans in ${Alfred.escapeHtml(group.currency)}`,
-        value: Alfred.formatCurrency(group.outstanding, group.currency),
+        value: group.approximate && Alfred.showHomeCurrency() ? `${Alfred.formatApproximate(group.approximate, "outstanding")} <small class="text-muted">(${Alfred.formatCurrency(group.outstanding, group.currency)})</small>` : Alfred.formatCurrency(group.outstanding, group.currency),
         caption: `${group.loans} loan(s), EMI ${Alfred.formatCurrency(group.monthly_emi, group.currency)} a month. Kept out of rupee totals.${group.approximate ? ` ${Alfred.formatApproximate(group.approximate, "outstanding")} in your currency.` : ""} ${Alfred.approximateNote(summary.display_currency)}`,
     }));
     const display = summary.display_currency || {};

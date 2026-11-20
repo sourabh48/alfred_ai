@@ -38,6 +38,7 @@
                 </div>
                 <span class="status-pill status-stable" id="settingsProfileStatus">Ready</span>
             </div>
+            {% if request.GET.welcome == "income" %}<div class="alert alert-info" role="status" id="settingsWelcomeIncome">Welcome to ALFRED. Start with your income below: your yearly CTC or monthly pay, and your actual in-hand pay if you know it. You can change it here any time, and ALFRED checks it against salary credits in the bank statements you add.</div>{% endif %}
             <form id="accountProfileForm" class="soft-grid" data-live-refresh-hold="true">
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -87,7 +88,7 @@
                         <input id="settingsTakeHome" name="take_home_monthly" type="number" min="0" step="0.01" class="form-control" aria-describedby="settingsTakeHomeHelp">
                         <label class="form-label mt-2" for="settingsAnnualBonus">Bonus per year (part of CTC)</label>
                         <input id="settingsAnnualBonus" name="annual_bonus" type="number" min="0" step="0.01" class="form-control">
-                        <div class="form-text" id="settingsTakeHomeHelp">With a yearly CTC and no in-hand pay, ALFRED estimates it after PF, professional tax and income tax, leaving out the bonus. Same currency as your income.</div>
+                        <div class="form-text" id="settingsTakeHomeHelp">With a yearly CTC and no in-hand pay, ALFRED estimates it after PF, gratuity, professional tax and income tax, leaving out the bonus. Same currency as your income.</div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" for="settingsVariableIncome">Variable Income</label>

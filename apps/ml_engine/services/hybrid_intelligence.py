@@ -364,7 +364,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             or (scope=='financial_document' and (record_type not in ('expense','loan','investment') or record_id is not None or selected_documents is not None))
             or (scope!='financial_document' and selected_records is not None)):
         raise ValueError('Choose a bounded question and an owned supported source.')
-    if provider=='local' and scope=='general' and not cloud_consent and not conversation_context and _gemini_by_itself(store,user,query):
+    # A clearly public question asked from a topic scope ("Latest repo rate in India" from Finance, 2026-11-20) is not about
+    # the person's records: it goes to Gemini as a general question instead of the slow local model, which has no web.
+    if (provider=='local' and scope in ('general','finance','travel','career') and not cloud_consent and not conversation_context
+            and _gemini_by_itself(store,user,query)):
         try:
             return hybrid_answer(store,user,query,cloud_consent=True,query_sensitivity='public',answer_style=answer_style,web_search=web_search,provider='gemini')
         except Exception as exc:  # over the daily cap, offline or refused: the local model answers instead

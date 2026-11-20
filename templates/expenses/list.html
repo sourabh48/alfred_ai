@@ -8,6 +8,7 @@
     <div>
         <h1 class="h2 fw-bold mb-1">{{ ui_config.expenses.page.title }}</h1>
         <p class="text-muted mb-0">{{ ui_config.expenses.page.description }}</p>
+        <div data-currency-toggle class="mt-2"></div>
         <nav aria-label="On this page" class="page-index mt-2">
             <a href="#expenseStatements">Add a statement</a>
             <a href="#expenseThisMonth">This month</a>
@@ -222,6 +223,6 @@
     <div class="d-flex gap-2"><button id="bankAccountsPrevious" class="btn btn-outline-secondary" type="button" disabled>Previous page</button><button id="bankAccountsNext" class="btn btn-outline-secondary" type="button" disabled>Next page</button></div>
 </section>
 {% include "expenses/modal_add.html" %}
-<script src="/static/js/expenses.js?v=3.10.4"></script>
+<script src="/static/js/expenses.js?v=3.10.5"></script>
 </div>
 {% endblock %}

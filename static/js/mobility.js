@@ -174,8 +174,10 @@ function renderTravelPlans(items) {
                     <div class="d-flex justify-content-between align-items-end gap-2 flex-wrap">
                         <div>
                             <div class="muted small">Budget</div>
-                            <strong>${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")}</strong>
-                            ${item.approximate && item.budget ? `<div class="muted small" title="${Alfred.escapeHtml(Alfred.approximateNote(mobilityState.display))}">${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "budget"))} approx.</div>` : ""}
+                            ${item.approximate && item.budget && Alfred.showHomeCurrency()
+                                ? `<strong>${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "budget"))}</strong><div class="muted small">${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")} as planned</div>`
+                                : `<strong>${Alfred.formatCurrency(item.budget, item.budget_currency || "INR")}</strong>`}
+                            ${item.approximate && item.budget && !Alfred.showHomeCurrency() ? `<div class="muted small" title="${Alfred.escapeHtml(Alfred.approximateNote(mobilityState.display))}">${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "budget"))} approx.</div>` : ""}
                             <div class="muted small">Logged spend ${Alfred.formatCurrency(spend, planCurrency)}</div>
                         </div>
                         <div><button class="btn btn-sm btn-outline-primary" type="button" onclick="TravelPlanner.openPlan(${item.id})">Open plan</button> <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTravelPlan(${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.title)}">Delete</button></div>

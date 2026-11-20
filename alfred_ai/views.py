@@ -394,8 +394,10 @@ def social_callback_view(request, provider):
         return redirect("/settings/#settingsSignIn" if connect else "/login/")
     if connect:
         return redirect("/settings/#settingsSignIn")
+    first_time = user.last_login is None
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-    return redirect(pending.get("next") or "/")
+    # A new person enters their income first (owner 2026-11-20: "enter the salary on signup, user can modify in settings").
+    return redirect("/settings/?welcome=income#settingsProfile" if first_time else pending.get("next") or "/")
 
 
 class AlfredLoginView(LoginView):

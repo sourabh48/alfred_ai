@@ -1742,6 +1742,34 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('estimated from schedule (assumes on-time EMIs)',
                       self.browser.find_element(self.By.CSS_SELECTOR, liabilities).text)
 
+    def test_currency_toggle_leads_with_the_home_currency_and_back(self):
+        # FIN-15 owner request 2026-11-20: a toggle between the recorded currency and the home currency.
+        from django.utils import timezone
+        from apps.expenses.models import Expense
+        from tests.test_exchange_rates import store_table
+        owner = self.scenario['user']
+        type(owner).objects.filter(pk=owner.pk).update(display_currency='INR')
+        store_table(rates={'INR': '100', 'USD': '1.10'})
+        Expense.objects.create(user=owner, amount='11.00', currency='USD', category='travel', raw_description='SYNTHETIC USD',
+                               transaction_date=timezone.localdate(), source='manual')
+        cache.clear()
+        self.login(); self.browser.get(self.live_server_url + '/expenses/')
+        note = lambda: ''.join(item.text for item in self.browser.find_elements(self.By.CSS_SELECTOR, '[data-expense-approximate]'))
+        cell = lambda: self.browser.find_element(self.By.CSS_SELECTOR, '[data-expense-approximate]').find_element(self.By.XPATH, './ancestor::td').text
+        self.wait.until(lambda _: 'at the' in note())
+        self.assertTrue(cell().startswith('-$11.00'), cell())
+        self.assertIn('1,000.00 at the', cell())
+        self.memory_click('[data-currency-toggle] [data-currency-view="home"]')
+        self.wait.until(lambda _: 'as recorded' in note())
+        self.assertTrue(cell().startswith('-≈'), cell())
+        self.assertIn('$11.00 as recorded', cell())
+        self.assertIn('Kept out of rupee totals', cell())
+        self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '[data-currency-view="home"]').get_attribute('aria-pressed'), 'true')
+        self.memory_click('[data-currency-toggle] [data-currency-view="original"]')
+        self.wait.until(lambda _: 'at the' in note())
+        self.assertTrue(cell().startswith('-$11.00'), cell())
+        self.browser.execute_script('localStorage.removeItem("alfred.currencyView")')
+
     def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
         self.login()
         self.browser.get(self.live_server_url + '/loans/')

@@ -51,15 +51,18 @@ class SocialLoginTests(TestCase):
         self.assertEqual((query["code_challenge_method"], query["redirect_uri"]), (["S256"], ["http://testserver/auth/google/callback/"]))
         self.client.logout()
         response, answers = self.sign_in(start_query="?next=/travel/")
-        self.assertEqual(response["Location"], "/travel/")
+        self.assertEqual(response["Location"], "/settings/?welcome=income#settingsProfile")  # a new person enters income first
+        self.assertIn('id="settingsWelcomeIncome"', self.client.get(response["Location"]).content.decode())
         user = self.users.get()
         self.assertEqual((user.email, user.has_usable_password()), ("owner@example.org", False))
         self.assertTrue(social_login.is_verified(user))
         token_call = answers.calls[0][2]["data"]
         self.assertTrue(token_call["code_verifier"] and token_call["client_secret"] == "x-google-secret")
         self.client.logout()
-        self.sign_in()
+        again, _ = self.sign_in(start_query="?next=/travel/")
+        self.assertEqual(again["Location"], "/travel/")
         self.assertEqual((self.users.count(), int(self.client.session["_auth_user_id"])), (1, user.pk))
+        self.assertNotIn('id="settingsWelcomeIncome"', self.client.get("/settings/").content.decode())
 
     def test_a_wrong_state_unverified_email_or_unknown_provider_signs_nobody_in(self):
         self.client.get("/auth/google/start/")

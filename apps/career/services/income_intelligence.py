@@ -369,6 +369,9 @@ def _normalize_employer_key(value: str) -> str:
 # force from 21 November 2025, basic wages are at least half of pay; PF is 12% of basic from the employee and again from the
 # employer inside CTC; most states charge professional tax of 200 a month; income tax comes from ALFRED's verified rules.
 BASIC_SHARE, PF_RATE, PROFESSIONAL_TAX_MONTHLY = Decimal("0.50"), Decimal("0.12"), Decimal("200")
+# Gratuity provision inside CTC: 15/26 of a month's basic a year = 4.81% of basic (owner formula 2026-11-20). Insurance, employer
+# NPS and a PF wage cap vary by employer and are unknown here; the person's entered in-hand pay overrides the estimate.
+GRATUITY_RATE = Decimal("0.0481")
 
 
 def take_home_from_ctc(annual_ctc, *, today: date) -> dict:
@@ -376,11 +379,13 @@ def take_home_from_ctc(annual_ctc, *, today: date) -> dict:
     from apps.ml_engine.services.tax_policy import calculate_income_tax, default_financial_year
     ctc = Decimal(str(annual_ctc))
     pf = (ctc * BASIC_SHARE * PF_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)  # a year, from each side
-    gross = ctc - pf  # the employer's PF is part of CTC but never paid out
+    gratuity = (ctc * BASIC_SHARE * GRATUITY_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    gross = ctc - pf - gratuity  # employer PF and gratuity are part of CTC but never paid out monthly
     tax = calculate_income_tax(gross, "new", financial_year=default_financial_year(today))["final_tax"]
     monthly = ((gross - pf - tax) / 12 - PROFESSIONAL_TAX_MONTHLY).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return {"monthly": max(monthly, Decimal("0.00")), "employee_pf_monthly": (pf / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
             "employer_pf_monthly": (pf / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+            "gratuity_monthly": (gratuity / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
             "professional_tax_monthly": PROFESSIONAL_TAX_MONTHLY, "income_tax_monthly": (tax / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)}
 
 
@@ -427,6 +432,6 @@ def _build_source_summary(
         parts.append("The entered income is not used until you confirm in Settings whether it is per month or per year.")
     if reported_mode == "annual_ctc":
         parts.append("With an employer on record, your yearly CTC becomes estimated monthly take-home after PF (12% of a "
-                     "basic of half your pay, from you and your employer), professional tax of INR 200 and income tax; enter "
+                     "basic of half your pay, from you and your employer), gratuity (4.81% of basic), professional tax of INR 200 and income tax; enter "
                      "your in-hand pay per month in Settings if it differs.")
     return " ".join(parts[:3]).strip()

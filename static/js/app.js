@@ -337,6 +337,27 @@ function approximateNote(display) {
     return `Approximate, using the ECB reference rate of ${display.rate_date}${display.stale ? " (over a week old)" : ""}. Your records keep their own currency.`;
 }
 
+// FIN-15 (owner 2026-11-20): amounts in another currency can lead with the recorded figure or the home-currency one.
+// A per-viewer display choice only; records and totals never change.
+function showHomeCurrency() {
+    try { return localStorage.getItem("alfred.currencyView") === "home"; } catch { return false; }
+}
+
+function mountCurrencyToggle() {
+    document.querySelectorAll("[data-currency-toggle]").forEach(holder => {
+        const home = showHomeCurrency();
+        const button = (view, label, active) => `<button type="button" class="btn btn-outline-secondary${active ? " active" : ""}" aria-pressed="${active}" data-currency-view="${view}">${label}</button>`;
+        setHTML(holder, `<div class="btn-group btn-group-sm" role="group" aria-label="Show other currencies in">${button("original", "Original currency", !home)}${button("home", "Home currency", home)}</div>`);
+        holder.addEventListener("click", event => {
+            const view = event.target.closest("[data-currency-view]")?.dataset.currencyView;
+            if (!view || (view === "home") === showHomeCurrency()) return;
+            try { localStorage.setItem("alfred.currencyView", view); } catch { return; }
+            window.location.reload();
+        });
+    });
+}
+document.addEventListener("DOMContentLoaded", mountCurrencyToggle);
+
 function formatRecordedMoney(value) {
     if (!value || value.evidence_status === "unavailable") return "Financial evidence unavailable";
     const parts = typeof value.amount === "string" && value.amount.match(/^(-?)(0|[1-9]\d{0,30})\.(\d{2})$/);
@@ -1201,6 +1222,7 @@ window.Alfred = {
     formatCurrency,
     formatApproximate,
     approximateNote,
+    showHomeCurrency,
     formatPercent,
     formatDate,
     formatDateTime,
