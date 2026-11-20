@@ -145,7 +145,8 @@ def reading_model():
         scores = result["scores"]
         if (result["state"] == "ready" and scores["current_model"] == settings.ALFRED_TRAVEL_READING_MODEL
                 and scores["held_back"] >= 20 and scores["new"] >= scores["current"]):
-            return result["model"]
+            # Ollama lists an untagged import as "name:latest", and the reader matches installed names exactly (2026-11-20).
+            return result["model"] if ":" in result["model"] else result["model"] + ":latest"
     except (OSError, ValueError, KeyError, TypeError):
         pass
     return settings.ALFRED_TRAVEL_READING_MODEL

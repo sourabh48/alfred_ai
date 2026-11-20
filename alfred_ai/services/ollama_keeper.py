@@ -81,13 +81,16 @@ WARM_FOR = "60m"  # refreshed every two minutes while ALFRED runs, so the model 
 
 
 def warm_reading_model():
-    """Keep the Travel reading model loaded: a cold load took about 20 s on the owner PC, a warm reading about 3 s."""
+    """Keep the Travel models loaded: a cold load took about 20 s on the owner PC, a warm reading about 3 s. The configured
+    model answers trip questions; a fine-tuned reader that tested better (understanding.reading_model) is kept loaded too."""
     if not settings.ALFRED_TRAVEL_LOCAL_READING:
         return "off"
     from apps.ml_engine.services.local_embeddings import OllamaEmbeddings
-    client, model, deadline = OllamaEmbeddings(), settings.ALFRED_TRAVEL_READING_MODEL, time.monotonic() + 90
+    from apps.mobility.services.travel.understanding import reading_model
+    client, deadline = OllamaEmbeddings(), time.monotonic() + 90
     installed = {item.get("name") for item in client._request("GET", "/api/tags", deadline=deadline).get("models", [])}
-    if model not in installed and f"{model}:latest" not in installed:
-        return "not_installed"
-    client._request("POST", "/api/generate", {"model": model, "keep_alive": WARM_FOR, "stream": False}, deadline=deadline)
-    return "warm"
+    models = [model for model in dict.fromkeys((settings.ALFRED_TRAVEL_READING_MODEL, reading_model()))
+              if model in installed or f"{model}:latest" in installed]
+    for model in models:
+        client._request("POST", "/api/generate", {"model": model, "keep_alive": WARM_FOR, "stream": False}, deadline=deadline)
+    return "warm" if models else "not_installed"

@@ -117,7 +117,7 @@ class SwitchTests(TestCase):
 
     def test_the_reader_switches_only_when_the_new_model_scores_at_least_as_well(self):
         self.assertEqual(understanding.reading_model(), "qwen3.5:9b")  # never trained
-        self.assertEqual(self.outcome(), "alfred-brain")
+        self.assertEqual(self.outcome(), "alfred-brain:latest")  # the name Ollama lists for an untagged import
         self.assertEqual(self.outcome(new=0.79), "qwen3.5:9b")
         self.assertEqual(self.outcome(held_back=5), "qwen3.5:9b")  # too few to tell
         self.assertEqual(self.outcome(current_model="qwen3.5:35b-a3b"), "qwen3.5:9b")  # compared with another model

@@ -42,6 +42,11 @@ class OllamaKeeperTests(SimpleTestCase):
             ollama.return_value = {"models": [{"name": "all-minilm:latest"}]}
             self.assertEqual(ollama_keeper.warm_reading_model(), "not_installed")
             self.assertEqual(ollama.call_count, 1)  # nothing is downloaded or loaded
+            ollama.reset_mock(return_value=True)
+            ollama.return_value = {"models": [{"name": "qwen3.5:9b"}, {"name": "alfred-brain:latest"}]}
+            with patch("apps.mobility.services.travel.understanding.reading_model", return_value="alfred-brain:latest"):
+                self.assertEqual(ollama_keeper.warm_reading_model(), "warm")
+            self.assertEqual([call.args[2]["model"] for call in ollama.call_args_list[1:]], ["qwen3.5:9b", "alfred-brain:latest"])
         with override_settings(ALFRED_TRAVEL_LOCAL_READING=False):
             self.assertEqual(ollama_keeper.warm_reading_model(), "off")
 
