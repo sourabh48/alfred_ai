@@ -1,15 +1,20 @@
 """Nightly fine-tuning of a small local model from ALFRED's central brain (owner approval 2026-11-20).
 
-ALFRED exports one owner's brain examples to a private file, then starts this script in a separate Python that has the
-CPU PyTorch stack (the owner's AMD GPU has no PyTorch support on Windows). This script never imports Django, never
-downloads anything (the base model must already be on disk) and deletes the exported examples when it ends. The result is
-imported into the local Ollama as `alfred-brain`; ALFRED keeps its current models until the owner names alfred-brain in
-config/local.env after checking it.
+ALFRED exports one owner's brain examples to a private file, then starts this script in a separate Python with
+PyTorch. AMD's ROCm build for the owner's RX 6700 XT (gfx1031, owner approval 2026-11-20) trains on the GPU in about
+1 s a step; the CPU build takes about 20 s. This script never imports Django, never downloads anything (the base model
+must already be on disk) and deletes the exported examples when it ends. The result is imported into the local Ollama
+as `alfred-brain`, and the Travel reader uses it only when it reads the held-back examples at least as well.
 
 Setup, once, with the owner's approval (2026-11-20). The app never installs these; they live only in that Python:
     py -3.12 -m venv F:/ALFRED/brain/venv
     F:/ALFRED/brain/venv/Scripts/python -m pip install <TORCH> --index-url https://download.pytorch.org/whl/cpu
     F:/ALFRED/brain/venv/Scripts/python -m pip install <PACKAGES>
+or, for the AMD GPU (about 1.1 GB from AMD's stable index, tested 2026-11-20):
+    py -3.12 -m venv F:/ALFRED/brain/gpu-venv
+    F:/ALFRED/brain/gpu-venv/Scripts/python -m pip install --index-url https://stable.repo.amd.com/rocm/whl-next/ \
+        "torch[device-gfx1031]==2.15.0+rocm10.2.0"
+    F:/ALFRED/brain/gpu-venv/Scripts/python -m pip install <PACKAGES>
 requirements-brain.txt names the same packages; TORCH and PACKAGES below are the exact versions installed and tested.
 """
 from __future__ import annotations
@@ -45,8 +50,11 @@ def train(chats, base, out_dir, *, epochs=EPOCHS):  # pragma: no cover - needs t
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     torch.set_num_threads(max(1, (os.cpu_count() or 2) - 1))  # leave a core for the owner
+    # A GPU build of PyTorch (AMD ROCm, owner approval 2026-11-20) trains on the card with a half-precision base, leaving
+    # room beside Ollama's model in 12 GB; the LoRA weights stay full precision. The CPU build keeps full precision.
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     tokenizer = AutoTokenizer.from_pretrained(base, local_files_only=True)
-    model = AutoModelForCausalLM.from_pretrained(base, local_files_only=True, torch_dtype=torch.float32)
+    model = AutoModelForCausalLM.from_pretrained(base, local_files_only=True, torch_dtype=torch.float16 if device == "cuda" else torch.float32).to(device)
     model = get_peft_model(model, LoraConfig(r=8, lora_alpha=16, lora_dropout=0.05, task_type="CAUSAL_LM",
                                              target_modules=["q_proj", "k_proj", "v_proj", "o_proj"]))
     optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=2e-4)
@@ -56,7 +64,7 @@ def train(chats, base, out_dir, *, epochs=EPOCHS):  # pragma: no cover - needs t
         for chat in chats:
             text = tokenizer.apply_chat_template(chat["messages"], tokenize=False)
             asked = tokenizer.apply_chat_template(chat["messages"][:-1], tokenize=False, add_generation_prompt=True)
-            batch = tokenizer(text, return_tensors="pt", truncation=True, max_length=MAX_TOKENS)
+            batch = tokenizer(text, return_tensors="pt", truncation=True, max_length=MAX_TOKENS).to(device)
             labels, start = batch["input_ids"].clone(), len(tokenizer(asked).input_ids)
             if start >= labels.shape[1] - 1:
                 continue  # no answer left after truncation
@@ -66,7 +74,10 @@ def train(chats, base, out_dir, *, epochs=EPOCHS):  # pragma: no cover - needs t
             optimizer.step()
             optimizer.zero_grad()
             losses.append(float(loss))
-    merged = model.merge_and_unload().to(torch.float16)  # half the size on disk; Ollama keeps f16
+    merged = model.merge_and_unload().to("cpu", torch.float16)  # half the size on disk; Ollama keeps f16
+    del optimizer
+    if device == "cuda":
+        torch.cuda.empty_cache()  # frees the card for Ollama's scoring
     merged.save_pretrained(out_dir, safe_serialization=True)
     tokenizer.save_pretrained(out_dir)
     return round(sum(losses[-len(chats):]) / max(1, len(chats)), 4)
