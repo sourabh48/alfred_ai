@@ -121,11 +121,21 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
     variable_income = float(getattr(user, "rupee_variable_income", 0) or 0)
     observed_salary = round(sum(item["monthly_amount"] for item in current_salaries), 2)
     reported_mode = _reported_income_mode(reported_value, user.monthly_income_basis)
-    reported_monthly_equivalent = {
-        "annual_ctc": float((Decimal(str(reported_value)) / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)),
+    # An employer outlasts the 92-day rule for amounts: statements imported months ago still name who pays you.
+    last_payer = best_salary_signal or next((item for item in salary_candidates if item["described_as_salary"] and item["employer"]), None)
+    entered_take_home = float(getattr(user, "rupee_take_home_monthly", 0) or 0)
+    bonus = Decimal(str(getattr(user, "rupee_annual_bonus", 0) or 0))
+    take_home = (take_home_from_ctc(max(Decimal(str(reported_value)) - bonus, Decimal("0")), today=today)
+                 # Only a salaried CTC has PF and professional tax; a freelancer's yearly income does not.
+                 if reported_mode == "annual_ctc" and not entered_take_home and (resume_employer or last_payer) else None)
+    reported_monthly_equivalent = {  # what the person says lands each month wins over the estimate
+        "annual_ctc": entered_take_home or (float(take_home["monthly"]) if take_home else
+                                            float((Decimal(str(reported_value)) / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))),
         "monthly": round(reported_value, 2),
     }.get(reported_mode, 0.0)
-    income_conflict = _income_conflict(observed_salary, reported_monthly_equivalent)
+    # Credits are judged against CTC/12 as before: real in-hand pay lands between the estimate and that, inside the band.
+    income_conflict = _income_conflict(observed_salary, round(reported_value / 12, 2) if reported_mode == "annual_ctc"
+                                       and not entered_take_home else reported_monthly_equivalent)
     # A confirmed income is never silently replaced by what the credits suggest.
     salary_monthly = 0.0 if income_conflict else observed_salary
     monthly_cash_income = round(salary_monthly or reported_monthly_equivalent, 2)
@@ -134,8 +144,9 @@ def build_employment_income_signals(*, user, latest_resume=None, profile=None, t
     if reported_mode == "annual_ctc":
         annualized_compensation = round(reported_value, 2)
 
-    current_employer = resume_employer or str(best_salary_signal.get("employer", "") if best_salary_signal else "").strip()
-    employer_source = "resume" if resume_employer else ("salary_credit" if best_salary_signal else "not_evidenced")
+    current_employer = resume_employer or str(last_payer.get("employer", "") if last_payer else "").strip()
+    employer_source = "resume" if resume_employer else (
+        "salary_credit" if best_salary_signal else "salary_credit_last_seen" if last_payer else "not_evidenced")
     salary_source = "salary_credits" if salary_monthly else {
         "annual_ctc": "reported_annual_ctc", "monthly": "reported_monthly_income", "unconfirmed": "reported_income_unconfirmed",
     }.get(reported_mode, "not_evidenced")
@@ -354,6 +365,25 @@ def _normalize_employer_key(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", " ", str(value or "").upper())).strip()
 
 
+# India salary structure (owner check 2026-11-20: CTC 6,72,000 lands as about 49,000 a month). Under the Code on Wages, in
+# force from 21 November 2025, basic wages are at least half of pay; PF is 12% of basic from the employee and again from the
+# employer inside CTC; most states charge professional tax of 200 a month; income tax comes from ALFRED's verified rules.
+BASIC_SHARE, PF_RATE, PROFESSIONAL_TAX_MONTHLY = Decimal("0.50"), Decimal("0.12"), Decimal("200")
+
+
+def take_home_from_ctc(annual_ctc, *, today: date) -> dict:
+    """Estimated monthly in-hand pay for an Indian salaried annual CTC, with the parts it subtracts."""
+    from apps.ml_engine.services.tax_policy import calculate_income_tax, default_financial_year
+    ctc = Decimal(str(annual_ctc))
+    pf = (ctc * BASIC_SHARE * PF_RATE).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)  # a year, from each side
+    gross = ctc - pf  # the employer's PF is part of CTC but never paid out
+    tax = calculate_income_tax(gross, "new", financial_year=default_financial_year(today))["final_tax"]
+    monthly = ((gross - pf - tax) / 12 - PROFESSIONAL_TAX_MONTHLY).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return {"monthly": max(monthly, Decimal("0.00")), "employee_pf_monthly": (pf / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+            "employer_pf_monthly": (pf / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+            "professional_tax_monthly": PROFESSIONAL_TAX_MONTHLY, "income_tax_monthly": (tax / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)}
+
+
 def _reported_income_mode(reported_value: float, basis: str) -> str:
     """The owner states the period; an amount's size never decides it."""
     if reported_value <= 0:
@@ -396,5 +426,7 @@ def _build_source_summary(
     if reported_mode == "unconfirmed":
         parts.append("The entered income is not used until you confirm in Settings whether it is per month or per year.")
     if reported_mode == "annual_ctc":
-        parts.append("The reported income input is being treated as annual CTC, not monthly take-home.")
+        parts.append("With an employer on record, your yearly CTC becomes estimated monthly take-home after PF (12% of a "
+                     "basic of half your pay, from you and your employer), professional tax of INR 200 and income tax; enter "
+                     "your in-hand pay per month in Settings if it differs.")
     return " ".join(parts[:3]).strip()

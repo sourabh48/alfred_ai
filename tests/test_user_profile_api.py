@@ -46,6 +46,8 @@ class UserProfileApiTests(TestCase):
                 "monthly_income",
                 "monthly_income_basis",
                 "variable_income",
+                "take_home_monthly",
+                "annual_bonus",
                 "rent_or_emi",
                 "city",
                 "country",

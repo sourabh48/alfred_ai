@@ -9,7 +9,7 @@ from django.test import Client, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from apps.career.models import CareerProfile
-from apps.career.services.income_intelligence import build_employment_income_signals, is_never_pay
+from apps.career.services.income_intelligence import build_employment_income_signals, is_never_pay, take_home_from_ctc
 from apps.expenses.models import Expense
 from apps.expenses.services.financial_intelligence import build_financial_intelligence, resolve_canonical_financial_baseline
 from apps.loans.models import Loan
@@ -326,7 +326,8 @@ class ConfirmedIncomeTests(SalaryEvidenceBase):
                 user = self.user(name, amount, basis)
                 self.paid(user, salary)
                 baseline = self.baseline(user)
-                expected = float(amount if basis == "monthly" else amount / 12)
+                # A salaried yearly CTC stands for its estimated take-home (owner check 2026-11-20).
+                expected = float(amount if basis == "monthly" else take_home_from_ctc(amount, today=timezone.localdate())["monthly"])
                 self.assertEqual(baseline["monthly_income"], expected)
                 self.assertEqual(baseline["income_source"], expected_source)
                 self.assertEqual(baseline["income_conflict"]["salary_monthly"], float(salary))
@@ -498,3 +499,56 @@ class UnknownIncomeIsNotZeroTests(SalaryEvidenceBase):
         self.user("train_monthly", 90000, "monthly")
         spec = next(item for item in TRAINING_SPECS if item.key == "salary_predictor")
         self.assertEqual(spec.sample_counter(), 1)
+
+
+class TakeHomeFromCtcTests(SalaryEvidenceBase):
+    """Owner check 2026-11-20: a CTC of 6,72,000 lands as about 49,000 a month, not CTC / 12 = 56,000."""
+
+    def test_annual_ctc_becomes_take_home_after_pf_professional_tax_and_income_tax(self):
+        from apps.career.services.income_intelligence import take_home_from_ctc
+        estimate = take_home_from_ctc(672000, today=date(2026, 11, 20))
+        self.assertEqual(estimate["monthly"], Decimal("49080.00"))  # 56,000 - PF 3,360 x 2 - professional tax 200; no income tax
+        self.assertEqual((estimate["employee_pf_monthly"], estimate["income_tax_monthly"]), (Decimal("3360.00"), Decimal("0.00")))
+        taxed = take_home_from_ctc(3000000, today=date(2026, 11, 20))
+        self.assertGreater(taxed["income_tax_monthly"], 0)
+        self.assertLess(taxed["monthly"], Decimal("3000000") / 12 - 2 * taxed["employee_pf_monthly"])
+        user = self.user("ctc_only", 672000, "annual")
+        self.assertEqual(self.signals(user)["monthly_cash_income"], 56000.0)  # no employer on record: a yearly income, not a CTC
+        self.credit(user, 49000, months_ago=5, employer="Tata Consultancy Services", text="SALARY TATA CONSULTANCY SERVICES")
+        signals = self.signals(user)
+        self.assertEqual(signals["monthly_cash_income"], 49080.0)
+        self.assertEqual(signals["annualized_compensation"], 672000.0)  # the career benchmark stays the CTC
+
+    def test_entered_in_hand_pay_wins_and_a_bonus_is_left_out_of_the_monthly_estimate(self):
+        user = self.user("with_bonus", 672000, "annual")
+        self.credit(user, 49000, months_ago=5, employer="Tata Consultancy Services", text="SALARY TATA CONSULTANCY SERVICES")
+        user.annual_bonus = 72000
+        user.save()
+        self.assertEqual(self.signals(user)["monthly_cash_income"], 43800.0)  # 6,00,000: 50,000 - PF 3,000 x 2 - 200
+        user.take_home_monthly = 49000
+        user.save()
+        signals = self.signals(user)
+        self.assertEqual(signals["monthly_cash_income"], 49000.0)
+        self.assertEqual(signals["annualized_compensation"], 672000.0)
+        self.assertEqual(self.baseline(user)["monthly_income"], 49000.0)
+
+    def test_the_employer_on_old_salary_credits_is_still_named(self):
+        user = self.user("old_payer", 672000, "annual")
+        for month in range(4, 8):
+            self.credit(user, 49000, months_ago=month, employer="Tata Consultancy Services", text="SALARY TATA CONSULTANCY SERVICES")
+        signals = self.signals(user)
+        self.assertIsNone(signals["salary_credit_signal"])  # too old to set the amount
+        self.assertEqual(signals["current_employer_source"], "salary_credit_last_seen")
+        self.assertIn("Tata Consultancy", signals["current_employer"])
+
+
+class ResumeEmployerTests(SimpleTestCase):
+    def test_the_employer_above_or_beside_dates_running_to_the_present_is_read(self):
+        from apps.career.services.resume_intelligence import ResumeIntelligenceService
+        read = ResumeIntelligenceService()._extract_current_company
+        self.assertEqual(read("Java Developer\nWork Experience\nTata Consultancy Services\nJune 2022 - Present\nSystemEngineer\nBengaluru"),
+                         "Tata Consultancy Services")
+        self.assertEqual(read("Work Experience\nT ata Consultancy ServicesJune 2022 - Present\nSystem Engineer Bengaluru, India"),
+                         "Tata Consultancy Services")
+        self.assertEqual(read("Experience\nAcme Software Pvt Ltd\nEngineer, 2019 - 2021"), "Acme Software Pvt Ltd")
+        self.assertEqual(read("Skills\nJava, Spring"), "")

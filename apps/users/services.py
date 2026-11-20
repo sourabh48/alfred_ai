@@ -203,12 +203,14 @@ def clear_user_fed_data(user) -> dict:
         UserMoneySnapshot.objects.filter(user=user).delete()
         user.monthly_income = 0
         user.variable_income = 0
+        user.take_home_monthly = user.annual_bonus = 0
         user.rent_or_emi = 0
         user.income_currency = user.variable_income_currency = user.rent_currency = None
         user.city = ""
         user.country = ""
         user.monthly_income_basis = IncomeBasis.MONTHLY
         user.save(update_fields=["monthly_income", "monthly_income_basis", "variable_income", "rent_or_emi", "city", "country",
+                                 "take_home_monthly", "annual_bonus",
                                  "income_currency", "variable_income_currency", "rent_currency"])
 
     _delete_storage_files(file_names)

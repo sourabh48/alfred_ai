@@ -1,5 +1,23 @@
 # ALFRED execution state
 
+## Money walkthrough — 2026-11-20
+
+Owner walkthrough of the Money module on master `4ba0c37` (owner app). Local commits on work/completion-sprint-2026-11-19, not pushed.
+
+- FIN-13 export and corrections: owner answered "Works"; recorded COMPLETE_VERIFIED.
+- Salary (owner: "ctc is 672000 but the in hand salary is 49000 appx after pf and professional tax ... also there is bonus"): a yearly CTC
+  with an employer on record now means estimated take-home: basic half of CTC (Code on Wages, from 21 Nov 2025), PF 12% of basic from
+  both sides inside CTC, professional tax INR 200 a month and new-regime income tax. CTC 6,72,000 gives 49,080 a month. Settings has
+  "In-hand pay per month" (wins over the estimate) and "Bonus per year" (taken off CTC first). New users migration 0008 (two columns,
+  default 0): applying it to the owner database needs the owner's OK before the app restarts. Salary credits still win when they agree
+  with CTC/12 inside the existing band; a yearly income with no employer stays CTC/12.
+- Employer: résumé parsing now finds the current employer under a "Work Experience" heading (owner CV: Tata Consultancy Services);
+  without a résumé employer, the last salary credit naming a payer is used (`salary_credit_last_seen`). The owner's stored résumé
+  was parsed before this and still has no employer until it is parsed again.
+- CI on `4ba0c37`: Browser Regression failed in selenium shard 0 (log needs GitHub sign-in); the same shard passed locally
+  (81 tests) on this branch, so it looks flaky; the next push re-runs it.
+- Tests: income 88, wider income/career/user suites 191, migration-history suites 226, all PASS; drift and system checks clean.
+- Open: first-sign-in income prompt, original/home currency toggle (FIN-15), FIN-06 goals recheck, LOAN-07/08.
 ## Smarter local AI — 2026-11-20
 
 Local commits after `c0b519f` (pushed), same worktree and branch, not pushed: owner approved eight upgrades ("make it

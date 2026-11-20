@@ -82,6 +82,8 @@ class IncomeCurrencyMigrationTests(TransactionTestCase):
                 MigrationExecutor(db).migrate(leaves)
                 db.close()
                 after = read_database(candidate)[0]
+                self.assertEqual([(float(row.pop("take_home_monthly")), float(row.pop("annual_bonus"))) for row in after["users_user"]],
+                                 [(0.0, 0.0)])  # added 2026-11-20, empty until entered
                 for table, columns in (("users_user", ("income_currency", "variable_income_currency", "rent_currency", "display_currency")),
                                        ("career_careerprofile", ("salary_currency",))):
                     for column in columns:

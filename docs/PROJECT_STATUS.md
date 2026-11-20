@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 84/143 (58.7%) verified.**
+**Baseline: 85/143 (59.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 36 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 84 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 35 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -814,7 +814,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 11 | 17 | 64.7 | 3 | 2 | 0 | 0 | 0 |
+| FIN | 12 | 17 | 70.6 | 2 | 2 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | INV | 3 | 8 | 37.5 | 5 | 0 | 0 | 0 | 0 |
 | DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
@@ -1698,6 +1698,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: No dedicated goal model or end-to-end goal management route found; savings capacity is not goal persistence. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_IMPLEMENTATION 2026-11-06: new `SavingsGoal` (migration budgets 0003) with name, INR target, saved-so-far and optional target date, using the existing Budget Decimal money field. Owner-only `/api/budgets/goals/` list/create/update/delete. Progress is owner-entered, not matched transactions; the monthly amount spreads what is left evenly over the months to the target date, rounded up to the cent; reached and overdue states are explicit. Budgets page has a Savings Goals section; account data reset removes goals. INR only; no FX (FIN-15 stays approval-gated). [Tests](../tests/test_savings_goals.py): 5 backend PASS (cents, edges, invalid input, other owners, reset) plus budget/reset/profile suites (58 PASS); a new Chrome test PASS with desktop and 390px captures inspected.
 - Next: owner check in the app after approving the migration; linking goals to transactions or investments is a separate decision.
+- 2026-11-20 walkthrough: the owner pointed out that income was CTC/12, not in-hand pay. Fixed in the shared income service (take-home after PF, professional tax and income tax; entered in-hand pay and bonus in Settings). Goals still need the owner's recheck with the corrected income.
 
 ### FIN-07 — Cash-flow forecasting
 
@@ -1768,7 +1769,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-13 — Financial export and correction
 
-**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P2.
+**COMPLETE_VERIFIED** · Personal finance · P2.
 
 - Source: [expense API/export](../apps/expenses/views.py), [correction boundary](../apps/expenses/serializers.py), [shared hydration](../apps/expenses/services/transaction_intelligence.py), [Expense UI](../templates/expenses/list.html), [existing reports](../apps/reports/services.py).
 - APIs/UI/models: `/expenses/`, `/api/expenses/`, owner-authenticated `/api/expenses/export/`; existing Expense/BankAccount/StatementUpload records, no duplicate register or schema change.
@@ -1777,7 +1778,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: CSV exports all owner expenses, independent of timeline display filters; retains exact recorded cents without asserting currency, blanks null balances, escapes formula-leading text and omits raw source/account details. Current-value export, not a backup or a reimport contract. Corrections preserve omitted owner values, import linkage/identity and unrelated bank snapshots.
 - OWNER_DECISION 2026-11-06: broader portability is one ZIP of CSVs. Implemented in `24e8b84`: owner-authenticated `/api/expenses/export/financial/` and an "Export financial data (ZIP)" button on Expenses. One CSV each for bank accounts, transactions, loans, investments and budgets; recorded values only, no currency inferred, unknowns blank, formula-leading text escaped, account numbers masked to the last four digits (short numbers with fewer than four digits stay as recorded, like the existing account display), only the signed-in owner's rows. Free-text notes are included. Tests: 6 export tests, 584 related backend tests (Chrome skipped there) and both Chrome download tests PASS.
 - 2026-11-06: owner downloaded the ZIP on their own account and confirmed the page and files look right ("Looks right"). The header buttons now wrap on narrow windows (`96f9892`).
-- Next: exact-HEAD CI and a fresh-package check, due with the phase B push. Not a backup or a reimport contract.
+- 2026-11-20 Money walkthrough: the owner checked export and corrections on their own account in the running app (master `4ba0c37`, whose CI passed) and answered "Works". Accepted. Still not a backup or a reimport contract.
 
 ### FIN-14 — Money storage across every domain
 

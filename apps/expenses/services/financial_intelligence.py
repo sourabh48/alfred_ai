@@ -319,8 +319,9 @@ def _financial_revision(user) -> str:
     return "|".join(
         str(value or "")
         for value in [
-            "expense-bank-money-v2-safe-loan-diagnostics",
+            "expense-bank-money-v2-safe-loan-diagnostics-take-home",  # 2026-11-20: CTC becomes estimated take-home
             user.monthly_income, user.monthly_income_basis, user.variable_income, user.rent_or_emi, user.city,
+            user.take_home_monthly, user.annual_bonus,
             user.income_currency, user.variable_income_currency, user.rent_currency,
             expense_meta["count"], expense_meta["max_id"], expense_meta["max_date"],
             loan_meta["count"], loan_meta["max_id"], loan_meta["max_updated"],

@@ -20,6 +20,9 @@ class User(AbstractUser):
     monthly_income = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)
     monthly_income_basis = models.CharField(max_length=12, choices=IncomeBasis.choices, default=IncomeBasis.MONTHLY)
     variable_income = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)
+    # Owner check 2026-11-20: CTC is not what lands in the bank. Both follow income_currency; zero means not entered.
+    take_home_monthly = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)  # actual in-hand pay per month
+    annual_bonus = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)  # bonus or variable pay inside a yearly CTC
     rent_or_emi = ProfileMoneyField(max_digits=14, decimal_places=2, default=0)
     # FIN-15: each entered amount records its own currency; null is not recorded and counts as legacy INR.
     income_currency = currency_field()
@@ -42,6 +45,14 @@ class User(AbstractUser):
     def rupee_monthly_income(self):
         """Entered income for rupee totals; zero when it was recorded in another currency."""
         return rupee_amount(Decimal(str(self.monthly_income or 0)), self.income_currency)
+
+    @property
+    def rupee_take_home_monthly(self):
+        return rupee_amount(Decimal(str(self.take_home_monthly or 0)), self.income_currency)
+
+    @property
+    def rupee_annual_bonus(self):
+        return rupee_amount(Decimal(str(self.annual_bonus or 0)), self.income_currency)
 
     @property
     def rupee_variable_income(self):

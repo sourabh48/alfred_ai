@@ -54,6 +54,11 @@ LINK_RE = re.compile(
     re.IGNORECASE,
 )
 YEARS_RE = re.compile(r"(\d+(?:\.\d+)?)\+?\s+(?:years?|yrs?)", re.IGNORECASE)
+EXPERIENCE_HEADING_RE = re.compile(r"^(?:work |professional )?(?:experience|employment(?: history)?)\s*:?$", re.IGNORECASE)
+CURRENT_DATES_RE = re.compile(r"\b(?:19|20)\d\d\b.*\b(?:present|current|till date|to date|now)\b", re.IGNORECASE)
+DATE_START_RE = re.compile(r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*(?:19|20)\d\d|\b(?:19|20)\d\d", re.IGNORECASE)
+ORGANISATION_RE = re.compile(r"\b(?:services|technologies|technology|consultancy|consulting|solutions|systems|software|labs|limited|ltd|"
+                             r"pvt|private|inc|llc|llp|corporation|corp|bank|group|industries|infotech|enterprises)\b", re.IGNORECASE)
 COMPANY_FIELD_RE = re.compile(
     r"\b(?:company|current company|employer|organization)\s*[:\-]\s*([A-Z][A-Z0-9&.,'() /-]{2,90})",
     re.IGNORECASE,
@@ -444,6 +449,25 @@ class ResumeIntelligenceService:
                 if 2 <= len(cleaned.split()) <= 6:
                     return cleaned[:120]
 
+        # "Work Experience / Tata Consultancy Services / June 2021 - Present / System Engineer" (owner's CV, 2026-11-20): the
+        # current employer is the line above the dates that run to the present, else the first organisation-like line.
+        # The same CV also extracts as "T ata Consultancy ServicesJune 2022 - Present": name and dates on one line.
+        def tidy(name):
+            return re.sub(r"\b([A-Z]) (?=[a-z]{2,})", r"\1", " ".join(name.split())).strip(" -|,\u2013\u2014")[:120]
+
+        for index, line in enumerate(lines):
+            if not EXPERIENCE_HEADING_RE.match(line):
+                continue
+            section = lines[index + 1:index + 40]
+            for at, entry in enumerate(section):
+                if not CURRENT_DATES_RE.search(entry):
+                    continue
+                before = tidy(entry[:DATE_START_RE.search(entry).start()])
+                if before:
+                    return before
+                if at and not CURRENT_DATES_RE.search(section[at - 1]) and len(section[at - 1].split()) <= 8:
+                    return tidy(section[at - 1])
+            return next((tidy(entry) for entry in section[:8] if ORGANISATION_RE.search(entry) and len(entry.split()) <= 8), "")
         return ""
 
     def _extract_links(self, text: str) -> list[str]:

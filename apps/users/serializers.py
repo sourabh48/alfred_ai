@@ -9,6 +9,8 @@ class UserSerializer(serializers.ModelSerializer):
     monthly_income = ProfileMoneySerializerField(required=False)
     monthly_income_basis = serializers.ChoiceField(choices=IncomeBasis.choices, required=False)
     variable_income = ProfileMoneySerializerField(required=False)
+    take_home_monthly = ProfileMoneySerializerField(required=False)
+    annual_bonus = ProfileMoneySerializerField(required=False)
     rent_or_emi = ProfileMoneySerializerField(required=False)
     income_currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
     variable_income_currency = serializers.ChoiceField(choices=CURRENCY_CHOICES, required=False, allow_null=True, allow_blank=True)
@@ -32,6 +34,8 @@ class UserSerializer(serializers.ModelSerializer):
             "monthly_income",
             "monthly_income_basis",
             "variable_income",
+            "take_home_monthly",
+            "annual_bonus",
             "rent_or_emi",
             "income_currency",
             "variable_income_currency",

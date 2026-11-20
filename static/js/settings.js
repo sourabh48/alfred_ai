@@ -56,6 +56,8 @@ function renderSettingsProfile(profile = {}) {
         "country",
         "monthly_income",
         "variable_income",
+        "take_home_monthly",
+        "annual_bonus",
         "rent_or_emi",
         "income_currency",
         "variable_income_currency",
@@ -79,7 +81,7 @@ function submitProfileForm(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const payload = Object.fromEntries(new FormData(form).entries());
-    ["monthly_income", "variable_income", "rent_or_emi"].forEach(field => {
+    ["monthly_income", "variable_income", "take_home_monthly", "annual_bonus", "rent_or_emi"].forEach(field => {
         payload[field] = Number(payload[field] || 0);
     });
     if (!payload.monthly_income_basis) {

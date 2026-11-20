@@ -83,6 +83,13 @@
                         {% if career_income %}<div class="form-text" id="settingsCareerIncomeHint">Also applies to your career income of &#8377;{{ career_income|floatformat:2 }}, used because no income is entered here.</div>{% endif %}
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label" for="settingsTakeHome">In-hand pay per month</label>
+                        <input id="settingsTakeHome" name="take_home_monthly" type="number" min="0" step="0.01" class="form-control" aria-describedby="settingsTakeHomeHelp">
+                        <label class="form-label mt-2" for="settingsAnnualBonus">Bonus per year (part of CTC)</label>
+                        <input id="settingsAnnualBonus" name="annual_bonus" type="number" min="0" step="0.01" class="form-control">
+                        <div class="form-text" id="settingsTakeHomeHelp">With a yearly CTC and no in-hand pay, ALFRED estimates it after PF, professional tax and income tax, leaving out the bonus. Same currency as your income.</div>
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label" for="settingsVariableIncome">Variable Income</label>
                         <input id="settingsVariableIncome" name="variable_income" type="number" min="0" step="0.01" class="form-control">
                         <label class="form-label mt-2" for="settingsVariableIncomeCurrency">Variable income currency</label>
@@ -184,7 +191,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/settings.js?v=1.7"></script>
+<script src="/static/js/settings.js?v=1.8"></script>
 <script src="/static/js/gemini_key.js?v=2"></script>
 <script src="/static/js/online_services.js?v=4"></script>
 <script src="/static/js/offline_maps.js?v=3"></script>
