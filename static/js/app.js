@@ -346,7 +346,7 @@ function showHomeCurrency() {
 function mountCurrencyToggle() {
     document.querySelectorAll("[data-currency-toggle]").forEach(holder => {
         const home = showHomeCurrency();
-        const button = (view, label, active) => `<button type="button" class="btn btn-outline-secondary${active ? " active" : ""}" aria-pressed="${active}" data-currency-view="${view}">${label}</button>`;
+        const button = (view, label, active) => `<button type="button" class="btn ${active ? "btn-dark active" : "btn-light border"}" aria-pressed="${active}" data-currency-view="${view}">${label}</button>`;
         setHTML(holder, `<div class="btn-group btn-group-sm" role="group" aria-label="Show other currencies in">${button("original", "Original currency", !home)}${button("home", "Home currency", home)}</div>`);
         holder.addEventListener("click", event => {
             const view = event.target.closest("[data-currency-view]")?.dataset.currencyView;

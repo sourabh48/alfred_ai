@@ -1768,6 +1768,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('[data-currency-toggle] [data-currency-view="original"]')
         self.wait.until(lambda _: 'at the' in note())
         self.assertTrue(cell().startswith('-$11.00'), cell())
+        # CI's native check found the first switch style too faint (axe color-contrast, 2026-11-20).
+        self.browser.execute_script((Path(__file__).resolve().parents[1]/'artifacts/tools/package/axe.min.js').read_text(encoding='utf-8'))
+        for theme in ('light', 'dark'):
+            self.browser.execute_script('document.documentElement.dataset.theme=arguments[0]', theme)
+            audit = self.browser.execute_async_script("const done=arguments[0];axe.run('[data-currency-toggle]',{runOnly:{type:'rule',values:['color-contrast']}}).then(r=>done(r.violations.map(v=>v.nodes.map(n=>n.target+': '+n.failureSummary))));")
+            self.assertEqual(audit, [], theme)
         self.browser.execute_script('localStorage.removeItem("alfred.currencyView")')
 
     def test_loan_refresh_response_does_not_replace_rows_during_table_interaction(self):
