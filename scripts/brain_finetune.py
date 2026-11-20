@@ -22,6 +22,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import urllib.request
 
 TORCH = "torch==2.15.0"  # CPU build, from download.pytorch.org/whl/cpu
 PACKAGES = ("transformers==5.23.0", "peft==0.22.0", "accelerate==1.16.0", "safetensors==0.8.0", "huggingface_hub==2.4.0",
@@ -31,7 +32,7 @@ PACKAGES = ("transformers==5.23.0", "peft==0.22.0", "accelerate==1.16.0", "safet
 # ALFRED_BRAIN_CONVERTER.
 MODEL_NAME = "alfred-brain"
 EPOCHS = 2
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048  # the travel reader's instructions and schema alone are about 900 tokens
 
 
 def write_status(path, **values):
@@ -54,8 +55,13 @@ def train(chats, base, out_dir, *, epochs=EPOCHS):  # pragma: no cover - needs t
     for _ in range(epochs):
         for chat in chats:
             text = tokenizer.apply_chat_template(chat["messages"], tokenize=False)
+            asked = tokenizer.apply_chat_template(chat["messages"][:-1], tokenize=False, add_generation_prompt=True)
             batch = tokenizer(text, return_tensors="pt", truncation=True, max_length=MAX_TOKENS)
-            loss = model(**batch, labels=batch["input_ids"]).loss
+            labels, start = batch["input_ids"].clone(), len(tokenizer(asked).input_ids)
+            if start >= labels.shape[1] - 1:
+                continue  # no answer left after truncation
+            labels[:, :start] = -100  # learn the answer only, not the instructions it was given
+            loss = model(**batch, labels=labels).loss
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -66,12 +72,42 @@ def train(chats, base, out_dir, *, epochs=EPOCHS):  # pragma: no cover - needs t
     return round(sum(losses[-len(chats):]) / max(1, len(chats)), 4)
 
 
+def _filled(answer):
+    if not isinstance(answer, dict):
+        return {}
+    return {key: sorted(str(v).casefold() for v in value) if isinstance(value, list) else
+            value.casefold().strip() if isinstance(value, str) else value
+            for key, value in answer.items() if value not in (None, "", [])}
+
+
+def ask(url, model, messages, schema):
+    """One reading from the local Ollama, with the options the travel reader uses."""
+    body = json.dumps({"model": model, "messages": messages, "format": schema, "stream": False, "think": False,
+                       "options": {"temperature": 0, "num_ctx": 4096, "num_predict": 300}}).encode()
+    with urllib.request.urlopen(urllib.request.Request(url.rstrip("/") + "/api/chat", body,
+                                                       {"Content-Type": "application/json"}), timeout=300) as reply:
+        return json.loads(json.loads(reply.read())["message"]["content"])
+
+
+def score(url, model, held_back):
+    """Share of held-back messages the model reads exactly right (every stated field, nothing extra)."""
+    right = 0
+    for item in held_back["items"]:
+        try:
+            right += _filled(ask(url, model, item["messages"], held_back["format"])) == _filled(item["expected"])
+        except Exception:  # a failed or unreadable answer counts as wrong
+            pass
+    return round(right / max(1, len(held_back["items"])), 4)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     for name in ("--chats", "--base", "--out", "--status", "--ollama", "--converter"):
         parser.add_argument(name, required=True)
     parser.add_argument("--model", default=MODEL_NAME)
     parser.add_argument("--epochs", type=int, default=EPOCHS)
+    parser.add_argument("--held-back", help="Held-back examples; the switch needs the new model to score at least as well")
+    parser.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     args = parser.parse_args(argv)
     chats_file, out = Path(args.chats), Path(args.out)
     merged, gguf = out / "merged", out / f"{args.model}.gguf"
@@ -86,14 +122,25 @@ def main(argv=None):
         (out / "Modelfile").write_text(f"FROM {gguf.resolve()}\n", encoding="utf-8")
         created = subprocess.run([args.ollama, "create", args.model, "-f", str(out / "Modelfile")],
                                  capture_output=True, encoding="utf-8", errors="replace", timeout=3600)
-        write_status(args.status, state="ready" if created.returncode == 0 else "ollama_import_failed", examples=len(chats),
-                     loss=loss, model=args.model if created.returncode == 0 else None, detail=(created.stderr or "")[-300:])
-        return 0 if created.returncode == 0 else 4
+        if created.returncode != 0:
+            write_status(args.status, state="ollama_import_failed", examples=len(chats), loss=loss, detail=(created.stderr or "")[-300:])
+            return 4
+        scores = None
+        if args.held_back:
+            held_back = json.loads(Path(args.held_back).read_text(encoding="utf-8"))
+            write_status(args.status, state="scoring", examples=len(chats), loss=loss)
+            scores = {"current_model": held_back["current_model"], "held_back": len(held_back["items"]),
+                      "current": score(args.ollama_url, held_back["current_model"], held_back),
+                      "new": score(args.ollama_url, args.model, held_back)}
+        write_status(args.status, state="ready", examples=len(chats), loss=loss, model=args.model, scores=scores)
+        return 0
     except Exception as exc:
         write_status(args.status, state="failed", detail=type(exc).__name__)
         return 5
     finally:
         chats_file.unlink(missing_ok=True)  # the private examples stay only in the encrypted vault
+        if args.held_back:
+            Path(args.held_back).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

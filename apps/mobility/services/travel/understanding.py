@@ -136,6 +136,21 @@ def clean(answer, message, *, pending=None, alfred_said=""):
     return out
 
 
+def reading_model():
+    """The fine-tuned alfred-brain once it scored at least as well as the configured model on held-back examples, else that model."""
+    import json
+    from pathlib import Path
+    try:
+        result = json.loads((Path(settings.ALFRED_MEMORY_DIR).parent / "brain-training" / "status.json").read_text(encoding="utf-8"))
+        scores = result["scores"]
+        if (result["state"] == "ready" and scores["current_model"] == settings.ALFRED_TRAVEL_READING_MODEL
+                and scores["held_back"] >= 20 and scores["new"] >= scores["current"]):
+            return result["model"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return settings.ALFRED_TRAVEL_READING_MODEL
+
+
 def upcoming_holidays(user=None):
     """Holidays in the next year: fixed Indian dates always, plus the holiday lookup (Nager.Date, else Google) when it answers."""
     today, found = timezone.localdate(), set()
@@ -152,6 +167,13 @@ def upcoming_holidays(user=None):
             if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) and today.isoformat() <= day <= until and name][:60]
 
 
+def system_prompt(today):
+    """The reader's instructions for one day, exactly as the model sees them (fine-tuning uses the same text)."""
+    saturday = today + timedelta(days=(5 - today.weekday()) % 7)  # the model miscounted weekdays on its own (2026-11-20)
+    return SYSTEM.format(today=today.isoformat(), weekday=today.strftime("%A"), year=today.year, saturday=saturday.isoformat(),
+                         sunday=(saturday + timedelta(days=1)).isoformat())
+
+
 def read(text, *, pending=None, recent=(), lessons=(), user=None):
     """Fields the local model read from one message; {} when reading is off, Ollama is down, slow or unsure."""
     text = str(text or "").strip()
@@ -162,14 +184,11 @@ def read(text, *, pending=None, recent=(), lessons=(), user=None):
     class Reader(LocalChat):
         def __init__(self):
             super().__init__()
-            self.model = settings.ALFRED_TRAVEL_READING_MODEL
+            self.model = reading_model()
             if not re.fullmatch(r"[\w.:-]{1,100}", self.model) or "cloud" in self.model.casefold():
                 raise ValueError("A fixed installed local model is required.")
 
-    today = timezone.localdate()
-    saturday = today + timedelta(days=(5 - today.weekday()) % 7)  # the model miscounted weekdays on its own (2026-11-20)
-    prompt = SYSTEM.format(today=today.isoformat(), weekday=today.strftime("%A"), year=today.year,
-                           saturday=saturday.isoformat(), sunday=(saturday + timedelta(days=1)).isoformat())
+    prompt = system_prompt(timezone.localdate())
     try:
         earlier = [{"from": "ALFRED" if role == "assistant" else "traveller", "text": str(said)[:400]} for role, said in recent]
         festive = upcoming_holidays(user) if FESTIVAL_CUE.search(text) else []  # looked up only when a message names one

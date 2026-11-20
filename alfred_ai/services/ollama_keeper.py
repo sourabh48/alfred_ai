@@ -33,7 +33,8 @@ def start_brain_finetune():
     """Export the owner's brain examples and start scripts/brain_finetune.py at low priority in its own Python."""
     import json
     from django.contrib.auth import get_user_model
-    from apps.ml_engine.services.brain import training_chats
+    from apps.ml_engine.services.brain import held_back, training_chats
+    from apps.mobility.services.travel.understanding import SCHEMA
     from apps.ml_engine.services.memory_key import private_directory
     name, python, base = settings.ALFRED_BRAIN_FINETUNE_USER, settings.ALFRED_BRAIN_FINETUNE_PYTHON, Path(settings.ALFRED_BRAIN_BASE_MODEL_DIR)
     if not name or not python:
@@ -58,16 +59,20 @@ def start_brain_finetune():
         last = {}
     if len(chats) < settings.ALFRED_BRAIN_FINETUNE_MIN_EXAMPLES:
         return "too_few_examples"
-    if last.get("state") == "training" or (last.get("state") == "ready" and last.get("examples") == len(chats)):
+    if last.get("state") in ("training", "scoring") or (last.get("state") == "ready" and last.get("examples") == len(chats)):
         return "nothing_new"
     exported = work / "chats.jsonl"  # deleted by the script when it ends; the vault keeps the encrypted copy
     exported.write_text("".join(json.dumps(chat, ensure_ascii=False) + "\n" for chat in chats), encoding="utf-8")
+    scoring = work / "held_back.json"  # deleted with the examples; the new model must match the current one on these
+    scoring.write_text(json.dumps({"current_model": settings.ALFRED_TRAVEL_READING_MODEL, "format": SCHEMA,
+                                   "items": held_back(user)}, ensure_ascii=False), encoding="utf-8")
     ollama = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe"
     flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.BELOW_NORMAL_PRIORITY_CLASS
              if os.name == "nt" else 0)
     subprocess.Popen([python, str(Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py"), "--chats", str(exported),
                       "--base", str(base), "--out", str(work.parent / "brain-model"), "--status", str(status),
-                      "--ollama", str(ollama) if ollama.is_file() else "ollama", "--converter", str(converter)],
+                      "--ollama", str(ollama) if ollama.is_file() else "ollama", "--converter", str(converter),
+                      "--held-back", str(scoring), "--ollama-url", f"http://{settings.ALFRED_OLLAMA_HOST}:{settings.ALFRED_OLLAMA_PORT}"],
                      cwd=work, creationflags=flags, close_fds=True)
     return "started"
 

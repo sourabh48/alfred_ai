@@ -11,6 +11,7 @@ from django.test import TestCase, override_settings
 
 from alfred_ai.services import ollama_keeper
 from apps.ml_engine.services import brain
+from apps.mobility.services.travel import understanding
 from scripts import brain_finetune
 
 
@@ -44,6 +45,9 @@ class StartTests(TestCase):
                 self.assertEqual(command[:2], [sys.executable, str(Path(settings.BASE_DIR) / "scripts" / "brain_finetune.py")])
                 self.assertEqual(command[command.index("--base") + 1], str(self.root / "base"))
                 self.assertEqual(command[command.index("--converter") + 1], str(self.root / "convert_hf_to_gguf.py"))
+                scoring = json.loads(Path(command[command.index("--held-back") + 1]).read_text(encoding="utf-8"))
+                self.assertEqual((scoring["current_model"], scoring["items"]), (settings.ALFRED_TRAVEL_READING_MODEL, []))
+                self.assertEqual(scoring["format"]["type"], "object")
                 chats = [json.loads(line) for line in (work / "chats.jsonl").read_text(encoding="utf-8").splitlines()]
                 self.assertEqual(len(chats), 2)
                 (work / "status.json").write_text(json.dumps({"state": "ready", "examples": 2}))
@@ -73,4 +77,47 @@ class StartTests(TestCase):
         self.assertEqual(create[:3], ["ollama", "create", "alfred-brain"])
         self.assertIn("alfred-brain.gguf", (self.root / "Modelfile").read_text())
         self.assertEqual(json.loads(status.read_text())["state"], "ready")
+        self.assertIsNone(json.loads(status.read_text())["scores"])
         self.assertFalse(chats.exists())
+
+    def test_held_back_examples_score_both_models_and_are_deleted(self):
+        chats, status, held = self.root / "chats.jsonl", self.root / "status.json", self.root / "held_back.json"
+        chats.write_text(json.dumps({"messages": []}) + "\n", encoding="utf-8")
+        items = [{"messages": [], "expected": {"destination": "Goa", "travellers": 4}},
+                 {"messages": [], "expected": {"trip_styles": ["beach", "food"]}}]
+        held.write_text(json.dumps({"current_model": "qwen3.5:9b", "format": {}, "items": items}), encoding="utf-8")
+        answers = {"qwen3.5:9b": [{"destination": "goa", "travellers": 4, "food": None}, {"trip_styles": ["food"]}],
+                   "alfred-brain": [{"destination": "Goa", "travellers": 4}, {"trip_styles": ["Food", "beach"], "avoid": []}]}
+
+        def fake_ask(url, model, messages, schema):
+            return answers[model].pop(0)
+        arguments = ["--chats", str(chats), "--base", "b", "--out", str(self.root), "--status", str(status), "--ollama", "ollama",
+                     "--converter", "c.py", "--held-back", str(held), "--ollama-url", "http://127.0.0.1:11434"]
+        with patch.object(brain_finetune, "train", return_value=0.5), patch("subprocess.run") as run, \
+                patch.object(brain_finetune, "ask", side_effect=fake_ask):
+            run.return_value.returncode, run.return_value.stderr = 0, ""
+            self.assertEqual(brain_finetune.main(arguments), 0)
+        result = json.loads(status.read_text())
+        self.assertEqual(result["scores"], {"current_model": "qwen3.5:9b", "held_back": 2, "current": 0.5, "new": 1.0})
+        self.assertFalse(held.exists())
+
+
+class SwitchTests(TestCase):
+    def setUp(self):
+        self.root = Path(self.enterContext(TemporaryDirectory(prefix="alfred-switch-synthetic-")))
+        self.enterContext(override_settings(ALFRED_MEMORY_DIR=str(self.root / "artifacts" / "private-memory-v2"),
+                                            ALFRED_TRAVEL_READING_MODEL="qwen3.5:9b"))
+        (self.root / "artifacts" / "brain-training").mkdir(parents=True)
+
+    def outcome(self, **scores):
+        (self.root / "artifacts" / "brain-training" / "status.json").write_text(json.dumps(
+            {"state": "ready", "model": "alfred-brain",
+             "scores": {"current_model": "qwen3.5:9b", "held_back": 50, "current": 0.8, "new": 0.8, **scores}}))
+        return understanding.reading_model()
+
+    def test_the_reader_switches_only_when_the_new_model_scores_at_least_as_well(self):
+        self.assertEqual(understanding.reading_model(), "qwen3.5:9b")  # never trained
+        self.assertEqual(self.outcome(), "alfred-brain")
+        self.assertEqual(self.outcome(new=0.79), "qwen3.5:9b")
+        self.assertEqual(self.outcome(held_back=5), "qwen3.5:9b")  # too few to tell
+        self.assertEqual(self.outcome(current_model="qwen3.5:35b-a3b"), "qwen3.5:9b")  # compared with another model

@@ -16,7 +16,7 @@ from django.conf import settings
 from .persistent_memory import MemoryStore, _json, _owner
 
 logger = logging.getLogger(__name__)
-KINDS = ("travel_reading", "public_answer")
+KINDS = ("travel_reading", "travel_practice", "public_answer")  # travel_practice: Gemini's made-up messages, never lessons
 PER_KIND = 500  # shortcut: the oldest examples are dropped past this; raise it with a measured fine-tuning budget
 
 
@@ -71,21 +71,44 @@ def try_examples(user, kind, *, limit=PER_KIND, store=None):
         return []
 
 
-def training_chats(user, *, store=None):
-    """This owner's examples as chat records for fine-tuning, oldest first."""
+def reading_messages(message, today):
+    """System and user turns exactly as the travel reader sends them (LocalChat.ask), so training matches use."""
     import json
-    from apps.mobility.services.travel.understanding import SYSTEM
-    out = []
-    for item in reversed(examples(user, "travel_reading", store=store)):
-        if isinstance(item.get("message"), str) and isinstance(item.get("meant"), dict):
-            out.append({"messages": [{"role": "system", "content": SYSTEM.split(" Today is ")[0]},
-                                     {"role": "user", "content": json.dumps({"message": item["message"]}, ensure_ascii=False)},
-                                     {"role": "assistant", "content": json.dumps(item["meant"], ensure_ascii=False)}]})
+    from apps.mobility.services.travel.understanding import SCHEMA, system_prompt
+    return [{"role": "system", "content": system_prompt(today) + " Output schema: " + json.dumps(SCHEMA, separators=(",", ":"))},
+            {"role": "user", "content": json.dumps({"message": message, "alfred_last_asked": None}, ensure_ascii=False)}]
+
+
+def _readings(user, store):
+    """(message, meant, held back) for corrections and practice, oldest first; every tenth practice example is held back."""
+    for kind in ("travel_reading", "travel_practice"):
+        for item in reversed(examples(user, kind, store=store)):
+            if isinstance(item.get("message"), str) and isinstance(item.get("meant"), dict):
+                yield item["message"], item["meant"], item.get("held_back") is True
+
+
+def training_chats(user, *, store=None, today=None):
+    """This owner's examples as chat records for fine-tuning, oldest first; held-back practice examples are left out."""
+    import json
+    from django.utils import timezone
+    today, out = today or timezone.localdate(), []
+    for message, meant, held_back in _readings(user, store):
+        if not held_back:
+            out.append({"messages": [*reading_messages(message, today),
+                                     {"role": "assistant", "content": json.dumps(meant, ensure_ascii=False)}]})
     for item in reversed(examples(user, "public_answer", store=store)):
         if isinstance(item.get("question"), str) and isinstance(item.get("answer"), str):
             out.append({"messages": [{"role": "user", "content": item["question"]},
                                      {"role": "assistant", "content": item["answer"]}]})
     return out
+
+
+def held_back(user, *, store=None, today=None):
+    """Practice examples kept out of training, to score the fine-tuned model against the current one."""
+    from django.utils import timezone
+    today = today or timezone.localdate()
+    return [{"messages": reading_messages(message, today), "expected": meant}
+            for message, meant, kept_back in _readings(user, store) if kept_back]
 
 
 STOP = set("the and for with from what which when where does how why who whose that this these those are was were has have "

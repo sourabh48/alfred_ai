@@ -24,7 +24,7 @@ smarter"). IMPLEMENTED_NOT_ACCEPTED; unit tests and live checks against the owne
   architecture"). The owner approved the llama.cpp v1.0.0 converter (MIT): the synthetic model converted to GGUF in
   39 s, imported into Ollama in 63 s and answered. Fine-tuning stays off until config/local.env names the owner's user
   and the paths; no training on the owner's examples has run.
-
+- Full fine-tune (owner choices 2026-11-20: Gemini practice set, switch only if it tests better, owner account read from the app): `manage.py brain_practice --user <name>` asks Gemini (the owner's saved key; only a fixed instruction, the date and a theme are sent) for made-up Indian trip messages and keeps those every field of which passes the reader's `clean()` checks (live batch: 25 of 25 kept in 6 s), as `travel_practice` examples, every tenth held back. Training now uses the reader's exact prompt and learns only the answer. After import, both models read the held-back messages; the reader uses `alfred-brain` only when it scores at least as well as `ALFRED_TRAVEL_READING_MODEL` on 20 or more. Timing on the owner PC: about 20 s per example step, so 450 examples x 2 epochs is about 5 h.
 ## Sign-in, built-in keys and UI polish — 2026-11-19
 
 PUSHED to master at `5766899` with the owner's OK (merged into the owner's app and restarted; CI_PASSED: Browser

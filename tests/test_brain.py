@@ -1,4 +1,5 @@
 """The central brain keeps what ALFRED learns, encrypted per owner in the private vault (owner decision 2026-11-20)."""
+from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -36,10 +37,18 @@ class BrainTests(TestCase):
         brain.remember(self.alice, "travel_reading", {"message": "me n the gang", "meant": {"travellers": 5}})
         brain.remember(self.alice, "public_answer", {"question": "What is a dosa?", "answer": "A rice and lentil crepe."})
         brain.remember(self.bob, "public_answer", {"question": "Bob's question?", "answer": "Bob's answer."})
-        chats = brain.training_chats(self.alice)
-        self.assertEqual([chat["messages"][-1]["content"] for chat in chats], ['{"travellers": 5}', "A rice and lentil crepe."])
-        self.assertEqual(chats[0]["messages"][1]["content"], '{"message": "me n the gang"}')
-        self.assertNotIn("{today}", chats[0]["messages"][0]["content"])
+        brain.remember(self.alice, "travel_practice", {"message": "goa 3 ppl", "meant": {"destination": "goa"}, "held_back": False})
+        brain.remember(self.alice, "travel_practice", {"message": "ooty", "meant": {"destination": "ooty"}, "held_back": True})
+        chats = brain.training_chats(self.alice, today=date(2026, 11, 20))
+        self.assertEqual([chat["messages"][-1]["content"] for chat in chats],
+                         ['{"travellers": 5}', '{"destination": "goa"}', "A rice and lentil crepe."])
+        self.assertEqual(chats[0]["messages"][1]["content"], '{"message": "me n the gang", "alfred_last_asked": null}')
+        self.assertIn("Today is Friday 2026-11-20.", chats[0]["messages"][0]["content"])
+        self.assertIn("Output schema:", chats[0]["messages"][0]["content"])
+        held = brain.held_back(self.alice, today=date(2026, 11, 20))
+        self.assertEqual([(item["messages"][1]["content"], item["expected"]) for item in held],
+                         [('{"message": "ooty", "alfred_last_asked": null}', {"destination": "ooty"})])
+        self.assertEqual(brain.held_back(self.bob), [])
 
     def test_a_correction_right_after_i_understood_teaches_the_reader(self):
         session = new_session(self.alice)
