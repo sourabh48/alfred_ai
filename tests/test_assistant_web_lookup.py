@@ -124,6 +124,20 @@ class QuestionFilterTests(SimpleTestCase):
             reasoner.body({"query": "my account 123456789012", "memories": [], "web_results": web}, 1024)
 
 
+    def test_a_mixed_question_sends_only_its_public_part(self):
+        # Owner 2026-11-25: ALFRED decides; the owner's figures stay on this PC and only the public fact is looked up.
+        for question, public in (("Is my 5 lakh FD rate good today?", "Is FD rate good today?"),
+                                 ("Should I buy gold now with rs 50000?", "Should buy gold now with?"),
+                                 ("my account 123456789012 interest rate today", "account interest rate today")):
+            with self.subTest(question=question):
+                self.assertEqual(web_lookup.public_part(question), public)
+                self.assertFalse(web_lookup.should_search(question))
+        for question in ("is 12 lakh a good salary today", "What is Anika's rent today", "what did I note about my trip",
+                         "where is my nearest bank", "my rs 5000", "latest repo rate news", "", None):
+            with self.subTest(kept=question):
+                self.assertIsNone(web_lookup.public_part(question))
+
+
 class HybridWebLookupTests(TestCase):
     def setUp(self):
         root = Path(self.enterContext(TemporaryDirectory(prefix="alfred-web-lookup-synthetic-")))
@@ -166,6 +180,10 @@ class HybridWebLookupTests(TestCase):
             self.assertEqual(web(self.ask("what did I note about my trip")), [])
             self.assertEqual(web(self.ask("is 12 lakh a good salary today")), [])  # private-looking: never searched
             self.assertEqual(web(self.ask("latest repo rate news", scope="finance")), [])
+            with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
+                self.assertEqual(web(self.ask("Is my 5 lakh FD rate good today?")), ["web-1", "web-2"])
+                self.assertEqual({call.kwargs.get("params", {}).get("q") or call.args[1] for call in request.call_args_list},
+                                 {"Is FD rate good today?", "https://news.google.com/rss/search?q=Is+FD+rate+good+today%3F&hl=en-IN&gl=IN&ceid=IN:en"})
         self.assertEqual(web(self.ask("latest repo rate news")), [])  # switched off
 
     def test_a_possibly_private_question_reaches_the_web_only_after_the_owner_confirms_the_exact_text(self):

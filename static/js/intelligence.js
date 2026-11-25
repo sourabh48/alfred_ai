@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const documentChoice = document.getElementById("intelligenceDocument");
     const statementChoice = document.getElementById("intelligenceStatement");
     const financialChoice = document.getElementById("intelligenceFinancial");
-    const consent = document.getElementById("intelligenceCloudConsent");
     const webSearch = document.getElementById("intelligenceWebSearch");
     let searchOnce = false;  // one confirmed lookup, without changing the "always" tick
     const feedback = document.getElementById("intelligenceFeedback");
@@ -179,14 +178,14 @@ document.addEventListener("DOMContentLoaded", () => {
         historyClear.disabled = !active || pending || !historyPolicy?.conversations;
         historyDisable.disabled = !active || pending || !(historyPolicy?.enabled || historyPolicy?.conversations);
         historyList.querySelectorAll("button").forEach(button => { button.disabled = !active || pending; });
-        updateScope(false);
+        updateScope();
     }
     function clearConversation(clearDraft = false) {
         streamRequest?.abort();
         generation++; conversation = null; requestToken = null; historyBlocked = false;
         pageDialogue = [];
         resetSources();
-        answers.replaceChildren(); empty.hidden = false; retry.hidden = true; consent.checked = false;
+        answers.replaceChildren(); empty.hidden = false; retry.hidden = true;
         if (clearDraft) { query.value = ""; historyTitle.value = ""; }
         updateHistoryControls();
     }
@@ -201,10 +200,10 @@ document.addEventListener("DOMContentLoaded", () => {
         historyMessageMatches = null;
         document.getElementById("conversationHistoryMatches").textContent = "";
         historyConsent.checked = false; historyDays.value = "7";
-        query.value = ""; memoryText.value = ""; verified.checked = false; consent.checked = false;
+        query.value = ""; memoryText.value = ""; verified.checked = false;
         feedback.textContent = ""; historyFeedback.textContent = ""; retry.hidden = true;
         document.getElementById("conversationHistoryStatus").textContent = "Checking local policy";
-        updateHistoryControls(); consent.disabled = true;
+        updateHistoryControls();
     }
     function applyHistory(data) {
         historyPolicy = data.policy;
@@ -324,7 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     historyRefresh.addEventListener('click', async () => {
-        historyPolicy = null; consent.checked = false;
+        historyPolicy = null;
         await historyRequest('/api/ai/conversations/', {}, data => {
             applyHistory(data);
             if (!conversation) historyBlocked = false;
@@ -355,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function setLocalStatus(text, state) {
         localStatus.textContent = text; localStatus.dataset.state = state;
     }
-    function updateScope(resetConsent = true) {
+    function updateScope() {
         const tool = active ? registeredTools.find(item => item.scope === scope.value) : null;
         toolPolicy.textContent = !active ? 'Tool access is unavailable. Sign in or reload to check your session.' : scope.value === 'general'
             ? "Choose local records to include a module's evidence for this question."
@@ -380,14 +379,12 @@ document.addEventListener("DOMContentLoaded", () => {
             : conversation ? `Saved locally: ${conversation.title} · expires ${new Date(conversation.expires_at).toLocaleString()}`
             : historyEnabled() ? "New local conversation · saved only after a successful local answer" : "Page-only conversation";
         ensureSources();
-        if (resetConsent || scope.value !== "general" || !cloudAvailable || historyEnabled()) consent.checked = false;
-        consent.disabled = scope.value !== "general" || !cloudAvailable || !historyPolicy || historyEnabled();
         if (scope.value !== "general") webSearch.checked = false;
         webSearch.disabled = scope.value !== "general";
     }
     async function refreshControls() {
         const ticket = generation;
-        cloudAvailable = false; consent.checked = false; consent.disabled = true;
+        cloudAvailable = false;
         // Cloud policy status must not gate independent owner-only source browsing.
         const [insights, history, policy, tools] = await Promise.all([
             Alfred.fetchJSON("/api/ai/personal-insights/?assistant_status=1"),
@@ -470,7 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
     newConversation.addEventListener("click", () => {
         if (pending) return;
         clearConversation(true);
-        consent.checked = false; feedback.textContent = "New conversation. Previous messages cleared from this page."; retry.hidden = true; query.focus();
+        feedback.textContent = "New conversation. Previous messages cleared from this page."; retry.hidden = true; query.focus();
     });
     function safeCitation(url) {
         return ['/career/','/loans/','/expenses/','/mobility/'].includes(url) || /^\/settings\/#memory-[a-f0-9]{32}$/.test(url || "") || /^\/documents\/statements\/\d+\/transactions\/\d+\/$/.test(url || "") || /^\/documents\/(investments|loans)\/\d+\/records\/\d+\/$/.test(url || "") || /^\/documents\/loan-closures\/\d+\/$/.test(url || "") || /^\/ai\/financial-records\/(expense|budget|loan|investment|baseline)\/\d+\/$/.test(url || "");
@@ -700,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (event.type === 'error') {
                         throw Object.assign(new Error(event.detail || 'Local output is incomplete. Your draft is preserved.'),{status:event.status,code:event.code,reference:event.error_id});
                     } else if (event.type === 'final') {
-                        if (!event.result || !['ollama','local_evidence','gemini'].includes(event.result.provider) || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
+                        if (!event.result || !['ollama','local_evidence','gemini','mock'].includes(event.result.provider) || typeof event.result.answer !== 'string') throw new Error('Invalid final local answer.');
                         partial.remove(); return event.result;
                     } else if (!['started','heartbeat'].includes(event.type)) throw new Error('Invalid local stream event.');
                 }
@@ -747,8 +744,7 @@ document.addEventListener("DOMContentLoaded", () => {
         feedback.textContent = "ALFRED is processing locally.";
         const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
         button.textContent = "Thinking…";
-        const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: consent.checked, query_sensitivity: consent.checked ? "public" : "sensitive"};
-        if (consent.checked) payload.provider = "gemini";
+        const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: false, query_sensitivity: "sensitive"};  // ALFRED decides: public questions go to Gemini on the server, private ones stay here
         if ((webSearch.checked || searchOnce) && scope.value === "general") payload.web_search = true;
         searchOnce = false;
         if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && pageDialogue.length) payload.page_context = pageDialogue;
@@ -843,7 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if ([401,403].includes(error.status)) { forgetPrivatePage(); feedback.textContent = "Session or history permission is no longer available. Sign in or reload before continuing."; }
             }
         }
-        finally { pending = false; consent.checked = false; button.disabled = !active; button.textContent = "Ask ALFRED"; newConversation.disabled = !active; query.readOnly = false; answers.setAttribute("aria-busy", "false"); updateHistoryControls(); }
+        finally { pending = false; button.disabled = !active; button.textContent = "Ask ALFRED"; newConversation.disabled = !active; query.readOnly = false; answers.setAttribute("aria-busy", "false"); updateHistoryControls(); }
     });
     document.getElementById("intelligenceMemoryForm").addEventListener("submit", async event => {
         event.preventDefault();

@@ -482,6 +482,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
     if auto_web:  # memory first; the web only for what it lacks, and only for a plainly public question
         if web_lookup.should_search(query,memories): web=web_lookup.search(query)
+        elif public:=web_lookup.public_part(query): web=web_lookup.search(public)  # mixed question: only the public part goes out
         else: web_offer=web_lookup.offer(query,memories)
     # Filenames and private citation URLs are UI metadata, never model instructions.
     model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{

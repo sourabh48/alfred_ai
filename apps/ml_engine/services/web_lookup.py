@@ -28,6 +28,7 @@ PRIVATE_IN_QUESTION = re.compile(
     rf"|\b(?:{_NUMBER})(?:[\s-]+(?:and|a|{_NUMBER}|{_SCALE}))*[\s-]+(?:{_SCALE}|rupees?|dollars?|euros?|pounds?|bucks|lpa)\b"
     r"|\b(?:password|passcode|otp|pin|cvv|secret|token|bearer|aadhaar|aadhar|pan number|ifsc)\b")
 TAG = re.compile(r"<[^>]+>")
+_PRIVATE_SPAN = re.compile(r"(?i)(?:" + PRIVATE_IN_QUESTION.pattern.removeprefix("(?i)") + r")(?:(?<!\s)[\w,./-]+)?")  # the whole amount, not its first digit
 
 
 PRIVATE_MESSAGE = ("This question has details that look private (an amount, number, email or key), so ALFRED "
@@ -94,6 +95,23 @@ def offer(question, memories=()):
         return None
     wanted = CURRENT.search(question) or (not memories and GENERAL.search(question))
     return question if wanted and not PERSONAL.search(question) and not clearly_public(question) else None
+
+
+def public_part(question):
+    """For a question that mixes the owner's details with a current public fact ("Is my 5 lakh FD rate good today?"), the
+    question with amounts, identifiers and personal words taken out ("Is FD rate good today?"), so only that leaves this PC
+    and the local model puts the answer together with the owner's own figures. None when nothing public is left to look up."""
+    if not isinstance(question, str) or len(question) > 300 or PRIVATE_LIFE.search(question):
+        return None
+    # shortcut: word-level removal, not understanding; a name or detail the patterns do not know stays in, as it does for any lookup.
+    public = " ".join(PERSONAL.sub(" ", _PRIVATE_SPAN.sub(" ", question)).split())
+    public = re.sub(r"\s+([?.,!])", r"\1", public)
+    if public == " ".join(question.split()) or len(public.split()) < 3 or not CURRENT.search(public):
+        return None
+    try:
+        return check_public(public)
+    except PrivateQuestion:
+        return None
 
 
 def check_public(question):
