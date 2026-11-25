@@ -144,6 +144,16 @@ class MemoryReasoningTests(TestCase):
                 self.http.side_effect=None; self.http.return_value=PublicResponse(json.dumps(original|change).encode(),'application/json')
                 with self.assertRaises(SyncUnavailable): self.reason(daily_tokens=65536,daily_microusd=1000000)
 
+    def test_model_version_with_a_models_prefix_is_the_same_model(self):
+        with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=65536):
+            configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=65536,daily_microusd=100000)
+        original=self.response().json()
+        self.http.side_effect=None
+        self.http.return_value=PublicResponse(json.dumps(original|{'modelVersion':'models/'+MODEL}).encode(),'application/json')
+        self.reason(daily_tokens=65536,daily_microusd=1000000)
+        self.http.return_value=PublicResponse(json.dumps(original|{'modelVersion':'models/different-model'}).encode(),'application/json')
+        with self.assertRaises(SyncUnavailable): self.reason(daily_tokens=65536,daily_microusd=1000000)
+
     def test_concurrent_requests_share_atomic_spending_reservations(self):
         from concurrent.futures import ThreadPoolExecutor
         cost=self.provider.budget({'query':'mountain','memories':[]},CLOUD_OUTPUT_TOKENS)[1]

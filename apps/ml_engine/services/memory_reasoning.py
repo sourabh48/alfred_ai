@@ -145,7 +145,8 @@ class GeminiReasoner:
         result=response.json(); usage=result.get('usageMetadata'); candidates=result.get('candidates')
         if (result.get('promptFeedback') or {}).get('blockReason') or not isinstance(candidates,list) or len(candidates)!=1 or not isinstance(usage,dict):
             raise ValueError('Invalid bounded reasoning response.')
-        if not str(result.get('modelVersion','')).startswith(self.model): raise ValueError('Unexpected reasoning model.')
+        # Google does not document the modelVersion format; accept the code with or without a "models/" prefix.
+        if not str(result.get('modelVersion','')).removeprefix('models/').startswith(self.model): raise ValueError('Unexpected reasoning model.')
         if type(usage.get('promptTokenCount')) is not int or not 0<=usage['promptTokenCount']<=input_bound: raise ValueError('Invalid reasoning usage.')
         if type(usage.get('candidatesTokenCount',0)) is not int or not 0<=usage.get('candidatesTokenCount',0)<=max_output_tokens: raise ValueError('Invalid reasoning usage.')
         candidate=candidates[0]; content=candidate.get('content') or {}; parts=content.get('parts')
