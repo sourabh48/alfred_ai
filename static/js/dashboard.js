@@ -8,7 +8,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadDashboard();
     Alfred.enableLiveRefresh("dashboard-live", loadDashboard, { rootId: "dashboardRoot" });
+    setUpBriefing();
 });
+
+// The offline voice reads Home's figures and notices; shown only when Piper is installed on this PC.
+function setUpBriefing() {
+    const button = document.getElementById("homeBriefingRead"), source = document.getElementById("homeBriefingText");
+    if (!button || !source || !window.AlfredVoice) return;
+    const text = JSON.parse(source.textContent);
+    AlfredVoice.status().then(state => { button.hidden = !state.speak || !text; });
+    let reading = false;
+    button.addEventListener("click", async () => {
+        if (reading) { AlfredVoice.stopSpeaking(); return; }
+        reading = true; button.textContent = "Stop reading";
+        const status = document.getElementById("homeBriefingStatus"); status.textContent = "";
+        try { await AlfredVoice.speak(text); } catch (error) { status.textContent = error.message; }
+        reading = false; button.textContent = "Read my briefing";
+    });
+}
 
 // Career follow-ups load on their own: a Career failure never hides the finance dashboard.
 function loadCareerFollowUpReminder() {

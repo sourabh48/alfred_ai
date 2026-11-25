@@ -8,7 +8,9 @@
             <div class="alfred-chip mb-3">Home</div>
             <h1 class="alfred-hero-title">Hello{% if request.user.first_name %}, {{ request.user.first_name }}{% endif %}</h1>
             <p class="alfred-hero-copy">Here is where your money stands. Every figure comes from what you have entered or imported.</p>
-            <div class="d-flex gap-2 flex-wrap mt-3"><a class="btn btn-primary" href="/ai/insights/?scope=finance#intelligencePanel">Ask about my finances</a></div>
+            <div class="d-flex gap-2 flex-wrap mt-3"><a class="btn btn-primary" href="/ai/insights/?scope=finance#intelligencePanel">Ask about my finances</a><button type="button" class="btn btn-outline-primary" id="homeBriefingRead" hidden>Read my briefing</button></div>
+            <p class="small mt-2 mb-0" id="homeBriefingStatus" role="status" aria-live="polite"></p>
+            {{ briefing|json_script:"homeBriefingText" }}
         </div>
         <div class="surface-card text-center dashboard-health-card">
             <p class="metric-kicker">Estimated Financial Health</p>
@@ -182,6 +184,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/dashboard.js?v=2.5.3"></script>
+<script src="/static/js/voice.js?v=2"></script>
+<script src="/static/js/dashboard.js?v=2.5.4"></script>
 <script src="/static/js/task_bots.js?v=5"></script>
 {% endblock %}

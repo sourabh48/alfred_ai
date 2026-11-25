@@ -166,8 +166,29 @@ def _home_context(user):
     setup = data_sources_snapshot(user)
     steps = [dict(label=source["label"], done=source["has_data"] and not source.get("next_action"),
                   action=source.get("next_action")) for source in setup["sources"]]
+    attention = _attention_items(user, setup["sources"])
     return {"glance": glance, "setup_steps": steps, "setup_done": sum(step["done"] for step in steps),
-            "attention": _attention_items(user, setup["sources"])}
+            "attention": attention, "briefing": _briefing(user, glance, attention)}
+
+
+def _briefing(user, glance, attention):
+    """Home read aloud by the offline voice: the same figures and notices the page shows, and the next trip."""
+    from django.utils import timezone
+    from apps.mobility.models import TravelPlan
+
+    now = timezone.localtime()
+    part = "morning" if now.hour < 12 else "afternoon" if now.hour < 17 else "evening"
+    lines = [f"Good {part}{', ' + user.first_name if user.first_name else ''}."]
+    lines += [f"{tile['label']}: ₹{tile['amount']:,.2f}." for tile in glance if tile["amount"] is not None]
+    if attention:
+        lines.append(f"{len(attention)} thing{'s' if len(attention) > 1 else ''} need{'' if len(attention) > 1 else 's'} your attention.")
+        lines += [f"You have spent ₹{item['spent']:,.2f} of ₹{item['limit']:,.2f}: {item['text']}." if item.get("spent") is not None
+                  else item["text"] for item in attention]
+    trip = (TravelPlan.objects.filter(user=user, start_date__gte=now.date()).exclude(status__in=("completed", "cancelled"))
+            .order_by("start_date").first())
+    if trip:
+        lines.append(f"Your next trip, {trip.title}, starts on {trip.start_date:%A %d %B}.")
+    return " ".join(lines)
 
 
 def _attention_items(user, sources):

@@ -65,7 +65,24 @@ class HomePageTests(TestCase):
         self.assertEqual([(item["tone"], item["spent"], item["limit"]) for item in attention if "spent" in item],
                          [("danger", 12000.5, 10000)])
         self.assertContains(response, "over this month&#x27;s budget")
+        # The spoken briefing reads the same figures and notices the page shows.
+        briefing = response.context["briefing"]
+        self.assertIn("Money in your bank accounts: ₹150,000.00.", briefing)
+        self.assertIn("You have spent ₹12,000.50 of ₹10,000.00: over this month's budget.", briefing)
+        self.assertContains(response, 'id="homeBriefingText"')
         self.assertEqual([list(model.objects.values()) for model in (BankAccount, Expense, Budget)], before)
+
+    def test_briefing_names_the_next_trip_and_skips_past_or_cancelled_ones(self):
+        from datetime import timedelta
+        from apps.mobility.models import TravelPlan
+        today = timezone.localdate()
+        TravelPlan.objects.create(user=self.user, title="Synthetic Old Ride", start_date=today - timedelta(days=3), status="planned")
+        TravelPlan.objects.create(user=self.user, title="Synthetic Dropped Trip", start_date=today + timedelta(days=2), status="cancelled")
+        TravelPlan.objects.create(user=self.user, title="Synthetic Hills", start_date=today + timedelta(days=9), status="planned")
+        briefing = self.home().context["briefing"]
+        self.assertIn(f"Your next trip, Synthetic Hills, starts on {today + timedelta(days=9):%A %d %B}.", briefing)
+        self.assertNotIn("Old Ride", briefing); self.assertNotIn("Dropped", briefing)
+        self.assertNotIn("₹", briefing)  # nothing added yet: no figure is read out as zero
 
     def test_budget_in_another_currency_is_not_compared_in_rupees(self):
         today = timezone.localdate()
