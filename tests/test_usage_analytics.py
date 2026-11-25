@@ -55,8 +55,16 @@ class UsageAnalyticsTests(TestCase):
         self.assertEqual(len({event["distinct_id"] for event in events}), 1)  # one random ID for the whole PC
         self.assertTrue(all(event["properties"]["$process_person_profile"] is False and event["properties"]["$geoip_disable"] for event in events))
         sent = json.dumps(events)
-        for private in ("synthetic-analytics", "Synthia", str(self.user.pk) + '"', "@"):
+        for private in ("synthetic-analytics", "Synthia", "@"):
             self.assertNotIn(private, sent)
+        # The account ID as a value, not as text: a random ID or timestamp can end in the same digit (failed CI 2026-11-25/26).
+        values, pending = [], list(events)
+        while pending:
+            item = pending.pop()
+            if isinstance(item, dict): pending.extend(item.values())
+            elif isinstance(item, list): pending.extend(item)
+            else: values.append(item)
+        self.assertFalse({self.user.pk, str(self.user.pk)} & {value for value in values if isinstance(value, (int, str)) and not isinstance(value, bool)})
 
     def test_a_local_answer_reports_topic_model_tier_and_seconds_only(self):
         result = {"answer": "Synthetic EMI is ₹12,000.", "provider": "ollama", "local_model": "qwen3.5:9b", "answer_seconds": 2.04,

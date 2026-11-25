@@ -2,6 +2,11 @@
 
 ## Ask ALFRED decides public or private — 2026-11-25/26
 
+`9fca200` run 45699164397: backend shard 2 CI_FAILED on `test_usage_analytics`
+`test_pages_are_counted_by_route_name_and_the_batch_carries_no_person`, its second failure (also `b0ddef0`). Cause found in
+the test: it searched the sent JSON for the account ID followed by a quote, which a random uuid4 or timestamp ending in the
+same digit also matches (about 1 run in 16). Fixed locally to compare whole values; the check is not weakened.
+
 CI_PASSED on `d2e3fd7` (tick removed, mixed-question lookup) and on `f650fcb` (Gemini answers kept in the local chat;
 stand-alone public questions in a chat go to Gemini): Browser Regression all jobs success, each for its own SHA only.
 `b0ddef0` (Travel session push) CI_FAILED: backend shard 2 had one failure, `test_usage_analytics`
