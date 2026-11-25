@@ -166,7 +166,7 @@ Docker not required. Shallow clone at the pin read in a scratch folder, never ru
 
 Ledger check: the learning, trace and memory code does not import or call the mining code. Mining (Pearl) is off unless
 a `[mining]` config section exists and submits only proofs to its gateway. The only other outbound path is opt-in
-PostHog analytics. Learning data is therefore not shared as a ledger at this pin; ALFRED adopts neither part.
+PostHog analytics (ALFRED now has its own, allow-listed sender). Learning data is therefore not shared as a ledger at this pin; ALFRED adopts neither part.
 
 | Feature / upstream source at J pin | ALFRED equivalent / target IDs | Gap / intended refinement | Disposition | Status, dependencies and validation |
 | --- | --- | --- | --- | --- |
@@ -175,6 +175,6 @@ PostHog analytics. Learning data is therefore not shared as a ledger at this pin
 | Prompt-injection patterns; `security/injection_scanner.py` (S) | AI-12, INV-04; `prompt_injection.py` in `web_lookup.search` and `research_social` | Web results and Reddit titles that match are left out before any model reads them; prompts still treat all text as data | ADAPT_ALFRED | `tests.test_assistant_web_lookup`, `tests.test_research_desk` PASS (commit `54cadcd`); patterns are not a complete defence |
 | Morning digest agent and spoken output (C) | AI-18; Home "Read my briefing" with the existing Piper voice | Reads Home's own figures, attention items and next trip; no news feed, no model call | IMPLEMENT_INDEPENDENTLY | `tests.test_home_page` PASS and three Home Chrome tests PASS (commit `736ec03`); not heard on the owner's PC |
 | Pearl crypto mining; `mining/` (S) | none | Owner: no mining on this PC | EXCLUDE | Not copied or installed |
-| PostHog analytics; `analytics/client.py` (S) | none | Would send usage data off the PC | EXCLUDE | Not copied |
+| PostHog analytics; `analytics/client.py` (S) | `alfred_ai/services/usage_analytics.py`, page and local-answer events | Owner 2026-11-25: use it, never sensitive data, ALFRED decides. Sends whenever `ALFRED_POSTHOG_PROJECT_KEY` is set (EU or US PostHog Cloud only); allowlist: page route name, answer topic, fast/main model, rounded seconds, thinking, web used. One random ID per PC, no person profile, no GeoIP. `ALFRED_USAGE_ANALYTICS=false` stops it | IMPLEMENT_INDEPENDENTLY | No upstream code; `tests.test_usage_analytics` 5 PASS; no live PostHog project checked |
 | Docker code interpreter, shell and sandbox tools (C) | none | Owner: Docker not required | EXCLUDE | Not copied |
 | Skill marketplace, A2A, messaging channels (C) | none | Untrusted community code; outbound messages need per-action approval | EXCLUDE | Not copied |

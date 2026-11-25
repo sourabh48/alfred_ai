@@ -99,3 +99,20 @@ class VerifiedSignInMiddleware:
             request.session["alfred_sign_in_error"] = "Sign in with Google, GitHub or Microsoft to continue. Passwords are no longer used."
             return redirect("login")
         return self.get_response(request)
+
+
+class UsageAnalyticsMiddleware:
+    """Counts opened pages by route name for the owner's opt-in PostHog project; nothing when it is switched off."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        from alfred_ai.services import usage_analytics
+        match = getattr(request, "resolver_match", None)
+        if (usage_analytics.enabled() and request.method == "GET" and response.status_code == 200 and match is not None
+                and not request.path.startswith(("/api/", "/static/", "/media/"))
+                and "text/html" in response.get("Content-Type", "")):
+            usage_analytics.record("page_viewed", {"page": match.view_name})
+        return response

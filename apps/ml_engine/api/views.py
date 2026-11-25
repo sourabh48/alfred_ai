@@ -132,6 +132,11 @@ class AlfredPersonalInsightsAPI(MemoryAPI):
                 answer_style=data.get('answer_style','auto'), web_search=data.get('web_search',False), provider=data.get('provider','local'), **local)
         finally:
             if page_only_question: current_session(request)
+        from alfred_ai.services import usage_analytics
+        if result.get('provider') == 'ollama':
+            usage_analytics.record('assistant_answered', {'scope': data.get('scope', 'general'), 'model': usage_analytics.model_tier(result.get('local_model')),
+                'seconds': result.get('answer_seconds'), 'thinking': result.get('local_thinking'), 'web_results': any(
+                    isinstance(item, dict) and item.get('classification') == 'public_web_result' for item in result.get('sources', []))})
         if identity is not None:
             def check_history():
                 if stream is not None: stream.check()

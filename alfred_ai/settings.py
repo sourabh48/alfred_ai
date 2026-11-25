@@ -183,6 +183,7 @@ MIDDLEWARE = [
     "alfred_ai.services.upload_limits.UploadProtectionMiddleware",
     "alfred_ai.services.abuse_protection.AbuseProtectionMiddleware",
     "alfred_ai.middleware.UserDataCacheMiddleware",
+    "alfred_ai.middleware.UsageAnalyticsMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

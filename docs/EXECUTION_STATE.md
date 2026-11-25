@@ -5,7 +5,9 @@
 - Ledger check: OpenJarvis learning, trace and memory code does not use its Pearl mining code; mining is off unless configured and sends only proofs. Learning data is not shared as a ledger at that pin. Mining, PostHog analytics, Docker tools, the skill marketplace, A2A and messaging channels are excluded.
 - Added, local commits only (not pushed): `0c3bfff` simple Finance/Travel/Career lookups use the fast 9B model; `0e8b701` a local answer shows its model and seconds; `54cadcd` web results and Reddit titles that try to hijack the AI are left out; `736ec03` Home "Read my briefing" with the offline Piper voice. `9c5226a` (Gemini model-version prefix fix) is also unpushed.
 - Tests: answer-path backend 247 PASS; web lookup, research desk and hybrid 83 PASS; Home and speech 10 PASS; three Home Chrome tests plus UI contracts 28 PASS. Not checked: answer speed or quality on the owner's PC, the briefing heard aloud, hosted CI.
-- Next: push these commits with the owner's OK, then the owner checks listed under Money walkthrough.
+- Pushed `f6ac1f9` with the owner's OK and restarted the app on it; hosted CI for it was still running at the restart.
+- PostHog usage counts (owner 2026-11-25, ALFRED decides): sent whenever `ALFRED_POSTHOG_PROJECT_KEY` is in config/local.env; only page route names and local-answer topic, model tier, seconds, thinking and web use; one random ID per PC. `tests.test_usage_analytics` 5 PASS; no project key yet, so nothing has been sent.
+- Next: owner request 2026-11-25 to add a Telegram/messaging bot, agent-to-agent links and skills outside sensitive finance areas.
 
 ## Money walkthrough — 2026-11-20
 
