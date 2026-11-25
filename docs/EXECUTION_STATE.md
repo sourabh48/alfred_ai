@@ -1,5 +1,12 @@
 # ALFRED execution state
 
+## OpenJarvis ideas, local only — 2026-11-25
+- Source: OpenJarvis main `86f75ef` (Apache-2.0), read in a scratch folder and never run; dispositions in `docs/UPSTREAM_REFERENCE_MATRIX.md` section J.
+- Ledger check: OpenJarvis learning, trace and memory code does not use its Pearl mining code; mining is off unless configured and sends only proofs. Learning data is not shared as a ledger at that pin. Mining, PostHog analytics, Docker tools, the skill marketplace, A2A and messaging channels are excluded.
+- Added, local commits only (not pushed): `0c3bfff` simple Finance/Travel/Career lookups use the fast 9B model; `0e8b701` a local answer shows its model and seconds; `54cadcd` web results and Reddit titles that try to hijack the AI are left out; `736ec03` Home "Read my briefing" with the offline Piper voice. `9c5226a` (Gemini model-version prefix fix) is also unpushed.
+- Tests: answer-path backend 247 PASS; web lookup, research desk and hybrid 83 PASS; Home and speech 10 PASS; three Home Chrome tests plus UI contracts 28 PASS. Not checked: answer speed or quality on the owner's PC, the briefing heard aloud, hosted CI.
+- Next: push these commits with the owner's OK, then the owner checks listed under Money walkthrough.
+
 ## Money walkthrough — 2026-11-20
 
 Owner walkthrough of the Money module on master `4ba0c37` (owner app). Local commits on work/completion-sprint-2026-11-19, not pushed.

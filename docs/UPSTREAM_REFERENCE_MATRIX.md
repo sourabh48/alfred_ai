@@ -14,6 +14,7 @@ cover related workflows without inventing additional roadmap IDs.
 | R | [liketrek/TREK](https://github.com/liketrek/TREK), main | [d4da05bbc93bcfa9668e7a8f4e5384b788452418](https://github.com/liketrek/TREK/tree/d4da05bbc93bcfa9668e7a8f4e5384b788452418) | AGPL-3.0; Node/React/Nest ecosystem | Product inspiration; independent Django implementation only |
 | C | [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops), main | [4df3d0525a0a466f6b08928a7c3bd23946cb410f](https://github.com/career-ops-hq/career-ops/tree/4df3d0525a0a466f6b08928a7c3bd23946cb410f) | MIT; Node ^22.13 or >=23.4, optional Go dashboard | Incremental native Python/Django business-workflow port |
 | S | [D4Vinci/Scrapling](https://github.com/D4Vinci/Scrapling), main | [v0.5.1 = 3a4bb5b0a008233c85269a0a38a6d08edd4ce329](https://github.com/D4Vinci/Scrapling/tree/3a4bb5b0a008233c85269a0a38a6d08edd4ce329) | BSD-3-Clause; Python >=3.10; PyPI "4 - Beta" | Core HTML parser only, on bytes ALFRED already fetched; fetcher/stealth/AI extras rejected |
+| J | [open-jarvis/OpenJarvis](https://github.com/open-jarvis/OpenJarvis), main | [86f75ef7faeeb2b022a6621716d88c57ba105db0](https://github.com/open-jarvis/OpenJarvis/tree/86f75ef7faeeb2b022a6621716d88c57ba105db0) | Apache-2.0 (no NOTICE file); Python + Rust, FastAPI, Tauri desktop | Ideas and small pattern sets only; its runtime, mining, analytics, Docker sandboxes and marketplace are excluded |
 
 Repository API/default refs, LICENSE text, README and recursive path inventories
 were inspected at these pins. Component/dependency licenses must be rechecked
@@ -156,3 +157,24 @@ Local synthetic tests only; no hosted CI on these commits yet; live accuracy unv
 | Transit and holiday/vacation planner (R) | TRAVEL; `GoogleTransit`, `NagerHolidays` | Google only for transit; Nager.Date for holidays (no India coverage) | IMPLEMENT_INDEPENDENTLY | Owner approval 2026-11-18; Nager live check PASS; Google transit faked in tests |
 | Collaboration, cost splitting, public share, photo book (R) | none | Out of scope | EXCLUDE | Not approved |
 
+## Local assistant — J (OpenJarvis) — 2026-11-25
+
+Owner request (session of 2026-11-25): scan OpenJarvis in depth and add what helps, keeping security in mind; no crypto mining;
+Docker not required. Shallow clone at the pin read in a scratch folder, never run. Inspection **S** for
+`learning/routing/complexity.py`, `security/injection_scanner.py`, `mining/`, `analytics/client.py`, `learning/`,
+`traces/` and `memory/` imports; other modules **C**.
+
+Ledger check: the learning, trace and memory code does not import or call the mining code. Mining (Pearl) is off unless
+a `[mining]` config section exists and submits only proofs to its gateway. The only other outbound path is opt-in
+PostHog analytics. Learning data is therefore not shared as a ledger at this pin; ALFRED adopts neither part.
+
+| Feature / upstream source at J pin | ALFRED equivalent / target IDs | Gap / intended refinement | Disposition | Status, dependencies and validation |
+| --- | --- | --- | --- | --- |
+| Query complexity score and tiers; `learning/routing/complexity.py` (S) | AI-15; `question_complexity.py`, `hybrid_intelligence.easy_question` | Same signals and weights, money words added to the arithmetic signal; simple Finance, Travel and Career lookups use the fast local model, anything with arithmetic, comparison or advice keeps the main one | ADAPT_ALFRED | Apache attribution and change note in source; `tests.test_local_thinking` PASS (commit `0c3bfff`); answer quality on the owner's PC not measured |
+| Per-request timing and model in traces; `traces/` (C) | AI-15; `local_model` and `answer_seconds` on a local answer | Shown beside the answer only; nothing stored or sent, no analytics | IMPLEMENT_INDEPENDENTLY | `tests.test_local_thinking` PASS (commit `0e8b701`) |
+| Prompt-injection patterns; `security/injection_scanner.py` (S) | AI-12, INV-04; `prompt_injection.py` in `web_lookup.search` and `research_social` | Web results and Reddit titles that match are left out before any model reads them; prompts still treat all text as data | ADAPT_ALFRED | `tests.test_assistant_web_lookup`, `tests.test_research_desk` PASS (commit `54cadcd`); patterns are not a complete defence |
+| Morning digest agent and spoken output (C) | AI-18; Home "Read my briefing" with the existing Piper voice | Reads Home's own figures, attention items and next trip; no news feed, no model call | IMPLEMENT_INDEPENDENTLY | `tests.test_home_page` PASS and three Home Chrome tests PASS (commit `736ec03`); not heard on the owner's PC |
+| Pearl crypto mining; `mining/` (S) | none | Owner: no mining on this PC | EXCLUDE | Not copied or installed |
+| PostHog analytics; `analytics/client.py` (S) | none | Would send usage data off the PC | EXCLUDE | Not copied |
+| Docker code interpreter, shell and sandbox tools (C) | none | Owner: Docker not required | EXCLUDE | Not copied |
+| Skill marketplace, A2A, messaging channels (C) | none | Untrusted community code; outbound messages need per-action approval | EXCLUDE | Not copied |
