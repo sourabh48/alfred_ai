@@ -358,7 +358,7 @@ function mountCurrencyToggle() {
 }
 document.addEventListener("DOMContentLoaded", mountCurrencyToggle);
 // A wide table that scrolls sideways on a phone must take keyboard focus so arrow keys can scroll it.
-document.addEventListener("DOMContentLoaded", () => document.querySelectorAll(".table-responsive:not([tabindex])").forEach(box => { box.tabIndex = 0; }));
+document.addEventListener("DOMContentLoaded", () => document.querySelectorAll(".table-responsive:not([tabindex]), .stack-scroll:not([tabindex])").forEach(box => { box.tabIndex = 0; }));
 
 function formatRecordedMoney(value) {
     if (!value || value.evidence_status === "unavailable") return "Financial evidence unavailable";

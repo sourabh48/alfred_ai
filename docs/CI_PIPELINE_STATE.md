@@ -19,6 +19,13 @@ the Telegram listener asked for 15-second reads while the web helper stops readi
 out in the owner's app; it now waits 4 seconds (live check with the owner's bot: a 4-second read returns). Pushed with the owner's
 OK. CI_PASSED on `07c06ef` (Browser Regression 45606139279: all 11 jobs success); applies to `07c06ef` only.
 
+CI_FAILED on `b2d98dd` (Browser Regression 45623692483, the UI round `1bc4094` + `b2d98dd`): the native mobile WCAG
+audit found `scrollable-region-focusable` on `#documentDiagnosticsList` at 390 px, light and dark; backend shard 1 had
+one error, `test_windows_setup` retained-database test, at its 30-second subprocess limit twice; Selenium shard 0 had one
+error, `test_travel_d1`, the reminder checkbox not interactable. Fix: scrolling `.stack-scroll` lists get `tabindex=0`
+like `.table-responsive` (documents page at 390 px: axe 0 violations, all seven lists focusable). The setup and Travel
+tests touch no changed code and pass locally (3 tests OK); recorded as CI timing failures, not waived.
+
 ## Partial-ID completion, Gemini and backup key — 2026-11-19
 
 CI_PENDING on `84a2afd` (Browser Regression 44538439074 and pages build and deployment 44538436196 started 13:56 UTC), pushed as a fast-forward from `5766899` with the owner's OK ("Yes, push") after the local gates passed on `84a2afd`: backend 3,233 PASS in 4 shards and full Chrome 243 PASS, 0 skipped. 22 commits from `work/completion-sprint-2026-11-19`: sign-in fixes, per-person keys, Career email through each person's Gmail or Outlook, phone QR code, OpenAI removed for Gemini, backup key with Google + passphrase, multi-stop Google road legs, value alerts, fund-category risk, goal projection, recruiter email intake, tracker and walkthrough rows 11-19. The first gate run on `6031134` failed one backend duration-manifest test and two Chrome Career send tests (still importing the removed shared mailbox); fixed in `6031134` and `84a2afd`. The docs delta publishes to Pages. The owner's running app (`F:\ALFRED\alfred_ai`, master `0dbc4c3`) is not updated; that needs its own OK. CI_PENDING is not acceptance.
