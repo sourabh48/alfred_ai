@@ -299,6 +299,8 @@ class PublicPageReadPolicyTests(TestCase):
                    and any(token in path.read_text(encoding='utf-8') for token in ('"text/html"', "'text/html'", 'xhtml'))}
         # The transport itself: its robots.txt reader accepts HTML only so a 404 page means "no file"; it reads no page.
         readers.discard('alfred_ai/services/public_http.py')
+        # Usage analytics counts ALFRED's own HTML replies by route name; it fetches no website.
+        readers.discard('alfred_ai/middleware.py')
         listed = {item['file'] for item in PUBLIC_PAGE_READS}
         self.assertEqual(readers, listed, 'A new web-page reader needs a free-source review and a PUBLIC_PAGE_READS entry.')
 
