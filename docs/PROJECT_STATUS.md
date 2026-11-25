@@ -1686,6 +1686,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: Owned session/API and ordinary Chrome plan workflow, Decimal/category reconciliation, canonical transaction boundaries, cache/CSRF/isolation, unavailable income, explicit plan warnings and desktop/mobile evidence accepted locally with disclosed synthetic data. Financial records unchanged.
 - Limitations/dependencies: FIN-14 Decimal schema/rollback receipts remain applicable. Category/city weights and daily guides are planning rules, not verified local prices or funding confirmation. Unknown income/zero utilization abstain; saved plans can exceed available income only with an explicit warning. No currency/FX, schema, provider, packaging or production changes.
 - Next: Preserve these invariants during FIN-07 chronological forecasting; real-account and release acceptance remain separate.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): Category limits are suggested allocations from a fixed planning table; a person cannot set their own limit per category (one monthly total per plan). Spending per category is calculated from transactions.
 
 ### FIN-06 — Persisted savings goals and progress workflow
 
@@ -1788,8 +1789,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
 - Tests: [tests/test_financial_baseline_alignment.py](../tests/test_financial_baseline_alignment.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
-- Limitations/dependencies: Core Expense/BankAccount/Investment/Loan amounts are Decimal; User, Budget, Career and Mobility money tail remains float. Existing owner/session controls; canonical data availability; acceptance plan.
+- Limitations/dependencies: All stored money amounts are Decimal, including the User, Budget, Career and Mobility tail. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Budget/User/Career/Mobility Decimal tail, original snapshots and guarded rollback complete; tests/test_budget_money_migration.py, tests/test_user_money.py, tests/test_career_money.py, tests/test_mobility_money.py. No currency inferred.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): Every stored money field is Decimal (no money FloatField remains; rates, scores and measurements stay float). Canonical calculations run in Decimal and convert to float for numeric API output; a few derived ratios and the loan payoff forecast still use float.
 
 ### FIN-15 — Canonical currency persistence and multi-currency aggregation
 
@@ -1826,6 +1828,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - OWNER_DECISION 2026-11-06: add an official-site Budget check that only notifies. Implemented: a daily Huey task (01:45 UTC) and the scheduled evidence refresh read https://www.indiabudget.gov.in/ through the bounded public HTTP client (no credentials, cookies or private data), store only the newest "Budget YYYY-YY" label and page hash as verified evidence (24-hour freshness, circuit breaker), and the tax page shows "Official Budget site last checked ...". When the site lists a Budget newer than ALFRED's latest verified year, the page says so and that estimates still use the verified rules; rules are never changed from the web. Live check 2026-11-06: site lists Budget 2026-27 (already verified), so no warning.
 - PAGE_CHECK 2026-11-06 (owner asked "you check"): on the owner's running app the tax page opens on tax year 2026-27 (Income-tax Act, 2025, rebate section 156), FY 2025-26 still selectable (Income-tax Act, 1961, section 87A), tax year 2027-28 is refused with a clear error, the filing hint shows on 2026-27 and hides once 2025-26 is chosen, no Budget-check record yet (first daily run pending). Tax estimates there read Unavailable because the owner's income is unverified (see FIN-07). No amounts recorded.
 - Next: reviewed actual tax cases once income is confirmed; exact-HEAD CI at the phase B push. Conditional eligibility stays caller-supplied; do not infer deductions.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): Capital gains are not covered: tax_policy.py lists them as excluded (ordinary income only).
 
 ### FIN-17 — Credit bureau reports and official score access
 
@@ -1940,6 +1943,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Values can be entered snapshots; cached external quotes have freshness metadata. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Accept owner portfolio and reconcile to broker evidence.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): Holdings carry units, an AMFI scheme code and NAV, so AMFI-coded funds revalue; stocks and ETFs have no ticker or ISIN on the holding, so their value is only what was entered or imported. There are no buy/sell transaction records.
 
 ### INV-02 — Investment PDF imports and corrections
 
@@ -1966,6 +1970,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: verified local nominal 12-month planning with recorded month zero, beginning-of-month contributions, entered annual percentage / 1200 monthly rate and explicit uncertainty. Ordinary synthetic owner UI/API acceptance; no private account or provider access.
 - Limitations/dependencies: Not guaranteed/live returns, inflation forecasts, suitability or currency conversion. Invalid/unrepresentable forecasts abstain without changing holdings; external/provider and money/currency approvals remain separate.
 - Next: Outcome calibration and inflation/real-return planning require their own evidence and scope; do not repeat this nominal-projection acceptance.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): Without buy/sell transaction records there is no XIRR, realised gain or holding-period figure; returns and projections rest on entered values and assumptions, not dated cash flows.
 
 ### INV-04 — Risk classification and recommendations
 
@@ -2756,6 +2761,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Dated official references exist; no verified live permit availability or closure service. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Maintain reviewed effective-date references and unknown state.
 - SCOPED_INSPECTION 2026-11-06: the Kerala forest reference was reviewed 2026-09-29 and now shows as stale with UNKNOWN confidence, as intended. No live permit or closure service exists to integrate.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): The dated reference list covers one place (Chembra Peak, Kerala); every other place returns UNKNOWN.
 
 ### TRAVEL-16 — Weather, horizons and replanning
 
