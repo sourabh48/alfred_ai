@@ -199,8 +199,9 @@ def answer_for(user, text) -> str:
     return public_answer(text) if text else HELP
 
 
-def poll_once(wait=15) -> int:
+def poll_once(wait=4) -> int:
     """Read new messages once and answer each; returns how many were handled."""
+    # wait stays under public_http's 5-second read limit, or every long poll times out.
     from django.db import close_old_connections
     with _lock:
         offset = _load()["offset"]

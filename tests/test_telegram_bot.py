@@ -1,4 +1,5 @@
 """ALFRED on Telegram: only a code-linked private chat is answered, never with money, documents or saved history."""
+import inspect
 import json
 import os
 from datetime import timedelta
@@ -90,6 +91,7 @@ class TelegramBotTests(TestCase):
             return updates if method == "getUpdates" else {}
         with patch.object(telegram_bot, "_call", side_effect=call):
             self.assertEqual(telegram_bot.poll_once(wait=0), 1)
+            self.assertLess(inspect.signature(telegram_bot.poll_once).parameters["wait"].default, 5)  # public_http reads for 5 s at most
             updates = []
             telegram_bot.poll_once(wait=0)
         sent = [body for method, body in calls if method == "sendMessage"]
