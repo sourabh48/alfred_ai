@@ -348,6 +348,27 @@ def _extract_pdf_text(raw_bytes: bytes, filename: str, *, ocr_page_limit: int, d
     return finalized
 
 
+PDF_PASSWORD_MESSAGE = (
+    "This PDF is locked with a password. Open it with its password, choose Print, then Microsoft Print to PDF, "
+    "and upload that unlocked copy."
+)
+
+
+def pdf_is_password_locked(raw_bytes: bytes) -> bool:
+    """True when the PDF needs a password to read; PDFs locked only against editing still open."""
+    try:
+        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            reader = PdfReader(BytesIO(raw_bytes))
+    except Exception:
+        return False  # not a readable PDF at all; the parser reports that
+    if not reader.is_encrypted:
+        return False
+    try:
+        return not reader.decrypt("")
+    except Exception:
+        return True
+
+
 def _extract_pdf_with_pypdf(raw_bytes: bytes, *, layout: bool) -> str:
     try:
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):

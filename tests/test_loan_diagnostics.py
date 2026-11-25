@@ -60,6 +60,20 @@ class LoanDiagnosticTests(TestCase):
             self.assertNotIn(marker, text)
             self.assertNotIn(json.dumps(marker)[1:-1], text)
 
+    def test_a_password_locked_pdf_says_how_to_unlock_it_and_saves_nothing(self):
+        import fitz
+        document = fitz.open()
+        document.new_page().insert_text((72, 72), "Example Housing Finance loan statement")
+        locked = document.tobytes(encryption=fitz.PDF_ENCRYPT_AES_256, owner_pw="owner-x", user_pw="reader-x")
+        response = self.client.post("/api/loans/import-pdf/", {"file": SimpleUploadedFile("locked.pdf", locked, content_type="application/pdf")})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("locked with a password", response.json()["error"])
+        self.assertFalse(LoanImportDocument.objects.filter(user=self.user).exists())
+        # Locked only against editing (empty open password) still reads.
+        from alfred_ai.services.document_extraction import pdf_is_password_locked
+        self.assertFalse(pdf_is_password_locked(document.tobytes(encryption=fitz.PDF_ENCRYPT_AES_256, owner_pw="owner-x", user_pw="")))
+        self.assertFalse(pdf_is_password_locked(b"%PDF-1.7 not really a pdf"))
+
     def test_parser_failures_are_reviewable_with_safe_persistence_and_correlated_logs(self):
         for marker in SECRETS:
             with self.subTest(marker=marker), patch("apps.loans.views.loan_pdf_parser.parse_document", side_effect=RuntimeError(marker)), self.assertLogs(

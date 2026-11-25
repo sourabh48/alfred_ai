@@ -27,6 +27,7 @@ from apps.expenses.services.financial_intelligence import build_financial_intell
 from apps.investments.models import Investment
 from apps.mobility.models import BikeProfile
 from alfred_ai.services import record_parser_learning
+from alfred_ai.services.document_extraction import PDF_PASSWORD_MESSAGE, pdf_is_password_locked
 from apps.reports.services import operational_logging_service
 from apps.loans.services.loan_pdf_parser import loan_pdf_parser
 from apps.loans.services import loan_closure_parser, loan_foreclosure_service, loan_intelligence_service
@@ -325,6 +326,10 @@ def import_loan_pdf(request):
                 {"error": "Only PDF files are supported"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        head = pdf_file.read()
+        pdf_file.seek(0)
+        if pdf_is_password_locked(head):
+            return Response({"error": PDF_PASSWORD_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
 
         processing_stage = "parser"
         parsed = loan_pdf_parser.parse_document(pdf_file, user=request.user, filename=pdf_file.name)
