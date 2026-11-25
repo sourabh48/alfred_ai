@@ -1,5 +1,16 @@
 # Development CI and integration pipeline
 
+## Ask ALFRED decides public or private — 2026-11-25/26
+
+CI_PASSED on `d2e3fd7` (tick removed, mixed-question lookup) and on `f650fcb` (Gemini answers kept in the local chat;
+stand-alone public questions in a chat go to Gemini): Browser Regression all jobs success, each for its own SHA only.
+`b0ddef0` (Travel session push) CI_FAILED: backend shard 2 had one failure, `test_usage_analytics`
+`test_pages_are_counted_by_route_name_and_the_batch_carries_no_person`, which passed on the next head. `87a2450` (badge fix
+`d7048f8` merged with that Travel work) attempt 1 CI_FAILED: Selenium shard 0 had one error,
+`test_private_trip_photo_exif_review_and_gallery` (`#plannerMedia img` not shown before the wait ended); the test passed
+locally 2 of 2 on synthetic data. The owner approved re-running the failed jobs: attempt 2 of run 45682087433 passed all 11
+jobs, so CI_PASSED on `87a2450`. Both single failures look intermittent; neither is waived and neither cause is known.
+
 ## OpenJarvis ideas, Telegram and agent links — 2026-11-25
 
 CI_FAILED on `917eccb` (Browser Regression 45592092610): the four backend shards failed in preflight with
