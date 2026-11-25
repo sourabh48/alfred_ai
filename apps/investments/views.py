@@ -324,6 +324,11 @@ def import_investment_pdf(request):
         return Response({"error": "Upload an investment PDF or statement first."}, status=status.HTTP_400_BAD_REQUEST)
     if not upload.name.lower().endswith('.pdf'):
         return Response({'detail': 'Choose a PDF investment source.'}, status=400)
+    from alfred_ai.services.document_extraction import PDF_PASSWORD_MESSAGE, pdf_is_password_locked
+    head = upload.read()
+    upload.seek(0)
+    if pdf_is_password_locked(head):  # CAMS/KFintech statements always come locked
+        return Response({'error': PDF_PASSWORD_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
 
     from alfred_ai.services.api_errors import safe_error_details
     from alfred_ai.services.upload_limits import UploadLimitExceeded, UploadFormatError, UploadStorageUnavailable, UploadProtectionUnavailable

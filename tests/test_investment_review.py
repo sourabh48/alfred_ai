@@ -234,6 +234,14 @@ class InvestmentReviewTests(TestCase):
         result = self.client.post('/api/investments/import-pdf/', {'file': SimpleUploadedFile('wrong.txt', b'text')})
         self.assertEqual(result.status_code, 400)
         self.assertFalse(Investment.objects.filter(user=self.owner).exists())
+        import fitz
+        locked = fitz.open(); locked.new_page().insert_text((72, 72), 'Consolidated Account Statement')
+        before = InvestmentImportDocument.objects.filter(user=self.owner).count()
+        result = self.client.post('/api/investments/import-pdf/', {'file': SimpleUploadedFile('cas.pdf', locked.tobytes(
+            encryption=fitz.PDF_ENCRYPT_AES_256, owner_pw='owner-x', user_pw='reader-x'), content_type='application/pdf')})
+        self.assertEqual(result.status_code, 400)
+        self.assertIn('locked with a password', result.json()['error'])
+        self.assertEqual(InvestmentImportDocument.objects.filter(user=self.owner).count(), before)
 
     def test_pdf_decimal_precision_and_negative_sign_are_not_silently_changed(self):
         from apps.investments.services.portfolio_intelligence import portfolio_intelligence_service
