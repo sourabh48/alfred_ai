@@ -126,6 +126,8 @@ PUBLIC_TEST_IDENTIFIERS = {
     ("tests/test_online_services.py", "3b10a0c6ee8556890d87044b879bac760887e7b5413c6d7db76996b888513ed8"),
     ("tests/test_online_services.py", "3afa16d706581c127becfb57fed6514f48fa8652cf45aaa335e50b6c7baf2e57"),
     ("tests/test_social_login.py", "f83dcc7784d3fca6972cdfc50b1b0975ccc5b834900c5d6b398024f5cf1a70b1"),
+    # The constant holding the setting name ALFRED_TELEGRAM_BOT_TOKEN (not a token) in 917eccb..7c7aa39; renamed TOKEN_ENV 2026-11-25.
+    ("alfred_ai/services/telegram_bot.py", "9772d9174d132c8ef352cae3c5b534783c151ed72cac4388663f07b369a687b0"),
 }
 SOURCE_SCAN_BATCH_BYTES = 64 * 1024 * 1024
 SOURCE_SCAN_TOTAL_BYTES = 128 * 1024 * 1024
