@@ -486,7 +486,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const answer = result.provider !== 'local_evidence' && !result.narrative_withheld
             ? Alfred.renderAnswerMarkdown(result.answer) : document.createElement('p');
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
-        if (historical) label.textContent = `Historical AI hypothesis · Ollama (local) · saved ${new Date(result.saved_at).toLocaleString()}`;
+        if (historical) label.textContent = `Historical AI hypothesis · ${result.provider === 'gemini' ? 'Gemini (your key)' : 'Ollama (local)'} · saved ${new Date(result.saved_at).toLocaleString()}`;
         assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
         if (result.web_offer && !historical) {
             // ALFRED never sends a possibly private question by itself: the owner sees the exact text first.

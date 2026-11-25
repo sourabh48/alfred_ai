@@ -53,6 +53,20 @@ class ConversationHistoryTests(TestCase):
     def post(self, payload, client=None):
         return (client or self.client).post('/api/ai/personal-insights/', json.dumps(payload), content_type='application/json')
 
+    def test_gemini_answers_to_public_questions_stay_in_the_chat(self):
+        # Owner 2026-11-25/26: with chats on, "What is the capital of France?" went to Gemini, then the save refused the answer.
+        record = self.create()
+        gemini = {'answer':'Paris.', 'provider':'gemini', 'classification':'ai_generated_hypothesis', 'financial_authority':False, 'sources':[]}
+        with patch('apps.ml_engine.api.views.hybrid_answer', return_value=gemini):
+            response = self.post(self.turn(record, query='What is the capital of France?'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.json()['answer'], response.json()['conversation_saved']), ('Paris.', True))
+        [turn] = self.history.get(self.alice, record['id'])['turns']
+        self.assertEqual((turn['query'], turn['answer'], turn['provider']), ('What is the capital of France?', 'Paris.', 'gemini'))
+        for provider in ('openai', 'local_evidence', None):
+            with self.subTest(provider=provider), self.assertRaises(ValueError):
+                self.history.append(self.alice, record['id'], 1, uuid4().hex, self.question, gemini | {'provider': provider}, 0)
+
     def test_saved_message_search_is_local_metadata_only_and_case_insensitive(self):
         record = self.create()
         question = self.question | {'query': 'A fictional walk along the Straße'}

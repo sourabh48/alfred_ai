@@ -3333,25 +3333,28 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.ask_history_question('Synthetic private page warmup')
             self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value') == '')
             local.reason.side_effect = EmbeddingUnavailable('synthetic local outage')
-            self.ask_history_question('What is the synthetic public retry question?')
+            self.ask_history_question('What about that synthetic public retry question?')
             self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
             self.assertFalse(request.call_args.kwargs['cloud_consent'])  # a follow-up carries the private chat, so it stays here
             self.assertEqual(len(request.call_args.kwargs['conversation_context']),2)
             self.assertNotIn('gemini',[call.kwargs.get('provider') for call in request.call_args_list])
-            self.memory_click('#intelligenceNew')
-            self.ask_history_question('What is the synthetic public retry question?')
+            self.ask_history_question('What is the synthetic public retry question?')  # stands alone: Gemini, without the chat
             self.wait.until(lambda _: 'Mock (synthetic)' in self.text('intelligenceAnswers'))
             first,routed=request.call_args_list[-2:]  # the page asked locally; ALFRED sent the public question on by itself
             self.assertFalse(first.kwargs['cloud_consent']); self.assertNotIn('conversation_context',routed.kwargs)
             self.assertEqual((routed.kwargs['provider'],routed.kwargs['cloud_consent']),('gemini',True))
             self.memory_click('#conversationHistoryPanel > summary'); self.enable_private_history_ui()
+            self.ask_history_question('What is the capital of the synthetic republic?')  # chats on (owner's case, 2026-11-25)
+            self.wait.until(lambda _: 'synthetic republic?' in self.text('intelligenceAnswers') and 'Mock (synthetic)' in self.text('intelligenceAnswers'))
+            self.assertNotIn('invalid or not permitted', self.text('intelligenceFeedback'))
             request.reset_mock()
             self.ask_history_question('Synthetic private local draft')
             self.wait.until(lambda _: 'Ollama unavailable' in self.text('intelligenceLocalStatus'))
             self.assertEqual([(call.kwargs['cloud_consent'],call.kwargs.get('provider','local')) for call in request.call_args_list],[(False,'local')])
         self.assertEqual(self.browser.find_element(self.By.ID, 'intelligenceQuery').get_property('value'), 'Synthetic private local draft')
         record = history.list(self.scenario['user'])[0]
-        self.assertEqual(history.get(self.scenario['user'], record['id'])['turns'], [])
+        turns = history.get(self.scenario['user'], record['id'])['turns']  # Gemini's public answer kept; the failed private draft not
+        self.assertEqual([(turn['query'], turn['provider']) for turn in turns], [('What is the capital of the synthetic republic?', 'mock')])
 
     def capture(self, name):
         self.browser.save_screenshot(str(self.artifacts / f"{name}.png"))

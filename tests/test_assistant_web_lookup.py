@@ -230,8 +230,11 @@ class HybridWebLookupTests(TestCase):
             for personal in ("what did I save about my trip", "Does Anika have cancer?"):
                 with self.subTest(personal=personal):
                     self.assertEqual(self.ask(personal)["provider"], "ollama")
-            self.assertEqual(self.ask("What is the capital of France?", conversation_context=[
-                {"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}])["provider"], "ollama")  # follow-ups need the chat
+            chat = [{"role": "user", "content": "What is the capital of France?"}, {"role": "assistant", "content": "Paris."}]
+            self.assertEqual(self.ask("What is the capital of Japan?", conversation_context=chat)["provider"], "mock")  # stands alone
+            for follow_up in ("What about its population?", "How big is it?", "and Germany?"):
+                with self.subTest(follow_up=follow_up):  # needs the chat, which never leaves this PC
+                    self.assertEqual(self.ask(follow_up, conversation_context=chat)["provider"], "ollama")
             with patch("apps.ml_engine.services.hybrid_intelligence.reason_with_memory", side_effect=RuntimeError("over the daily cap")):
                 self.assertEqual(self.ask("What is the capital of France?")["provider"], "ollama")  # Gemini failed: local answers
         self.local.reason.reset_mock()

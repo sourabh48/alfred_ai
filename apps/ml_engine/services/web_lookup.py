@@ -44,6 +44,8 @@ PERSONAL = re.compile(r"(?i)\b(?:my|me|mine|myself|i|i'm|i've|i'd|our|ours|we|yo
 # Words that mean the answer changes over time, so saved memories cannot hold it.
 CURRENT = re.compile(r"(?i)\b(?:latest|today|tonight|tomorrow|yesterday|now|current(?:ly)?|recent(?:ly)?|news|this (?:week|month|year)"
                      r"|20\d\d|prices?|rates?|scores?|weather|forecast|who won|elections?|released?|launch(?:ed|es)?|happening|update[sd]?)\b")
+# A question that leans on the chat so far ("what about its population?") needs that chat, so it stays with the local model.
+FOLLOW_UP = re.compile(r"(?i)\b(?:it|its|that|this|those|these|they|them|their|there|he|she|him|her|his|same|also|else|above)\b|^\s*(?:and|so|then|what about|how about)\b")
 GENERAL = re.compile(r"(?i)^\s*(?:who|what|when|where|which|why|how|is|are|was|were|does|did|tell me about|explain|define|meaning of)\b")
 
 # With no reliable way to identify people in free text, automatic searches use complete public query patterns.
