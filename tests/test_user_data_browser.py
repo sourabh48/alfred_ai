@@ -126,6 +126,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def text(self, element_id, by=None):
         from selenium.common.exceptions import StaleElementReferenceException, WebDriverException
         try:
+            if element_id == 'intelligenceAnswers' and by is None:  # sources start collapsed (owner 2026-11-26); open them to read them
+                self.browser.execute_script("document.querySelectorAll('#intelligenceAnswers details.conversation-evidence').forEach(d=>{d.open=true})")
             return self.browser.find_element(by or self.By.ID, element_id).text
         except WebDriverException as error:
             # ChromeDriver can report a just-replaced element this way instead of as stale.
@@ -5156,6 +5158,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.ask_history_question('Explain my baseline')
         self.wait.until(lambda _: 'Recorded values ready.' in self.text('intelligenceFeedback'))
         evidence = self.browser.find_element(self.By.CSS_SELECTOR,'#intelligenceAnswers .conversation-evidence')
+        self.assertIsNone(evidence.get_attribute('open'))  # collapsed until the owner opens it (owner 2026-11-26)
+        self.memory_click('#intelligenceAnswers .conversation-evidence > summary')
         fact = next(item.text for item in evidence.find_elements(self.By.TAG_NAME,'p') if item.text.startswith('record id:'))
         self.assertEqual(fact, f'record id: {owner.pk}')
         self.assertTrue(evidence.find_elements(self.By.CSS_SELECTOR,'ul li'))

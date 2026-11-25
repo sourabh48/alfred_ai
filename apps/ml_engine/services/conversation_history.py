@@ -14,7 +14,7 @@ MAX_CONVERSATIONS = 200
 MAX_TURNS = 50
 MAX_DAYS = 365
 KEEP_UNTIL_DELETED = 3650  # days; a chat with no age limit still needs an expiry date in its record
-MAX_RECORD = 262144
+MAX_RECORD = 1048576  # 50 turns of detailed answers (owner 2026-11-26)
 
 
 class ConversationConflict(MemoryConflict):
@@ -257,7 +257,7 @@ class ConversationHistory:
         # The local model's answers, and Gemini's answers to public questions (owner 2026-11-26); 'mock' is the synthetic test stand-in.
         if (result.get('provider') not in ('ollama', 'gemini', 'mock') or result.get('classification') != 'ai_generated_hypothesis'
                 or result.get('financial_authority') is not False or not isinstance(result.get('answer'), str)
-                or not 1 <= len(result['answer'].encode()) <= 8192):
+                or not 1 <= len(result['answer'].encode()) <= 16384):  # the longest answer either model may give
             raise ValueError('Only a validated assistant answer can be retained.')
         # Historical citations keep references only, never copied canonical amounts or memory content.
         sources = [{key:source[key] for key in ('ref','classification','url','verified_at') if key in source}

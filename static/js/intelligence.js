@@ -490,7 +490,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (typeof result.web_search_text === "string" && result.web_search_text) {
             const searched = document.createElement("p"); searched.className = "small text-body-secondary mt-2";
             const found = (result.sources || []).filter(source => source.classification === "public_web_result").length;
-            searched.textContent = `Searched Wikipedia and Google News for “${result.web_search_text}” · ${found} result${found === 1 ? "" : "s"} used`;
+            searched.textContent = `Searched ${result.web_search_text} · ${found} result${found === 1 ? "" : "s"} used`;
             assistantMessage.append(searched);
         }
         const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
@@ -551,8 +551,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         assistantMessage.append(reviewButton, readAloudButton(result.answer));
         reviewButton.hidden = historical || Boolean(result.narrative_withheld) || result.provider === "local_evidence";
-        while (answers.children.length > 20) answers.firstElementChild.remove();
-        evidence.open = true;
+        while (answers.children.length > 20) answers.firstElementChild.remove();  // sources stay collapsed (owner 2026-11-26)
     }
     function renderActionProposal(text, result) {
         // AI-17: a proposed change is shown with its exact values; only Confirm saves it.

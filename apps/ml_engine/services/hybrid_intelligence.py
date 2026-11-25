@@ -13,7 +13,7 @@ from .local_embeddings import KEEP_ALIVE, OllamaEmbeddings, EmbeddingUnavailable
 from .local_ai_limits import (context_bytes, context_tokens, deadline as local_deadline, learn_window, max_output_tokens as output_token_cap,
                               payload_bytes, supports_thinking, thinking_mode, thinking_tokens)
 from .persistent_memory import _owner, MemoryConflict
-from .memory_reasoning import reason_with_memory, reasoning_provider
+from .memory_reasoning import SECTIONS, reason_with_memory, reasoning_provider
 
 FINANCIAL_LANGUAGE = re.compile(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',re.I)
 CURRENCY_LANGUAGE = re.compile(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',re.I)
@@ -24,6 +24,14 @@ ANSWER_STYLES = {
     'comparison': (768, 'Compare the options using labelled side-by-side points and state missing evidence.'),
     'steps': (768, 'Explain the requested process in ordered steps with word labels. Do not claim to have performed actions.'),
 }
+
+
+def searched_text(question):
+    """Exactly what went to Wikipedia and Google News, in words the owner reads under the answer."""
+    from .web_lookup import subject
+    question=' '.join(question.split()); name=subject(question)
+    return (f'Wikipedia for “{name}” and “{question}”; Google News for “{question}”' if name and name!=question
+            else f'Wikipedia and Google News for “{question}”')
 
 
 BRIEF = re.compile(r'\b(?:brief|briefly|concise|short answer)\b', re.I)
@@ -130,7 +138,7 @@ class OllamaReasoner(OllamaEmbeddings):
                 'Sources classified public_web_result are public information from the named website, not personal facts or advice; '
                 'when you use one, cite its ref in brackets such as [web-1], and quote any figure exactly as that result shows it. '
                 'For current figures prefer the most recent dated result and give its date; encyclopedia text may be out of date. '
-                'When public_web_result sources are supplied, explain the search fully in labelled sections: What was searched (web_search_text, on Wikipedia and Google News), What was found (each result that bears on the question, with its ref and date, and say plainly which results were unrelated), What this means (the outcome in plain words), and What is still unknown. '
+                'When public_web_result sources are supplied, explain in full in '+SECTIONS+' '
                 'Only canonical financial tool data is authoritative; do not calculate or invent financial values. '
                 'You may state a monetary amount only when it is copied exactly from a supplied source amount, written as digits '
                 'with that source ref in brackets beside it and its recorded currency code if it has one. Never calculate, total, '
@@ -471,8 +479,8 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     if auto_web and provider=='gemini' and web_lookup.should_search(query): web=web_lookup.search(query)
     if provider=='gemini':
         result=present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
-        if web: result['web_search_text']=' '.join(searched.split())
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web,searched=searched_text(searched) if web else None),scope,query)
+        if web: result['web_search_text']=searched_text(searched)
         if web_lookup.clearly_public(query) and isinstance(result.get('answer'),str) and result['answer'].strip():
             from .brain import try_remember  # Gemini teaches the local model (owner decision 2026-11-20); kept encrypted on this PC
             try_remember(user,'public_answer',{'question':query[:500],'answer':result['answer'][:3000]},store=store)
@@ -500,7 +508,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     if hasattr(type(reasoner), 'use_quick_model') and easy_question(query, scope): reasoner.use_quick_model()  # not test doubles
     limit=context_bytes(context_tokens(reasoner),output_limit)  # the window learned by an earlier call, else the safe fallback
     payload={'query':query,'sources':model_tools.copy(),'response_style':style}; included=[]
-    if web: payload['web_search_text']=' '.join(searched.split())
+    if web: payload['web_search_text']=searched_text(searched)
     if payload_bytes(payload)>limit: raise ValueError('Select smaller local source context.')
     kept=[]
     for item in web:  # web results fill the local window first; any that do not fit are left out
@@ -557,7 +565,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     revalidate()
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'answer_style':style, 'local_output_token_limit':output_limit,
-        **({'web_search_text':' '.join(searched.split())} if web else {}),
+        **({'web_search_text':searched_text(searched)} if web else {}),
         'local_thinking':getattr(used,'thought',False) is True,
         # Shown beside the answer only; never stored or sent anywhere.
         'local_model':getattr(used,'model',None) if isinstance(getattr(used,'model',None),str) else None,

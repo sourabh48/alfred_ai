@@ -116,13 +116,53 @@ def _clean(text, limit):
     return html.unescape(TAG.sub("", text or "")).strip()[:limit]
 
 
+# A proper name in the question ("Navtej Singh Johar v. Union of India"): Wikipedia ranks a whole question poorly
+# (it returned articles that only mention the case) and the name itself well.
+_NAME = re.compile(r"[A-Z][\w'’.-]*(?:\s+(?:v\.|vs\.?|of|and|the|de|for|[A-Z][\w'’.-]*))*")
+_QUESTION_WORDS = {"what", "who", "when", "where", "which", "why", "how", "is", "are", "was", "were", "does", "did", "do", "tell",
+                   "explain", "define", "i", "the", "a", "an"}
+_JOINERS = {"v.", "vs", "vs.", "of", "and", "the", "de", "for"}
+ARTICLE_CHARS = 6000  # about 1,500 tokens of each article, so the answer can give dates, who decided and what changed
+
+
+def subject(question):
+    """The longest proper name of two or more words in a question, or None: one word ("India", "FD") is too broad to lead."""
+    names = []
+    for match in _NAME.finditer(question):
+        words = match.group().split()
+        while words and words[0].lower() in _QUESTION_WORDS: words.pop(0)
+        while words and words[-1].lower() in _JOINERS: words.pop()
+        if len(words) >= 2: names.append(re.sub(r"['’]s$", "", " ".join(words)))
+    return max(names, key=len, default=None)
+
+
+def _article(key, deadline):
+    """The article's own text, not just the search snippet; empty when it cannot be read or looks like an attack."""
+    try:
+        response = public_http.request("GET", "https://en.wikipedia.org/w/api.php", params={
+            "action": "query", "prop": "extracts", "explaintext": 1, "redirects": 1, "titles": key, "format": "json", "formatversion": 2},
+            headers={"User-Agent": USER_AGENT}, max_bytes=2_000_000, deadline=deadline)
+        text = _clean(response.json()["query"]["pages"][0].get("extract"), ARTICLE_CHARS)
+    except (public_http.PublicHTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError, OSError):
+        return ""
+    return "" if finding(text) else text
+
+
 def _wikipedia(question, deadline):
-    response = public_http.request("GET", "https://en.wikipedia.org/w/rest.php/v1/search/page",
-        params={"q": question, "limit": 3}, headers={"User-Agent": USER_AGENT}, max_bytes=300_000, deadline=deadline)
-    return [{"title": _clean(page.get("title"), 200), "snippet": _clean(page.get("excerpt"), 400) or _clean(page.get("description"), 400),
-             "url": "https://en.wikipedia.org/wiki/" + quote_plus(str(page.get("key", "")).replace(" ", "_"), safe="_()"),
-             "source": "Wikipedia", "published": ""}
-            for page in response.json().get("pages", [])[:3] if page.get("key")]
+    pages, seen = [], set()
+    name = subject(question)
+    for text in ([name] if name and name != question else []) + [question]:  # the name first: it finds the article itself
+        response = public_http.request("GET", "https://en.wikipedia.org/w/rest.php/v1/search/page",
+            params={"q": text, "limit": 3}, headers={"User-Agent": USER_AGENT}, max_bytes=300_000, deadline=deadline)
+        for page in response.json().get("pages", [])[:3]:
+            if page.get("key") and page["key"] not in seen:
+                seen.add(page["key"]); pages.append(page)
+    found = [{"title": _clean(page.get("title"), 200), "snippet": _clean(page.get("excerpt"), 400) or _clean(page.get("description"), 400),
+              "url": "https://en.wikipedia.org/wiki/" + quote_plus(str(page.get("key", "")).replace(" ", "_"), safe="_()"),
+              "source": "Wikipedia", "published": ""} for page in pages[:3]]
+    for item, page in list(zip(found, pages))[:2]:  # research: read the two best articles in full
+        if text := _article(page["key"], deadline): item["text"] = text
+    return found
 
 
 def _news(question, deadline):
