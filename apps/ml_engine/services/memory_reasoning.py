@@ -1,6 +1,7 @@
 """Optional public-context reasoning; cloud contact is disabled unless authorized."""
 from datetime import datetime, timezone
 import json
+import logging
 import re
 import time
 import unicodedata
@@ -139,6 +140,7 @@ class GeminiReasoner:
         return input_bound+max_output_tokens,input_bound+4*max_output_tokens
 
     def reason(self,payload,*,max_output_tokens,deadline):
+        self.stop=None
         body=self.body(payload,max_output_tokens); input_bound=len(encoded(body))+256
         response=request('POST',GEMINI.format(self.model),headers={'x-goog-api-key':self.key,'Content-Type':'application/json'},
             data=encoded(body),max_bytes=65536,deadline=deadline)
@@ -149,7 +151,7 @@ class GeminiReasoner:
         if not str(result.get('modelVersion','')).removeprefix('models/').startswith(self.model): raise ValueError('Unexpected reasoning model.')
         if type(usage.get('promptTokenCount')) is not int or not 0<=usage['promptTokenCount']<=input_bound: raise ValueError('Invalid reasoning usage.')
         if type(usage.get('candidatesTokenCount',0)) is not int or not 0<=usage.get('candidatesTokenCount',0)<=max_output_tokens: raise ValueError('Invalid reasoning usage.')
-        candidate=candidates[0]; content=candidate.get('content') or {}; parts=content.get('parts')
+        candidate=candidates[0]; content=candidate.get('content') or {}; parts=content.get('parts'); self.stop=candidate.get('finishReason')
         if candidate.get('finishReason')!='STOP' or content.get('role')!='model' or not isinstance(parts,list) or not 1<=len(parts)<=8:
             raise ValueError('Unsupported reasoning output.')
         text=[]
@@ -186,11 +188,11 @@ def configure_reasoning(store,user,*,enabled,consent=False):
     return policy
 
 
-CLOUD_OUTPUT_TOKENS=1024
+CLOUD_OUTPUT_TOKENS=4096  # Gemini's thinking counts toward this; 1024 cut off a detailed answer (owner's app, 2026-11-26)
 CLOUD_SECONDS=20  # public_http caps one call at 20 seconds anyway
 
 
-def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,provider=None,daily_tokens=4096,daily_microusd=10000,web_results=()):
+def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,provider=None,daily_tokens=16384,daily_microusd=40000,web_results=()):
     owner=_owner(user)
     if consent is not True or query_sensitivity!='public':
         raise PermissionError('Confirm public query classification and explicit reasoning consent.')
@@ -233,7 +235,10 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
     try:
         answer=provider.reason(payload,max_output_tokens=CLOUD_OUTPUT_TOKENS,deadline=time.monotonic()+CLOUD_SECONDS)
         if not isinstance(answer,str) or len(answer.encode())>16384: raise ValueError()
-    except Exception:
+    except Exception as exc:
+        stop=getattr(provider,'stop',None)  # Google's stop code (MAX_TOKENS, SAFETY…), never the reply or the question
+        logging.getLogger(__name__).warning('Gemini reply not used: %s%s',type(exc).__name__,
+            f' ({stop})' if isinstance(stop,str) and re.fullmatch(r'[A-Z_]{1,40}',stop) else '')
         raise SyncUnavailable('Optional reasoning is unavailable; its reserved budget is retained.') from None
     used=getattr(provider,'used',None) if isinstance(provider,GeminiReasoner) else None
     with store._transaction() as db:

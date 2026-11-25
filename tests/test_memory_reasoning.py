@@ -160,6 +160,10 @@ class MemoryReasoningTests(TestCase):
             with self.subTest(change=list(change)):
                 self.http.side_effect=None; self.http.return_value=PublicResponse(json.dumps(original|change).encode(),'application/json')
                 with self.assertRaises(SyncUnavailable): self.reason(daily_tokens=65536,daily_microusd=1000000)
+        self.http.return_value=PublicResponse(json.dumps(original|answer(finishReason='MAX_TOKENS',content={'role':'model','parts':[{'text':'Synthetic cut-off'}]})).encode(),'application/json')
+        with self.assertLogs('apps.ml_engine.services.memory_reasoning','WARNING') as logged, self.assertRaises(SyncUnavailable):
+            self.reason(daily_tokens=65536,daily_microusd=1000000)
+        self.assertEqual(logged.output,['WARNING:apps.ml_engine.services.memory_reasoning:Gemini reply not used: ValueError (MAX_TOKENS)'])
 
     def test_model_version_with_a_models_prefix_is_the_same_model(self):
         original=self.response().json()
