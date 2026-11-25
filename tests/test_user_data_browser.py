@@ -167,7 +167,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
     def source_link(self,selector):
         # Sources start collapsed (owner 2026-11-26): open the panel holding the link, as the owner would.
         link=self.browser.find_element(self.By.CSS_SELECTOR,selector)
-        self.browser.execute_script("const d=arguments[0].closest('details.conversation-evidence'); if(d) d.open=true;",link)
+        self.browser.execute_script("const d=arguments[0].tagName==='SUMMARY'?null:arguments[0].closest('#intelligenceAnswers details.conversation-evidence'); if(d) d.open=true;",link)
         return link
 
     def memory_click(self,selector):
@@ -179,7 +179,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 if element.get_attribute('id') == 'intelligenceWebSearch':
                     self.open_answer_options()
                 # Sources start collapsed (owner 2026-11-26): open the panel holding the link, as the owner would.
-                self.browser.execute_script("const d=arguments[0].closest('details.conversation-evidence'); if(d) d.open=true;",element)
+                self.browser.execute_script("const d=arguments[0].tagName==='SUMMARY'?null:arguments[0].closest('#intelligenceAnswers details.conversation-evidence'); if(d) d.open=true;",element)
                 self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
                 if not element.is_displayed() or not element.is_enabled():
                     return False
