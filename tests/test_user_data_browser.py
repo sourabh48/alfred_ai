@@ -2842,6 +2842,14 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Mock (synthetic)',self.text('intelligenceAnswers'))
         local.reason.assert_not_called()
         self.capture('hybrid-public-consent-sync-policy')
+        gemini={'answer':'Synthetic Gemini answer.','provider':'gemini','classification':'ai_generated_hypothesis','financial_authority':False,
+            'narrative_withheld':False,'sources':[]}
+        with patch('apps.ml_engine.api.views.hybrid_answer',return_value=gemini):  # how a real Gemini answer is shown
+            self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('What is the synthetic public river question?')
+            self.memory_click('#intelligenceForm button')
+            self.wait.until(lambda _: 'Synthetic Gemini answer.' in self.text('intelligenceAnswers'))
+        self.assertIn('Gemini (your key)',self.text('intelligenceAnswers'))
+        self.assertEqual(self.text('intelligenceLocalStatus'),'Answered by Gemini · local model not used')  # not stuck on "processing"
         failed=Mock(); failed.embed.side_effect=EmbeddingUnavailable('synthetic local server offline')
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=failed))
         self.browser.find_element(self.By.ID,'intelligenceQuery').send_keys('synthetic note about my mountain plans')

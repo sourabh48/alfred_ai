@@ -812,7 +812,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     retry.hidden = false;
                 }
             } else {
-                if (result.provider !== "gemini") setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
+                if (result.provider === "gemini") setLocalStatus("Answered by Gemini · local model not used", "ready");
+                else setLocalStatus(result.provider === "ollama" ? "Ollama available" : "Ollama unavailable · consented fallback used", result.provider === "ollama" ? "ready" : "unavailable");
                 query.value = ""; requestToken = null;
             }
             if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && result.provider === "ollama" && !result.narrative_withheld) {
