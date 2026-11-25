@@ -960,6 +960,34 @@ def telegram_api_view(request):
 
 @login_required
 @require_http_methods(["GET", "POST"])
+def skills_api_view(request):
+    """Settings > Skills: review an imported skill, save (approve) exactly what is shown, or delete one."""
+    from apps.ml_engine.services import skills
+    draft = None
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body or b"{}")
+            action = data.get("action")
+            if action == "import":
+                draft = skills.import_draft(data.get("url"))
+            elif action == "save":
+                skills.save(request.user, data, source=str(data.get("source") or ""))
+            elif action == "delete":
+                skills.delete(request.user, data.get("id"))
+            else:
+                raise skills.SkillError("Choose to import, save or delete a skill.")
+        except skills.SkillError as exc:
+            return JsonResponse({"detail": str(exc)}, status=400)
+        except (ValueError, AttributeError):
+            return JsonResponse({"detail": "Send the skill as JSON."}, status=400)
+    response = JsonResponse({"skills": [{key: skill[key] for key in ("id", "name", "description", "scope", "text", "source", "approved_at")}
+                                        for skill in skills.listed(request.user)], "draft": draft})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
 def backup_key_api_view(request):
     """Settings > Backup key: make the key and its locked copy, or open a fetched copy with the passphrase.
     Saving to or fetching from Google Drive goes through /auth/google/start/?purpose=backupkey&mode=save|fetch."""

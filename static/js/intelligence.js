@@ -485,6 +485,7 @@ document.addEventListener("DOMContentLoaded", () => {
         label.textContent = result.grounding === "canonical_record_overview" ? "Recorded sources · AI unavailable" : result.provider === "local_evidence" ? "Local evidence check · no model used" : `AI hypothesis · ${result.provider === "ollama" ? "Ollama (local)" : result.provider === "mock" ? "Mock (synthetic)" : result.provider === "gemini" ? "Gemini (your key)" : "Approved cloud"}`;
         if (result.provider === "ollama" && typeof result.local_model === "string") label.textContent += ` · ${result.local_model}`;
         if (result.provider === "ollama" && Number.isFinite(result.answer_seconds)) label.textContent += ` · ${result.answer_seconds} s`;
+        if (typeof result.skill_used === "string") label.textContent += ` · skill: ${result.skill_used}`;
         const answer = result.provider !== 'local_evidence' && !result.narrative_withheld
             ? Alfred.renderAnswerMarkdown(result.answer) : document.createElement('p');
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;

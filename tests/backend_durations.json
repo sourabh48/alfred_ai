@@ -283,6 +283,7 @@
  "tests.test_task_bots": 21.3,
  "tests.test_usage_analytics": 4.2,
  "tests.test_telegram_bot": 10.3,
+ "tests.test_skills": 8.9,
  "tests.test_research_searches": 0.981,
  "tests.test_research_desk": 3.0,
  "tests.test_investment_audit_regressions": 1.0,
