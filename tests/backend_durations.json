@@ -266,6 +266,7 @@
  "tests.test_statement_layouts": 0.23,
  "tests.test_statement_upload_cleanup": 5.25,
  "tests.test_tax_policy": 0.92,
+ "tests.test_capital_gains": 0.014,
  "tests.test_travel_continuation": 0.33,
  "tests.test_travel_discovery_acceptance": 30.06,
  "tests.test_travel_media_acceptance": 1.84,
