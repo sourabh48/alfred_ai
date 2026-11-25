@@ -2420,7 +2420,9 @@ For unchanged rows the dated code/test scope is retained from the completed audi
   money matters by itself, and Gemini answers them when it is on; the "Search online with this text" offer is removed. Only
   the owner's own life ("my brother's divorce", "my diagnosis") stays local and is never split into a public part. Gemini's
   own medical/salary/account word refusal is unchanged (those fall back to the local model with web results). Synthetic:
-  5 AI suites 126 PASS; not yet live in the owner's app (needs a push and restart).
+  5 AI suites 126 PASS. Live on `5523e96` (owner's app, at the owner's request): "What is the latest on Rahul's divorce
+  court case today?" searched by itself and was answered by Gemini (your key) with 8 web sources, after raising Gemini's
+  output allowance from 1024 to 4096 tokens (the first try on `fd25d48` was cut off and fell back to Ollama).
 - On Gemini's free tier Google may keep and review prompts; the Settings card and the consent line say so.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
