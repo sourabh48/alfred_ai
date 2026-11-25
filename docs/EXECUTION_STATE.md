@@ -7,7 +7,8 @@
 - Tests: answer-path backend 247 PASS; web lookup, research desk and hybrid 83 PASS; Home and speech 10 PASS; three Home Chrome tests plus UI contracts 28 PASS. Not checked: answer speed or quality on the owner's PC, the briefing heard aloud, hosted CI.
 - Pushed `f6ac1f9` with the owner's OK and restarted the app on it; hosted CI for it was still running at the restart.
 - PostHog usage counts (owner 2026-11-25, ALFRED decides): sent whenever `ALFRED_POSTHOG_PROJECT_KEY` is in config/local.env; only page route names and local-answer topic, model tier, seconds, thinking and web use; one random ID per PC. `tests.test_usage_analytics` 5 PASS; no project key yet, so nothing has been sent.
-- Next: owner request 2026-11-25 to add a Telegram/messaging bot, agent-to-agent links and skills outside sensitive finance areas.
+- Telegram bot (owner 2026-11-25, not in sensitive finance): listener thread in the worker, idle until `ALFRED_TELEGRAM_BOT_TOKEN` is in config/local.env; chats linked by a one-time code from Settings > Telegram; next trip, due follow-ups, non-money notices, public questions from web results only. `tests.test_telegram_bot` 7 PASS; no real bot checked.
+- Next: instruction-only skills and read-only LAN agent links (owner 2026-11-25), outside sensitive finance.
 
 ## Money walkthrough — 2026-11-20
 

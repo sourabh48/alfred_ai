@@ -197,6 +197,8 @@ def consume(data, instance, parent_pid):
     consumer = HUEY.create_consumer(workers=2, worker_type="thread", periodic=True)
     stop = runtime_directory(data) / f"worker-stop-{instance}"
     consumer.start()
+    from alfred_ai.services import telegram_bot  # owner 2026-11-25; idle until a bot token is set
+    telegram_bot.start_polling(lambda: not stop.exists() and parent_is_running(parent_pid))
     health_check = time.monotonic()
     try:
         while not stop.exists() and parent_is_running(parent_pid):

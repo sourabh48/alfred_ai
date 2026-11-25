@@ -937,6 +937,29 @@ def google_sync_api_view(request):
 
 @login_required
 @require_http_methods(["GET", "POST"])
+def telegram_api_view(request):
+    """Settings > Telegram: a one-time code to link a chat, or unlink this person's chats."""
+    from .services import telegram_bot
+    code = None
+    if request.method == "POST":
+        try:
+            action = json.loads(request.body or b"{}").get("action")
+        except (ValueError, AttributeError):
+            action = None
+        if action == "code":
+            code = telegram_bot.new_code(request.user) if telegram_bot.configured() else None
+        elif action == "unlink":
+            telegram_bot.unlink(request.user)
+        else:
+            return JsonResponse({"detail": "Choose to get a code or unlink."}, status=400)
+    response = JsonResponse({"configured": telegram_bot.configured(), "linked": len(telegram_bot.links_for(request.user)),
+                             "code": code, "code_minutes": telegram_bot.CODE_SECONDS // 60})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
 def backup_key_api_view(request):
     """Settings > Backup key: make the key and its locked copy, or open a fetched copy with the passphrase.
     Saving to or fetching from Google Drive goes through /auth/google/start/?purpose=backupkey&mode=save|fetch."""
