@@ -225,6 +225,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_travel_d2_accessibility_all_panels_contrast":  16.109,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_travel_d2_keyboard_focus_consent_and_error_states":  33.5,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_hotel_cards_show_a_photo_and_price_buttons_like_google_hotels":  11.504,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_capital_gains_card_works_out_tax_for_an_entered_sale":  13.417,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_travel_discovery_novelty_sources_expiry_and_offline_reference":  7.547,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_travel_editor_conflict_preserves_draft_and_lost_response_retry_is_idempotent":  8.25,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_travel_editor_desktop_pointer_keyboard_undo_save_and_reopen":  14.281,

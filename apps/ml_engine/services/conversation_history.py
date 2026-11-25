@@ -254,10 +254,11 @@ class ConversationHistory:
 
     def append(self, user, identity, revision, request_id, question, result, generation, *, check=None):
         owner = _owner(user)
-        if (result.get('provider') != 'ollama' or result.get('classification') != 'ai_generated_hypothesis'
+        # The local model's answers, and Gemini's answers to public questions (owner 2026-11-26); 'mock' is the synthetic test stand-in.
+        if (result.get('provider') not in ('ollama', 'gemini', 'mock') or result.get('classification') != 'ai_generated_hypothesis'
                 or result.get('financial_authority') is not False or not isinstance(result.get('answer'), str)
                 or not 1 <= len(result['answer'].encode()) <= 8192):
-            raise ValueError('Only a validated local assistant answer can be retained.')
+            raise ValueError('Only a validated assistant answer can be retained.')
         # Historical citations keep references only, never copied canonical amounts or memory content.
         sources = [{key:source[key] for key in ('ref','classification','url','verified_at') if key in source}
                    for source in result.get('sources', [])]
@@ -267,7 +268,7 @@ class ConversationHistory:
                     classification='selected_document_reference',url=item['url'])
                     for item in source['data']['document_sources'] if item['url'] != source.get('url')]
         turn = dict(request_id=request_id, input_digest=sha256(_json(question).encode()).hexdigest(),
-                    **question, answer=result['answer'], provider='ollama', classification='ai_generated_hypothesis',
+                    **question, answer=result['answer'], provider=result['provider'], classification='ai_generated_hypothesis',
                     financial_authority=False, sources=sources, narrative_withheld=bool(result.get('narrative_withheld')),
                     saved_at=datetime.now(timezone.utc).isoformat())
         with self.store._transaction() as db:

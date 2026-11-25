@@ -28,6 +28,7 @@ PRIVATE_IN_QUESTION = re.compile(
     rf"|\b(?:{_NUMBER})(?:[\s-]+(?:and|a|{_NUMBER}|{_SCALE}))*[\s-]+(?:{_SCALE}|rupees?|dollars?|euros?|pounds?|bucks|lpa)\b"
     r"|\b(?:password|passcode|otp|pin|cvv|secret|token|bearer|aadhaar|aadhar|pan number|ifsc)\b")
 TAG = re.compile(r"<[^>]+>")
+_PRIVATE_SPAN = re.compile(r"(?i)(?:" + PRIVATE_IN_QUESTION.pattern.removeprefix("(?i)") + r")(?:(?<!\s)[\w,./-]+)?")  # the whole amount, not its first digit
 
 
 PRIVATE_MESSAGE = ("This question has details that look private (an amount, number, email or key), so ALFRED "
@@ -43,6 +44,8 @@ PERSONAL = re.compile(r"(?i)\b(?:my|me|mine|myself|i|i'm|i've|i'd|our|ours|we|yo
 # Words that mean the answer changes over time, so saved memories cannot hold it.
 CURRENT = re.compile(r"(?i)\b(?:latest|today|tonight|tomorrow|yesterday|now|current(?:ly)?|recent(?:ly)?|news|this (?:week|month|year)"
                      r"|20\d\d|prices?|rates?|scores?|weather|forecast|who won|elections?|released?|launch(?:ed|es)?|happening|update[sd]?)\b")
+# A question that leans on the chat so far ("what about its population?") needs that chat, so it stays with the local model.
+FOLLOW_UP = re.compile(r"(?i)\b(?:it|its|that|this|those|these|they|them|their|there|he|she|him|her|his|same|also|else|above)\b|^\s*(?:and|so|then|what about|how about)\b")
 GENERAL = re.compile(r"(?i)^\s*(?:who|what|when|where|which|why|how|is|are|was|were|does|did|tell me about|explain|define|meaning of)\b")
 
 # With no reliable way to identify people in free text, automatic searches use complete public query patterns.
@@ -94,6 +97,23 @@ def offer(question, memories=()):
         return None
     wanted = CURRENT.search(question) or (not memories and GENERAL.search(question))
     return question if wanted and not PERSONAL.search(question) and not clearly_public(question) else None
+
+
+def public_part(question):
+    """For a question that mixes the owner's details with a current public fact ("Is my 5 lakh FD rate good today?"), the
+    question with amounts, identifiers and personal words taken out ("Is FD rate good today?"), so only that leaves this PC
+    and the local model puts the answer together with the owner's own figures. None when nothing public is left to look up."""
+    if not isinstance(question, str) or len(question) > 300 or PRIVATE_LIFE.search(question):
+        return None
+    # shortcut: word-level removal, not understanding; a name or detail the patterns do not know stays in, as it does for any lookup.
+    public = " ".join(PERSONAL.sub(" ", _PRIVATE_SPAN.sub(" ", question)).split())
+    public = re.sub(r"\s+([?.,!])", r"\1", public)
+    if public == " ".join(question.split()) or len(public.split()) < 3 or not CURRENT.search(public):
+        return None
+    try:
+        return check_public(public)
+    except PrivateQuestion:
+        return None
 
 
 def check_public(question):
