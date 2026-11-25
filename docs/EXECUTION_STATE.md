@@ -11,6 +11,7 @@
 - Pushed `917eccb` (PostHog, Telegram) with the owner's OK and restarted the app on it.
 - Skills (`9384d99` and the next commit): text only, owner-approved, GitHub .md import for review; guide General, Travel, Career, Money or Documents questions on the local model only (owner 2026-11-25). Agent links: A2A card and `tasks/send` with a Settings token, home network only, Telegram's read-only answers. `tests.test_skills` 5, `tests.test_agent_link` 3, Settings Chrome tests 5 PASS. Local commits, not pushed.
 - Sprint end: OPENAI-01 response shape checked against Google's reference (no change needed; live key still needed). The remaining eligible queue items (OPENAI-01 to 07, SYNC-09, RUNTIME-08, RUNTIME-16) each need the owner: a live Gemini key, the R2 backup and key copy, sign-in with Narrator and real accounts. Others are blocked on evidence, external providers, approval or dependencies.
+- CI fix: `917eccb` failed the source privacy scan on the Telegram setting-name line; fixed in `955f079` and `e97bfe7` (see `docs/CI_PIPELINE_STATE.md`). Selenium shard 0 failed in CI but passed locally (81 OK); cause unknown.
 
 ## Money walkthrough — 2026-11-20
 

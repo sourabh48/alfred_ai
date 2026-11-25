@@ -1,5 +1,16 @@
 # Development CI and integration pipeline
 
+## OpenJarvis ideas, Telegram and agent links — 2026-11-25
+
+CI_FAILED on `917eccb` (Browser Regression 45592092610): the four backend shards failed in preflight with
+`source_privacy_findings`, because the source scan's token pattern matched the line naming the Telegram bot setting
+(a setting name, not a token); `native-windows` failed with them. `selenium-shards (0)` also failed; the job log needs a
+GitHub sign-in, and the same 81-test shard ran OK locally on synthetic data, so its cause is unknown. Fix: `955f079`
+renames the constant and `e97bfe7` records the old line (exact path and match hash) as a reviewed non-secret for history
+scans; the scanner is unchanged. Preflight PASS locally on `e97bfe7` against baseline `917eccb`; release validation
+tests 30 PASS; Telegram and agent link tests PASS. Pushed with the owner's OK with `9384d99`, `7c7aa39` and `466194f`.
+CI_PENDING on the new head until its run finishes; CI_PENDING is not acceptance.
+
 ## Partial-ID completion, Gemini and backup key — 2026-11-19
 
 CI_PENDING on `84a2afd` (Browser Regression 44538439074 and pages build and deployment 44538436196 started 13:56 UTC), pushed as a fast-forward from `5766899` with the owner's OK ("Yes, push") after the local gates passed on `84a2afd`: backend 3,233 PASS in 4 shards and full Chrome 243 PASS, 0 skipped. 22 commits from `work/completion-sprint-2026-11-19`: sign-in fixes, per-person keys, Career email through each person's Gmail or Outlook, phone QR code, OpenAI removed for Gemini, backup key with Google + passphrase, multi-stop Google road legs, value alerts, fund-category risk, goal projection, recruiter email intake, tracker and walkthrough rows 11-19. The first gate run on `6031134` failed one backend duration-manifest test and two Chrome Career send tests (still importing the removed shared mailbox); fixed in `6031134` and `84a2afd`. The docs delta publishes to Pages. The owner's running app (`F:\ALFRED\alfred_ai`, master `0dbc4c3`) is not updated; that needs its own OK. CI_PENDING is not acceptance.
