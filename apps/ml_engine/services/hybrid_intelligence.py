@@ -519,7 +519,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             payload['sources'].append(source); included.append(item)
     thinking=wants_thinking(query,scope); used=None
     try:
-        used=reasoner or OllamaReasoner()
+        used=reasoner or OllamaReasoner(); started=time.monotonic()
         answer=used.reason(payload,max_output_tokens=output_limit,deadline=local_deadline(),**({'think':True} if thinking else {}))
         if not isinstance(answer,str) or not answer.strip() or len(answer.encode())>max(8192,8*output_limit): raise EmbeddingUnavailable('Invalid local answer.')
     except EmbeddingUnavailable:
@@ -545,6 +545,9 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     return offered(present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'answer_style':style, 'local_output_token_limit':output_limit,
         'local_thinking':getattr(used,'thought',False) is True,
+        # Shown beside the answer only; never stored or sent anywhere.
+        'local_model':getattr(used,'model',None) if isinstance(getattr(used,'model',None),str) else None,
+        'answer_seconds':round(time.monotonic()-started,1),
         'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],

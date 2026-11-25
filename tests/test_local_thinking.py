@@ -117,6 +117,7 @@ class HybridAnswerThinkingTests(TestCase):
     def test_hard_questions_ask_to_think_and_report_whether_it_happened(self):
         result = hybrid_answer(self.store, self.user, 'What is a monsoon?', local=self.local)
         self.assertNotIn('think', self.local.reason.call_args.kwargs); self.assertFalse(result['local_thinking'])
+        self.assertIsNone(result['local_model'])  # a reasoner without a model name shows none
         self.local.thought = True
         result = hybrid_answer(self.store, self.user, PUZZLE, local=self.local)
         self.assertIs(self.local.reason.call_args.kwargs['think'], True); self.assertTrue(result['local_thinking'])
@@ -131,7 +132,9 @@ class HybridAnswerThinkingTests(TestCase):
             return 'Synthetic AI hypothesis.'
         with patch.object(OllamaReasoner, 'reason', autospec=True, side_effect=reason), \
                 patch.object(OllamaReasoner, '_request', side_effect=lambda *a, **k: installed):
-            hybrid_answer(self.store, self.user, 'What is a monsoon?', local=OllamaReasoner())
+            result = hybrid_answer(self.store, self.user, 'What is a monsoon?', local=OllamaReasoner())
+            self.assertEqual(result['local_model'], 'qwen3.5:9b')  # the answer says which model and how long
+            self.assertIsInstance(result['answer_seconds'], float); self.assertGreaterEqual(result['answer_seconds'], 0)
             hybrid_answer(self.store, self.user, PUZZLE, local=OllamaReasoner())
             installed = {'models': []}  # the fast model is not installed: checked before answering
             hybrid_answer(self.store, self.user, 'What is a dosa?', local=OllamaReasoner())
