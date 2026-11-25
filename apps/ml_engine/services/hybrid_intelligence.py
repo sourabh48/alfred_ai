@@ -55,9 +55,17 @@ def wants_thinking(query, scope):
     return mode == 'on' or bool(HARD_QUESTION.search(query)) or len(re.findall(r'\d+', query)) >= 6 or len(query) >= 600
 
 
+QUICK_TOPIC_SCOPES = ('finance', 'travel', 'career')  # their snapshot figures are computed by ALFRED; the model only reads them
+
+
 def easy_question(query, scope):
-    """A short everyday general question the fast model answers well; hard, long or record questions keep the main model."""
-    return scope == 'general' and isinstance(query, str) and len(query) <= 300 and not wants_thinking(query, scope)
+    """A short everyday general question the fast model answers well; hard, long or record questions keep the main model.
+    Finance, Travel and Career questions qualify too when they score simple (OpenJarvis-style difficulty, 2026-11-25):
+    no arithmetic, comparison or several parts, since the owner found every topic question waiting on the large model."""
+    if not isinstance(query, str) or len(query) > 300 or wants_thinking(query, scope):
+        return False
+    from .question_complexity import is_simple
+    return scope == 'general' or (scope in QUICK_TOPIC_SCOPES and is_simple(query))
 
 
 class OllamaReasoner(OllamaEmbeddings):

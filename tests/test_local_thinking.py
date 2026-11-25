@@ -140,6 +140,17 @@ class HybridAnswerThinkingTests(TestCase):
                 hybrid_answer(self.store, self.user, 'What is a monsoon?', local=OllamaReasoner())
         self.assertEqual(used, ['qwen3.5:9b', 'qwen3.5:35b-a3b', 'qwen3.5:35b-a3b', 'qwen3.5:35b-a3b'])
 
+    def test_simple_topic_questions_qualify_for_the_fast_model_and_hard_ones_do_not(self):
+        from apps.ml_engine.services.hybrid_intelligence import easy_question
+        for scope, query in (('finance', 'What is my EMI?'), ('finance', 'How much did I spend on food last month?'),
+                             ('career', 'Which company do I work for?'), ('travel', 'What is my next trip?')):
+            with self.subTest(query=query): self.assertTrue(easy_question(query, scope))
+        for scope, query in (('finance', 'Should I prepay my home loan or invest?'), ('finance', 'What percent of income goes to EMI?'),
+                             ('finance', 'If I pay 5000 extra each month when does my loan end?'), ('finance', 'Compare March and April spending'),
+                             ('travel', 'Plan a 3 day trip to Goa then Gokarna'), ('bank_statements', 'What is my EMI?'),
+                             ('documents', 'List my loans'), ('finance', 'x' * 301)):
+            with self.subTest(query=query[:40], scope=scope): self.assertFalse(easy_question(query, scope))
+
 
 class StreamThinkingTests(SimpleTestCase):
     def setUp(self):
