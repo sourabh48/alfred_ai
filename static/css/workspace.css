@@ -269,3 +269,6 @@ html:not([data-theme="dark"]) .auth-panel { background: #fff; border-color: rgba
 html:not([data-theme="dark"]) .provider-button { border-color: #8c959f; }
 html:not([data-theme="dark"]) .provider-button:hover { border-color: #57606a; }
 html:not([data-theme="dark"]) .auth-alt-links a { color: #1858d6; }
+/* Capital gains sale rows: keep every field readable; the table scrolls sideways on narrow screens. */
+#capitalGainsTable td > .form-control, #capitalGainsTable td > .form-select { min-width: 9.5rem; }
+#capitalGainsTable td > [name="asset_type"] { min-width: 17rem; }

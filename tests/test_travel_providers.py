@@ -386,6 +386,17 @@ class TravelPermitTests(TestCase):
         self.assertIsNone(result.payload["daily_quota"])
         self.assertIn("keralatourism.org", result.source_url)
 
+    def test_each_reference_names_its_official_page_and_matches_whole_words(self):
+        for place, authority in [("Tawang", "Arunachal"), ("Kohima", "Nagaland"), ("Imphal", "Manipur"),
+                                 ("Aizawl", "Mizoram"), ("Agatti Island", "Lakshadweep"), ("Kudremukh trek", "Karnataka")]:
+            result = PermitProvider().lookup(place)
+            self.assertTrue(result.success, place)
+            self.assertIn(authority, result.payload["authority"])
+            self.assertTrue(result.source_url.startswith("https://") and result.payload["booking_url"].startswith("https://"))
+            self.assertEqual(result.payload["opening_status"], "UNKNOWN")
+        for place in ("Manipal", "Monaco", "Leh"):  # no partial-word or uncovered matches
+            self.assertFalse(PermitProvider().lookup(place).success, place)
+
     def test_unknown_permit_is_not_invented(self):
         result = PermitProvider().lookup("Unknown forest")
         self.assertFalse(result.success)

@@ -8,4 +8,5 @@ from . import views
 urlpatterns = [
     path('recommendations/overview/', views.recommendation_overview, name='recommendation_overview'),
     path('tax/overview/', views.tax_optimizer_overview, name='tax_optimizer_overview'),
+    path('tax/capital-gains/', views.capital_gains_tax, name='capital_gains_tax'),
 ]

@@ -52,7 +52,7 @@ BACKEND = tuple("tests." + name for name in (
     "test_ml_role_routing", "test_ml_training_orchestrator", "test_mobility_endpoint_contracts", "test_mobility_record_acceptance", "test_mobility_vehicle_dashboard", "test_model_registry_recovery",
     "test_net_worth_overdraft", "test_observation_supervisor", "test_parser_adaptive_learning", "test_pdf_recovery", "test_platform_hardening", "test_project_details_career_outcomes",
     "test_project_details_live", "test_related_loan_money_migration", "test_relationship_alignment_coverage", "test_remaining_task_closures", "test_risk_evidence_coverage", "test_service_import_receipts",
-    "test_statement_layouts", "test_statement_upload_cleanup", "test_tax_policy", "test_travel_continuation", "test_travel_discovery_acceptance", "test_travel_media_acceptance",
+    "test_statement_layouts", "test_statement_upload_cleanup", "test_tax_policy", "test_capital_gains","test_travel_continuation", "test_travel_discovery_acceptance", "test_travel_media_acceptance",
     "test_travel_places_acceptance", "test_travel_planner", "test_travel_providers", "test_untrusted_link_rendering",
     "test_user_data_acceptance", "test_user_profile_api", "test_vehicle_accounting", "test_windows_setup",
     "test_home_page", "test_assistant_web_lookup", "test_task_bots", "test_usage_analytics", "test_telegram_bot", "test_skills", "test_agent_link"))
