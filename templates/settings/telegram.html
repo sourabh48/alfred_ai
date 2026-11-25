@@ -1,11 +1,20 @@
 <section class="surface-card mb-4" id="settingsTelegram" aria-labelledby="settingsTelegramTitle">
     <h2 class="page-section-title mb-1" id="settingsTelegramTitle">Telegram</h2>
-    <p class="page-section-copy mb-2">Ask ALFRED from Telegram about your next trip, career follow-ups that are due and Home notices, or ask any public question. Telegram's servers see these messages, so money, documents and your saved history are never read or sent there. ALFRED only replies; it never books, sends, pays or changes anything from Telegram.</p>
+    <p class="page-section-copy mb-1">Ask ALFRED from Telegram about your next trip, due career follow-ups, Home notices or any public question.</p>
+    <p class="small muted mb-3">Telegram's servers see these messages, so money, documents and saved history never go there. ALFRED only replies; it never books, sends, pays or changes anything.</p>
     <div id="telegramFeedback" class="d-none alert mb-2" role="status"></div>
-    <p class="small mb-2" id="telegramStatus">Checking…</p>
+    <p class="fw-semibold mb-2" id="telegramStatus">Checking…</p>
     <div class="d-flex flex-wrap gap-2">
-        <button class="btn btn-outline-dark btn-sm rounded-pill d-none" type="button" id="telegramCode">Get a link code</button>
+        <button class="btn btn-outline-primary btn-sm rounded-pill d-none" type="button" id="telegramCode">Get a link code</button>
         <button class="btn btn-outline-danger btn-sm rounded-pill d-none" type="button" id="telegramUnlink">Unlink my chats</button>
     </div>
-    <p class="small muted mt-2 mb-0">Set up once: in Telegram, message @BotFather, send /newbot and follow its steps. Put the token it gives you in config/local.env in ALFRED's data folder as ALFRED_TELEGRAM_BOT_TOKEN=… and restart ALFRED. Never paste the token into a chat.</p>
+    <details class="small mt-3" id="telegramSetup">
+        <summary>How to set up the bot</summary>
+        <ol class="mt-2 mb-0 ps-3">
+            <li>In Telegram, message @BotFather and send /newbot.</li>
+            <li>Choose a name, then a username ending in "bot".</li>
+            <li>Add the token it gives you to config/local.env in ALFRED's data folder as ALFRED_TELEGRAM_BOT_TOKEN=…</li>
+            <li>Restart ALFRED, then come back here for a link code. Never paste the token into a chat.</li>
+        </ol>
+    </details>
 </section>

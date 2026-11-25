@@ -1,20 +1,23 @@
 <section class="surface-card mb-4" id="settingsSkills" aria-labelledby="settingsSkillsTitle">
     <h2 class="page-section-title mb-1" id="settingsSkillsTitle">Skills</h2>
-    <p class="page-section-copy mb-2">A skill is a short set of how-to instructions, such as how you like ride plans, interview practice or a monthly spending review done. When a question matches a skill's name or description, ALFRED adds that skill to the question for the local AI on this PC and names it beside the answer. Skills are text only: nothing is run or installed, they never go to a cloud model, Telegram or another agent, and ALFRED's money rules still apply.</p>
+    <p class="page-section-copy mb-1">Short how-to instructions, such as how you like ride plans or a monthly spending review done. When a question matches, ALFRED uses the skill and names it beside the answer.</p>
+    <p class="small muted mb-3">Text only: nothing is run or installed. Skills stay with the local AI on this PC and never go to a cloud model, Telegram or another agent. ALFRED's money rules still apply.</p>
     <div id="skillsFeedback" class="d-none alert mb-2" role="status"></div>
+    <h3 class="h6 mb-2">Your skills</h3>
+    <ul class="list-unstyled small mb-4" id="skillsList" aria-live="polite"></ul>
+    <h3 class="h6 mb-2">Add a skill</h3>
     <form class="row g-2 align-items-end mb-3" id="skillsImportForm">
-        <div class="col-md-9"><label class="form-label small mb-1" for="skillsImportUrl">Import a skill file from GitHub (for review first)</label>
+        <div class="col-md-9"><label class="form-label small mb-1" for="skillsImportUrl">Start from a GitHub skill file (you review it first)</label>
             <input class="form-control form-control-sm" id="skillsImportUrl" type="url" placeholder="https://github.com/…/SKILL.md" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-dark btn-sm rounded-pill w-100" type="submit">Read it</button></div>
+        <div class="col-md-3"><button class="btn btn-outline-primary btn-sm rounded-pill w-100" type="submit">Read it</button></div>
     </form>
     <form class="row g-2" id="skillsForm">
-        <div class="col-md-5"><label class="form-label small mb-1" for="skillsName">Name</label><input class="form-control form-control-sm" id="skillsName" maxlength="80" required></div>
-        <div class="col-md-3"><label class="form-label small mb-1" for="skillsScope">Used for</label>
+        <div class="col-md-8"><label class="form-label small mb-1" for="skillsName">Name</label><input class="form-control form-control-sm" id="skillsName" maxlength="80" required></div>
+        <div class="col-md-4"><label class="form-label small mb-1" for="skillsScope">Used for</label>
             <select class="form-select form-select-sm" id="skillsScope"><option value="general">General questions</option><option value="travel">Travel</option><option value="career">Career</option><option value="finance">Money</option><option value="documents">Documents</option></select></div>
-        <div class="col-12"><label class="form-label small mb-1" for="skillsDescription">When to use it</label><input class="form-control form-control-sm" id="skillsDescription" maxlength="300"></div>
-        <div class="col-12"><label class="form-label small mb-1" for="skillsText">Instructions (read them before you approve)</label><textarea class="form-control form-control-sm" id="skillsText" rows="6" maxlength="4000" required></textarea></div>
+        <div class="col-12"><label class="form-label small mb-1" for="skillsDescription">When to use it</label><input class="form-control form-control-sm" id="skillsDescription" maxlength="300" placeholder="e.g. planning a weekend motorcycle ride"></div>
+        <div class="col-12"><label class="form-label small mb-1" for="skillsText">Instructions (read them before you approve)</label><textarea class="form-control form-control-sm" id="skillsText" rows="5" maxlength="4000" required></textarea></div>
         <input type="hidden" id="skillsSource">
         <div class="col-12"><button class="btn btn-primary btn-sm rounded-pill" type="submit">Approve and save</button></div>
     </form>
-    <ul class="list-unstyled small mt-3 mb-0" id="skillsList" aria-live="polite"></ul>
 </section>

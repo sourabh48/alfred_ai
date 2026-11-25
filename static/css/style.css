@@ -539,6 +539,10 @@ html[data-theme="dark"] .status-buy { background: #123d30; color: #8fe0bf; }
 html[data-theme="dark"] .status-neutral { background: #253650; color: #d3dff0; }
 html[data-theme="dark"] .status-warn { background: #43300f; color: #ffcf8a; }
 html[data-theme="dark"] .status-bad { background: #46201c; color: #ffb4aa; }
+/* Bootstrap's dark outline button is near-black text on ALFRED's dark cards; give it light ink there. */
+html[data-theme="dark"] .btn-outline-dark { --bs-btn-color: #d3dff0; --bs-btn-border-color: #7d93b2; --bs-btn-hover-color: #10213a;
+    --bs-btn-hover-bg: #d3dff0; --bs-btn-hover-border-color: #d3dff0; --bs-btn-active-color: #10213a; --bs-btn-active-bg: #d3dff0;
+    --bs-btn-active-border-color: #d3dff0; --bs-btn-disabled-color: #8fa3bf; --bs-btn-disabled-border-color: #4b607e; }
 
 .status-high {
     background: rgba(196, 74, 61, 0.12);

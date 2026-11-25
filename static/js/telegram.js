@@ -12,7 +12,8 @@
     function render(data) {
         $("telegramCode").classList.toggle("d-none", !data.configured);
         $("telegramUnlink").classList.toggle("d-none", !data.linked);
-        $("telegramStatus").textContent = !data.configured ? "No Telegram bot is set up yet (see below)."
+        $("telegramSetup").open = !data.configured;
+        $("telegramStatus").textContent = !data.configured ? "No Telegram bot is set up yet; the steps are below."
             : data.linked ? `${data.linked} chat${data.linked > 1 ? "s" : ""} linked.` : "No chat linked yet.";
         if (data.code) say(`Send this to your ALFRED bot in Telegram within ${data.code_minutes} minutes: /link ${data.code}`, "info");
     }
