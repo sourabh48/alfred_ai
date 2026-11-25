@@ -15,6 +15,8 @@ import feedparser
 
 from alfred_ai.services import public_http
 
+from .prompt_injection import finding
+
 USER_AGENT = "ALFRED-local/2.0 (+https://github.com/sourabh48/alfred_ai)"  # Wikimedia refuses agents without a contact link
 # Amounts (digits or spelled out), long digit runs (account, card, phone and ID numbers), emails, keys and file paths stay on this PC.
 _NUMBER = ("one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen"
@@ -133,6 +135,6 @@ def search(question, *, deadline=None):
             continue
     sources = []
     for item in results:
-        if urlsplit(item["url"]).scheme == "https" and item["title"]:
+        if urlsplit(item["url"]).scheme == "https" and item["title"] and not finding(item["title"], item["snippet"]):
             sources.append({"ref": f"web-{len(sources) + 1}", "classification": "public_web_result", "url": item["url"], "data": item})
     return sources

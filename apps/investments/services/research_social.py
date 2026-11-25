@@ -16,6 +16,7 @@ from datetime import datetime, timezone as dt_timezone
 from django.core.cache import cache
 
 from alfred_ai.services import public_http
+from apps.ml_engine.services.prompt_injection import finding
 
 TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 SEARCH_URL = "https://oauth.reddit.com/r/{subs}/search"
@@ -56,7 +57,7 @@ def posts(symbol: str, name: str) -> list:
     for child in reply["data"]["children"]:
         data = child.get("data") or {}
         title = " ".join(str(data.get("title") or "").split())[:TITLE]
-        if title and str(data.get("permalink", "")).startswith("/r/"):
+        if title and str(data.get("permalink", "")).startswith("/r/") and not finding(title):  # an attack title is left out
             found.append({"title": title, "subreddit": str(data.get("subreddit", ""))[:40],
                           "on": datetime.fromtimestamp(float(data.get("created_utc") or 0), dt_timezone.utc).date().isoformat(),
                           "url": "https://www.reddit.com" + data["permalink"]})
