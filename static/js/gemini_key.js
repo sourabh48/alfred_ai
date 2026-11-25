@@ -35,7 +35,8 @@ document.addEventListener("DOMContentLoaded", () => {
     $("memoryReasoningForm").addEventListener("submit", event => {
         event.preventDefault();
         const enabled = $("memoryReasoningEnabled").checked;
-        act("reason", {enabled, consent: enabled}, "Gemini settings saved. Public questions go to Gemini by themselves; personal ones stay on this PC.");
+        act("reason", {enabled, consent: enabled}, enabled ? "Gemini settings saved. Public questions go to Gemini by themselves; personal ones stay on this PC."
+            : "Gemini settings saved. Gemini is off; every question uses the local model.");
     });
     // Clear what the page showed when it goes into the back/forward cache, and reload it on return.
     window.addEventListener("pagehide", () => { generation++; feedback.textContent = ""; $("memoryReasoningUsage").textContent = ""; $("memoryReasoningKey").value = ""; });

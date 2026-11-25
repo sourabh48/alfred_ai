@@ -2831,6 +2831,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: 'Gemini settings saved.' in self.text('geminiFeedback'))
         with store._transaction() as db:
             self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy'],{'enabled':True,'public_only':True})
+        self.assertIn('Public questions go to Gemini',self.text('geminiFeedback'))
+        self.memory_click('#memoryReasoningEnabled'); self.memory_click('#memoryReasoningForm button')  # switching off says off (owner's app, 2026-11-26)
+        self.wait.until(lambda _: 'Gemini is off' in self.text('geminiFeedback'))
+        self.memory_click('#memoryReasoningEnabled'); self.memory_click('#memoryReasoningForm button')
+        self.wait.until(lambda _: 'Public questions go to Gemini' in self.text('geminiFeedback'))
         self.capture('memory-sync-reasoning-owner-policy')
         self.enterContext(patch('apps.ml_engine.services.memory_reasoning.answers_by_itself',return_value=True))  # stands in for a saved key
         self.browser.get(self.live_server_url+'/ai/insights/')

@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 87/143 (60.8%) verified.**
+**Baseline: 88/143 (61.5%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 33 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 87 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 32 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 88 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -824,7 +824,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
-| OPENAI | 2 | 7 | 28.6 | 5 | 0 | 0 | 0 | 0 |
+| OPENAI | 3 | 7 | 42.9 | 4 | 0 | 0 | 0 | 0 |
 | SYNC | 7 | 11 | 63.6 | 1 | 0 | 0 | 0 | 3 |
 | RUNTIME | 11 | 16 | 68.8 | 4 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
@@ -2386,16 +2386,20 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-03 — Encrypted key provisioning and owner consent
 
-**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
+**COMPLETE_VERIFIED** · Optional Gemini (OPENAI IDs kept) · P2.
 
 - 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
-- Next: owner saves their own Gemini key in Settings, opts in, and removes it again.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- 2026-11-26 live in the owner's app (code `87a2450`, at the owner's request, signed in as the owner in the browser pane):
+  with Gemini switched off and the key still saved, "What is the capital of Japan?" was answered by Ollama (local) in
+  79.3 s; Remove key (after its confirmation) showed "Key removed. Gemini is off." and "Gemini off: no key saved"; ticking
+  the opt-in without a key kept Gemini off; the owner pasted the key back (Settings then showed only its last four
+  characters), and "What is the capital of Australia?" went to Gemini (your key) again. The key was never shown or sent
+  to this chat. Found and fixed: switching Gemini off still said public questions go to Gemini.
+- Acceptance: ACCEPTED 2026-11-26 (owner delegated the decision: "you decide"): the live save, opt-in, opt-out, removal and re-add above, on `87a2450` with Browser Regression green. Encryption at rest is covered by the synthetic tests, not inspected in the owner's store.
 - Limitations/dependencies: Masked operator provisioning plus owner policy and per-request public consent; no browser key leakage. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Use account-scoped approved keys; never expand to private financial content.
 
 ### OPENAI-04 — Privacy classification and sensitive-data filtering
 
