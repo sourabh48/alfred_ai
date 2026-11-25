@@ -7,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const statementChoice = document.getElementById("intelligenceStatement");
     const financialChoice = document.getElementById("intelligenceFinancial");
     const webSearch = document.getElementById("intelligenceWebSearch");
-    let searchOnce = false;  // one confirmed lookup, without changing the "always" tick
     const feedback = document.getElementById("intelligenceFeedback");
     const answers = document.getElementById("intelligenceAnswers");
     const memoryText = document.getElementById("intelligenceMemoryText");
@@ -488,14 +487,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
         if (historical) label.textContent = `Historical AI hypothesis · ${result.provider === 'gemini' ? 'Gemini (your key)' : 'Ollama (local)'} · saved ${new Date(result.saved_at).toLocaleString()}`;
         assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
-        if (result.web_offer && !historical) {
-            // ALFRED never sends a possibly private question by itself: the owner sees the exact text first.
-            const offer = document.createElement("p"); offer.className = "small mt-2";
-            offer.textContent = `Search Wikipedia and Google News with this exact text? Those services may keep it: “${result.web_offer}” `;
-            const send = document.createElement("button"); send.type = "button"; send.className = "btn btn-outline-primary btn-sm"; send.textContent = "Search online with this text";
-            send.addEventListener("click", () => { scope.value = "general"; scope.dispatchEvent(new Event("change")); query.value = result.web_offer; searchOnce = true; form.requestSubmit(); });
-            offer.append(send); assistantMessage.append(offer);
-        }
         const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
         const summary = document.createElement("summary"); summary.textContent = `Sources & evidence (${(result.sources || []).length})`;
         evidence.append(summary); assistantMessage.append(evidence);
@@ -745,8 +736,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const spinner = document.createElement("span"); spinner.className = "conversation-spinner me-2"; spinner.setAttribute("aria-hidden", "true"); feedback.prepend(spinner);
         button.textContent = "Thinking…";
         const payload = {query: query.value, scope: scope.value, answer_style:document.getElementById('intelligenceAnswerStyle').value, cloud_consent: false, query_sensitivity: "sensitive"};  // ALFRED decides: public questions go to Gemini on the server, private ones stay here
-        if ((webSearch.checked || searchOnce) && scope.value === "general") payload.web_search = true;
-        searchOnce = false;
+        if (webSearch.checked && scope.value === "general") payload.web_search = true;
         if (!historyEnabled() && payload.scope === "general" && !payload.cloud_consent && pageDialogue.length) payload.page_context = pageDialogue;
         if (scope.value === "documents") payload.document_id = Number(documentChoice.value);
         if (scope.value === "bank_statements") payload.transaction_id = Number(statementChoice.value);

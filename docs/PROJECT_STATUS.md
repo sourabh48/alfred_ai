@@ -2416,6 +2416,11 @@ For unchanged rows the dated code/test scope is retained from the completed audi
   "FdI" party), a search-quality gap, not a privacy one. The private-life question "What is the latest on Rahul's divorce
   court case today?" (a made-up name) was answered locally in 1.8 s with 0 sources and only offered "Search online with
   this text", which was not tapped, so nothing left the PC.
+- 2026-11-26 owner decision ("FIX IT", after seeing that answer): ALFRED researches other people's family, health, legal and
+  money matters by itself, and Gemini answers them when it is on; the "Search online with this text" offer is removed. Only
+  the owner's own life ("my brother's divorce", "my diagnosis") stays local and is never split into a public part. Gemini's
+  own medical/salary/account word refusal is unchanged (those fall back to the local model with web results). Synthetic:
+  5 AI suites 126 PASS; not yet live in the owner's app (needs a push and restart).
 - On Gemini's free tier Google may keep and review prompts; the Settings card and the consent line say so.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.

@@ -64,8 +64,9 @@ PUBLIC_LOOKUP = re.compile(
 )
 
 
-# Owner 2026-11-19: research by itself when saved data has nothing. Owner 2026-11-20: online data is used without asking,
-# so a name alone no longer waits; a family or work relation, or a health, legal or money-trouble word still waits for a tap.
+# Owner 2026-11-19: research by itself when saved data has nothing; 2026-11-20: online data without asking. Owner 2026-11-26:
+# other people's family, health, legal or money matters are searched too. Only the owner's own ("my brother's divorce") stays
+# here: such a question is never split into a public part.
 PRIVATE_LIFE = re.compile(
     r"(?i)\b(?:friend|wife|husband|partner|son|daughter|mother|father|mom|dad|brother|sister|cousin|uncle|aunt|colleague|boss"
     r"|neighbou?r|girlfriend|boyfriend|ex|diagnos\w*|hiv|aids|cancer|pregnan\w*|depression|anxiety|therapy|treatment|disease"
@@ -73,11 +74,10 @@ PRIVATE_LIFE = re.compile(
 
 
 def clearly_public(question):
-    """A complete recognized public query, or a general one with no sign of anyone's private life."""
+    """A complete recognized public query, or a general or current one that is not about the owner or ALFRED."""
     if PUBLIC_LOOKUP.fullmatch(question):
         return True
-    return (not PERSONAL.search(question) and not PRIVATE_LIFE.search(question)
-            and bool(GENERAL.search(question) or CURRENT.search(question)))
+    return not PERSONAL.search(question) and bool(GENERAL.search(question) or CURRENT.search(question))
 
 
 def should_search(question, memories=()):
@@ -87,16 +87,6 @@ def should_search(question, memories=()):
     except PrivateQuestion:
         return False
     return clearly_public(question) and (bool(CURRENT.search(question)) or not memories)
-
-
-def offer(question, memories=()):
-    """The exact text a lookup would send, when looking online could help but the question may be about someone's private life."""
-    try:
-        question = check_public(question)
-    except PrivateQuestion:
-        return None
-    wanted = CURRENT.search(question) or (not memories and GENERAL.search(question))
-    return question if wanted and not PERSONAL.search(question) and not clearly_public(question) else None
 
 
 def public_part(question):

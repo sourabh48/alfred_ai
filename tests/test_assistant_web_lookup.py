@@ -48,34 +48,30 @@ class QuestionFilterTests(SimpleTestCase):
                          "explain the rules of cricket"):
             with self.subTest(auto=question):
                 self.assertTrue(web_lookup.should_search(question))
-                self.assertIsNone(web_lookup.offer(question))
         self.assertTrue(web_lookup.should_search("latest mutual fund news", [{"id": "saved"}]))  # memory cannot be current
 
-    def test_a_question_that_may_be_about_someones_private_life_is_offered_not_sent(self):
-        # Third-party health, money trouble, work and family facts; no pronoun or keyword is needed for the default to hold.
+    def test_other_peoples_private_matters_are_searched_but_the_owners_own_stay_here(self):
+        # Owner 2026-11-26 ("FIX IT"): ALFRED researches other people's family, health, legal and money matters by itself.
         for question in ("What should Anika do after her HIV diagnosis?", "How should Anika handle bankruptcy after losing her job?",
-                         "Does Anika have cancer?", "Is Anika pregnant?", "What is Anika's rent today",
-                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression"):
+                         "Does Anika have cancer?", "What is the latest on Rahul's divorce court case today?",
+                         "latest news on a friend who was arrested", "Why does Anika avoid Rahul?", "current treatment for depression",
+                         "latest repo rate in India", "When did Anika leave Infosys?", "Who is the director of Cedar Clinic?"):
             with self.subTest(question=question):
-                self.assertFalse(web_lookup.clearly_public(question))
-                self.assertFalse(web_lookup.should_search(question))
-                self.assertEqual(web_lookup.offer(question), question)  # the exact text, for the owner to confirm
-        # Owner 2026-11-20: online data without asking, so a name alone no longer waits for a tap.
-        for question in ("latest repo rate in India", "what is a mutual fund", "What is the capital of France?", "how does a SIP work",
-                         "When did Anika leave Infosys?", "Who is the director of Cedar Clinic?", "Current interview results at Cedar Clinic"):
-            with self.subTest(public=question):
+                self.assertTrue(web_lookup.clearly_public(question))
                 self.assertTrue(web_lookup.should_search(question))
-                self.assertIsNone(web_lookup.offer(question))
-        self.assertIsNone(web_lookup.offer("what did I save about my trip"))  # about the owner: memory answers it
-        self.assertIsNone(web_lookup.offer("suggest a quiet hobby"))  # nothing a lookup would help
-        self.assertIsNone(web_lookup.offer("what is a mutual fund", [{"id": "saved"}]))
+        # The owner's own life is private history: never searched, and never split into a "public part".
+        for question in ("What is the latest on my brother's divorce court case today?", "What should I do after my HIV diagnosis today?",
+                         "Is my wife's rent fair today?", "what did I save about my trip"):
+            with self.subTest(own=question):
+                self.assertFalse(web_lookup.should_search(question))
+                self.assertIsNone(web_lookup.public_part(question))
+        self.assertFalse(web_lookup.should_search("suggest a quiet hobby"))  # nothing a lookup would help
 
     def test_written_out_amounts_and_identifiers_never_leave_even_when_confirmed(self):
         for private in ("Is salary of fifty thousand rupees fair today?", "is two lakh a month enough", "loan of one and a half crore",
                         "twenty-five thousand dollars bonus", "my aadhaar is 1234 5678 9012", "card 4111 1111 1111 1111 expiry"):
             with self.subTest(private=private):
                 self.assertFalse(web_lookup.should_search(private))
-                self.assertIsNone(web_lookup.offer(private))
                 with patch("apps.ml_engine.services.web_lookup.public_http.request") as request, self.assertRaises(web_lookup.PrivateQuestion):
                     web_lookup.search(private)
                 request.assert_not_called()
@@ -186,27 +182,28 @@ class HybridWebLookupTests(TestCase):
                                  {"Is FD rate good today?", "https://news.google.com/rss/search?q=Is+FD+rate+good+today%3F&hl=en-IN&gl=IN&ceid=IN:en"})
         self.assertEqual(web(self.ask("latest repo rate news")), [])  # switched off
 
-    def test_a_possibly_private_question_reaches_the_web_only_after_the_owner_confirms_the_exact_text(self):
+    def test_a_question_about_someone_else_is_looked_up_by_itself_and_the_owners_own_is_not(self):
         self.local.reason.return_value = "Synthetic general answer."
         question = "What should Anika do after her  HIV diagnosis?"
         exact = "What should Anika do after her HIV diagnosis?"
-        with override_settings(ALFRED_ASSISTANT_AUTO_WEB=True),                 patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
+        with override_settings(ALFRED_ASSISTANT_AUTO_WEB=True), \
+                patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
             result = self.ask(question)
-            request.assert_not_called()  # automatic lookup: nothing left this PC
-            self.assertEqual(result["web_offer"], exact)
-            self.assertFalse(any(s.get("classification") == "public_web_result" for s in result["sources"]))
-            self.assertNotIn("web_offer", self.ask("latest repo rate news"))  # plainly public: looked up, nothing to confirm
-            request.reset_mock()
-            confirmed = self.ask(exact, web_search=True)  # the owner pressed "Search online with this text"
             self.assertEqual({call.kwargs.get("params", {}).get("q", exact) for call in request.call_args_list}, {exact})
-            self.assertNotIn("web_offer", confirmed)
+            self.assertTrue(any(s.get("classification") == "public_web_result" for s in result["sources"]))
+            self.assertNotIn("web_offer", result)
             request.reset_mock()
+            self.ask("What should I do after my HIV diagnosis today?")
+            request.assert_not_called()  # the owner's own health stays on this PC
             cloud = self.ask("Why does Anika avoid Rahul?", provider="gemini", cloud_consent=True, query_sensitivity="public")
-            request.assert_not_called()
-            self.assertEqual(cloud["web_offer"], "Why does Anika avoid Rahul?")
-            with self.assertRaises(PermissionError):  # the cloud path keeps its own stricter refusal for sensitive text
+            self.assertEqual({call.kwargs.get("params", {}).get("q", "Why does Anika avoid Rahul?") for call in request.call_args_list},
+                             {"Why does Anika avoid Rahul?"})
+            self.assertNotIn("web_offer", cloud)
+            with self.assertRaises(PermissionError):  # the cloud path keeps its own stricter refusal for medical words
                 self.ask(question, provider="gemini", cloud_consent=True, query_sensitivity="public")
-        self.assertNotIn("web_offer", self.ask(question))  # automatic lookup switched off: no offer either
+        with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
+            self.ask(question)
+        request.assert_not_called()  # automatic lookup switched off
 
     def test_gemini_answers_directly_when_chosen_with_consent(self):
         result = self.ask(web_search=True, provider="gemini", cloud_consent=True, query_sensitivity="public")
@@ -227,7 +224,8 @@ class HybridWebLookupTests(TestCase):
             self.assertEqual(self.ask("Latest repo rate in India", scope="finance")["provider"], "mock")  # public, from a topic scope
             self.local.reason.assert_not_called()
             self.assertNotEqual(self.ask("what is my savings rate", scope="finance")["provider"], "mock")  # own records stay here
-            for personal in ("what did I save about my trip", "Does Anika have cancer?"):
+            self.assertEqual(self.ask("Does Anika have cancer?")["provider"], "mock")  # someone else's matter (owner 2026-11-26)
+            for personal in ("what did I save about my trip", "Does my brother have cancer?"):
                 with self.subTest(personal=personal):
                     self.assertEqual(self.ask(personal)["provider"], "ollama")
             chat = [{"role": "user", "content": "What is the capital of France?"}, {"role": "assistant", "content": "Paris."}]

@@ -463,20 +463,14 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     from . import web_lookup
     web=web_lookup.search(query) if web_search else []
     auto_web=not web_search and scope=='general' and settings.ALFRED_ASSISTANT_AUTO_WEB
-    web_offer=None  # the exact text a lookup would send, when ALFRED will not send it without the owner's say
-    def offered(result):
-        if web_offer: result['web_offer']=web_offer
-        return result
-    if auto_web and provider=='gemini':
-        if web_lookup.should_search(query): web=web_lookup.search(query)
-        else: web_offer=web_lookup.offer(query)
+    if auto_web and provider=='gemini' and web_lookup.should_search(query): web=web_lookup.search(query)
     if provider=='gemini':
         result=present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
         if web_lookup.clearly_public(query) and isinstance(result.get('answer'),str) and result['answer'].strip():
             from .brain import try_remember  # Gemini teaches the local model (owner decision 2026-11-20); kept encrypted on this PC
             try_remember(user,'public_answer',{'question':query[:500],'answer':result['answer'][:3000]},store=store)
-        return offered(result)
+        return result
     retrieval_error=None
     try: memories=[] if scope=='financial_document' else store.retrieve(user,query,min_score=settings.ALFRED_MEMORY_RELEVANCE_MIN_SCORE)
     except EmbeddingUnavailable as exc:
@@ -485,7 +479,6 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     if auto_web:  # memory first; the web only for what it lacks, and only for a plainly public question
         if web_lookup.should_search(query,memories): web=web_lookup.search(query)
         elif public:=web_lookup.public_part(query): web=web_lookup.search(public)  # mixed question: only the public part goes out
-        else: web_offer=web_lookup.offer(query,memories)
     # Filenames and private citation URLs are UI metadata, never model instructions.
     model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{
         'ref':source['ref'],'classification':source['classification'],
@@ -545,15 +538,15 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
                 'grounding':'canonical_record_overview','model_unavailable':True,'sources':tools,
                 'narrative_withheld':False,'context_omitted':0,'memory_retrieval_available':None}
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
-        return offered(present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query))
+        return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
     if scope!='financial_document':
         with store._transaction() as db:
             store._expire(db,owner)
             live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
             if any(item['id'] not in live for item in included): raise MemoryConflict('Answer context changed during inference.')
     revalidate()
-    return offered(present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
+    return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'answer_style':style, 'local_output_token_limit':output_limit,
         'local_thinking':getattr(used,'thought',False) is True,
         # Shown beside the answer only; never stored or sent anywhere.
@@ -563,4 +556,4 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
             'score':item['score']} for item in included]+tools+web,'context_omitted':len(memories)-len(included),
-        'conversation_context_turns':len(history)//2,'skill_used':skill['name'] if skill else None},scope,query+' '+ ' '.join(turn['content'] for turn in history)))
+        'conversation_context_turns':len(history)//2,'skill_used':skill['name'] if skill else None},scope,query+' '+ ' '.join(turn['content'] for turn in history))
