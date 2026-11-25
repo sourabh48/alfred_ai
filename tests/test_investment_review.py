@@ -112,6 +112,26 @@ class InvestmentReviewTests(TestCase):
         return stage_investment_document(user=self.owner, parsed=parsed or extraction(),
             upload_file=SimpleUploadedFile('synthetic-investment.pdf', b'%PDF-1.4 synthetic retained source'))
 
+    def test_the_same_fund_from_another_source_is_linked_not_counted_twice(self):
+        # Owner holds funds through Groww and will also import a CAMS/KFintech statement (2026-11-25).
+        groww = Investment.objects.create(user=self.owner, **extraction(asset_name='Example Focused Fund - Direct Plan - Growth',
+            institution='Groww', account_number='GROWW-01')['investments'][0])
+        cas = lambda *names: {**extraction(), 'investments': [extraction(asset_name=name, institution='Example Mutual Fund',
+            account_number='123456/78')['investments'][0] for name in names]}
+        document = self.stage(cas('EXAMPLE FOCUSED DIRECT GROWTH', 'Example Focused Fund Regular Growth',
+                                  'Example Focused Direct Growth Option'))
+        rows = investment_preview(document)['rows']
+        self.assertEqual((rows[0]['action'], rows[0]['target_id']), ('link', groww.pk))
+        self.assertIn('not counted twice', rows[0]['same_fund_note'])
+        self.assertEqual(rows[1]['action'], 'create')  # Regular plan is a different fund
+        self.assertEqual(rows[2]['action'], 'create')  # a second folio of it is not folded into the one already linked
+        self.assertNotIn('same_fund_note', rows[2])
+        page = self.client.get(f'/investments/import-uploads/{document.pk}/review/')
+        self.assertContains(page, 'data-same-fund')
+        second_account = self.stage({**extraction(), 'investments': [extraction(asset_name='Example Focused Direct Growth',
+            institution='groww', account_number='GROWW-02')['investments'][0]]})
+        self.assertEqual(investment_preview(second_account)['rows'][0]['action'], 'create')
+
     def confirm(self, document, token=None):
         return self.client.post(f'/api/investments/import-uploads/{document.pk}/confirm/',
             dict(confirm=True, token=token or investment_preview(document)['token']), content_type='application/json')

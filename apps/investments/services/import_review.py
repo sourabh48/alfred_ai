@@ -4,6 +4,7 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 import json
+import re
 from math import isfinite
 from uuid import uuid4
 
@@ -55,6 +56,28 @@ def _matches(user, row):
         institution__iexact=institution, account_number__iexact=account) if name else Investment.objects.none()
 
 
+FUND_FILLER = {'plan', 'option', 'fund', 'the', 'scheme'}
+
+
+def _fund_key(name):
+    # "HDFC Focused Fund - Direct Plan - Growth" and "HDFC Focused Direct Growth" are one fund; Direct/Regular/Growth/IDCW still differ.
+    words = re.sub(r'[^0-9a-z]+', ' ', str(name or '').casefold()).split()
+    return ' '.join(sorted(word for word in words if word not in FUND_FILLER))
+
+
+def _same_fund(user, row, taken):
+    """One owned holding of the same fund from another source (Groww vs CAMS/KFintech label it differently), or None."""
+    key = _fund_key(row.get('asset_name'))
+    institution = str(row.get('institution') or '').strip().casefold()
+    if len(key.split()) < 2 or not row.get('asset_type') or not institution:
+        return None
+    # Only across sources: the same institution with another account is a separate holding, and so is a record of unknown source.
+    found = [item for item in Investment.objects.filter(user=user, asset_type=row['asset_type']).exclude(pk__in=taken)
+             .exclude(institution='').only('pk', 'asset_name', 'institution', 'account_number')
+             if _fund_key(item.asset_name) == key and item.institution.strip().casefold() != institution]
+    return found[0] if len(found) == 1 else None
+
+
 @transaction.atomic
 def stage_investment_document(*, user, parsed, upload_file=None, existing=None):
     rows = parsed.get('investments') or []
@@ -91,7 +114,7 @@ def stage_investment_document(*, user, parsed, upload_file=None, existing=None):
             raise InvestmentReviewConflict('Keep this source and upload a new copy to begin another review.')
         receipts.append({key: previous[key] for key in ('id', 'confirmed_at', 'confirmed_token', 'receipt')})
     candidates = []
-    identities = set()
+    identities, taken = set(), set()
     for raw in original or [{}]:
         row = {field: raw.get(field) for field in FIELDS}
         row['field_status'] = {field: (raw.get('field_status') or {}).get(field,
@@ -102,6 +125,12 @@ def stage_investment_document(*, user, parsed, upload_file=None, existing=None):
         identities.add(identity)
         row.update(action='skip' if duplicate else 'link' if len(matches) == 1 else 'create',
                    target_id=matches[0] if len(matches) == 1 else None)
+        same = None if duplicate or matches else _same_fund(user, row, taken)
+        if same:
+            taken.add(same.pk)
+            row.update(action='link', target_id=same.pk, same_fund_note=(
+                f'Looks like the same fund as #{same.pk} ({same.institution or "no institution"} {same.account_number}). '
+                'Linked so it is not counted twice; choose Create if you hold it separately.'))
         candidates.append(row)
     payload.update(broker_name=document.broker_name, confidence=document.parse_confidence, investments=original)
     payload['import_review'] = dict(id=uuid4().hex, revision=0, state='pending', original=original,

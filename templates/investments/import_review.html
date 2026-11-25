@@ -26,6 +26,7 @@
     <p>Page {{ preview.page }} of {{ preview.pages }}; {{ preview.row_count }} row(s). Save corrections on each page before moving on.</p>
     {% for row in preview.rows %}<fieldset class="surface-card mb-4" {% if preview.state == 'confirmed' %}disabled{% endif %}>
         <legend class="h4">Investment row {{ row.index|add:1 }}</legend>
+        {% if row.same_fund_note and row.action == 'link' %}<div class="alert alert-info" data-same-fund>{{ row.same_fund_note }}</div>{% endif %}
         {% if row.errors %}<div class="alert alert-warning"><p class="fw-semibold">Resolve before creating this investment, link an existing record, or skip this row:</p><ul>{% for field, message in row.errors.items %}<li>{{ field }}: {{ message }}</li>{% endfor %}</ul></div>{% endif %}
         <div class="row g-3">
         {% for field in row.form_fields %}<div class="col-12 col-lg-6">
