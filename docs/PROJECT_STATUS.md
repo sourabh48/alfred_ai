@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 85/143 (59.4%) verified.**
+**Baseline: 87/143 (60.8%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 35 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 85 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 33 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 87 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -824,7 +824,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
-| OPENAI | 0 | 7 | 0.0 | 7 | 0 | 0 | 0 | 0 |
+| OPENAI | 2 | 7 | 28.6 | 5 | 0 | 0 | 0 | 0 |
 | SYNC | 7 | 11 | 63.6 | 1 | 0 | 0 | 0 | 3 |
 | RUNTIME | 11 | 16 | 68.8 | 4 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
@@ -2355,19 +2355,17 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-01 — Gemini generateContent request/response adapter
 
-**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
+**COMPLETE_VERIFIED** · Optional Gemini (OPENAI IDs kept) · P2.
 
 - 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
 - 2026-11-25: Google's public model pages (aistudio.google.com/docs/models) list `gemini-3.5-flash-lite` as a stable model, free of charge on the free tier, thinking on at the minimal level by default (thinking tokens count toward the output limit; ALFRED's Ask limit is 1024). The reply's modelVersion format is undocumented, so a `models/` prefix is now accepted (one-line change, `tests.test_memory_reasoning` 15 PASS). Still not checked with a live key.
 - 2026-11-25 response check against Google's generateContent reference (aistudio.google.com/api-reference/generate-content, read, no API call): usageMetadata reports thoughts as `thoughtsTokenCount`, apart from `candidatesTokenCount`, which the adapter bounds; a reply cut at the limit ends with `MAX_TOKENS`, which the adapter refuses rather than show a cut answer; parts may carry fields other than text, thought and thoughtSignature (function calls, files, code), and the adapter refuses any of them, so an unexpected reply fails closed. No code change needed. Still not checked with a live key.
 - 2026-11-25/26 live in the owner's app on port 8000 (code `87a2450`, CI green): the owner asked "What is the capital of France?" with chats on and got "AI hypothesis · Gemini (your key)" with 8 web sources, kept in the local chat; at the owner's request ("you check") Claude then asked, signed in as the owner in the browser pane, "What is the current repo rate in India?" mid-chat: Gemini (your key), badge "Answered by Gemini · local model not used", 8 sources (the rate it quoted came from a web result and was not checked by ALFRED). The adapter's live request and reply work with the owner's free key.
-- Next: owner confirms acceptance; error paths (MAX_TOKENS, refusals) remain synthetic-tested only.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. DISABLED; paid acceptance NOT_RUN.
+- Acceptance: ACCEPTED 2026-11-26 (owner: "you decide"): the live checks above meet this ID's stated acceptance, on `87a2450` with Browser Regression green (run 45682087433, attempt 2). Scope: the owner's free key answering public questions; error paths stay synthetic-tested, and no paid use is accepted.
 - Limitations/dependencies: Pinned endpoint, schema/model/usage validation and bounded public-query adapter are synthetic tested; no paid acceptance. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Keep real access OFF until separately approved.
 
 ### OPENAI-02 — Model compatibility and current price review
 
@@ -2448,17 +2446,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-07 — Real provider acceptance with the owner's free Gemini key
 
-**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
+**COMPLETE_VERIFIED** · Optional Gemini (OPENAI IDs kept) · P2.
 
 - 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
 - 2026-11-25/26 live in the owner's app on port 8000 (code `87a2450`, CI green): the owner asked "What is the capital of France?" with chats on and got "AI hypothesis · Gemini (your key)" with 8 web sources, kept in the local chat; at the owner's request ("you check") Claude then asked, signed in as the owner in the browser pane, "What is the current repo rate in India?" mid-chat: Gemini (your key), badge "Answered by Gemini · local model not used", 8 sources (the rate it quoted came from a web result and was not checked by ALFRED). No paid plan or spending.
-- Next: owner confirms acceptance.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. BLOCKED_APPROVAL
-- Limitations/dependencies: Not authorized; no real request made. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Obtain model/provider consent and bounded synthetic-only spending authorization.
+- Acceptance: ACCEPTED 2026-11-26 (owner: "you decide"): the live checks above meet this ID's stated acceptance, on `87a2450` with Browser Regression green (run 45682087433, attempt 2). Scope: the owner's free key answering public questions; error paths stay synthetic-tested, and no paid use is accepted.
+- Limitations/dependencies: Free tier only; Google may keep free-tier prompts (Settings says so). Existing owner/session controls; canonical data availability; acceptance plan.
 
 ### SYNC-01 — Provider-neutral mock sync protocol
 
