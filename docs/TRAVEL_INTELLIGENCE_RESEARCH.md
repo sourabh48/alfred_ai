@@ -10,9 +10,8 @@ Companion files:
 ## How this was checked
 
 - **Source of truth:** the code audited is `master` at `6a17def` (2026-11-25), read with `git show` and `git grep`.
-  The worktree these files were written in (`F:\ALFRED_DEV\post-audit`, branch `feat/travel-world-dataset`, `f48a9b1`)
-  is 260 commits behind `master` and has no commits of its own, so its Travel code is out of date. Owner decision
-  needed: where these docs get committed (the recommendation is a branch cut from current `master`).
+  These files were first drafted in a stale worktree and then moved to `work/travel-intel-2026-11-25`, cut
+  from `master` `6a17def`.
 - **Graphify** was skipped (Windows Application Control blocks it), so Grep and Read were used instead.
 - **Web evidence:** official pages were preferred. Each claim is marked as checked against an official page,
   official but only partly read, or secondary. Where an official page did not state a fact, it is called

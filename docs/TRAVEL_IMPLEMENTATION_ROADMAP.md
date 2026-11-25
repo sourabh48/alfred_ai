@@ -1,6 +1,8 @@
 # Travel implementation roadmap (P0–P7)
 
-**Proposal only, awaiting owner approval (2026-11-25).** Nothing here is built. Each task extends existing code on
+**Owner approved P0, P1, P3 and P4 on 2026-11-25.** Status on branch `work/travel-intel-2026-11-25`:
+P0 done; P1 built (implemented, not accepted); P4 built within what official pages could be read; P3 waits for
+owner decisions (see its status line). P2, P5, P6 and P7 are not approved. Each task extends existing code on
 `master` 6a17def; none recreates working providers. Status rules apply: implemented is not accepted, and the 143
 original requirements and 13 extensions are tracked separately. Acceptance tests for each task are in
 [TRAVEL_ACCEPTANCE_CRITERIA.md](TRAVEL_ACCEPTANCE_CRITERIA.md).
@@ -21,6 +23,7 @@ needs an owner decision. P7 holds items that cannot be delivered.
 - **Risks:** editing PROJECT_STATUS by hand can break the tracker check.
 - **Tests:** `scripts/project_execution.py --check` passes; counts stay at 85/143 and 0/13.
 - **Acceptance:** A0 in the acceptance criteria.
+- **Status 2026-11-25:** done.
 
 ## P1 — Official disaster and weather warnings from NDMA SACHET (TRAVEL-16 gap, TRAVEL-15 partly)
 
@@ -44,6 +47,9 @@ needs an owner decision. P7 holds items that cannot be delivered.
   billion-laughs XML is refused; budget and backoff reuse; owner isolation of the evidence; browser check of the
   block with axe light and dark.
 - **Acceptance:** A1.
+- **Status 2026-11-25:** built in `providers/safety.py` (`SachetAlerts`) and `proactive.py` (`official_alert_steps`),
+  shown as trip steps within three days of departure, not in the research panel. `tests/test_travel_sachet.py`.
+  Live read checked once (a Kerala alert matched a Kozhikode point). Browser check not run. Implemented, not accepted.
 
 ## P2 — IMD district warnings, nowcast and highway warnings (after IMD grants access)
 
@@ -84,6 +90,11 @@ needs an owner decision. P7 holds items that cannot be delivered.
 - **Tests:** plaza-near-route geometry; no fee is ever shown; stale-date warning; monument badge positive and negative
   cases.
 - **Acceptance:** A3.
+- **Status 2026-11-25:** not built. NPCI's plaza PDFs refuse automated downloads (403), so they can only be
+  downloaded by a person; Google's toll estimate has an `IN_FASTAG` pass but India pricing coverage is not stated and
+  toll requests bill at a higher rate; ASI's list downloads but states no reuse licence, and the repository is public.
+  Owner decisions needed: bundle a hand-downloaded NPCI and ASI list despite no stated licence, try Google tolls with
+  your key, or drop P3.
 
 ## P4 — More permits and drone, foreigner and safari notes (TRAVEL-15)
 
@@ -103,6 +114,10 @@ needs an owner decision. P7 holds items that cannot be delivered.
 - **Tests:** every entry has an HTTPS official host, a reviewed date and a stale label after its window; the
   foreign-national note appears only when flagged.
 - **Acceptance:** A4.
+- **Status 2026-11-25:** Aranya Vihaara treks named on the portal (Kudremukha, Nishani Motte, Nagamale, Netravathi,
+  Bandaje, Skandagiri, Kurinjal) and Ladakh (LAHDC: inner line permit for foreign tourists only; fees apply) added.
+  Not added because the official pages could not be read on 2026-11-25: Sikkim (expired certificate), Rohtang (domain
+  does not resolve), MHA PAP/RAP (expired certificate), DigitalSky (403). Brahmagiri is left out as ambiguous.
 
 ## P5 — Bengaluru bus and metro (BMTC, BMRCL)
 
