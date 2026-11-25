@@ -147,9 +147,10 @@ and Weather API**; Geocoding is not needed because Places text search finds plac
 | Place names | `google_places`: Places text search | 30 days (Google allows keeping coordinates 30 days) | Ambiguous names ask you to choose |
 | Places and hotels | `google_places_nearby`, `google_lodging`: Places nearby search | 1 day | Listings, ratings and price level only; no room rates or availability |
 | Destination ideas | `google_destinations`: Places text search in a box around the start city | 1 day | Google Maps listings, not an official list; seed catalogue fallback |
-| Routing | `google_routes`: Routes API | 1 hour | Two-wheeler, car or walking; up to three alternatives; distance and time only, no line on a non-Google map (Google terms); motorcycle legality and closures unverified |
-| Weather | `google_weather`: Weather API daily forecast | 2 hours | Today and the next nine days only; trips further out show "not checked"; official warnings unavailable |
-| Flights | `skyscanner`: Flights Live Prices v3; `TRAVEL_SKYSCANNER_API_KEY` | 15 minutes | Waiting for Skyscanner partner approval; until then each trip shows a Google Flights link |
+| Routing | `google_routes`: Routes API | 1 hour | Two-wheeler, car or walking; up to three alternatives; distance and time only, no line on a non-Google map (Google terms); car routes also carry Google's FASTag toll estimate (Enterprise billing; India coverage unconfirmed, so "no tolls reported" keeps the budget allowance); motorcycle legality and closures unverified |
+| Weather | `google_weather`: Weather API daily forecast | 2 hours | Today and the next nine days only; trips further out show "not checked". Official warnings: see the row below |
+| Official alerts | `ndma_sachet`: NDMA SACHET CAP feed (state feed, else national), each alert's polygon matched on this PC | 30 minutes | Trips starting within three days; feed says "public domain"; only the state name is sent; expired, cancelled and exercise alerts dropped; a failed read says "not checked", never "none" |
+| Flights | `skyscanner`: Flights Live Prices v3; `TRAVEL_SKYSCANNER_API_KEY` | 15 minutes | Waiting for Skyscanner partner approval, which Skyscanner gives to "an established business with a large audience (over 100k monthly traffic)", so a personal app is unlikely to qualify; Amadeus below is the practical source. Until a key exists each trip shows a Google Flights link |
 | Flights (when no Skyscanner key) | `amadeus`: free Amadeus Travel Builder beta, `GET /api/v3/search/`; `TRAVEL_AMADEUS_API_KEY` | 15 minutes | Some airlines only; of Indian airlines only Air India (live check 2026-11-19; no IndiGo, Akasa, SpiceJet or Air India Express); search only, the airline's own link to buy |
 | Permits | Dated official references | 6 hours near departure, otherwise 24 hours | No authorized live permit inventory API verified; opening remains unverified |
 | Indian rail | Unavailable boundary | None | Authorized agreement/API required; timetable never implies seats, waitlist or fare |
@@ -157,8 +158,10 @@ and Weather API**; Geocoding is not needed because Places text search finds plac
 
 Every Google provider shares the app caps in code (10 a minute, 60 an hour, 200 a day, 3000 a month each),
 well inside Google's monthly free usage. Removed on 2026-11-14 and no longer called: openrouteservice,
-Valhalla, Open-Meteo, Overpass, Wikivoyage/Wikipedia, Brave, SearXNG, Duffel and Travelpayouts. Their old
-keys in `config/local.env` are ignored and can be deleted.
+Valhalla, Open-Meteo forecast and geocoding, Overpass, Wikivoyage/Wikipedia, Brave, SearXNG, Duffel and Travelpayouts. Their old
+keys in `config/local.env` are ignored and can be deleted. One Open-Meteo use remains: the archive API gives
+same-dates climate for trips past Google's ten days (`weather.py::OpenMeteoClimate`). Its free tier is for
+non-commercial use only and the data is CC BY 4.0, which fits a personal app; a paid plan is needed if ALFRED is ever sold.
 
 ### Skyscanner, once the key is approved
 

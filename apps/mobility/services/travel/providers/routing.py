@@ -19,6 +19,12 @@ def _coordinate(value):
 GOOGLE_KEY = "TRAVEL_GOOGLE_MAPS_API_KEY"
 
 
+def money(value):
+    """Google's Money object as a two-place Decimal string and its currency."""
+    amount = Decimal(str(value.get("units") or 0)) + Decimal(int(value.get("nanos") or 0)) / Decimal(10 ** 9)
+    return {"amount": str(amount.quantize(Decimal("0.01"))), "currency": str(value["currencyCode"])[:3]}
+
+
 def decode_polyline(encoded, limit=500):
     """Google's encoded polyline as GeoJSON [lon, lat] pairs, thinned to at most `limit` points (ends kept)."""
     points, index, lat, lon = [], 0, 0, 0
@@ -50,7 +56,7 @@ class GoogleRoutes(Provider):
     """
     name = "google_routes"
     category = "routing"
-    version = 2  # adds the route line
+    version = 3  # 2 added the route line, 3 car toll estimates
     source_url = "https://www.google.com/maps"
     attribution = "Powered by Google"
     # shortcut: Google limits storing its content; an hour keeps a planning session usable. Revisit if plans must keep it.
@@ -79,9 +85,32 @@ class GoogleRoutes(Provider):
             body["intermediates"] = [{"location": {"latLng": {"latitude": via[1], "longitude": via[0]}}}]
         if travel_mode != "WALK":
             body["routeModifiers"] = {"avoidHighways": bool(p.get("avoid_expressways")), "avoidTolls": bool(p.get("avoid_tolls"))}
+        fields = "routes.distanceMeters,routes.duration,routes.description,routes.polyline.encodedPolyline"
+        if self.with_tolls(p):  # owner approved 2026-11-26; Google bills these at its Enterprise rate
+            body["extraComputations"] = ["TOLLS"]
+            body["routeModifiers"]["tollPasses"] = ["IN_FASTAG"]  # FASTag is compulsory in India; ignored elsewhere
+            fields += ",routes.travelAdvisory.tollInfo"
         return request_json("POST", "https://routes.googleapis.com/directions/v2:computeRoutes", json=body,
-            headers={"X-Goog-Api-Key": personal_keys.get(GOOGLE_KEY), "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.description,routes.polyline.encodedPolyline",
-                     "Content-Type": "application/json"})
+            headers={"X-Goog-Api-Key": personal_keys.get(GOOGLE_KEY), "X-Goog-FieldMask": fields, "Content-Type": "application/json"})
+
+    def with_tolls(self, p):
+        # Cars only: Indian national-highway tolls exempt two-wheelers, and detour checks need no price.
+        return self.MODES.get(p.get("mode", "car")) == "DRIVE" and p.get("via") is None
+
+    def tolls(self, item, p):
+        if not self.with_tolls(p):
+            return None
+        info = (item.get("travelAdvisory") or {}).get("tollInfo")
+        if info is None:
+            # Google's docs read this as no tolls expected, but its India toll coverage is not stated, so it is not "no tolls".
+            return {"status": "not_reported", "note": "Google reported no tolls; its India toll coverage is not confirmed, so check."}
+        price = next((m for m in info.get("estimatedPrice") or [] if isinstance(m, dict) and m.get("currencyCode")), None)
+        if price is None:
+            return {"status": "unknown_price", "note": "This route has tolls; Google has no price for them."}
+        try:
+            return {"status": "estimated", **money(price), "note": "Google's FASTag estimate for a private car, one way."}
+        except (ArithmeticError, TypeError, ValueError):
+            raise ProviderError("malformed_response")
 
     def normalize(self, raw, p):
         travel_mode = self.MODES.get(p.get("mode", "car"))
@@ -97,6 +126,7 @@ class GoogleRoutes(Provider):
                 "constraints_requested": {"avoid_expressways": bool(p.get("avoid_expressways")), "avoid_tolls": bool(p.get("avoid_tolls"))},
                 "note": "Google route. Check signs and closures."}
             route["route_id"] = sha256(json.dumps(route, sort_keys=True, allow_nan=False).encode()).hexdigest()  # line excluded: ids stay stable
+            route["tolls"] = self.tolls(item, p)  # also outside the id, so a price change keeps a saved choice
             encoded = str((item.get("polyline") or {}).get("encodedPolyline") or "")
             if encoded:
                 try:
@@ -169,10 +199,7 @@ class GoogleTransit(Provider):
                     steps.append({"mode": "WALK", "minutes": self._minutes(step.get("staticDuration")),
                                   "note": str((step.get("navigationInstruction") or {}).get("instructions") or "")[:160]})
             fare = (item.get("travelAdvisory") or {}).get("transitFare") or {}
-            fare_text = None
-            if fare.get("currencyCode"):
-                amount = Decimal(str(fare.get("units") or 0)) + Decimal(int(fare.get("nanos") or 0)) / Decimal(10 ** 9)
-                fare_text = {"amount": str(amount.quantize(Decimal("0.01"))), "currency": str(fare["currencyCode"])[:3]}
+            fare_text = money(fare) if fare.get("currencyCode") else None
             if not any(s["mode"] == "TRANSIT" for s in steps):
                 continue  # walking only is not a public-transport answer
             routes.append({"minutes": self._minutes(item.get("duration")), "distance_km": round(number(item.get("distanceMeters") or 0, low=0) / 1000, 1),

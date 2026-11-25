@@ -7,6 +7,29 @@ from django.utils.dateparse import parse_datetime
 from .money import decimal_amount, quoted_amount, rupees
 
 
+def route_tolls(destination):
+    """Google's toll finding for the chosen route: the multi-stop total, else the selected single route's, else {}."""
+    if "route_tolls" in destination:
+        return destination["route_tolls"] or {}
+    routes = ((destination.get("route_result") or {}).get("payload") or {}).get("routes") or []
+    chosen = next((r for r in routes if r.get("route_id") and r["route_id"] == destination.get("selected_route_id")), None)
+    return (chosen or {}).get("tolls") or {}
+
+
+def toll_line(mode, tolls, *, return_trip):
+    """INR toll amount and its formula. Google's figure replaces the INR 400 car allowance only when it is in rupees."""
+    if mode != "roadtrip":
+        return 0, "INR 400 car allowance; other modes 0 allowance, actual toll liability unknown"
+    if tolls.get("status") == "estimated" and tolls.get("currency") == "INR":
+        one = decimal_amount(tolls["amount"])
+        if return_trip:
+            return rupees(one*2), f"Google FASTag estimate INR {one} one way × 2 (return assumed the same road)"
+        return rupees(one), f"Google FASTag estimate INR {one} across the ordered legs"
+    why = {"unknown_price": "Google has no price for its tolls",
+           "not_reported": "Google reported no tolls, but its India toll coverage is not confirmed"}.get(tolls.get("status"), "no Google toll estimate in rupees")
+    return 400, f"INR 400 car allowance; {why}"
+
+
 def calculate_budget(state, destination, *, relaxed_days=0, route_distance_km=None):
     def value(key, default=None):
         return state.get(key, {}).get("value", default)
@@ -34,9 +57,10 @@ def calculate_budget(state, destination, *, relaxed_days=0, route_distance_km=No
     fuel_freshness = "USER_PROVIDED" if value("fuel_price_per_litre") else "ESTIMATED"
     if price_date and (timezone.localdate()-date.fromisoformat(price_date)).days > 7:
         fuel_freshness = "CACHED"
+    tolls, toll_formula = toll_line(mode, route_tolls(destination), return_trip=route_distance_km is None)
     amounts = {"Transport": 0 if riding else rupees(max(1000, one_way*(14 if mode == "flight" else 6))*people),
                "Fuel": rupees(distance/mileage*fuel_price) if riding else 0,
-               "Tolls": 400 if mode == "roadtrip" else 0, "Stay": rupees(nightly*nights*rooms),
+               "Tolls": tolls, "Stay": rupees(nightly*nights*rooms),
                "Food": 650*days*people, "Activities": max(0, days-2-relaxed_days)*350*people,
                "Permits": 300*people, "Parking": 100*days if riding else 0,
                "Local Transport": 0 if riding else 350*days*people}
@@ -47,7 +71,7 @@ def calculate_budget(state, destination, *, relaxed_days=0, route_distance_km=No
                 "Food": f"INR 650 × {days} days × {people} travellers",
                 "Activities": f"max(0, {days} − 2 − {relaxed_days}) × INR 350 × {people}",
                 "Permits": f"INR 300 × {people}; contingency, not a permit fee",
-                "Tolls": "INR 400 car allowance; other modes 0 allowance, actual toll liability unknown",
+                "Tolls": toll_formula,
                 "Parking": f"INR 100 × {days} days" if riding else "No parking allowance",
                 "Local Transport": f"INR 350 × {days} days × {people}" if not riding else "Included in local fuel distance"}
     quotes = []

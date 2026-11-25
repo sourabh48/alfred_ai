@@ -84,6 +84,41 @@ def safety_steps(plan, today):
         steps.append(_step(plan, "air", f"Poor air in {plan.destination or 'your destination'}",
             f"{air.payload['category']} right now (Universal AQI {air.payload['aqi']} of 100; main pollutant {air.payload['pollutant'] or 'unknown'}). "
             "Consider a mask and fewer outdoor hours; this is current air, not a forecast.", due_on=today, basis="Google Air Quality"))
+    return steps + official_alert_steps(plan, today, point)
+
+
+def official_alert_steps(plan, today, point):
+    """NDMA SACHET alerts whose area covers the destination (India only). A failed check says so; it never says "none"."""
+    from .cache import query
+    from .providers.safety import SACHET_PORTAL, SachetAlerts
+    from .world import match_point
+
+    region = match_point(*point)
+    if not region or region["country_code"] != "IN":
+        return []
+    portal = [{"label": "NDMA SACHET alerts", "url": SACHET_PORTAL}]
+    place = plan.destination or "your destination"
+    try:
+        result = query(SachetAlerts(), {"latitude": point[0], "longitude": point[1], "state": region["state"]})
+    except Exception:
+        result = None  # a safety lookup must never break the trip page
+    if result is None or not result.success:
+        return [_step(plan, "official_alert", "Official warnings not checked",
+                      f"ALFRED could not read NDMA SACHET just now, so official warnings for {place} are unknown. Check the portal before you go.",
+                      due_on=today, links=portal, basis="NDMA SACHET")]
+    now, steps = timezone.now(), []
+    for alert in result.payload.get("alerts") or []:
+        until = timezone.localtime(timezone.datetime.fromisoformat(alert["expires"]))
+        if until <= now:
+            continue  # the cached copy outlived the alert
+        steps.append({**_step(plan, "official_alert", f"{alert['severity'] or 'Official'} alert: {alert['event'] or 'warning'} at {place}",
+            f"{alert['headline']} Area: {alert['area'] or 'as issued'}. Valid until {until:%d %b %H:%M}.",
+            due_on=today, links=portal, basis=f"NDMA SACHET, issued by {alert['agency'] or 'the alerting agency'}"),
+            "id": f"{plan.pk}:official_alert:{alert['expires']}:{alert['event']}"})
+    if not steps and result.payload.get("unplaced"):
+        steps.append(_step(plan, "official_alert", f"Official alerts in {result.payload.get('feed') or 'India'} to check",
+            f"{result.payload['unplaced']} current alert(s) had no map area, so ALFRED cannot tell whether they cover {place}. Check the portal.",
+            due_on=today, links=portal, basis="NDMA SACHET"))
     return steps
 
 

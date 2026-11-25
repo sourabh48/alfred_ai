@@ -2724,8 +2724,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
 - Tests: [tests/test_travel_planner.py](../tests/test_travel_planner.py), [tests/test_travel_providers.py](../tests/test_travel_providers.py), [tests/test_travel_continuation.py](../tests/test_travel_continuation.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. REQUIRES_CREDENTIALS/CONTRACT; NOT_REAL_LIVE_TESTED.
-- Limitations/dependencies: Duffel Flights adapter exists, intentionally disabled without approved access; research links are not offers. Existing owner/session controls; canonical data availability; acceptance plan.
-- Next: Authorize provider and capped synthetic availability acceptance.
+- Limitations/dependencies: Duffel was removed 2026-11-14. Skyscanner accepts only "an established business with a large audience (over 100k monthly traffic)" (checked 2026-11-25), so Amadeus Travel Builder is the practical live source; research links are not offers. Existing owner/session controls; canonical data availability; acceptance plan.
+- Next: owner checks one Amadeus flight list against the airline site; Skyscanner stays optional because a personal app is unlikely to meet its business criteria (docs/TRAVEL_API_ACCESS_MATRIX.md).
 
 ### TRAVEL-13 — Train live seat/fare/waitlist inventory
 

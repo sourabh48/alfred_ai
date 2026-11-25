@@ -64,12 +64,22 @@ def road_leg(state, a, b):
         return None
     route = result.payload["routes"][0]
     return {"distance_km": max(1, round(route["distance_km"])), "hours": route["duration_hours"], "confidence": "PROVIDER",
-            "source": "google_routes", "profile": route["profile"], "retrieved_at": result.retrieved_at}
+            "source": "google_routes", "profile": route["profile"], "retrieved_at": result.retrieved_at, "tolls": route.get("tolls")}
+
+
+def legs_tolls(legs):
+    """Total of Google's rupee toll estimates when every leg has one, else None (the allowance stays)."""
+    found = [leg.get("tolls") or {} for leg in legs]
+    if not all(t.get("status") == "estimated" and t.get("currency") == "INR" for t in found):
+        return None
+    return {"status": "estimated", "amount": str(sum((decimal_amount(t["amount"]) for t in found), decimal_amount(0))), "currency": "INR"}
 
 
 def leg_text(leg):
     if leg["confidence"] == "PROVIDER":
-        return f"~{leg['distance_km']} km by road, about {leg['hours']:g} h (Google); closures and legality unverified"
+        tolls = leg.get("tolls") or {}
+        toll = f", tolls about {tolls['currency']} {tolls['amount']}" if tolls.get("status") == "estimated" else ""
+        return f"~{leg['distance_km']} km by road, about {leg['hours']:g} h (Google{toll}); closures and legality unverified"
     return f"~{leg['distance_km']} km allowance; duration and legal route unverified"
 
 
@@ -109,7 +119,7 @@ def build_multi_stop_itinerary(state, stops, roads=True):
         basis = "Google road routes are unavailable, so leg distances use straight-line distance × 1.35 rounded to 10 km (minimum 20 km); "
     nights = [(days-1)//len(stops) + (i < (days-1) % len(stops)) for i in range(len(stops))]
     nightly = sum(decimal_amount(s.get("nightly", 1500))*n for s, n in zip(stops, nights))/decimal_amount(days-1)
-    budget = calculate_budget(state, {"nightly": nightly}, route_distance_km=sum(leg["distance_km"] for leg in legs))
+    budget = calculate_budget(state, {"nightly": nightly, "route_tolls": legs_tolls(legs)}, route_distance_km=sum(leg["distance_km"] for leg in legs))
     result = build_itinerary(state, stops[0])
     result["destination"] = " → ".join(s["name"] for s in stops)
     result["summary"] = f"{days} days across {len(stops)} manually ordered stops; nights are shared as evenly as possible. Reordering rebuilds day edits and allowances."

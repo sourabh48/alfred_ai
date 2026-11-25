@@ -12,18 +12,28 @@ from django.utils.dateparse import parse_datetime
 from .base import ProviderResult
 
 # Each entry was read by hand on the official page named in "source" on its "reviewed" date (Indian visitors).
-# Ladakh, Sikkim and Rohtang are left out: their official permit portals could not be read on 2026-11-25.
+# Sikkim and Rohtang are left out: on 2026-11-25 sikkimtourism.gov.in had an expired certificate and
+# rohtangpermits.nic.in did not resolve. Brahmagiri is left out on purpose: the name also covers a Nashik hill.
 REFERENCES = (
     {"places": ("chembra",),
      "source": "https://www.keralatourism.org/destination/chembra-peak-wayanad/508/",
      "authority": "Kerala Forest Department (referenced by Kerala Tourism)",
      "requirement": "Trekking permit from the Forest Department at the base camp; entry and guide fees apply.",
      "booking_url": "https://forest.kerala.gov.in/en/ecotourism/", "reviewed": "2026-11-25T06:00:00+00:00"},
-    {"places": ("kudremukh",),
+    {"places": ("kudremukh", "kudremukha", "nishanimotte", "nishani motte", "nagamale", "netravathi peak", "netravathi trek",
+                "bandaje", "skandagiri", "kurinjal"),
      "source": "https://aranyavihaara.karnataka.gov.in/",
      "authority": "Karnataka Forest Department (Aranya Vihaara)",
-     "requirement": "Trek must be booked online 1 to 30 days ahead for a time slot; carry an original photo ID.",
-     "booking_url": "https://aranyavihaara.karnataka.gov.in/", "reviewed": "2026-11-25T06:00:00+00:00"},
+     "requirement": "Trek must be booked online 1 to 30 days ahead for a time slot; carry the original ID used to book. "
+                    "Cancelling 8 or more days ahead refunds 50%, later cancellations nothing (notice of 15 July 2026).",
+     "booking_url": "https://aranyavihaara.karnataka.gov.in/", "reviewed": "2026-11-25T16:00:00+00:00"},
+    {"places": ("ladakh", "leh", "nubra", "pangong", "tso moriri", "hanle", "khardung la", "khardungla", "turtuk"),
+     "source": "https://www.lahdclehpermit.in/faq/",
+     "authority": "Ladakh Autonomous Hill Development Council, Leh (permit portal)",
+     "requirement": "The inner line permit applies only to foreign tourists, who also need protected or restricted area "
+                    "clearance for places such as Nubra, Pangong and Tso Moriri. The council's environment, wildlife and Red "
+                    "Cross fees still apply to visitors; the site does not state the amounts.",
+     "booking_url": "https://www.lahdclehpermit.in/", "reviewed": "2026-11-25T16:00:00+00:00"},
     {"places": ("arunachal", "tawang", "ziro", "bomdila", "dirang", "itanagar", "mechuka", "sela pass", "pasighat", "roing"),
      "source": "https://eilp.arunachal.gov.in/",
      "authority": "Government of Arunachal Pradesh (Tourist e-ILP, Bengal Eastern Frontier Regulation, 1873)",
