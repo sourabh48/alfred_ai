@@ -1,5 +1,10 @@
 # ALFRED execution state
 
+## Travel government sources — 2026-11-25/26
+- Research and plan: `docs/TRAVEL_INTELLIGENCE_RESEARCH.md`, `TRAVEL_API_ACCESS_MATRIX.md`, `TRAVEL_DATA_LICENSING.md`, `TRAVEL_IMPLEMENTATION_ROADMAP.md` (P0–P7), `TRAVEL_ACCEPTANCE_CRITERIA.md`. Owner approved P0, P1, P3 and P4 (2026-11-25) and chose Google tolls for P3 (2026-11-26).
+- Built, implemented not accepted: P0 provider doc fixes; P1 NDMA SACHET official alerts in a trip's next steps (`tests.test_travel_sachet`); P3 Google FASTag toll estimates on car routes and in the car budget (`tests.test_travel_tolls`; Enterprise billing; plazas, road safety and monuments not built); P4 Aranya Vihaara treks and a Ladakh LAHDC reference.
+- Tests: affected Travel suites 195 and 100 PASS. Not checked: a live Google toll answer for India, the new steps in Chrome, the full backend suite. Tracker unchanged (85/143, 0/13).
+
 ## OpenJarvis ideas, local only — 2026-11-25
 - Ask ALFRED decides (owner 2026-11-25): the per-question "This question is public" tick is gone. A clearly public question goes to Gemini when it is on in Settings, private ones stay local, and a follow-up that carries the chat stays local. A mixed question ("Is my 5 lakh FD rate good today?") looks up only `web_lookup.public_part` ("Is FD rate good today?"); the owner's figures never leave. With chats on (owner 2026-11-26) Gemini answers are kept in the local chat, and a stand-alone public question in a chat still goes to Gemini without the chat; a follow-up (web_lookup.FOLLOW_UP) stays local. The owner hit the save refusal live; fixed and tested, live recheck pending.
 - Gemini limits (owner 2026-11-25): ALFRED sets them (config/local.env), and each answer counts Google's reported tokens; Settings keeps only the key and on/off. The owner's live question was refused by the old saved 4096-token limit before any call. Local commit; live Gemini answer still pending (OPENAI-01 to 07).
