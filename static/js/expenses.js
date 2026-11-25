@@ -858,8 +858,8 @@ function openCreateModal() {
     form.elements.classification.value = "expense";
     form.elements.transaction_date.value = todayLocal();
     document.getElementById("expenseId").value = "";
-    document.getElementById("expenseModalTitle").textContent = "Add Expense";
-    document.getElementById("expenseSubmitBtn").textContent = "Save Expense";
+    document.getElementById("expenseModalTitle").textContent = "Add expense";
+    document.getElementById("expenseSubmitBtn").textContent = "Save expense";
     document.getElementById("expenseFormError").classList.add("d-none");
     expenseModal.show();
 }

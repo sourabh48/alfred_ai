@@ -85,6 +85,9 @@ html[data-theme="dark"] .form-control::file-selector-button { background: #29497
 html[data-theme="dark"] .detail-item { background: #203751; color: #e5edf8; }
 .table-alfred th { font-size: .8rem; color: var(--alfred-muted); }
 .table-alfred td { vertical-align: middle; }
+/* The extra-payment note wraps instead of pushing the Edit buttons out of view. */
+.table td.loan-extra-cell { min-width: 16rem; white-space: normal; }
+.loan-extra-cell > div { max-width: 22rem; }
 tr[hidden] { display: none !important; }
 @media (max-width: 767.98px) { #memoryRetentionForm { flex-wrap: wrap; } }
 html[data-theme="dark"] { color-scheme: dark; --alfred-ink: #e5edf8; --alfred-muted: #b0bfd3; --alfred-surface-strong: #182b44; --alfred-surface: #182b44; --alfred-stroke: #37506e; --bs-body-color: #e5edf8; --bs-body-bg: #182b44; --bs-secondary-color: #b0bfd3; --bs-border-color: #37506e; }

@@ -23,7 +23,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Log Signal</h2>
+            <h2 class="page-section-title">Log signal</h2>
             <p class="page-section-copy mb-3">Capture a daily snapshot of stress, sleep, and work intensity.</p>
             <form id="behavioralForm" class="soft-grid">
                 <div class="row g-3">
@@ -32,27 +32,27 @@
                         <input id="behaviorStress" name="stress_score" type="number" min="0" max="10" step="0.1" class="form-control" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="behaviorSleep">Sleep Hours</label>
+                        <label class="form-label" for="behaviorSleep">Sleep hours</label>
                         <input id="behaviorSleep" name="sleep_hours" type="number" min="0" max="24" step="0.1" class="form-control" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="behaviorWork">Work Hours</label>
+                        <label class="form-label" for="behaviorWork">Work hours</label>
                         <input id="behaviorWork" name="work_hours" type="number" min="0" max="24" step="0.1" class="form-control" required>
                     </div>
                 </div>
                 <div id="behavioralFormFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Signal</button>
+                <button class="btn btn-primary" type="submit">Save signal</button>
             </form>
 
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Behavioral Insights</h3>
+                <h3 class="h6 fw-bold mb-3">Behavioral insights</h3>
                 <ul class="insight-list" id="behavioralInsightList"></ul>
             </div>
         </div>
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Weekly Stress Pattern</h2>
+            <h2 class="page-section-title">Weekly stress pattern</h2>
             <p class="page-section-copy mb-3">Recent stress readings tracked by the behavioral engine.</p>
             <div class="chart-box"><canvas id="stressChart"></canvas></div>
         </div>
@@ -62,22 +62,22 @@
 <section class="row g-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Fingerprint Breakdown</h2>
+            <h2 class="page-section-title">Fingerprint breakdown</h2>
             <p class="page-section-copy mb-3">Derived personality, linked spending style, and current trend signals.</p>
             <div id="behavioralFingerprintPanel" class="data-stack"></div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Financial Pressure Map</h3>
+                <h3 class="h6 fw-bold mb-3">Financial pressure map</h3>
                 <div id="behavioralPressureMap" class="data-stack"></div>
             </div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Grounding And Freshness</h3>
+                <h3 class="h6 fw-bold mb-3">Grounding and freshness</h3>
                 <div id="behavioralGroundingPanel" class="data-stack"></div>
             </div>
         </div>
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Recent Logs</h2>
+            <h2 class="page-section-title">Recent logs</h2>
             <p class="page-section-copy mb-3">Last recorded behavioral snapshots, alongside what ALFRED is reading from your spending data.</p>
             <div id="behavioralHistory" class="data-stack"></div>
         </div>

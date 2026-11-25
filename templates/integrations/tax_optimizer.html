@@ -22,23 +22,23 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Tax Inputs</h2>
+            <h2 class="page-section-title">Tax inputs</h2>
             <p class="page-section-copy mb-3">Edit assumptions to re-run the optimizer.</p>
             <form id="taxInputForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-12">
-                        <label class="form-label" for="taxFinancialYear">Financial Year</label>
+                        <label class="form-label" for="taxFinancialYear">Financial year</label>
                         <select id="taxFinancialYear" name="financial_year" class="form-select">
                             <option value="2026-27">Tax year 2026-27 (Income-tax Act, 2025)</option>
                             <option value="2025-26">FY 2025-26 / AY 2026-27</option>
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label" for="taxAnnualIncome">Annual Income</label>
+                        <label class="form-label" for="taxAnnualIncome">Annual income</label>
                         <input id="taxAnnualIncome" name="annual_income" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="taxBasicSalary">Monthly Basic</label>
+                        <label class="form-label" for="taxBasicSalary">Monthly basic</label>
                         <input id="taxBasicSalary" name="basic_salary" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
@@ -46,11 +46,11 @@
                         <input id="taxHraReceived" name="hra_received" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="taxRentPaid">Monthly Rent</label>
+                        <label class="form-label" for="taxRentPaid">Monthly rent</label>
                         <input id="taxRentPaid" name="rent_paid" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="taxMetro">Metro City</label>
+                        <label class="form-label" for="taxMetro">Metro city</label>
                         <select id="taxMetro" name="metro" class="form-select">
                             <option value="true">Yes</option>
                             <option value="false">No</option>
@@ -66,14 +66,14 @@
                     </div>
                     <p class="form-text mb-0" id="taxDeductionHelp">The comparison uses only amounts you confirm qualify for the selected year. Leave them blank if unverified.</p>
                 </div>
-                <button class="btn btn-primary" type="submit">Recalculate Tax Plan</button>
+                <button class="btn btn-primary" type="submit">Recalculate tax plan</button>
             </form>
         </div>
     </div>
     <div class="col-xl-8">
         <section class="soft-grid four-up" id="taxSummaryCards"></section>
         <div class="surface-card h-100 mt-4">
-            <h2 class="page-section-title">Regime Comparison</h2>
+            <h2 class="page-section-title">Regime comparison</h2>
             <p class="page-section-copy mb-3">Tax outgo comparison between old and new regime under the current assumptions.</p>
             <div class="chart-box"><canvas id="taxComparisonChart"></canvas></div>
         </div>
@@ -83,7 +83,7 @@
 <section class="row g-4">
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Action Plan</h2>
+            <h2 class="page-section-title">Action plan</h2>
             <p class="page-section-copy mb-3">Estimated scenarios. Individual action benefits assume a 30% slab and eligible deductions; investment returns are unverified planning assumptions.</p>
             <ul class="insight-list" id="taxActionList"></ul>
         </div>
@@ -97,7 +97,7 @@
     </div>
     <div class="col-xl-4">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Deduction Catalog</h2>
+            <h2 class="page-section-title">Deduction catalog</h2>
             <p class="page-section-copy mb-3">Major deduction sections and the eligible instruments behind them.</p>
             <div id="taxDeductionList" class="data-stack"></div>
         </div>

@@ -132,7 +132,7 @@ function renderGrounding(grounding) {
     const freshness = grounding.freshness || {};
     const modules = grounding.modules || [];
     const cards = [
-        { title: "Monthly Income", value: Number(history.monthly_income) > 0 ? Alfred.formatCurrency(history.monthly_income) : "Unavailable", copy: "Current income basis" },
+        { title: "Monthly income", value: Number(history.monthly_income) > 0 ? Alfred.formatCurrency(history.monthly_income) : "Unavailable", copy: "Current income basis" },
         { title: "Monthly Spend", value: Alfred.formatCurrency(history.monthly_expenses || 0), copy: "Recent history basis" },
         { title: "Tracked Personas", value: Alfred.formatNumber((history.tracked_personas || []).length, 0), copy: "Behavior personas influencing the stack" },
         { title: "Fresh Evidence", value: Alfred.formatNumber(freshness.fresh_records || 0, 0), copy: `${Alfred.formatNumber(freshness.tracked_records || 0, 0)} evidence records attached` },

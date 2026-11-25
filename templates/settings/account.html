@@ -6,7 +6,7 @@
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
             <h1 class="alfred-hero-title">Settings</h1>
-            <p class="alfred-hero-copy">Your account, privacy and connections. Alfred handles routine maintenance.</p>
+            <p class="alfred-hero-copy">Your account, privacy and connections. ALFRED handles routine maintenance.</p>
             <nav aria-label="On this page" class="page-index">
                 <a href="#settingsProfile">Your details and income</a>
                 <a href="#settingsFamily">Family sharing</a>
@@ -42,11 +42,11 @@
             <form id="accountProfileForm" class="soft-grid" data-live-refresh-hold="true">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label" for="settingsFirstName">First Name</label>
+                        <label class="form-label" for="settingsFirstName">First name</label>
                         <input id="settingsFirstName" name="first_name" class="form-control" autocomplete="given-name">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="settingsLastName">Last Name</label>
+                        <label class="form-label" for="settingsLastName">Last name</label>
                         <input id="settingsLastName" name="last_name" class="form-control" autocomplete="family-name">
                     </div>
                     <div class="col-md-6">
@@ -91,7 +91,7 @@
                         <div class="form-text" id="settingsTakeHomeHelp">With a yearly CTC and no in-hand pay, ALFRED estimates it after PF, gratuity, professional tax and income tax, leaving out the bonus. Same currency as your income.</div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="settingsVariableIncome">Variable Income</label>
+                        <label class="form-label" for="settingsVariableIncome">Variable income</label>
                         <input id="settingsVariableIncome" name="variable_income" type="number" min="0" step="0.01" class="form-control">
                         <label class="form-label mt-2" for="settingsVariableIncomeCurrency">Variable income currency</label>
                         <select id="settingsVariableIncomeCurrency" name="variable_income_currency" class="form-select" aria-describedby="settingsCurrencyHelp">
@@ -103,7 +103,7 @@
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="settingsRentOrEmi">Monthly Housing Cost</label>
+                        <label class="form-label" for="settingsRentOrEmi">Monthly housing cost</label>
                         <input id="settingsRentOrEmi" name="rent_or_emi" type="number" min="0" step="0.01" class="form-control">
                         <div class="form-text">Exclude EMIs already recorded under Loans; those are counted separately.</div>
                         <label class="form-label mt-2" for="settingsRentCurrency">Housing cost currency</label>
@@ -129,7 +129,7 @@
                 </div>
                 <div id="settingsProfileFeedback" class="d-none alert mb-0"></div>
                 <div>
-                    <button class="btn btn-primary" type="submit">Save Profile</button>
+                    <button class="btn btn-primary" type="submit">Save profile</button>
                 </div>
             </form>
         </div>
@@ -147,7 +147,7 @@
 
             <div class="soft-grid">
                 <div class="d-flex flex-wrap gap-2">
-                    <button id="settingsGenerateInviteBtn" class="btn btn-primary" type="button">Generate Link Code</button>
+                    <button id="settingsGenerateInviteBtn" class="btn btn-primary" type="button">Generate link code</button>
                     <button id="settingsRefreshLinksBtn" class="btn btn-outline-secondary" type="button">Refresh</button>
                 </div>
                 <div id="settingsInviteCodePanel" class="family-link-code-panel d-none">
@@ -157,12 +157,12 @@
                 </div>
                 <form id="settingsAcceptInviteForm" class="soft-grid" data-live-refresh-hold="true">
                     <div>
-                        <label class="form-label" for="settingsInviteCodeInput">Link Code</label>
+                        <label class="form-label" for="settingsInviteCodeInput">Link code</label>
                         <input id="settingsInviteCodeInput" name="invite_code" class="form-control" placeholder="ALF-XXXX-XXXX" autocomplete="off" required>
                     </div>
                     <div id="settingsLinkFeedback" class="d-none alert mb-0"></div>
                     <div>
-                        <button class="btn btn-outline-primary" type="submit">Connect Account</button>
+                        <button class="btn btn-outline-primary" type="submit">Connect account</button>
                     </div>
                 </form>
             </div>
@@ -189,7 +189,7 @@
 {% include "settings/offline_maps.html" %}
 <section class="surface-card" id="settingsAccountData">
     <h2 class="page-section-title mb-1">Delete my data</h2>
-    <p class="page-section-copy mb-3">Remove your saved Alfred data and uploaded documents to start fresh. Your account stays active. This cannot be undone.</p>
+    <p class="page-section-copy mb-3">Remove your saved ALFRED data and uploaded documents to start fresh. Your account stays active. This cannot be undone.</p>
     <button id="settingsClearDataBtn" type="button" class="btn btn-outline-danger">{{ ui_config.navigation.remove_data_label }}</button>
 </section>
 {% endblock %}
@@ -204,6 +204,6 @@
 <script src="/static/js/skills.js?v=2"></script>
 <script src="/static/js/agent_links.js?v=1"></script>
 <script src="/static/js/backup_key.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/travel_planner.css?v=1">
+<link rel="stylesheet" href="/static/css/travel_planner.css?v=2">
 <script src="/static/js/travel_preferences.js?v=workflow-2"></script>
 {% endblock %}

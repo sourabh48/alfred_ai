@@ -56,7 +56,7 @@ function renderBudgetSummary(summary, affordability) {
         { title: "Flexible Budget", value: planMoney(summary.total_budget), copy: budgetCurrency === "INR" ? summary.month : `${summary.month} | ${budgetCurrency} plan, ${budgetCurrency} spending only` },
         { title: "Living Spend", value: planMoney(summary.total_spent), copy: summary.percent_used == null ? "No positive budget for utilization" : `${Alfred.formatPercent(summary.percent_used)} of flexible budget used` },
         { title: "Housing + Loan EMIs", value: Alfred.formatCurrency(summary.fixed_obligations), copy: "Reserved separately from flexible spending" },
-        { title: "Daily Budget Guide", value: affordability.safe_daily_spend == null ? "Unavailable" : Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
+        { title: "Daily budget guide", value: affordability.safe_daily_spend == null ? "Unavailable" : Alfred.formatCurrency(affordability.safe_daily_spend), copy: `${affordability.days_remaining || 0} days left, including today` },
     ];
 
     Alfred.setHTML(document.getElementById("budgetSummaryCards"), cards.map(card => `

@@ -231,7 +231,7 @@ window.TravelPlanner = (() => {
         const messages = $("plannerMessages");
         const oldLast = messages.dataset.last;
         const last = session.messages.at(-1);
-        Alfred.setHTMLIfChanged(messages, session.messages.map(m => `<article class="travel-message ${m.role === "user" ? "user" : "assistant"}" data-message-id="${m.id}"><strong>${m.role === "user" ? "You" : "Alfred"}</strong>${esc(m.text)}</article>`).join(""));
+        Alfred.setHTMLIfChanged(messages, session.messages.map(m => `<article class="travel-message ${m.role === "user" ? "user" : "assistant"}" data-message-id="${m.id}"><strong>${m.role === "user" ? "You" : "ALFRED"}</strong>${esc(m.text)}</article>`).join(""));
         if (oldLast !== String(last?.id)) { messages.scrollTop = messages.scrollHeight; messages.dataset.last = last?.id || ""; }
         Alfred.setHTMLIfChanged("plannerChips", (last?.chips || []).map(c => `<button type="button" data-planner-message="${esc(c)}">${esc(c)}</button>`).join(""));
         const labels = {origin:"Starting from", trip_duration:"Days available", budget:"Target budget", budget_type:"Budget style", selected_destination:"Your choice", transport_mode:"Travel mode", available_start_date:"Start", available_end_date:"Return"};

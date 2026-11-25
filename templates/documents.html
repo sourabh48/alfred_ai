@@ -125,7 +125,7 @@
             <form id="documentStatementForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-5">
-                        <label class="form-label" for="documentStatementKind">Statement Type</label>
+                        <label class="form-label" for="documentStatementKind">Statement type</label>
                         <select id="documentStatementKind" name="statement_kind" class="form-select">
                             <option value="">Auto detect</option>
                             <option value="bank_statement">Bank Statement</option>
@@ -141,7 +141,7 @@
                     </div>
                 </div>
                 <div id="documentStatementFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Statements</button>
+                <button class="btn btn-primary" type="submit">Upload statements</button>
             </form>
         </div>
     </div>
@@ -166,16 +166,16 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Vehicle Documents</h2>
+            <h2 class="page-section-title">Vehicle documents</h2>
             <p class="page-section-copy mb-3">Upload one or more insurance, PUC, RC, and related vehicle documents from the same place.</p>
             <form id="documentVehicleForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-5">
-                        <label class="form-label" for="documentVehicleProfile">Vehicle Profile</label>
+                        <label class="form-label" for="documentVehicleProfile">Vehicle profile</label>
                         <select id="documentVehicleProfile" name="bike_profile_id" class="form-select" required></select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="documentVehicleType">Type Override</label>
+                        <label class="form-label" for="documentVehicleType">Type override</label>
                         <select id="documentVehicleType" name="document_type_override" class="form-select">
                             <option value="">Auto detect</option>
                             <option value="insurance">Insurance</option>
@@ -186,12 +186,12 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="documentVehicleFile">Document Files</label>
+                        <label class="form-label" for="documentVehicleFile">Document files</label>
                         <input id="documentVehicleFile" name="document_file" type="file" class="form-control" accept=".pdf,image/*" multiple required>
                     </div>
                 </div>
                 <div id="documentVehicleFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Vehicle Documents</button>
+                <button class="btn btn-primary" type="submit">Upload vehicle documents</button>
             </form>
         </div>
     </div>
@@ -202,16 +202,16 @@
             <form id="documentServiceForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-5">
-                        <label class="form-label" for="documentServiceProfile">Vehicle Profile</label>
+                        <label class="form-label" for="documentServiceProfile">Vehicle profile</label>
                         <select id="documentServiceProfile" name="bike_profile_id" class="form-select" required></select>
                     </div>
                     <div class="col-md-7">
-                        <label class="form-label" for="documentServiceFile">Bills / Work Notes</label>
+                        <label class="form-label" for="documentServiceFile">Bills / work notes</label>
                         <input id="documentServiceFile" name="service_file" type="file" class="form-control" accept=".pdf,image/*" multiple required>
                     </div>
                 </div>
                 <div id="documentServiceFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Import Service Files</button>
+                <button class="btn btn-primary" type="submit">Import service files</button>
             </form>
         </div>
     </div>
@@ -220,7 +220,7 @@
 <section class="row g-4 mb-4">
     <div class="col-12">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Career Files</h2>
+            <h2 class="page-section-title">Career files</h2>
             <p class="page-section-copy mb-3">You can upload your CV here too; the Career page uses it.</p>
             <form id="documentResumeForm" class="soft-grid" enctype="multipart/form-data">
                 <div class="row g-3">
@@ -230,7 +230,7 @@
                     </div>
                 </div>
                 <div id="documentResumeFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Resume Files</button>
+                <button class="btn btn-primary" type="submit">Upload resume files</button>
             </form>
         </div>
     </div>
@@ -248,7 +248,7 @@
                         <input id="documentChatGPTTitle" name="title" class="form-control" placeholder="Optional import title">
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" for="documentChatGPTImportType">Import Type</label>
+                        <label class="form-label" for="documentChatGPTImportType">Import type</label>
                         <select id="documentChatGPTImportType" name="import_type" class="form-select">
                             <option value="chat_transcript">Chat Transcript</option>
                             <option value="dashboard_export">Dashboard Export</option>
@@ -260,12 +260,12 @@
                         <input id="documentChatGPTSource" name="source_label" class="form-control" value="ChatGPT">
                     </div>
                     <div class="col-12">
-                        <label class="form-label" for="documentChatGPTRawText">Chat / Dashboard Text</label>
+                        <label class="form-label" for="documentChatGPTRawText">Chat / dashboard text</label>
                         <textarea id="documentChatGPTRawText" name="raw_text" class="form-control" rows="8" required></textarea>
                     </div>
                 </div>
                 <div id="documentChatGPTFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Import Chat Context</button>
+                <button class="btn btn-primary" type="submit">Import chat context</button>
             </form>
         </div>
     </div>

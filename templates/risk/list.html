@@ -37,7 +37,7 @@
     <div class="col-xl-6">
         <div class="surface-card h-100">
             <h2 class="page-section-title" id="riskEconomy">The economy right now</h2>
-            <p class="page-section-copy mb-3">External trend signals that are currently influencing Alfred's risk outlook.</p>
+            <p class="page-section-copy mb-3">External trend signals that are currently influencing ALFRED's risk outlook.</p>
             <div id="riskMacroContext" class="data-stack"></div>
         </div>
     </div>
@@ -62,7 +62,7 @@
     </div>
     <div class="col-xl-6">
         <div class="surface-card h-100">
-            <h2 class="page-section-title" id="riskActions">Action Queue</h2>
+            <h2 class="page-section-title" id="riskActions">Action queue</h2>
             <p class="page-section-copy mb-3">Practical actions ordered by current risk pressure.</p>
             <div id="riskActionList" class="data-stack"></div>
         </div>
@@ -77,20 +77,20 @@
             <form id="riskForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label" for="riskLayoff">Layoff Risk</label>
+                        <label class="form-label" for="riskLayoff">Layoff risk</label>
                         <input id="riskLayoff" name="layoff_risk" type="number" min="0" max="100" step="0.1" class="form-control" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="riskIllness">Illness Risk</label>
+                        <label class="form-label" for="riskIllness">Illness risk</label>
                         <input id="riskIllness" name="illness_risk" type="number" min="0" max="100" step="0.1" class="form-control" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="riskRelocation">Relocation Risk</label>
+                        <label class="form-label" for="riskRelocation">Relocation risk</label>
                         <input id="riskRelocation" name="relocation_risk" type="number" min="0" max="100" step="0.1" class="form-control" required>
                     </div>
                 </div>
                 <div id="riskFormFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Snapshot</button>
+                <button class="btn btn-primary" type="submit">Save snapshot</button>
             </form>
 
             <div class="mt-4">
@@ -128,12 +128,12 @@
 </section>
 
 <section class="surface-card mt-4">
-    <h2 class="page-section-title" id="riskNews">Related News</h2>
+    <h2 class="page-section-title" id="riskNews">Related news</h2>
     <p class="page-section-copy mb-3">Live layoff and hiring-market news relevant to the current consolidated risk view.</p>
     <div id="riskNewsList" class="data-stack"></div>
 </section>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/risk.js?v=2.6.3"></script>
+<script src="/static/js/risk.js?v=2.6.4"></script>
 {% endblock %}

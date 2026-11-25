@@ -357,6 +357,8 @@ function mountCurrencyToggle() {
     });
 }
 document.addEventListener("DOMContentLoaded", mountCurrencyToggle);
+// A wide table that scrolls sideways on a phone must take keyboard focus so arrow keys can scroll it.
+document.addEventListener("DOMContentLoaded", () => document.querySelectorAll(".table-responsive:not([tabindex])").forEach(box => { box.tabIndex = 0; }));
 
 function formatRecordedMoney(value) {
     if (!value || value.evidence_status === "unavailable") return "Financial evidence unavailable";
@@ -767,7 +769,7 @@ function uploadLogForPhase(phase) {
         case "preparing":
             return "Preparing secure upload right now";
         case "uploading":
-            return "Sending document to Alfred now";
+            return "Sending document to ALFRED now";
         case "processing":
             return "Waiting for parser response now";
         case "success":
@@ -974,7 +976,7 @@ function installUserDataResetAction() {
 
     button.dataset.bound = "true";
     button.addEventListener("click", () => {
-        if (!window.confirm(getUiConfig("prompts.remove_data_confirm", "Remove all Alfred data for this account, including uploaded documents and cached summaries? Your login stays active, and you can start fresh afterward."))) {
+        if (!window.confirm(getUiConfig("prompts.remove_data_confirm", "Remove all ALFRED data for this account, including uploaded documents and cached summaries? Your login stays active, and you can start fresh afterward."))) {
             return;
         }
 
@@ -987,11 +989,11 @@ function installUserDataResetAction() {
             body: JSON.stringify({}),
         })
             .then(data => {
-                window.alert(data.detail || getUiConfig("prompts.remove_data_success", "Your Alfred data has been removed."));
+                window.alert(data.detail || getUiConfig("prompts.remove_data_success", "Your ALFRED data has been removed."));
                 window.location.assign(document.body.dataset.homeUrl || "/");
             })
             .catch(error => {
-                window.alert(error.message || getUiConfig("prompts.remove_data_failure", "Could not remove your Alfred data."));
+                window.alert(error.message || getUiConfig("prompts.remove_data_failure", "Could not remove your ALFRED data."));
             })
             .finally(() => {
                 button.disabled = false;
@@ -1035,7 +1037,7 @@ function renderMlRuntimeBanner(host, payload) {
         : getUiConfig("ml_runtime.banner.runtime_title", "ALFRED ML runtime needs attention");
     const body = setupState === "awaiting_approval"
         ? getUiConfig("ml_runtime.banner.approval_body", "Approve startup auto-training once. After that, ALFRED can run training automatically on future startups when the local runtime is healthy.")
-        : getUiConfig("ml_runtime.banner.runtime_body", "Training can still use the built-in Alfred fallback models, but scikit-learn-backed training needs the local Windows policy to allow its native files.");
+        : getUiConfig("ml_runtime.banner.runtime_body", "Training can still use the built-in ALFRED fallback models, but scikit-learn-backed training needs the local Windows policy to allow its native files.");
     const approvalMeta = approval.granted
         ? `<div class="small muted mt-2">Approved by ${escapeHtml(approval.approved_by || "superuser")}${approval.approved_at ? ` on ${escapeHtml(formatDateTime(approval.approved_at))}` : ""}.</div>`
         : "";

@@ -231,7 +231,7 @@ function renderLoanTable(loans) {
                 <td class="text-end">${money(item.emi)}</td>
                 <td class="text-end">${money(item.estimated_balance)}${item.balance_label ? `<div class="muted small" data-balance-basis="estimated">${Alfred.escapeHtml(item.balance_label)}</div>` : ""}</td>
                 <td class="text-end">${confirmed ? item.months_remaining : `<span class="muted" title="Worked out from guessed terms">-</span>`}</td>
-                <td class="small">
+                <td class="small loan-extra-cell">
                     ${confirmed ? `<div>${money(item.recommended_prepayment)}</div>
                     <div class="muted">An example, not advice: check it in Prepayment what-if, which also shows the cash it leaves you.</div>
                     <div class="muted">Projected end: ${Alfred.formatDate(item.projected_end_date)}</div>` : "Review loan terms first"}
@@ -382,7 +382,7 @@ function resetLoanForm() {
     form.elements.home_other_upfront_payments.value = 0;
     form.elements.confirm_estimate.checked = false;
     document.getElementById("loanVerificationFields").classList.add("d-none");
-    document.getElementById("loanSubmitButton").textContent = "Save Loan";
+    document.getElementById("loanSubmitButton").textContent = "Save loan";
     document.getElementById("loanFormError").classList.add("d-none");
     toggleHomeLoanFields();
 }
@@ -622,7 +622,7 @@ function detectLoansFromExpenses() {
         .catch(error => showLoanImportStatus(error.message, "danger"))
         .finally(() => {
             button.disabled = false;
-            button.textContent = "Detect From Expenses";
+            button.textContent = "Detect from Expenses";
         });
 }
 
@@ -716,8 +716,8 @@ function updateHomeLoanDerivedFields() {
     const isHomeLoan = String(form.elements.loan_type.value || "").toLowerCase() === "home";
     if (!isHomeLoan) {
         form.elements.home_down_payment.readOnly = false;
-        hint.textContent = "Enter the upfront cash used at purchase, or let Alfred derive it automatically when purchase price is set.";
-        summary.textContent = "For home loans, Alfred uses the purchase price when you provide it. Otherwise it falls back to financed loan amount plus down payment to estimate the acquisition-cost base.";
+        hint.textContent = "Enter the upfront cash used at purchase, or let ALFRED derive it automatically when purchase price is set.";
+        summary.textContent = "For home loans, ALFRED uses the purchase price when you provide it. Otherwise it falls back to financed loan amount plus down payment to estimate the acquisition-cost base.";
         return;
     }
 
@@ -732,10 +732,10 @@ function updateHomeLoanDerivedFields() {
         form.elements.home_down_payment.readOnly = true;
         hint.textContent = purchasePrice >= principal
             ? "Down payment is being derived automatically from purchase price minus financed loan amount."
-            : "Purchase price is below financed loan amount. Alfred will ask you to correct this before saving.";
+            : "Purchase price is below financed loan amount. ALFRED will ask you to correct this before saving.";
     } else {
         form.elements.home_down_payment.readOnly = false;
-        hint.textContent = "Enter the upfront cash used at purchase, or let Alfred derive it automatically when purchase price is set.";
+        hint.textContent = "Enter the upfront cash used at purchase, or let ALFRED derive it automatically when purchase price is set.";
         downPayment = Number(form.elements.home_down_payment.value || 0);
     }
 

@@ -7,7 +7,7 @@
         <div>
             <div class="alfred-chip mb-3">ALFRED / AI Travel Planner</div>
             <h1 class="alfred-hero-title">Plan your next escape.</h1>
-            <p class="alfred-hero-copy">Tell Alfred when you're free, your budget, or what kind of trip you're craving. You don't need a destination to begin.</p>
+            <p class="alfred-hero-copy">Tell ALFRED when you're free, your budget, or what kind of trip you're craving. You don't need a destination to begin.</p>
             <div data-currency-toggle class="mt-2"></div>
         </div>
         <div class="small">
@@ -23,7 +23,7 @@
 <div id="mobilityPageAlert" class="d-none mb-4"></div>
 
 <details class="mb-4" id="planDetails" hidden>
-    <summary class="page-section-title">Plan Details · Edit saved plan</summary>
+    <summary class="page-section-title">Plan details · edit saved plan</summary>
 <section class="row g-4 mt-1">
     <div class="col-xl-12">
         <div class="surface-card h-100">
@@ -32,7 +32,7 @@
             <form id="travelPlanForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label" for="tripTitle">Trip Title</label>
+                        <label class="form-label" for="tripTitle">Trip title</label>
                         <input id="tripTitle" name="title" class="form-control" required>
                     </div>
                     <div class="col-md-6">
@@ -62,7 +62,7 @@
                         <div class="form-text">Only INR (or not recorded) counts in rupee totals; nothing is converted.</div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="transportMode">Transport Mode</label>
+                        <label class="form-label" for="transportMode">Transport mode</label>
                         <select id="transportMode" name="transport_mode" class="form-select">
                             <option value="ride">Bike Ride</option>
                             <option value="roadtrip">Road Trip</option>
@@ -72,7 +72,7 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="travelVehicleProfile">Vehicle Profile</label>
+                        <label class="form-label" for="travelVehicleProfile">Vehicle profile</label>
                         <select id="travelVehicleProfile" name="vehicle_profile" class="form-select">
                             <option value="">Optional vehicle link</option>
                         </select>
@@ -92,7 +92,7 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="stayDetails">Stay Details</label>
+                        <label class="form-label" for="stayDetails">Stay details</label>
                         <input id="stayDetails" name="stay_details" class="form-control" placeholder="Hotel, campsite, homestay">
                     </div>
                     <div class="col-12">
@@ -102,12 +102,12 @@
                 </div>
                 <div id="travelPlanFeedback" class="d-none alert mb-0"></div>
                 <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-primary" type="submit">Update Details</button>
+                    <button class="btn btn-primary" type="submit">Update details</button>
                     <button class="btn btn-outline-primary" type="button" id="travelAdviceButton">Continue planning in chat</button>
                 </div>
             </form>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Travel Advisor</h3>
+                <h3 class="h6 fw-bold mb-3">Travel advisor</h3>
                 <div id="travelAdvisorPanel" class="data-stack">
                     <div class="empty-state">Use the conversation above for discovery, research and itinerary changes.</div>
                 </div>
@@ -130,7 +130,7 @@
                         <select id="tripLogPlan" name="travel_plan" class="form-select" required></select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="logDate">Log Date</label>
+                        <label class="form-label" for="logDate">Log date</label>
                         <input id="logDate" name="log_date" type="date" class="form-control" required>
                     </div>
                     <div class="col-md-6">
@@ -138,7 +138,7 @@
                         <input id="logTitle" name="title" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="logLocation">Location Name</label>
+                        <label class="form-label" for="logLocation">Location name</label>
                         <input id="logLocation" name="location_name" class="form-control" list="worldPlaces" autocomplete="off">
                     </div>
                     <div class="col-md-4">
@@ -176,7 +176,7 @@
                     </div>
                 </div>
                 <div id="tripLogFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Trip Log</button>
+                <button class="btn btn-primary" type="submit">Save trip log</button>
             </form>
         </div>
     </div>
@@ -191,7 +191,7 @@
                         <select id="photoPlan" name="travel_plan" class="form-select"></select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="photoLog">Trip Log</label>
+                        <label class="form-label" for="photoLog">Trip log</label>
                         <select id="photoLog" name="trip_log" class="form-select"></select>
                     </div>
                     <div class="col-12">
@@ -203,7 +203,7 @@
                         <input id="photoCaption" name="caption" class="form-control">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="photoLocation">Location Name</label>
+                        <label class="form-label" for="photoLocation">Location name</label>
                         <input id="photoLocation" name="location_name" class="form-control">
                     </div>
                     <div class="col-md-4">
@@ -215,12 +215,12 @@
                         <input id="photoLongitude" name="longitude" type="number" step="0.000001" class="form-control">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label" for="photoTakenAt">Taken At</label>
+                        <label class="form-label" for="photoTakenAt">Taken at</label>
                         <input id="photoTakenAt" name="taken_at" type="datetime-local" class="form-control">
                     </div>
                 </div>
                 <div id="tripPhotoFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Upload Photo</button>
+                <button class="btn btn-primary" type="submit">Upload photo</button>
             </form>
         </div>
     </div>
@@ -319,7 +319,7 @@
         </div>
         <div class="col-12">
             <div id="tripVideoFeedback" class="d-none alert mb-2"></div>
-            <button class="btn btn-primary" type="submit">Upload Video</button>
+            <button class="btn btn-primary" type="submit">Upload video</button>
         </div>
     </div>
     </form>
@@ -328,8 +328,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="/static/css/travel_planner.css?v=cards3">
-<script src="/static/js/mobility.js?v=10"></script>
+<link rel="stylesheet" href="/static/css/travel_planner.css?v=cards4">
+<script src="/static/js/mobility.js?v=11"></script>
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/vendor/protomaps-leaflet/protomaps-leaflet.js?v=5.1.0"></script>
@@ -341,7 +341,7 @@
 <script src="/static/js/travel_affordability.js?v=2"></script>
 <script src="/static/js/travel_suggestions.js?v=4"></script>
 <script src="/static/js/travel_gallery.js?v=5"></script>
-<script src="/static/js/travel_planner.js?v=cards3"></script>
+<script src="/static/js/travel_planner.js?v=cards4"></script>
 <script src="/static/js/travel_preferences.js?v=2"></script>
 <script src="/static/js/travel_trip_tools.js?v=5"></script>
 {% endblock %}

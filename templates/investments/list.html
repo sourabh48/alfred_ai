@@ -35,7 +35,7 @@
                     <th>Position</th>
                     <th class="text-end">Invested</th>
                     <th class="text-end">Current</th>
-                    <th class="text-end">Gain / Loss</th>
+                    <th class="text-end">Gain / loss</th>
                     <th class="text-end">SIP</th>
                     <th>Risk</th>
                 </tr>
@@ -83,7 +83,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Import Portfolio PDF</h2>
+            <h2 class="page-section-title">Import portfolio PDF</h2>
             <p class="page-section-copy mb-3">Extract a portfolio PDF, review its values and currency, then explicitly confirm. Uploading does not change holdings.</p>
             <div class="row g-3 align-items-end mb-4">
                 <div class="col-lg-8">
@@ -91,23 +91,23 @@
                     <input id="investmentPdfFiles" type="file" class="form-control" accept=".pdf,application/pdf" multiple>
                 </div>
                 <div class="col-lg-4 d-grid">
-                    <button id="uploadInvestmentPdfBtn" class="btn btn-dark" type="button">Extract for Review</button>
+                    <button id="uploadInvestmentPdfBtn" class="btn btn-dark" type="button">Extract for review</button>
                 </div>
             </div>
             <div id="investmentImportStatus" class="mb-4"></div>
             <div class="mb-4">
-                <h3 class="h6 fw-bold mb-3">Recent PDF Imports</h3>
+                <h3 class="h6 fw-bold mb-3">Recent PDF imports</h3>
                 <div id="investmentImportList" class="data-stack stack-scroll stack-scroll-sm" role="region" aria-label="Recent portfolio imports" tabindex="0">
                     <div class="empty-state">No portfolio imports tracked yet.</div>
                 </div>
             </div>
 
-            <h2 class="page-section-title">Add Position</h2>
+            <h2 class="page-section-title">Add position</h2>
             <p class="page-section-copy mb-3">Register each investment so ALFRED can calculate allocation, SIP exposure, and risk concentration.</p>
             <form id="investmentForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label" for="investmentType">Asset Type</label>
+                        <label class="form-label" for="investmentType">Asset type</label>
                         <select id="investmentType" name="asset_type" class="form-select" required>
                             <option value="equity">Equity</option>
                             <option value="mutual_fund">Mutual Fund</option>
@@ -119,7 +119,7 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="investmentName">Asset Name</label>
+                        <label class="form-label" for="investmentName">Asset name</label>
                         <input id="investmentName" name="asset_name" class="form-control" required>
                     </div>
                     <div class="col-md-6">
@@ -127,11 +127,11 @@
                         <input id="investmentInstitution" name="institution" class="form-control">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="investmentAccountNumber">Account / Folio</label>
+                        <label class="form-label" for="investmentAccountNumber">Account / folio</label>
                         <input id="investmentAccountNumber" name="account_number" class="form-control" placeholder="Folio, demat, or broker account">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="investmentRisk">Risk Level</label>
+                        <label class="form-label" for="investmentRisk">Risk level</label>
                         <input id="investmentRisk" name="risk_level" class="form-control" placeholder="Low, Moderate, High">
                     </div>
                     <div class="col-md-6">
@@ -176,7 +176,7 @@
                         <input id="investmentSip" name="monthly_sip" type="number" step="0.01" class="form-control" value="0">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="investmentReturn">Assumed Annual Return %</label>
+                        <label class="form-label" for="investmentReturn">Assumed annual return %</label>
                         <input id="investmentReturn" name="annual_return_rate" type="number" step="0.01" class="form-control" value="0">
                     </div>
                     <div class="col-12">
@@ -185,7 +185,7 @@
                     </div>
                 </div>
                 <div id="investmentFormFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Position</button>
+                <button class="btn btn-primary" type="submit">Save position</button>
             </form>
         </div>
     </div>
@@ -205,12 +205,12 @@
                 </div>
             </div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-2">Portfolio Guidance</h3>
+                <h3 class="h6 fw-bold mb-2">Portfolio guidance</h3>
                 <p class="page-section-copy mb-3" id="investmentGuidanceBasis">Rule-based checks of your recorded holdings using fixed asset-class risk weights. General information, not personalised or certified investment advice.</p>
                 <ul class="insight-list" id="investmentRecommendationList"></ul>
             </div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Market Grounding</h3>
+                <h3 class="h6 fw-bold mb-3">Market grounding</h3>
                 <div class="soft-grid two-up mb-3" id="investmentGroundingCards"></div>
                 <ul class="insight-list" id="investmentGroundingEvidence"></ul>
             </div>
@@ -221,7 +221,7 @@
 <section class="surface-card mb-4" id="investmentWatchlistSection">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
         <div>
-            <h2 class="page-section-title mb-1">Short-Horizon Fund Watchlist</h2>
+            <h2 class="page-section-title mb-1">Short-Horizon fund watchlist</h2>
             <p class="page-section-copy mb-0">A transparent 1-2 month watchlist built from official AMFI NAV data, current market regime, and your current portfolio mix. This is a watchlist, not a guaranteed return promise.</p>
         </div>
         <div class="surface-card surface-card--compact investment-watchlist-hero">
@@ -236,13 +236,13 @@
     <div class="row g-4">
         <div class="col-xl-5">
             <div class="surface-card h-100">
-                <h3 class="h6 fw-bold mb-3">How Alfred Scores It</h3>
+                <h3 class="h6 fw-bold mb-3">How ALFRED scores it</h3>
                 <div id="investmentWatchlistAlgorithm"></div>
             </div>
         </div>
         <div class="col-xl-7">
             <div class="surface-card h-100">
-                <h3 class="h6 fw-bold mb-3">Evidence and Proof</h3>
+                <h3 class="h6 fw-bold mb-3">Evidence and proof</h3>
                 <ul class="insight-list" id="investmentWatchlistEvidence"></ul>
             </div>
         </div>
@@ -336,7 +336,7 @@
 
 <section class="surface-card mb-4" id="researchJournalSection" aria-labelledby="researchJournalTitle">
     <h2 id="researchJournalTitle" class="page-section-title mb-1">Research journal</h2>
-    <p class="page-section-copy">Search stocks and market symbols. Alfred saves your last 20 searches and checks up to three each day while the app is running. Personal notes are optional; holdings are never changed.</p>
+    <p class="page-section-copy">Search stocks and market symbols. ALFRED saves your last 20 searches and checks up to three each day while the app is running. Personal notes are optional; holdings are never changed.</p>
     <details class="mb-3" open><summary>Recent searches & automatic reviews</summary><div id="researchSearches" class="data-stack mt-2" aria-live="polite"></div><button id="researchSearchClear" class="btn btn-sm btn-outline-secondary mt-2" type="button" disabled>Clear search history</button><p class="small mt-2">Clearing stops future reviews for these searches. Existing review notices can be dismissed on Home.</p></details>
     <form id="researchPacketForm" class="soft-grid" data-live-refresh-hold="true">
         <h3 class="h6 mb-0">Search a stock or market</h3>

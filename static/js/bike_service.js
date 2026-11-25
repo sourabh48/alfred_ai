@@ -182,7 +182,7 @@ function renderBikeServiceSummary(summary) {
         ["Lifetime Service Spend", Alfred.formatCurrency(summary.total_service_cost || 0), `${Alfred.formatNumber(summary.service_count || 0, 0)} service logs | ${Alfred.formatCurrency(summary.annual_service_cost || 0)} this year`],
         ["Trip Costing", Alfred.formatCurrency(summary.trip_cost_total || 0), `${Alfred.formatNumber(summary.trip_distance_total || 0, 1)} km | ${summary.trip_cost_per_km ? `${Alfred.formatCurrency(summary.trip_cost_per_km)} / km` : "No cost/km yet"}`],
         ["Compliance", `${Alfred.formatNumber(summary.document_compliance_score || 0, 0)}/100`, `${Alfred.formatNumber(summary.expiring_documents || 0, 0)} expiring | ${Alfred.formatNumber(summary.missing_required_documents || 0, 0)} missing required`],
-        ["Mileage vs Optimal", mileageValue, mileageCaption],
+        ["Mileage vs optimal", mileageValue, mileageCaption],
         [
             "Route Wear",
             summary.route_wear_index ? `${Alfred.formatNumber(summary.route_wear_index, 1)}/100` : "No route signal",
@@ -1059,7 +1059,7 @@ function setBikeProfileFormMode(profile) {
         cancelButton.classList.remove("d-none");
         return;
     }
-    submitButton.textContent = "Save Vehicle Profile";
+    submitButton.textContent = "Save vehicle profile";
     cancelButton.classList.add("d-none");
 }
 

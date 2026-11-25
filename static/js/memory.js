@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("memorySyncEnabled").disabled = !sync.available;
         document.querySelector("#memorySyncForm button[type=submit]").disabled = !sync.available;
         document.getElementById("memorySyncNow").disabled = !sync.available || !sync.status.enabled;
-        document.getElementById("memorySyncNow").textContent = sync.status.failures ? "Retry encrypted updates" : "Sync Now";
+        document.getElementById("memorySyncNow").textContent = sync.status.failures ? "Retry encrypted updates" : "Sync now";
         const stamp = value => value ? new Date(value*1000).toLocaleString() : "Not recorded";
         document.getElementById("memorySyncDetails").textContent = `${sync.provider === 'mock' ? 'Synthetic provider only. ' : ''}Sync ${sync.status.enabled ? 'enabled' : 'disabled'}. Last successful sync: ${stamp(sync.status.last_success_at)}. Retry after: ${stamp(sync.status.retry_at)}. Deletion propagation follows this encrypted queue; historical backups retain their original copies.`;
         document.getElementById("memorySyncRecover").hidden = !sync.available || !sync.status.enabled || !sync.status.conflict;

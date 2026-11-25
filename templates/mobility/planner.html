@@ -1,5 +1,5 @@
 <nav class="travel-flow mb-3" aria-label="Trip planning steps">
-    <a href="#travelPlanner" id="plannerStepPlan">1 · Tell Alfred</a>
+    <a href="#travelPlanner" id="plannerStepPlan">1 · Tell ALFRED</a>
     <a href="#plannerResults" id="plannerStepChoose">2 · Choose a place</a>
     <a href="#plannerItinerary" id="plannerStepReview">3 · Review your trip</a>
     <p id="plannerNextStep" class="small mb-0" role="status">Start with your days off and starting city.</p>
@@ -14,7 +14,7 @@
         <div id="plannerMessages" class="travel-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Travel conversation"></div>
     <div id="plannerChips" class="travel-chips" role="group" aria-label="Quick replies"></div>
         <form id="plannerComposer" class="travel-composer">
-            <label for="plannerInput" class="visually-hidden">Message Alfred about your trip</label>
+            <label for="plannerInput" class="visually-hidden">Message ALFRED about your trip</label>
             <input id="plannerInput" type="text" class="form-control" maxlength="2000" autocomplete="off" placeholder="3 days, ₹15,000, somewhere peaceful…" required>
             <button type="submit" class="btn btn-primary" id="plannerSend" disabled>Send</button>
         </form>
@@ -30,10 +30,10 @@
     <aside class="travel-sidebar">
         <section class="surface-card"><h2 class="h5">Trip in focus</h2><div id="plannerContext" class="small">Start with an idea. We'll fill in the details together.</div>
             <label for="plannerVehicle" class="form-label small mt-3">Vehicle for this trip</label><select id="plannerVehicle" class="form-select"><option value="">Choose when relevant</option></select>
-            <details class="mt-3"><summary class="small">What Alfred understood</summary><div id="plannerProvenance" class="small mt-2"></div></details>
+            <details class="mt-3"><summary class="small">What ALFRED understood</summary><div id="plannerProvenance" class="small mt-2"></div></details>
         </section>
         <section class="surface-card"><h2 class="h5">Your plans</h2><div id="plannerPlans" class="travel-session-list"></div><details class="mt-3"><summary>Your conversations</summary><div id="plannerSessions" class="travel-session-list mt-2"></div></details></section>
-        <section class="surface-card"><h2 class="h5">Made for you</h2><p class="small mb-0">Alfred learns from the trips you choose. Tell the chat when your preferences change.</p><div id="plannerStyle" class="travel-chips mt-2"></div><details class="mt-2"><summary class="small">Privacy and corrections</summary><a href="/settings/#travelPreferences">Review or forget travel preferences</a></details></section>
+        <section class="surface-card"><h2 class="h5">Made for you</h2><p class="small mb-0">ALFRED learns from the trips you choose. Tell the chat when your preferences change.</p><div id="plannerStyle" class="travel-chips mt-2"></div><details class="mt-2"><summary class="small">Privacy and corrections</summary><a href="/settings/#travelPreferences">Review or forget travel preferences</a></details></section>
     </aside>
 </section>
 <nav id="plannerTripActions" class="travel-actions mb-3" aria-label="Explore your selected trip" hidden><a class="btn btn-outline-primary" href="#plannerAttractions">Attractions & offbeat leads</a><a class="btn btn-outline-primary" href="#plannerStays">Find a stay</a><a class="btn btn-outline-primary" href="#plannerMapPanel">Map & routes</a><a class="btn btn-outline-primary" href="#tripToolsSection" id="plannerToolsLink" hidden>Bookings & ride</a><a class="btn btn-primary" href="#plannerItinerary">Review itinerary</a></nav>
@@ -104,7 +104,7 @@
 <section id="plannerPacking" class="surface-card mb-4" aria-label="Private packing checklist"></section>
 <section id="plannerReminders" class="surface-card mb-4" aria-label="Local trip reminders"></section>
 <section id="plannerAffordability" class="surface-card mb-4" aria-label="Saved-trip affordability" hidden>
-    <details id="plannerAffordabilityDetails"><summary>Saved-trip affordability and What-if</summary>
+    <details id="plannerAffordabilityDetails"><summary>Saved-trip affordability and what-if</summary>
         <p>Current cash with one month of protected obligations. Future income and spending before departure are not projected. These are private planning scenarios, not certified financial advice.</p>
         <button id="plannerAffordabilityReload" type="button" class="btn btn-sm btn-outline-primary">Reload financial evidence</button>
         <p id="plannerAffordabilityStatus" role="status" aria-live="polite"></p>

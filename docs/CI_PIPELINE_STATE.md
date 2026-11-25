@@ -16,8 +16,8 @@ passed; backend shard 2 failed and `native-windows` with it. The same 72-file sh
 `test_data_sources` page-read policy, which flagged the usage-analytics middleware for checking ALFRED's own `text/html`
 reply type (it fetches no website). Fixed in `4b24596` with a named exemption beside the existing one. Also `3e02001`:
 the Telegram listener asked for 15-second reads while the web helper stops reading after 5 seconds, so every read timed
-out in the owner's app; it now waits 4 seconds (live check with the owner's bot: a 4-second read returns). LOCAL_TESTING;
-the push needs the owner's OK.
+out in the owner's app; it now waits 4 seconds (live check with the owner's bot: a 4-second read returns). Pushed with the owner's
+OK. CI_PASSED on `07c06ef` (Browser Regression 45606139279: all 11 jobs success); applies to `07c06ef` only.
 
 ## Partial-ID completion, Gemini and backup key — 2026-11-19
 

@@ -382,7 +382,7 @@ function submitTripPhoto(event) {
     Alfred.fetchJSON("/api/mobility/trip-photos/", { method: "POST", body: payload })
         .then(() => { form.reset(); setMobilityDefaults(); showFeedback("tripPhotoFeedback", "Trip photo uploaded.", "success"); loadMobilityDashboard(); TravelPlanner.refreshPostTrip(); })
         .catch(error => showFeedback("tripPhotoFeedback", error.message, "danger"))
-        .finally(() => { button.disabled = false; button.textContent = "Upload Photo"; });
+        .finally(() => { button.disabled = false; button.textContent = "Upload photo"; });
 }
 
 function deleteTravelPlan(id) { deleteRecord(`/api/mobility/travel-plans/${id}/`, "Delete this travel plan and its logs/photos?"); }
@@ -418,7 +418,7 @@ function submitTripVideo(event) {
     Alfred.fetchJSON("/api/mobility/trip-videos/", { method: "POST", body: payload })
         .then(() => { form.reset(); showFeedback("tripVideoFeedback", "Trip video saved privately on this PC.", "success"); loadTripVideos(); })
         .catch(error => showFeedback("tripVideoFeedback", error.message, "danger"))
-        .finally(() => { button.disabled = false; button.textContent = "Upload Video"; });
+        .finally(() => { button.disabled = false; button.textContent = "Upload video"; });
 }
 function deleteTripVideo(id) {
     if (!window.confirm("Delete this trip video? The file is removed from this PC; backups you made earlier keep their copy.")) return;

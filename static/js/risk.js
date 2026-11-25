@@ -60,12 +60,12 @@ function renderRiskSummary(summary, outlook, consolidated, items) {
             copy: summary.highest_label || "No category yet",
         },
         {
-            title: "Related News",
+            title: "Related news",
             value: Alfred.formatNumber(summary.news_count || 0, 0),
             copy: "Verified internet-backed articles in the current view",
         },
         {
-            title: "Action Queue",
+            title: "Action queue",
             value: Alfred.formatNumber(summary.action_count || 0, 0),
             copy: `${items.length} manual snapshots stored`,
         },

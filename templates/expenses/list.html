@@ -18,9 +18,9 @@
         </nav>
     </div>
     <div class="d-flex flex-wrap gap-2">
-        <a id="expenseExportBtn" class="btn btn-secondary text-nowrap" href="/api/expenses/export/" download="alfred-expenses.csv" title="Download all your transactions as CSV">Export all (CSV)</a>
-        <a id="financialExportBtn" class="btn btn-secondary text-nowrap" href="/api/expenses/export/financial/" download="alfred-financial-data.zip" title="Download bank accounts, transactions, loans, investments and budgets as CSV files in one ZIP. Account numbers show only their last 4 digits.">Export financial data (ZIP)</a>
-        <button class="btn btn-primary text-nowrap" type="button" onclick="openCreateModal()">Add Expense</button>
+        <a id="expenseExportBtn" class="btn btn-outline-primary text-nowrap" href="/api/expenses/export/" download="alfred-expenses.csv" title="Download all your transactions as CSV">Export all (CSV)</a>
+        <a id="financialExportBtn" class="btn btn-outline-primary text-nowrap" href="/api/expenses/export/financial/" download="alfred-financial-data.zip" title="Download bank accounts, transactions, loans, investments and budgets as CSV files in one ZIP. Account numbers show only their last 4 digits.">Export financial data (ZIP)</a>
+        <button class="btn btn-primary text-nowrap" type="button" onclick="openCreateModal()">Add expense</button>
     </div>
 </div>
 
@@ -46,7 +46,7 @@
                 <div class="small text-muted" id="lastUploadMeta">ALFRED reads the file on this computer and shows what it found. Nothing is saved until you review it.</div>
             </div>
             <div class="col-lg-2 d-grid">
-                <button id="uploadStatementBtn" class="btn btn-dark" type="button">Extract for review</button>
+                <button id="uploadStatementBtn" class="btn btn-primary" type="button">Extract for review</button>
             </div>
         </div>
         <p class="small text-muted mt-2 mb-0">Loan papers, vehicle files and CVs go in <a href="/documents/#docUpload">Documents</a>.</p>
@@ -223,6 +223,6 @@
     <div class="d-flex gap-2"><button id="bankAccountsPrevious" class="btn btn-outline-secondary" type="button" disabled>Previous page</button><button id="bankAccountsNext" class="btn btn-outline-secondary" type="button" disabled>Next page</button></div>
 </section>
 {% include "expenses/modal_add.html" %}
-<script src="/static/js/expenses.js?v=3.10.5"></script>
+<script src="/static/js/expenses.js?v=3.10.6"></script>
 </div>
 {% endblock %}

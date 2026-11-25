@@ -22,7 +22,7 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Monthly Plan</h2>
+            <h2 class="page-section-title">Monthly plan</h2>
             <p class="page-section-copy mb-3">Capture one budget plan per month so ALFRED has a target to compare against live spending.</p>
             <form id="budgetPlanForm" class="soft-grid">
                 <div class="row g-3">
@@ -31,11 +31,11 @@
                         <input id="budgetMonth" name="month" class="form-control" placeholder="Apr 2026" required>
                     </div>
                     <div class="col-md-6">
-                        <label for="budgetBase" class="form-label">Base Budget</label>
+                        <label for="budgetBase" class="form-label">Base budget</label>
                         <input id="budgetBase" name="base_budget" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label for="budgetInflation" class="form-label">Adjusted Budget</label>
+                        <label for="budgetInflation" class="form-label">Adjusted budget</label>
                         <input id="budgetInflation" name="inflation_adjusted" type="number" step="0.01" class="form-control" required>
                     </div>
                     <div class="col-md-6">
@@ -51,11 +51,11 @@
                     </div>
                 </div>
                 <div id="budgetPlanFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Budget Plan</button>
+                <button class="btn btn-primary" type="submit">Save budget plan</button>
             </form>
 
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Recent Plans</h3>
+                <h3 class="h6 fw-bold mb-3">Recent plans</h3>
                 <div id="budgetHistoryList" class="mini-list"></div>
             </div>
         </div>
@@ -94,11 +94,11 @@
     </div>
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Budget Recommendations</h2>
+            <h2 class="page-section-title">Budget recommendations</h2>
             <p class="page-section-copy mb-3">Guidance uses recorded income, fixed obligations and spending. A daily plan limit does not confirm affordability; allow separately for savings and unrecorded bills.</p>
             <ul class="insight-list mb-4" id="budgetSuggestionList"></ul>
             <div>
-                <h3 class="h6 fw-bold mb-3">Daily Budget Guide</h3>
+                <h3 class="h6 fw-bold mb-3">Daily budget guide</h3>
                 <div id="budgetDailyStatus" class="empty-state">Daily affordability will appear once budget data is available.</div>
             </div>
         </div>
@@ -106,7 +106,7 @@
 </section>
 
 <section class="surface-card mt-4" id="savingsGoalsSection" aria-labelledby="savingsGoalsTitle">
-    <h2 class="page-section-title" id="savingsGoalsTitle">Savings Goals</h2>
+    <h2 class="page-section-title" id="savingsGoalsTitle">Savings goals</h2>
     <p class="page-section-copy mb-3">Set a target in its currency and update what you have saved. Progress is what you enter, not matched transactions; the monthly amount spreads what is left evenly until the target date.</p>
     <form id="savingsGoalForm" class="row g-3 align-items-end mb-3">
         <div class="col-md-4">
@@ -146,5 +146,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/budgets.js?v=2.6.0"></script>
+<script src="/static/js/budgets.js?v=2.6.1"></script>
 {% endblock %}

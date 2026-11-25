@@ -22,16 +22,16 @@
 <section class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Partner Profile</h2>
+            <h2 class="page-section-title">Partner profile</h2>
             <p class="page-section-copy mb-3">Record the partner profile ALFRED should use for compatibility analysis.</p>
             <form id="relationshipForm" class="soft-grid">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label" for="partnerName">Partner Name</label>
+                        <label class="form-label" for="partnerName">Partner name</label>
                         <input id="partnerName" name="partner_name" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="partnerFinancialScore">Financial Score</label>
+                        <label class="form-label" for="partnerFinancialScore">Financial score</label>
                         <input id="partnerFinancialScore" name="partner_financial_score" type="number" min="0" max="100" step="0.1" class="form-control" required>
                     </div>
                     <div class="col-md-6">
@@ -39,26 +39,26 @@
                         <input id="partnerSavingsHabits" name="partner_savings_habits" type="number" min="1" max="5" class="form-control" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label" for="relationshipCompatibility">Compatibility Score</label>
+                        <label class="form-label" for="relationshipCompatibility">Compatibility score</label>
                         <input id="relationshipCompatibility" name="compatibility_score" type="number" min="0" max="100" step="0.1" class="form-control" required>
                     </div>
                 </div>
                 <div id="relationshipFormFeedback" class="d-none alert mb-0"></div>
-                <button class="btn btn-primary" type="submit">Save Relationship Profile</button>
+                <button class="btn btn-primary" type="submit">Save relationship profile</button>
             </form>
         </div>
     </div>
     <div class="col-xl-7">
         <div class="surface-card h-100">
-            <h2 class="page-section-title">Alignment Factors</h2>
+            <h2 class="page-section-title">Alignment factors</h2>
             <p class="page-section-copy mb-3">Each scored factor out of 100. Factors without data are left out and named in the summary above.</p>
             <div class="chart-box"><canvas id="relationshipRadar"></canvas></div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Relationship Insights</h3>
+                <h3 class="h6 fw-bold mb-3">Relationship insights</h3>
                 <ul class="insight-list" id="relationshipInsightList"></ul>
             </div>
             <div class="mt-4">
-                <h3 class="h6 fw-bold mb-3">Grounding And Proof</h3>
+                <h3 class="h6 fw-bold mb-3">Grounding and proof</h3>
                 <div class="soft-grid two-up mb-3" id="relationshipFactorCards"></div>
                 <div class="soft-grid four-up mb-3" id="relationshipGroundingMeta"></div>
                 <ul class="insight-list" id="relationshipGroundingList"></ul>
@@ -69,14 +69,14 @@
 </section>
 
 <section class="surface-card">
-    <h2 class="page-section-title">Saved Profiles</h2>
+    <h2 class="page-section-title">Saved profiles</h2>
     <p class="page-section-copy mb-3">Partner profiles currently stored for this account.</p>
     <div class="table-responsive">
         <table class="table table-alfred align-middle mb-0 metric-table">
             <thead>
                 <tr>
                     <th>Partner</th>
-                    <th class="text-end">Financial Score</th>
+                    <th class="text-end">Financial score</th>
                     <th class="text-end">Savings Habit</th>
                     <th class="text-end">Compatibility</th>
                 </tr>
