@@ -14,7 +14,88 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     loadTaxDashboard();
     Alfred.enableLiveRefresh("tax-live", loadTaxDashboard, { rootId: "taxRoot" });
+    setupCapitalGains();
 });
+
+const CAPITAL_GAIN_ASSETS = [
+    ["listed_equity", "Listed shares or equity fund"],
+    ["listed_other", "Other listed security"],
+    ["debt_fund", "Debt fund (bought from 1 Apr 2023)"],
+    ["unlisted_bond", "Market-linked or unlisted bond"],
+    ["land_building", "Land or building"],
+    ["other", "Gold, unlisted shares, other"],
+];
+
+function setupCapitalGains() {
+    const form = document.getElementById("capitalGainsForm");
+    if (!form) return;
+    document.getElementById("capitalGainsAdd").addEventListener("click", () => addCapitalGainRow());
+    document.getElementById("capitalGainsRows").addEventListener("click", event => {
+        const button = event.target.closest("[data-remove-sale]");
+        if (button) button.closest("tr").remove();
+    });
+    form.addEventListener("submit", submitCapitalGains);
+    addCapitalGainRow();
+}
+
+function addCapitalGainRow() {
+    const body = document.getElementById("capitalGainsRows");
+    const n = body.rows.length + 1;
+    const row = body.insertRow();
+    const options = CAPITAL_GAIN_ASSETS.map(([value, label]) => `<option value="${value}">${Alfred.escapeHtml(label)}</option>`).join("");
+    Alfred.setHTML(row, `
+        <td><select class="form-select" name="asset_type" aria-label="Asset, sale ${n}">${options}</select></td>
+        <td><input class="form-control" type="date" name="bought" required aria-label="Bought on, sale ${n}"></td>
+        <td><input class="form-control" type="date" name="sold" required min="2026-04-01" max="2027-03-31" aria-label="Sold on, sale ${n}"></td>
+        <td><input class="form-control" type="number" name="cost" min="0" step="0.01" required aria-label="Cost, sale ${n}"></td>
+        <td><input class="form-control" type="number" name="sale_value" min="0" step="0.01" required aria-label="Sale value, sale ${n}"></td>
+        <td><input class="form-check-input" type="checkbox" name="stt_paid" checked aria-label="STT paid, sale ${n}"></td>
+        <td><input class="form-control" type="number" name="indexed_cost" min="0" step="0.01" aria-label="Indexed cost, sale ${n}"></td>
+        <td><button class="btn btn-sm btn-outline-danger" type="button" data-remove-sale aria-label="Remove sale ${n}">Remove</button></td>`);
+}
+
+function submitCapitalGains(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const sales = [...document.getElementById("capitalGainsRows").rows].map(row => {
+        const field = name => row.querySelector(`[name="${name}"]`);
+        return {
+            asset_type: field("asset_type").value, bought: field("bought").value, sold: field("sold").value,
+            cost: field("cost").value, sale_value: field("sale_value").value, stt_paid: field("stt_paid").checked,
+            indexed_cost: field("indexed_cost").value || null,
+        };
+    });
+    const target = document.getElementById("capitalGainsResult");
+    Alfred.fetchJSON("/api/integrations/tax/capital-gains/", {
+        method: "POST",
+        body: JSON.stringify({
+            regime: form.regime.value, annual_income: form.annual_income.value || 0,
+            deductions_total: form.deductions_total.value || 0, age_group: form.age_group.value, sales,
+        }),
+    }).then(data => renderCapitalGains(target, data))
+        .catch(error => Alfred.setHTML(target, `<div class="alert alert-danger mb-0" role="alert">${Alfred.escapeHtml(error.message)}</div>`));
+}
+
+function renderCapitalGains(target, data) {
+    const money = value => Alfred.formatCurrency(Number(value));
+    const buckets = Object.entries(data.net_gains)
+        .filter(([, value]) => Number(value))
+        .map(([key, value]) => `<li>${Alfred.escapeHtml(data.sales.find(s => s.bucket === key)?.bucket_label || key)}: ${money(value)}</li>`)
+        .join("");
+    const setoffs = data.loss_setoffs.map(item => `<li>Loss of ${money(item.amount)} set off</li>`).join("");
+    const unused = Number(data.unused_losses.short_term) + Number(data.unused_losses.long_term);
+    const review = data.needs_review.map(text => `<p class="mb-0 fw-semibold">${Alfred.escapeHtml(text)}</p>`).join("");
+    Alfred.setHTML(target, `
+        <div class="mini-card">
+            <div class="fw-semibold">Estimated total tax: ${money(data.final_tax)}</div>
+            <div class="muted small mt-1">Includes tax on your other income, rebate ${money(data.rebate)}, surcharge ${money(data.surcharge)} and cess ${money(data.cess)}.</div>
+            ${buckets ? `<ul class="small mt-2 mb-0">${buckets}</ul>` : ""}
+            ${setoffs ? `<ul class="small mt-2 mb-0">${setoffs}</ul>` : ""}
+            ${unused ? `<p class="small mt-2 mb-0">${money(unused)} of losses are left to carry forward (file your return on time to keep them).</p>` : ""}
+            ${review}
+            <p class="muted small mt-2 mb-0">Estimate under the Income-tax Act, 2025, sections ${Alfred.escapeHtml(Object.values(data.policy.sections).join(", "))}. Check with your tax filing before you rely on it.</p>
+        </div>`);
+}
 
 function loadTaxDashboard(queryOrOptions = taxDashboardQuery) {
     const live = typeof queryOrOptions === "object" && queryOrOptions !== null;
@@ -126,6 +207,8 @@ function renderTaxInputs(inputs) {
     form.metro.value = String(inputs.metro);
     form.qualified_80c.value = inputs.qualified_80c ?? "";
     form.qualified_home_loan_interest.value = inputs.qualified_home_loan_interest ?? "";
+    const gainsIncome = document.getElementById("cgIncome");
+    if (gainsIncome && !gainsIncome.value) gainsIncome.value = inputs.annual_income || "";
 }
 
 function renderTaxActions(items, incomeUnavailable) {

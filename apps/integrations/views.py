@@ -372,6 +372,25 @@ def tax_optimizer_overview(request):
     return Response({**payload, "home_loan": home_loan})
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def capital_gains_tax(request):
+    """Tax year 2026-27 capital gains estimate from sales the person enters; nothing is stored."""
+    from apps.ml_engine.services.capital_gains import calculate_capital_gains_tax
+
+    data = request.data
+    if not isinstance(data, dict):
+        return Response({"error": "Send the sales as a JSON object."}, status=400)
+    try:
+        result = calculate_capital_gains_tax(
+            data.get("sales"), annual_income=data.get("annual_income") or 0,
+            deductions_total=data.get("deductions_total") or 0, regime=data.get("regime", "new"),
+            income_type=data.get("income_type", "salary"), age_group=data.get("age_group", "under_60"))
+    except TaxPolicyError as exc:
+        return Response({"error": str(exc)}, status=400)
+    return Response(result)
+
+
 def _build_tax_optimizer_overview_payload(request, policy, deductions) -> dict:
     """Build the tax scenario for the selected year and qualifying amounts."""
     financial_baseline = resolve_canonical_financial_baseline(request.user)

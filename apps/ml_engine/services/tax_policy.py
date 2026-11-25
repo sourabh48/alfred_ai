@@ -103,6 +103,7 @@ class TaxPolicy:
             "scope": "Ordinary slab-rate income only; salary standard deduction only for salary income.",
             "deduction_basis": "Amounts must already qualify under the section; gross payments are not proof of eligibility.",
             "rounding": "Paise, half up; statutory return-filing rounding is not applied.",
+            # Capital gains for tax year 2026-27 are computed separately in capital_gains.py.
             "excluded": ["special-rate income", "capital gains", "lottery winnings", "agricultural integration", "loss set-offs", "tax credits"],
         }
 
@@ -241,6 +242,15 @@ def _slab_tax(taxable, slabs):
     return tax, breakdown
 
 
+def slabs_for(policy, *, resident=True, age_group="under_60"):
+    """Old-regime residents aged 60+ get a higher zero-tax slab; everyone else uses the policy slabs."""
+    slabs = policy.slabs
+    if policy.regime == "old" and resident and age_group != "under_60":
+        exemption = 300000 if age_group == "60_to_79" else 500000
+        slabs = ((exemption, 0),) + tuple(slab for slab in slabs[1:] if slab[0] is None or slab[0] > exemption)
+    return slabs
+
+
 def _surcharge_rate(taxable, policy):
     return next((rate for threshold, rate in reversed(policy.surcharge_bands) if taxable > threshold), ZERO)
 
@@ -283,10 +293,7 @@ def calculate_income_tax(annual_income, regime="old", deductions=None, *, financ
         accepted[section] = min(requested, cap) if cap is not None else requested
         if accepted[section] != requested:
             capped[section] = requested - accepted[section]
-    slabs = policy.slabs
-    if regime == "old" and resident and age_group != "under_60":
-        exemption = 300000 if age_group == "60_to_79" else 500000
-        slabs = ((exemption, 0),) + tuple(slab for slab in slabs[1:] if slab[0] is None or slab[0] > exemption)
+    slabs = slabs_for(policy, resident=resident, age_group=age_group)
     with localcontext() as context:
         context.prec = 40
         standard = min(income, policy.standard_deduction) if income_type == "salary" else ZERO

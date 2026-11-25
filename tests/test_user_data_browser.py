@@ -6809,6 +6809,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(self.browser.find_element(self.By.ID, "taxFinancialYear").get_attribute("value"), "2025-26")
         self.capture("tax-policy-2025-26")
 
+    def test_capital_gains_card_works_out_tax_for_an_entered_sale(self):
+        self.login()
+        self.browser.get(self.live_server_url + "/tax-optimizer/")
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, "#capitalGainsRows tr"))
+        row = self.browser.find_element(self.By.CSS_SELECTOR, "#capitalGainsRows tr")
+        self.wait.until(lambda _: self.browser.find_element(self.By.ID, "cgIncome").get_attribute("value") != ""
+                        or "Official-source rules verified" in self.text("taxPolicyCopy"))
+        self.browser.execute_script(
+            "document.getElementById('cgIncome').value='1000000';"
+            # Dates by script so the test does not depend on the browser's date-entry format.
+            "arguments[0].querySelector('[name=bought]').value='2024-01-10';"
+            "arguments[0].querySelector('[name=sold]').value='2026-06-01';", row)
+        row.find_element(self.By.NAME, "cost").send_keys("100000")
+        row.find_element(self.By.NAME, "sale_value").send_keys("400000")
+        self.browser.find_element(self.By.CSS_SELECTOR, "#capitalGainsForm button[type=submit]").click()
+        expected = self.browser.execute_script("return Alfred.formatCurrency(48750);")
+        self.wait.until(lambda _: expected in self.text("capitalGainsResult"))
+        self.assertIn("198", self.text("capitalGainsResult"))
+        self.run_axe_light_dark("tax-capital-gains")
+        self.capture("tax-capital-gains")
+
     def test_inferred_loan_requires_explicit_confirmation_on_real_page(self):
         from django.utils import timezone
         from apps.loans.models import Loan

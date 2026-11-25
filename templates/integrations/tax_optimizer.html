@@ -103,8 +103,54 @@
         </div>
     </div>
 </section>
+
+<section class="surface-card mt-4" id="capitalGainsCard" aria-labelledby="capitalGainsTitle">
+    <h2 class="page-section-title" id="capitalGainsTitle">Capital gains</h2>
+    <p class="page-section-copy mb-3">Tax year 2026-27 (Income-tax Act, 2025) for a resident. Enter each sale; nothing is saved. Losses are set off in the order that costs least. Not covered: losses carried from earlier years, reinvestment exemptions and the 2018 grandfathered cost for older shares.</p>
+    <form id="capitalGainsForm">
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <label class="form-label" for="cgRegime">Regime</label>
+                <select id="cgRegime" name="regime" class="form-select">
+                    <option value="new">New regime</option>
+                    <option value="old">Old regime</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="cgIncome">Other annual income (₹)</label>
+                <input id="cgIncome" name="annual_income" type="number" min="0" step="0.01" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="cgDeductions">Eligible deductions (₹)</label>
+                <input id="cgDeductions" name="deductions_total" type="number" min="0" step="0.01" class="form-control" value="0" aria-describedby="cgDeductionsHelp">
+                <p class="form-text mb-0" id="cgDeductionsHelp">New regime: only employer NPS and Agniveer.</p>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="cgAge">Age</label>
+                <select id="cgAge" name="age_group" class="form-select">
+                    <option value="under_60">Under 60</option>
+                    <option value="60_to_79">60 to 79</option>
+                    <option value="80_plus">80 or more</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Sales">
+            <table class="table align-middle" id="capitalGainsTable">
+                <caption class="visually-hidden">Sales in tax year 2026-27</caption>
+                <thead><tr><th scope="col">Asset</th><th scope="col">Bought</th><th scope="col">Sold</th><th scope="col">Cost (₹)</th><th scope="col">Sale value (₹)</th><th scope="col">STT paid</th><th scope="col">Indexed cost (₹)</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+                <tbody id="capitalGainsRows"></tbody>
+            </table>
+        </div>
+        <p class="form-text">Indexed cost is optional, only for land or a building bought before 23 July 2024: ALFRED then uses 20% on the indexed gain when that is lower.</p>
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary" type="button" id="capitalGainsAdd">Add a sale</button>
+            <button class="btn btn-primary" type="submit">Work out the tax</button>
+        </div>
+    </form>
+    <div id="capitalGainsResult" class="data-stack mt-3" aria-live="polite"></div>
+</section>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/tax_optimizer.js?v=3.5.4"></script>
+<script src="/static/js/tax_optimizer.js?v=3.6.0"></script>
 {% endblock %}
