@@ -38,6 +38,7 @@
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_tools_profile_companies_and_retro_need_the_owners_ok": 15.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_trip_tools_bookings_recorded_ride_and_holidays": 20.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_settings_google_phone_sync_section": 8.0,
+                      "tests.test_user_data_browser.UserDataBrowserTests.test_settings_telegram_skills_and_agent_links_cards": 12.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_recruiter_reply_quotes_asks_blocks_blanks_and_sends_only_to_the_typed_address": 13.46,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_career_application_progress_is_owned_page_only_offline_and_reopens": 13.0,
                       "tests.test_user_data_browser.UserDataBrowserTests.test_registered_tools_permissions_real_reads_timeout_and_keyboard_accessibility": 12.125,

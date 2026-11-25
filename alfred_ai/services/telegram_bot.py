@@ -176,11 +176,18 @@ def reply_to(chat, text) -> str:
     user = _user(owner) if owner is not None else None
     if user is None:
         return "This chat is not linked. In ALFRED on your PC open Settings, Telegram, get a code and send: /link <code>"
-    if command in ("/start", "/help"):
-        return HELP
     if command == "/unlink":
         unlink(user, chat)
         return "Unlinked. This chat gets no more answers."
+    return answer_for(user, text)
+
+
+def answer_for(user, text) -> str:
+    """The safe answers Telegram and linked agents share: never money, documents or saved history."""
+    text = " ".join(str(text or "").split())[:500]
+    command = text.partition(" ")[0].split("@")[0].lower()
+    if command in ("/start", "/help"):
+        return HELP
     if command == "/trip":
         return next_trip(user)
     if command == "/followups":

@@ -5364,6 +5364,27 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.capture('settings-google-sync')
         self.run_axe_light_dark('settings-google-sync')
 
+    def test_settings_telegram_skills_and_agent_links_cards(self):
+        import os, tempfile
+        from unittest.mock import patch
+        folder = self.enterContext(tempfile.TemporaryDirectory(prefix='alfred-settings-cards-browser-'))
+        self.enterContext(patch.dict(os.environ, {'ALFRED_DATA_DIR': folder}))
+        self.login()
+        self.browser.get(self.live_server_url + '/settings/#settingsTelegram')
+        self.wait.until(lambda _: 'No Telegram bot is set up yet' in self.text('telegramStatus'))
+        self.assertFalse(self.browser.find_element(self.By.ID, 'telegramCode').is_displayed())
+        self.browser.find_element(self.By.ID, 'skillsName').send_keys('Weekend ride plan')
+        self.browser.find_element(self.By.ID, 'skillsDescription').send_keys('Plan a weekend motorcycle ride')
+        self.browser.find_element(self.By.ID, 'skillsText').send_keys('List fuel stops every 150 km and a rain plan.')
+        self.browser.execute_script("document.querySelector('#skillsForm button[type=submit]').click()")
+        self.wait.until(lambda _: 'Weekend ride plan' in self.text('skillsList'))
+        self.browser.execute_script("document.getElementById('agentLinksCreate').click()")
+        self.wait.until(lambda _: 'alfred_a2a_' in self.text('agentLinksFeedback'))
+        self.assertIn('1 token in use', self.text('agentLinksStatus'))
+        self.browser.execute_script("document.getElementById('settingsTelegram').scrollIntoView({block:'start',behavior:'instant'})")
+        self.capture('settings-telegram-skills-agents')
+        self.run_axe_light_dark('settings-telegram-skills-agents')
+
     def test_settings_backup_key_is_made_and_locked_without_showing_the_passphrase(self):
         import os, tempfile
         from unittest.mock import patch

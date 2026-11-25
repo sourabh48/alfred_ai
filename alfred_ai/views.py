@@ -18,6 +18,7 @@ from django.db import connection
 from django.http import HttpResponse, JsonResponse
 from django.core.serializers.json import DjangoJSONEncoder
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from apps.career.forms import CareerOpportunityOutcomeForm
@@ -982,6 +983,62 @@ def skills_api_view(request):
             return JsonResponse({"detail": "Send the skill as JSON."}, status=400)
     response = JsonResponse({"skills": [{key: skill[key] for key in ("id", "name", "description", "scope", "text", "source", "approved_at")}
                                         for skill in skills.listed(request.user)], "draft": draft})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
+def _nearby_only(request):
+    from .services import agent_link
+    return None if agent_link.nearby(request.META.get("REMOTE_ADDR", "")) else JsonResponse({"detail": "Only this PC and the home network."}, status=403)
+
+
+@require_http_methods(["GET"])
+def agent_card_view(request):
+    """A2A discovery card; it names what ALFRED answers, nothing about the person."""
+    from .services import agent_link
+    return _nearby_only(request) or JsonResponse(agent_link.card(request.build_absolute_uri("/")))
+
+
+@csrf_exempt  # bearer token only; no cookie is read, so a web page cannot use the browser's sign-in
+@require_http_methods(["POST"])
+def agent_tasks_view(request):
+    from .services import agent_link
+    refused = _nearby_only(request)
+    if refused:
+        return refused
+    scheme, _, token = request.META.get("HTTP_AUTHORIZATION", "").partition(" ")
+    user = agent_link.user_for(token.strip()) if scheme.lower() == "bearer" else None
+    if user is None:
+        return JsonResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32001, "message": "Unauthorized"}}, status=401)
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Send JSON."}}, status=400)
+    return JsonResponse(agent_link.handle(user, body))
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def agent_tokens_api_view(request):
+    """Settings > Agent links: make a token (shown once) or remove all of this person's tokens."""
+    from .services import agent_link
+    token = None
+    if request.method == "POST":
+        try:
+            action = json.loads(request.body or b"{}").get("action")
+        except (ValueError, AttributeError):
+            action = None
+        try:
+            if action == "create":
+                token = agent_link.new_token(request.user)
+            elif action == "revoke":
+                agent_link.revoke(request.user)
+            else:
+                raise ValueError("Choose to make a token or remove them.")
+        except ValueError as exc:
+            return JsonResponse({"detail": str(exc)}, status=400)
+    response = JsonResponse({"tokens": agent_link.count(request.user), "token": token,
+                             "card": request.build_absolute_uri("/.well-known/agent.json")})
     response["Cache-Control"] = "no-store, private"
     return response
 

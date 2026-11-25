@@ -22,7 +22,7 @@
             item.append(title, document.createTextNode(` · ${scopes[skill.scope] || skill.scope}${skill.description ? " · " + skill.description : ""}`), remove);
             return item;
         }));
-        if (!data.skills.length) list.textContent = "No skills yet.";
+        if (!data.skills.length) { const empty = document.createElement("li"); empty.textContent = "No skills yet."; list.replaceChildren(empty); }
         if (data.draft) {
             $("skillsName").value = data.draft.name; $("skillsDescription").value = data.draft.description;
             $("skillsText").value = data.draft.text; $("skillsSource").value = data.draft.source;
