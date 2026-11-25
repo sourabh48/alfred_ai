@@ -11,6 +11,14 @@ scans; the scanner is unchanged. Preflight PASS locally on `e97bfe7` against bas
 tests 30 PASS; Telegram and agent link tests PASS. Pushed with the owner's OK with `9384d99`, `7c7aa39` and `466194f`.
 CI_PENDING on the new head until its run finishes; CI_PENDING is not acceptance.
 
+CI_FAILED on `24b6169` (Browser Regression 45598213992): preflight, every Selenium shard and backend shards 0, 1 and 3
+passed; backend shard 2 failed and `native-windows` with it. The same 72-file shard run locally: 839 tests, 1 failure,
+`test_data_sources` page-read policy, which flagged the usage-analytics middleware for checking ALFRED's own `text/html`
+reply type (it fetches no website). Fixed in `4b24596` with a named exemption beside the existing one. Also `3e02001`:
+the Telegram listener asked for 15-second reads while the web helper stops reading after 5 seconds, so every read timed
+out in the owner's app; it now waits 4 seconds (live check with the owner's bot: a 4-second read returns). LOCAL_TESTING;
+the push needs the owner's OK.
+
 ## Partial-ID completion, Gemini and backup key — 2026-11-19
 
 CI_PENDING on `84a2afd` (Browser Regression 44538439074 and pages build and deployment 44538436196 started 13:56 UTC), pushed as a fast-forward from `5766899` with the owner's OK ("Yes, push") after the local gates passed on `84a2afd`: backend 3,233 PASS in 4 shards and full Chrome 243 PASS, 0 skipped. 22 commits from `work/completion-sprint-2026-11-19`: sign-in fixes, per-person keys, Career email through each person's Gmail or Outlook, phone QR code, OpenAI removed for Gemini, backup key with Google + passphrase, multi-stop Google road legs, value alerts, fund-category risk, goal projection, recruiter email intake, tracker and walkthrough rows 11-19. The first gate run on `6031134` failed one backend duration-manifest test and two Chrome Career send tests (still importing the removed shared mailbox); fixed in `6031134` and `84a2afd`. The docs delta publishes to Pages. The owner's running app (`F:\ALFRED\alfred_ai`, master `0dbc4c3`) is not updated; that needs its own OK. CI_PENDING is not acceptance.
