@@ -11,6 +11,12 @@ stand-alone public questions in a chat go to Gemini): Browser Regression all job
 locally 2 of 2 on synthetic data. The owner approved re-running the failed jobs: attempt 2 of run 45682087433 passed all 11
 jobs, so CI_PASSED on `87a2450`. Both single failures look intermittent; neither is waived and neither cause is known.
 
+`dc4cb23` (tracker documents only; code identical to `87a2450`) CI_FAILED (run 45693442146): backend shard 0 failed
+`test_document_corpus` `test_general_pdf_uses_its_text_layer_and_scans_are_read_by_local_ocr`, and backend shard 3 had
+two errors in `test_windows_setup` `test_retained_database_and_key_are_never_replaced` (60 s, the timing error seen on
+`b2d98dd`). CI keeps no traceback for them; both pass locally 2 of 2 on synthetic data, and both shards ran over 12
+minutes. Not waived; cause unknown; the next push reruns them.
+
 ## OpenJarvis ideas, Telegram and agent links — 2026-11-25
 
 CI_FAILED on `917eccb` (Browser Regression 45592092610): the four backend shards failed in preflight with
