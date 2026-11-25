@@ -179,12 +179,13 @@ class MemoryReasoningKeyAPI(MemoryAPI):
 class MemoryReasoningAPI(MemoryAPI):
     def get(self,request):
         state=forget_openai(memory_store(),request.user)
-        policy=state.get('reasoning_policy',{'enabled':False,'public_only':True,
-            'daily_tokens':settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,'daily_microusd':settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD})
+        saved=state.get('reasoning_policy',{})
+        policy={'enabled':saved.get('enabled') is True,'public_only':True}
         from datetime import datetime, timezone
         today = datetime.now(timezone.utc).date().isoformat()
         ledger = state.get('reasoning',{})
-        usage = {'day':today,'reserved_tokens':0,'reserved_microusd':0,'basis':'conservative_reservation'}
+        usage = {'day':today,'reserved_tokens':0,'reserved_microusd':0,'basis':'reported_usage',
+                 'limit_tokens':settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,'limit_microusd':settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD}
         if ledger.get('day') == today:
             usage.update(reserved_tokens=ledger.get('reserved',0),reserved_microusd=ledger.get('reserved_microusd',0))
         return Response({'policy':policy,'real_provider_enabled':bool(saved_key(state)),
@@ -192,9 +193,8 @@ class MemoryReasoningAPI(MemoryAPI):
             'provider_available':bool(settings.ALFRED_MEMORY_MOCK_REASONING or saved_key(state))})
 
     def put(self,request):
-        data=self.payload(('enabled','consent','daily_tokens','daily_microusd'))
-        return Response({'policy':configure_reasoning(memory_store(),request.user,enabled=data.get('enabled'),consent=data.get('consent',False),
-            daily_tokens=data.get('daily_tokens'),daily_microusd=data.get('daily_microusd'))})
+        data=self.payload(('enabled','consent'))
+        return Response({'policy':configure_reasoning(memory_store(),request.user,enabled=data.get('enabled'),consent=data.get('consent',False))})
 
     def post(self,request):
         data=self.payload(('query','consent','query_sensitivity'))

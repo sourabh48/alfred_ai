@@ -95,7 +95,7 @@ class IntelligenceUITests(TestCase):
         self.assertEqual(sync.status(self.user)['retry_at'],0)
         response = self.client.get('/api/ai/memories/reason/')
         self.assertFalse(response.json()['real_provider_enabled'])
-        self.assertEqual(response.json()['usage']['basis'],'conservative_reservation')
+        self.assertEqual(response.json()['usage']['basis'],'reported_usage')  # Google's reported tokens replace the estimate (2026-11-25)
         self.assertNotIn('key', str(response.json()['usage']))
 
     def test_usage_is_owner_scoped_and_expired_reservations_are_not_today_usage(self):

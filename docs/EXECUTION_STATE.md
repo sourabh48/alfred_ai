@@ -1,6 +1,8 @@
 # ALFRED execution state
 
 ## OpenJarvis ideas, local only — 2026-11-25
+- Gemini limits (owner 2026-11-25): ALFRED sets them (config/local.env), and each answer counts Google's reported tokens; Settings keeps only the key and on/off. The owner's live question was refused by the old saved 4096-token limit before any call. Local commit; live Gemini answer still pending (OPENAI-01 to 07).
+- API Setu: registration needs a business ID and an official-domain email; the owner has no GST, so it is skipped (documents via DigiLocker download and upload).
 - Source: OpenJarvis main `86f75ef` (Apache-2.0), read in a scratch folder and never run; dispositions in `docs/UPSTREAM_REFERENCE_MATRIX.md` section J.
 - Ledger check: OpenJarvis learning, trace and memory code does not use its Pearl mining code; mining is off unless configured and sends only proofs. Learning data is not shared as a ledger at that pin. Mining, PostHog analytics, Docker tools, the skill marketplace, A2A and messaging channels are excluded.
 - Added, local commits only (not pushed): `0c3bfff` simple Finance/Travel/Career lookups use the fast 9B model; `0e8b701` a local answer shows its model and seconds; `54cadcd` web results and Reddit titles that try to hijack the AI are left out; `736ec03` Home "Read my briefing" with the offline Piper voice. `9c5226a` (Gemini model-version prefix fix) is also unpushed.

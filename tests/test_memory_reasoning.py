@@ -30,7 +30,7 @@ class MemoryReasoningTests(TestCase):
         self.enterContext(patch('apps.ml_engine.services.persistent_memory.OllamaEmbeddings',return_value=SyntheticEmbeddings()))
         self.http=self.enterContext(patch('apps.ml_engine.services.memory_reasoning.request',side_effect=self.response))
         self.provider=GeminiReasoner(KEY)
-        configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=4096,daily_microusd=10000)
+        configure_reasoning(self.store,self.alice,enabled=True,consent=True)
         with self.store._transaction() as db:
             state=self.store._sync_state(db,self.owner); state['gemini_key']=KEY; self.store._write_sync_state(db,self.owner,state)
 
@@ -46,7 +46,7 @@ class MemoryReasoningTests(TestCase):
 
     def test_no_key_or_no_opt_in_prevents_calls(self):
         self.assertIsNone(reasoning_provider(self.store,self.bob))  # no key saved
-        configure_reasoning(self.store,self.alice,enabled=False,daily_tokens=4096,daily_microusd=10000)
+        configure_reasoning(self.store,self.alice,enabled=False)
         with self.assertRaises(PermissionError): self.reason()  # key saved, opt-in off
         remove_key(self.store,self.alice)
         self.assertIsNone(reasoning_provider(self.store,self.alice))
@@ -73,7 +73,7 @@ class MemoryReasoningTests(TestCase):
         self.assertNotIn(KEY,saved.content.decode()+client.get('/api/ai/memories/reason/').content.decode())
         self.assertNotIn(KEY.encode(),(self.store.directory/'verified.sqlite3').read_bytes())
         self.assertIsInstance(reasoning_provider(self.store,self.bob),GeminiReasoner)
-        configure_reasoning(self.store,self.bob,enabled=True,consent=True,daily_tokens=4096,daily_microusd=10000)
+        configure_reasoning(self.store,self.bob,enabled=True,consent=True)
         self.assertEqual(client.delete(url,HTTP_X_CSRFTOKEN=csrf).json(),{'key_saved':False,'key_hint':'','policy_enabled':False})
         self.assertIsNone(reasoning_provider(self.store,self.bob))
         self.assertIsInstance(reasoning_provider(self.store,self.alice),GeminiReasoner)  # other owners untouched
@@ -112,26 +112,43 @@ class MemoryReasoningTests(TestCase):
 
     def test_spending_cap_reserved_before_call_and_survives_failure_reset_restart(self):
         cost=self.provider.budget({'query':'mountain','memories':[]},CLOUD_OUTPUT_TOKENS)[1]
-        configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=4096,daily_microusd=cost)
         self.http.side_effect=OSError('SYNTHETIC-SECRET-PATH-F:/private')
-        with self.assertRaises(SyncUnavailable) as failure: self.reason()
+        with self.assertRaises(SyncUnavailable) as failure: self.reason(daily_microusd=cost)
         self.assertNotIn('SECRET',str(failure.exception)); self.store.reset_owner(self.alice)
         self.store=MemoryStore(self.root/'vault',embedder=SyntheticEmbeddings())
-        with self.assertRaises(ReasoningBudgetExceeded): self.reason()
+        with self.assertRaises(ReasoningBudgetExceeded): self.reason(daily_microusd=cost)
         self.assertEqual(self.http.call_count,1)
         with self.store._transaction() as db: self.assertEqual(self.store._sync_state(db,self.owner)['reasoning']['reserved_microusd'],cost)
 
-    def test_lowered_owner_limits_and_token_cap_reject_without_mutation(self):
+    def test_token_and_spending_caps_reject_without_mutation(self):
         for kwargs in ({'daily_tokens':1},{'daily_microusd':1}):
             with self.subTest(kwargs=kwargs),self.assertRaises(ReasoningBudgetExceeded): self.reason(**kwargs)
         self.http.assert_not_called()
         with self.store._transaction() as db: self.assertNotIn('reasoning',self.store._sync_state(db,self.owner))
-        for limits in ((99999,10000),(4096,10000000),(True,1)):
-            with self.assertRaises(ValueError): configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=limits[0],daily_microusd=limits[1])
+        for kwargs in ({'daily_tokens':10_000_001},{'daily_microusd':1_000_001},{'daily_tokens':True}):
+            with self.subTest(kwargs=kwargs),self.assertRaises(ValueError): self.reason(**kwargs)
+
+    def test_old_per_person_limits_no_longer_cap_answers(self):
+        # Before 2026-11-25 people typed their own limits; a saved 4096 tokens / USD 0.01 refused every web-backed question.
+        with self.store._transaction() as db:
+            state=self.store._sync_state(db,self.owner); state['reasoning_policy']|={'daily_tokens':1,'daily_microusd':1}
+            self.store._write_sync_state(db,self.owner,state)
+        self.assertEqual(self.reason(daily_tokens=65536,daily_microusd=1000000)['answer'],'Synthetic public suggestion.')
+
+    def test_reported_usage_replaces_the_up_front_estimate(self):
+        original=self.response().json(); self.http.side_effect=None
+        self.http.return_value=PublicResponse(json.dumps(original|{'usageMetadata':{'promptTokenCount':100,'candidatesTokenCount':12,'thoughtsTokenCount':20}}).encode(),'application/json')
+        result=self.reason(daily_tokens=65536,daily_microusd=1000000)
+        with self.store._transaction() as db: ledger=self.store._sync_state(db,self.owner)['reasoning']
+        self.assertEqual((ledger['reserved'],ledger['reserved_microusd']),(132,100+4*32))
+        self.assertEqual((result['reserved_tokens'],result['reserved_microusd']),(132,228))
+        self.http.return_value=PublicResponse(json.dumps(original|{'usageMetadata':{'promptTokenCount':100,'thoughtsTokenCount':'x'}}).encode(),'application/json')
+        estimate=self.provider.budget({'query':'mountain','memories':[]},CLOUD_OUTPUT_TOKENS)
+        self.reason(daily_tokens=65536,daily_microusd=1000000)  # unreadable thought count: the estimate stays counted
+        with self.store._transaction() as db: ledger=self.store._sync_state(db,self.owner)['reasoning']
+        self.assertEqual((ledger['reserved'],ledger['reserved_microusd']),(132+estimate[0],228+estimate[1]))
 
     def test_corrupt_usage_models_tools_and_oversized_answers_fail_safely(self):
-        with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=65536):
-            configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=65536,daily_microusd=100000)
         original=self.response().json()
         def answer(**candidate):
             return {'candidates':[{'finishReason':'STOP','content':{'role':'model','parts':[{'text':'ok'}]}}|candidate]}
@@ -145,8 +162,6 @@ class MemoryReasoningTests(TestCase):
                 with self.assertRaises(SyncUnavailable): self.reason(daily_tokens=65536,daily_microusd=1000000)
 
     def test_model_version_with_a_models_prefix_is_the_same_model(self):
-        with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=65536):
-            configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=65536,daily_microusd=100000)
         original=self.response().json()
         self.http.side_effect=None
         self.http.return_value=PublicResponse(json.dumps(original|{'modelVersion':'models/'+MODEL}).encode(),'application/json')
@@ -157,9 +172,8 @@ class MemoryReasoningTests(TestCase):
     def test_concurrent_requests_share_atomic_spending_reservations(self):
         from concurrent.futures import ThreadPoolExecutor
         cost=self.provider.budget({'query':'mountain','memories':[]},CLOUD_OUTPUT_TOKENS)[1]
-        configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=4096,daily_microusd=cost)
         def attempt():
-            try: self.reason(); return 'success'
+            try: self.reason(daily_microusd=cost); return 'success'
             except ReasoningBudgetExceeded: return 'limited'
         with ThreadPoolExecutor(max_workers=2) as executor: results=list(executor.map(lambda _:attempt(),range(2)))
         self.assertEqual(sorted(results),['limited','success']); self.assertEqual(self.http.call_count,1)
@@ -172,7 +186,7 @@ class MemoryReasoningTests(TestCase):
         self.http.assert_not_called()
 
     def test_credential_provisioning_is_masked_encrypted_and_owner_isolated(self):
-        configure_reasoning(self.store,self.alice,enabled=False,daily_tokens=4096,daily_microusd=10000)
+        configure_reasoning(self.store,self.alice,enabled=False)
         with patch('apps.ml_engine.management.commands.configure_memory_reasoning.sys.stdin.isatty',return_value=True),patch('apps.ml_engine.management.commands.configure_memory_reasoning.getpass',return_value=KEY):
             output=StringIO(); call_command('configure_memory_reasoning',user=self.alice.pk,stdout=output)
         self.assertNotIn(KEY,output.getvalue()); self.assertNotIn(KEY.encode(),(self.store.directory/'verified.sqlite3').read_bytes())
@@ -183,11 +197,12 @@ class MemoryReasoningTests(TestCase):
 
     def test_policy_api_keeps_credentials_private_and_requires_session_csrf(self):
         client=Client(enforce_csrf_checks=True); url='/api/ai/memories/reason/'
-        policy={'enabled':True,'consent':True,'daily_tokens':4096,'daily_microusd':10000}
+        policy={'enabled':True,'consent':True}
         self.assertEqual(client.put(url,policy,content_type='application/json').status_code,403)
         client.force_login(self.alice); self.assertEqual(client.put(url,policy,content_type='application/json').status_code,403)
         client.get('/settings/'); csrf=client.cookies['csrftoken'].value
-        self.assertEqual(client.put(url,policy|{'owner':self.bob.pk},content_type='application/json',HTTP_X_CSRFTOKEN=csrf).status_code,400)
+        for extra in ({'owner':self.bob.pk},{'daily_tokens':4096}):  # limits are ALFRED's, not settable per person
+            self.assertEqual(client.put(url,policy|extra,content_type='application/json',HTTP_X_CSRFTOKEN=csrf).status_code,400)
         self.assertEqual(client.put(url,policy,content_type='application/json',HTTP_X_CSRFTOKEN=csrf).status_code,200)
         response=client.get(url); self.assertIn('no-store',response['Cache-Control']); self.assertNotIn(KEY,str(response.content))
         payload={'query':'mountain','consent':True,'query_sensitivity':'public'}

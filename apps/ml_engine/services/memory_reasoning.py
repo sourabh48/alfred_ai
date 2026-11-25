@@ -158,6 +158,9 @@ class GeminiReasoner:
             if not part.get('thought'): text.append(part['text'])
         answer=''.join(text)
         if not answer.strip() or len(answer.encode())>16384: raise ValueError('Invalid bounded reasoning text.')
+        thoughts=usage.get('thoughtsTokenCount',0)
+        # What Google says this answer used, so the daily allowance counts real use, not the up-front estimate.
+        self.used=(usage['promptTokenCount'],usage.get('candidatesTokenCount',0)+thoughts) if type(thoughts) is int and thoughts>=0 else None
         return answer
 
 
@@ -174,11 +177,10 @@ def reasoning_provider(store,user):
     return GeminiReasoner(key) if key else None
 
 
-def configure_reasoning(store,user,*,enabled,consent=False,daily_tokens=None,daily_microusd=None):
+def configure_reasoning(store,user,*,enabled,consent=False):
+    """Owner decision 2026-11-25: people only switch Gemini on or off; ALFRED sets the daily limits (config/local.env)."""
     if not isinstance(enabled,bool) or (enabled and consent is not True): raise PermissionError('Explicit owner reasoning-policy consent is required.')
-    if type(daily_tokens) is not int or not 1<=daily_tokens<=min(settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,65536) or type(daily_microusd) is not int or not 1<=daily_microusd<=min(settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,1000000):
-        raise ValueError('Owner budgets must remain within operator limits.')
-    policy=dict(enabled=enabled,public_only=True,daily_tokens=daily_tokens,daily_microusd=daily_microusd)
+    policy=dict(enabled=enabled,public_only=True)
     with store._transaction() as db:
         state=store._sync_state(db,_owner(user)); state['reasoning_policy']=policy; store._write_sync_state(db,_owner(user),state)
     return policy
@@ -194,7 +196,7 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
         raise PermissionError('Confirm public query classification and explicit reasoning consent.')
     if not isinstance(query,str) or not query.strip() or len(query.encode())>1024:
         raise ValueError('Reasoning query exceeds the bounded slice.')
-    if type(daily_tokens) is not int or not 1<=daily_tokens<=65536:
+    if type(daily_tokens) is not int or not 1<=daily_tokens<=10_000_000:
         raise ValueError('Reasoning budget must be bounded.')
     if provider is None: raise SyncUnavailable('No approved reasoning provider is configured.')
     retrieval_error=None
@@ -223,7 +225,6 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
         if policy:
             if policy.get('enabled') is not True or policy.get('public_only') is not True:
                 raise PermissionError('Owner cloud reasoning policy is disabled.')
-            daily_tokens=min(daily_tokens,policy['daily_tokens']); daily_microusd=min(daily_microusd,policy['daily_microusd'])
         ledger=state.get('reasoning',{'day':day,'reserved':0})
         if ledger['day']!=day: ledger={'day':day,'reserved':0}
         if ledger['reserved']+reserve>daily_tokens or ledger.get('reserved_microusd',0)+cost>daily_microusd: raise ReasoningBudgetExceeded('Daily reasoning budget exhausted.')
@@ -234,7 +235,16 @@ def reason_with_memory(store,user,query,*,consent=False,query_sensitivity=None,p
         if not isinstance(answer,str) or len(answer.encode())>16384: raise ValueError()
     except Exception:
         raise SyncUnavailable('Optional reasoning is unavailable; its reserved budget is retained.') from None
+    used=getattr(provider,'used',None) if isinstance(provider,GeminiReasoner) else None
     with store._transaction() as db:
+        if used:
+            # Swap the up-front estimate for the tokens Google reported, at the same per-token cost rates.
+            state=store._sync_state(db,owner); ledger=state.get('reasoning',ledger)
+            if ledger.get('day')==day:
+                ledger['reserved']=max(0,ledger['reserved']-reserve+sum(used))
+                ledger['reserved_microusd']=max(0,ledger.get('reserved_microusd',0)-cost+used[0]+4*used[1])
+                state['reasoning']=ledger; store._write_sync_state(db,owner,state)
+            reserve,cost=sum(used),used[0]+4*used[1]
         store._expire(db,owner)
         live={r[0] for r in db.execute('SELECT id FROM memories WHERE owner=?',(owner,))}
         if any(item['id'] not in live for item in memories): raise MemoryConflict('Reasoning context was revoked during inference.')

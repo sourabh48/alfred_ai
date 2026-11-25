@@ -180,9 +180,9 @@ class HybridIntelligenceTests(TestCase):
 
     def test_configured_owner_policy_and_caps_also_apply_to_mock_fallback(self):
         self.save(sensitivity='public'); self.local.reason.side_effect=EmbeddingUnavailable('synthetic unavailable')
-        configure_reasoning(self.store,self.alice,enabled=True,consent=True,daily_tokens=1,daily_microusd=1000)
-        with self.assertRaises(ReasoningBudgetExceeded): self.answer(cloud_consent=True,query_sensitivity='public')
-        configure_reasoning(self.store,self.alice,enabled=False,daily_tokens=4096,daily_microusd=1000)
+        configure_reasoning(self.store,self.alice,enabled=True,consent=True)
+        with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=1),self.assertRaises(ReasoningBudgetExceeded): self.answer(cloud_consent=True,query_sensitivity='public')
+        configure_reasoning(self.store,self.alice,enabled=False)
         with self.assertRaises(PermissionError): self.answer(cloud_consent=True,query_sensitivity='public')
 
     def test_disabled_provider_status_reads_only_local_owner_state_without_network(self):

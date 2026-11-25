@@ -529,7 +529,9 @@ ALFRED_CLOUD_BACKUP_AUTHORIZED = env.bool('ALFRED_CLOUD_BACKUP_AUTHORIZED', defa
 ALFRED_BACKUP_DIR = env('ALFRED_BACKUP_DIR', default='')
 ALFRED_MEMORY_MOCK_REASONING = env.bool('ALFRED_MEMORY_MOCK_REASONING', default=False)
 ALFRED_GEMINI_DEV_ENABLED = env.bool('ALFRED_GEMINI_DEV_ENABLED', default=False)
-ALFRED_MEMORY_REASONING_DAILY_TOKENS = env.int('ALFRED_MEMORY_REASONING_DAILY_TOKENS', default=65536)
+# ALFRED sets Gemini's daily limits, not each person (owner decision 2026-11-25). Tokens are counted as Google reports them;
+# the USD cap matters only for a key with billing on and sits far below Google's lowest paid spend limit ($10 per 10 minutes).
+ALFRED_MEMORY_REASONING_DAILY_TOKENS = env.int('ALFRED_MEMORY_REASONING_DAILY_TOKENS', default=1000000)
 ALFRED_MEMORY_REASONING_DAILY_MICROUSD = env.int('ALFRED_MEMORY_REASONING_DAILY_MICROUSD', default=1000000)
 # Optional cloud answers to public questions use each person's own free Gemini key (owner decision 2026-11-19; OpenAI dropped).
 ALFRED_GEMINI_MODEL = env('ALFRED_GEMINI_MODEL', default='gemini-3.5-flash-lite')

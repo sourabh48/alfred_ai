@@ -2824,14 +2824,13 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#memorySyncNow')
         self.wait.until(lambda _: 'Revision 1;' in self.text('memorySyncStatus'))
         self.browser.get(self.live_server_url+'/settings/#settingsGemini')
-        self.wait.until(lambda _: 'Billing measurements are unavailable' in self.text('memoryReasoningUsage'))
+        self.wait.until(lambda _: 'tokens used' in self.text('memoryReasoningUsage'))
+        self.assertFalse(self.browser.find_elements(self.By.ID,'memoryReasoningTokens'))  # ALFRED sets the limits (owner 2026-11-25)
         self.memory_click('#memoryReasoningEnabled')
-        tokens=self.browser.find_element(self.By.ID,'memoryReasoningTokens'); tokens.clear(); tokens.send_keys('4000')  # two answers, each reserving up to 1024 output tokens
-        dollars=self.browser.find_element(self.By.ID,'memoryReasoningDollars'); dollars.clear(); dollars.send_keys('0.005')
         self.memory_click('#memoryReasoningForm button')
         self.wait.until(lambda _: 'Gemini settings saved.' in self.text('geminiFeedback'))
         with store._transaction() as db:
-            self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy']['daily_microusd'],5000)
+            self.assertEqual(store._sync_state(db,_owner(owner))['reasoning_policy'],{'enabled':True,'public_only':True})
         self.capture('memory-sync-reasoning-owner-policy')
         self.browser.get(self.live_server_url+'/ai/insights/')
         self.wait.until(lambda _: self.browser.find_element(self.By.ID,'intelligenceCloudConsent').is_enabled())
@@ -3319,8 +3318,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         from apps.ml_engine.services.local_embeddings import EmbeddingUnavailable
         history, local = self.private_history_fixture()
         self.enterContext(override_settings(ALFRED_MEMORY_MOCK_REASONING=True))
-        configure_reasoning(history.store, self.scenario['user'], enabled=True, consent=True,
-            daily_tokens=4096, daily_microusd=10000)
+        configure_reasoning(history.store, self.scenario['user'], enabled=True, consent=True)
         local.reason.side_effect = EmbeddingUnavailable('synthetic local outage')
         self.browser.refresh()
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'intelligenceCloudConsent').is_enabled())

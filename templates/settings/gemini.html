@@ -13,13 +13,7 @@
     </form>
     <form id="memoryReasoningForm" data-live-refresh-hold="true">
         <label class="d-block mb-2"><input id="memoryReasoningEnabled" type="checkbox"> Use Gemini for public questions. Leave unticked for local-only answers.</label>
-        <p class="small text-muted">Used only with a saved key and this box ticked; then Gemini answers clearly public questions without asking each time. Personal and sensitive questions always stay on this PC. The daily limits cap use; the spending limit matters only if you turned billing on for your key.</p>
-        <div class="row g-2 mb-2">
-            <div class="col-sm-6 col-lg-4"><label for="memoryReasoningTokens" class="form-label small mb-1">Daily token limit</label>
-                <input id="memoryReasoningTokens" class="form-control" type="number" min="1" max="65536" required></div>
-            <div class="col-sm-6 col-lg-4"><label for="memoryReasoningDollars" class="form-label small mb-1">Daily spending limit (USD)</label>
-                <input id="memoryReasoningDollars" class="form-control" type="number" min="0.000001" max="1" step="0.000001" required></div>
-        </div>
+        <p class="small text-muted">Used only with a saved key and this box ticked; then Gemini answers clearly public questions without asking each time. Personal and sensitive questions always stay on this PC. ALFRED sets the daily limits itself and counts what Google reports for each answer.</p>
         <button class="btn btn-outline-primary" type="submit">Save Gemini settings</button>
     </form>
     <p id="geminiFeedback" class="small mt-2 mb-0" role="status" aria-live="polite"></p>
