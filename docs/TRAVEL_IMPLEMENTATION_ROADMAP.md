@@ -1,8 +1,9 @@
 # Travel implementation roadmap (P0–P7)
 
 **Owner approved P0, P1, P3 and P4 on 2026-11-25.** Status on branch `work/travel-intel-2026-11-25`:
-P0 done; P1 built (implemented, not accepted); P4 built within what official pages could be read; P3 waits for
-owner decisions (see its status line). P2, P5, P6 and P7 are not approved. Each task extends existing code on
+P0 done; P1 built (implemented, not accepted); P4 built within what official pages could be read; P3 toll estimates
+built from Google Routes on 2026-11-26 (owner's choice), while plazas, road safety and monuments stay unbuilt (see its
+status line). P2, P5, P6 and P7 are not approved. Each task extends existing code on
 `master` 6a17def; none recreates working providers. Status rules apply: implemented is not accepted, and the 143
 original requirements and 13 extensions are tracked separately. Acceptance tests for each task are in
 [TRAVEL_ACCEPTANCE_CRITERIA.md](TRAVEL_ACCEPTANCE_CRITERIA.md).
@@ -95,6 +96,14 @@ needs an owner decision. P7 holds items that cannot be delivered.
   toll requests bill at a higher rate; ASI's list downloads but states no reuse licence, and the repository is public.
   Owner decisions needed: bundle a hand-downloaded NPCI and ASI list despite no stated licence, try Google tolls with
   your key, or drop P3.
+- **Status 2026-11-26:** the owner chose Google tolls. Built (implemented, not accepted): car routes from
+  `GoogleRoutes` ask for `TOLLS` with the `IN_FASTAG` pass, and each route shows Google's one-way estimate as a
+  Decimal in Google's currency. The car budget uses that estimate × 2 for a return trip, or the sum of every leg on a
+  multi-stop trip, only when it is in rupees. Otherwise the INR 400 allowance stays and the formula says why. If Google
+  reports no tolls, the trip is never called toll-free, because Google does not state its India coverage. Motorcycles
+  (national-highway tolls exempt two-wheelers) and detour checks do not ask, so they stay on the cheaper request. Each
+  car route request now bills at Google's Compute Routes Enterprise rate. Plaza lists, road-safety lines and the
+  monument badge are still not built. Tests: `tests/test_travel_tolls.py`.
 
 ## P4 — More permits and drone, foreigner and safari notes (TRAVEL-15)
 

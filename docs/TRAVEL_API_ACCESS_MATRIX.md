@@ -59,7 +59,7 @@ states. Where an official page states nothing, the cell says "not stated".
 | NHAI TIS (tis.nhai.gov.in) | WEBSITE_ONLY (undocumented JSON is not an API) | Read only | Free | No | Link; no scraping |
 | NPCI NETC Plaza Master PDFs | VERIFIED_FREE_PUBLIC_DATASET (plaza locations, no fees; licence not stated) | Yes | Free | No | P3: plazas near the route, "fees not known" |
 | NETC FASTag APIs | RESTRICTED_PRODUCTION_API (banks and acquirers) | No | n/a | No | Unavailable |
-| Google Routes toll estimate | PAID_PRODUCTION_API; India coverage **UNVERIFIED** | Yes | Higher SKU (not checked) | No | P3: verify coverage in Google docs first |
+| Google Routes toll estimate | PAID_PRODUCTION_API; `IN_FASTAG` pass documented, India coverage **UNVERIFIED** | Yes (user's Google key) | Compute Routes Enterprise SKU | Yes, car routes (2026-11-26) | Estimate only; "not reported" is never shown as toll-free |
 | MoRTH VAHAN / SARATHI (Data Sharing Policy 2025) | RESTRICTED_PRODUCTION_API | No | n/a | No | Not needed; unavailable |
 
 ## Bus, train and flights

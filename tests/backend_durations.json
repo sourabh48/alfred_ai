@@ -163,6 +163,8 @@
  "tests.test_travel_http": 0.27,
  "tests.test_travel_world": 0.3,
  "tests.test_travel_smarter": 6.0,
+ "tests.test_travel_sachet": 2.0,
+ "tests.test_travel_tolls": 0.3,
  "tests.test_travel_skyscanner_link": 0.05,
  "tests.test_travel_ics_export": 21.05,
  "tests.test_travel_itinerary_editor": 27.92,
