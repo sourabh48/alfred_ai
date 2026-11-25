@@ -20,7 +20,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 LOGGER = logging.getLogger(__name__)
-TOKEN = "ALFRED_TELEGRAM_BOT_TOKEN"
+TOKEN_ENV = "ALFRED_TELEGRAM_BOT_TOKEN"
 TOKEN_FORMAT = re.compile(r"^\d{5,15}:[\w-]{30,60}$")
 CODE_SECONDS, WRONG_CODES_PER_HOUR = 600, 5
 # Home notices that point here are about money or documents and never go to Telegram.
@@ -33,7 +33,7 @@ _lock = threading.Lock()
 
 
 def configured() -> bool:
-    return bool(TOKEN_FORMAT.match(os.environ.get(TOKEN, "")))
+    return bool(TOKEN_FORMAT.match(os.environ.get(TOKEN_ENV, "")))
 
 
 def _path() -> Path:
@@ -79,7 +79,7 @@ def unlink(user, chat=None) -> int:
 
 def _call(method, body, *, deadline=None):
     from alfred_ai.services import public_http
-    reply = public_http.request("POST", f"https://api.telegram.org/bot{os.environ[TOKEN]}/{method}", json_body=body,
+    reply = public_http.request("POST", f"https://api.telegram.org/bot{os.environ[TOKEN_ENV]}/{method}", json_body=body,
                                 max_bytes=2_000_000, deadline=deadline).json()
     if reply.get("ok") is not True:
         raise ValueError("Telegram refused the request.")
