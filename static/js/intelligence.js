@@ -487,6 +487,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (result.provider === 'local_evidence' || result.narrative_withheld) answer.textContent = result.answer;
         if (historical) label.textContent = `Historical AI hypothesis · ${result.provider === 'gemini' ? 'Gemini (your key)' : 'Ollama (local)'} · saved ${new Date(result.saved_at).toLocaleString()}`;
         assistantMessage.append(label, answer); row.append(userMessage, assistantMessage);
+        if (typeof result.web_search_text === "string" && result.web_search_text) {
+            const searched = document.createElement("p"); searched.className = "small text-body-secondary mt-2";
+            const found = (result.sources || []).filter(source => source.classification === "public_web_result").length;
+            searched.textContent = `Searched Wikipedia and Google News for “${result.web_search_text}” · ${found} result${found === 1 ? "" : "s"} used`;
+            assistantMessage.append(searched);
+        }
         const evidence = document.createElement("details"); evidence.className = "conversation-evidence";
         const summary = document.createElement("summary"); summary.textContent = `Sources & evidence (${(result.sources || []).length})`;
         evidence.append(summary); assistantMessage.append(evidence);

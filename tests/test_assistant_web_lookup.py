@@ -177,10 +177,17 @@ class HybridWebLookupTests(TestCase):
             self.assertEqual(web(self.ask("is 12 lakh a good salary today")), [])  # private-looking: never searched
             self.assertEqual(web(self.ask("latest repo rate news", scope="finance")), [])
             with patch("apps.ml_engine.services.web_lookup.public_http.request", side_effect=fake_request) as request:
-                self.assertEqual(web(self.ask("Is my 5 lakh FD rate good today?")), ["web-1", "web-2"])
+                mixed = self.ask("Is my 5 lakh FD rate good today?")
+                self.assertEqual(web(mixed), ["web-1", "web-2"])
+                # Owner 2026-11-26: the answer explains the lookup in detail and shows exactly what was searched.
+                self.assertEqual((mixed["web_search_text"], mixed["answer_style"]), ("Is FD rate good today?", "detailed"))
+                self.assertEqual(self.local.reason.call_args.args[0]["web_search_text"], "Is FD rate good today?")
                 self.assertEqual({call.kwargs.get("params", {}).get("q") or call.args[1] for call in request.call_args_list},
                                  {"Is FD rate good today?", "https://news.google.com/rss/search?q=Is+FD+rate+good+today%3F&hl=en-IN&gl=IN&ceid=IN:en"})
-        self.assertEqual(web(self.ask("latest repo rate news")), [])  # switched off
+                self.assertEqual(self.ask("Is my 5 lakh FD rate good today? Brief answer.")["answer_style"], "concise")
+        offline = self.ask("latest repo rate news")
+        self.assertEqual(web(offline), [])  # switched off
+        self.assertNotIn("web_search_text", offline)
 
     def test_a_question_about_someone_else_is_looked_up_by_itself_and_the_owners_own_is_not(self):
         self.local.reason.return_value = "Synthetic general answer."

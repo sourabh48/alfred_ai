@@ -26,11 +26,14 @@ ANSWER_STYLES = {
 }
 
 
+BRIEF = re.compile(r'\b(?:brief|briefly|concise|short answer)\b', re.I)
+
+
 def answer_budget(query, scope, style='auto'):
     if not isinstance(style, str) or style not in ('auto', *ANSWER_STYLES):
         raise ValueError('Choose a supported answer style.')
     if style == 'auto':
-        if re.search(r'\b(?:brief|briefly|concise|short answer)\b', query, re.I): style = 'concise'
+        if BRIEF.search(query): style = 'concise'
         elif re.search(r'\bstep[- ]by[- ]step\b|\bwalk me through\b', query, re.I): style = 'steps'
         elif re.search(r'\b(?:compare|comparison|versus|vs)\b', query, re.I): style = 'comparison'
         elif re.search(r'\bin detail\b|\bdetailed\b|\bin[- ]depth\b', query, re.I): style = 'detailed'
@@ -127,6 +130,7 @@ class OllamaReasoner(OllamaEmbeddings):
                 'Sources classified public_web_result are public information from the named website, not personal facts or advice; '
                 'when you use one, cite its ref in brackets such as [web-1], and quote any figure exactly as that result shows it. '
                 'For current figures prefer the most recent dated result and give its date; encyclopedia text may be out of date. '
+                'When public_web_result sources are supplied, explain the search fully in labelled sections: What was searched (web_search_text, on Wikipedia and Google News), What was found (each result that bears on the question, with its ref and date, and say plainly which results were unrelated), What this means (the outcome in plain words), and What is still unknown. '
                 'Only canonical financial tool data is authoritative; do not calculate or invent financial values. '
                 'You may state a monetary amount only when it is copied exactly from a supplied source amount, written as digits '
                 'with that source ref in brackets beside it and its recorded currency code if it has one. Never calculate, total, '
@@ -462,11 +466,13 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
             'memory_retrieval_available':None}
     from . import web_lookup
     web=web_lookup.search(query) if web_search else []
+    searched=query  # the text sent to Wikipedia and Google News, shown with the answer (owner 2026-11-26)
     auto_web=not web_search and scope=='general' and settings.ALFRED_ASSISTANT_AUTO_WEB
     if auto_web and provider=='gemini' and web_lookup.should_search(query): web=web_lookup.search(query)
     if provider=='gemini':
         result=present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
             daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
+        if web: result['web_search_text']=' '.join(searched.split())
         if web_lookup.clearly_public(query) and isinstance(result.get('answer'),str) and result['answer'].strip():
             from .brain import try_remember  # Gemini teaches the local model (owner decision 2026-11-20); kept encrypted on this PC
             try_remember(user,'public_answer',{'question':query[:500],'answer':result['answer'][:3000]},store=store)
@@ -478,7 +484,9 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         retrieval_error=safe_error_details(exc,'Saved-memory retrieval is unavailable; this answer has no saved-memory grounding.',logger_name=__name__)
     if auto_web:  # memory first; the web only for what it lacks, and only for a plainly public question
         if web_lookup.should_search(query,memories): web=web_lookup.search(query)
-        elif public:=web_lookup.public_part(query): web=web_lookup.search(public)  # mixed question: only the public part goes out
+        elif public:=web_lookup.public_part(query): web=web_lookup.search(public); searched=public  # mixed question: only the public part goes out
+    if web and answer_style=='auto' and not BRIEF.search(query):  # a lookup is explained in full unless a brief answer was asked
+        style, output_limit = answer_budget(query, scope, 'detailed')
     # Filenames and private citation URLs are UI metadata, never model instructions.
     model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{
         'ref':source['ref'],'classification':source['classification'],
@@ -492,6 +500,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     if hasattr(type(reasoner), 'use_quick_model') and easy_question(query, scope): reasoner.use_quick_model()  # not test doubles
     limit=context_bytes(context_tokens(reasoner),output_limit)  # the window learned by an earlier call, else the safe fallback
     payload={'query':query,'sources':model_tools.copy(),'response_style':style}; included=[]
+    if web: payload['web_search_text']=' '.join(searched.split())
     if payload_bytes(payload)>limit: raise ValueError('Select smaller local source context.')
     kept=[]
     for item in web:  # web results fill the local window first; any that do not fit are left out
@@ -548,6 +557,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     revalidate()
     return present_answer({'answer':answer,'provider':'ollama','classification':'ai_generated_hypothesis','financial_authority':False,
         'answer_style':style, 'local_output_token_limit':output_limit,
+        **({'web_search_text':' '.join(searched.split())} if web else {}),
         'local_thinking':getattr(used,'thought',False) is True,
         # Shown beside the answer only; never stored or sent anywhere.
         'local_model':getattr(used,'model',None) if isinstance(getattr(used,'model',None),str) else None,
