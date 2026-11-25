@@ -2761,7 +2761,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Dated official references exist; no verified live permit availability or closure service. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Maintain reviewed effective-date references and unknown state.
 - SCOPED_INSPECTION 2026-11-06: the Kerala forest reference was reviewed 2026-09-29 and now shows as stale with UNKNOWN confidence, as intended. No live permit or closure service exists to integrate.
-- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): The dated reference list covers one place (Chembra Peak, Kerala); every other place returns UNKNOWN.
+- SOURCE_AUDIT 2026-11-25 (master 7b10b3a): The dated reference list covered one place (Chembra Peak). Extended the same day to official pages read by hand on 2026-11-25: Chembra (rechecked), Kudremukh (Karnataka Aranya Vihaara), Arunachal Pradesh e-ILP, Nagaland ILP, Manipur ILP, Mizoram Inner Line Pass and Lakshadweep entry permit. Ladakh, Sikkim and Rohtang are not covered: their official portals could not be read (expired certificate or DNS failure). Every other place returns UNKNOWN; references stay stale-by-design with UNKNOWN confidence after 24 hours.
 
 ### TRAVEL-16 — Weather, horizons and replanning
 
