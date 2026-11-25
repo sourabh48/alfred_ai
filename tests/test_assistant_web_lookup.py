@@ -56,6 +56,38 @@ class ResearchTests(SimpleTestCase):
         self.assertNotIn("text", first["data"])
 
 
+class LegalAssistantTests(SimpleTestCase):
+    """Owner 2026-11-26: a scenario is answered like a legal assistant from the official BNS text and its old IPC section."""
+    def test_the_law_file_holds_every_section_with_its_old_ipc_section(self):
+        from apps.ml_engine.services import law
+        data = law.corpus()[0]
+        self.assertEqual(len(data["sections"]), 358)
+        murder = data["sections"][102]
+        self.assertEqual((murder["section"], murder["heading"]), (103, "Punishment for murder"))
+        self.assertIn("302.", murder["ipc"]); self.assertIn("imprisonment for life", murder["text"])
+        self.assertTrue(all(item["heading"] and len(item["text"]) >= 20 for item in data["sections"]))
+
+    def test_a_scenario_finds_the_sections_that_fit_and_other_questions_find_none(self):
+        from apps.ml_engine.services import law
+        found = lambda question: [source["data"]["section"] for source in law.sections(question)]
+        self.assertTrue({117, 118} & set(found("My neighbour hit me with an iron rod and broke my arm. What case can I file?")))
+        self.assertIn(303, found("Someone stole my phone from my bag on the train, what is the punishment?"))
+        self.assertIn(318, found("A man online took money promising a job and vanished. Is this a crime?"))
+        self.assertIn(106, found("A drunk driver hit a pedestrian who died. What offence?"))
+        self.assertEqual(found("What is the punishment under IPC 302?"), [103])
+        self.assertEqual(found("Explain section 103 BNS"), [103])
+        self.assertEqual(found("What is a good hobby?"), [])
+        [source] = law.sections("What is the punishment under IPC 302?")
+        self.assertEqual((source["ref"], source["classification"]), ("law-1", "statute_section"))
+
+    def test_gemini_is_told_to_answer_like_a_legal_assistant_only_when_sections_are_supplied(self):
+        from apps.ml_engine.services import law
+        gemini = GeminiReasoner("A" * 39)
+        system = lambda results: gemini.body({"query": "What is the punishment under IPC 302?", "web_results": results}, 100)["systemInstruction"]["parts"][0]["text"]
+        self.assertIn(law.INSTRUCTIONS, system([{"ref": "law-1", "section": 103}]))
+        self.assertNotIn(law.INSTRUCTIONS, system([{"ref": "web-1", "title": "Repo rate"}]))
+
+
 class QuestionFilterTests(SimpleTestCase):
     def test_public_questions_pass_and_private_looking_ones_stay_on_this_pc(self):
         self.assertEqual(web_lookup.check_public("  What is the  current repo rate in India? "), "What is the current repo rate in India?")
@@ -187,6 +219,18 @@ class HybridWebLookupTests(TestCase):
         self.assertEqual([s["ref"] for s in payload["sources"] if s["classification"] == "public_web_result"], ["web-1", "web-2"])
         self.assertFalse(result["narrative_withheld"]); self.assertTrue(result["cited_web_figures"])
         self.assertIn("https://en.wikipedia.org/wiki/Repo_rate", [s.get("url") for s in result["sources"]])
+
+    def test_a_legal_question_gets_the_statute_sections_and_a_cited_punishment_is_shown(self):
+        self.local.reason.return_value = "Section 103 [law-1] punishes murder with death or imprisonment for life, and fine."
+        result = self.ask("What is the punishment under IPC 302?")
+        payload = self.local.reason.call_args.args[0]
+        self.assertEqual([(s["ref"], s["data"]["section"]) for s in payload["sources"] if s["classification"] == "statute_section"], [("law-1", 103)])
+        self.assertEqual(result["answer_style"], "detailed")
+        self.assertFalse(result["narrative_withheld"])
+        self.assertIn("law-1", [s["ref"] for s in result["sources"]])
+        self.local.reason.return_value = "Synthetic general answer."
+        self.assertFalse(any(s.get("classification") == "statute_section" for s in self.ask("What is a good hobby?")["sources"]))
+        self.assertFalse(any(s.get("classification") == "statute_section" for s in self.ask("Explain IPC 302", scope="finance")["sources"]))
 
     def test_a_figure_no_cited_result_shows_is_still_withheld(self):
         self.local.reason.return_value = "Home loan rates will be 7.25 percent next year [web-1]."

@@ -164,6 +164,12 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         if not panel.get_attribute('open'):
             self.memory_click('#intelligenceOptions > summary')
 
+    def source_link(self,selector):
+        # Sources start collapsed (owner 2026-11-26): open the panel holding the link, as the owner would.
+        link=self.browser.find_element(self.By.CSS_SELECTOR,selector)
+        self.browser.execute_script("const d=arguments[0].closest('details.conversation-evidence'); if(d) d.open=true;",link)
+        return link
+
     def memory_click(self,selector):
         from selenium.common.exceptions import ElementClickInterceptedException, NoSuchElementException, StaleElementReferenceException
 
@@ -172,6 +178,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 element=self.browser.find_element(self.By.CSS_SELECTOR,selector)
                 if element.get_attribute('id') == 'intelligenceWebSearch':
                     self.open_answer_options()
+                # Sources start collapsed (owner 2026-11-26): open the panel holding the link, as the owner would.
+                self.browser.execute_script("const d=arguments[0].closest('details.conversation-evidence'); if(d) d.open=true;",element)
                 self.browser.execute_script("arguments[0].scrollIntoView({behavior:'instant',block:'center'});",element)
                 if not element.is_displayed() or not element.is_enabled():
                     return False
@@ -3631,7 +3639,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(self.browser.find_element(self.By.ID,'intelligenceQuery').get_property('value'),'')
             self.assertIn('no model used',self.text('intelligenceLocalStatus'))
             citation=evidence(owner,selected.pk)['citation_url']
-            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+            self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
             self.assertNotIn('AMBIGUOUS',self.text('intelligenceAnswers'))
         self.capture('reviewed-transaction-direction-credit')
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
@@ -3681,7 +3689,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceRetry').is_displayed())
             self.assertIn('no model used',self.text('intelligenceLocalStatus'))
             self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
-        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
+        self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
         self.capture('reviewed-transaction-classification')
         self.browser.execute_cdp_cmd('Emulation.setDeviceMetricsOverride',{'width':390,'height':844,'deviceScaleFactor':1,'mobile':True})
         self.addCleanup(self.browser.execute_cdp_cmd,'Emulation.clearDeviceMetricsOverride',{})
@@ -3726,7 +3734,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             self.assertEqual(draft.get_property('value'),''); self.assertFalse(self.browser.find_element(self.By.ID,'intelligenceRetry').is_displayed())
             self.assertIn('no model used',self.text('intelligenceLocalStatus'))
             self.assertEqual(self.text('intelligenceCloudStatus'),'Gemini disabled')
-            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
+            self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{item["citation_url"]}"]').is_displayed())
             if expected=='2026-09-01':
                 status=self.browser.execute_async_script('''
                     const [id,done]=arguments;
@@ -3977,7 +3985,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         selected=(records[0],records[1],records[-1]); owner=self.scenario['user']
         for record in selected:
             citation=service.evidence(owner,document.pk,record.pk)['citation_url']
-            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+            self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
         self.assertEqual(len(self.browser.find_elements(self.By.CSS_SELECTOR,'#intelligenceAnswers .recorded-amount')),3)
         self.assertNotIn(f'canonical-investment-{records[2].pk}',self.text('intelligenceAnswers'))
         self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
@@ -4041,7 +4049,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('4,321.09',self.text('intelligenceAnswers')); self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
         self.assertNotIn('99999.99',self.text('intelligenceAnswers'))
         citation=service.evidence(owner,document.pk,records[0].pk)['citation_url']
-        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+        self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
         cloud.assert_not_called()
         self.browser.execute_script("document.querySelector('#intelligenceAnswers > article:last-child').scrollIntoView({block:'start',behavior:'instant'})")
         self.capture('document-field-questions-reviewed-current-values')
@@ -4146,7 +4154,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('2,345.67 · Currency not recorded',self.text('intelligenceAnswers'))
         for document in (documents[0],documents[-1]):
             url=service.evidence(self.scenario['user'],document.pk,row.pk)['citation_url']
-            self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{url}"]').is_displayed())
+            self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{url}"]').is_displayed())
         self.assertNotIn('Synthetic investment source 2.pdf',self.text('intelligenceAnswers'))
         self.assertNotIn('Synthetic investment source',json.dumps(local.reason.call_args.args[0]))
         self.browser.execute_script("document.querySelector('#intelligenceSources').scrollIntoView({block:'start',behavior:'instant'})")
@@ -4263,7 +4271,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.memory_click('#intelligenceForm button[type="submit"]')
         self.wait.until(lambda _: '2,345.67' in self.text('intelligenceAnswers'))
         citation=service.evidence(owner,documents[0].pk,row.pk)['citation_url']
-        self.assertTrue(self.browser.find_element(self.By.CSS_SELECTOR,f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
+        self.assertTrue(self.source_link(f'#intelligenceAnswers a[href="{citation}"]').is_displayed())
         self.assertIn('Currency not recorded',self.text('intelligenceAnswers'))
         self.assertNotIn('filterLeak',json.dumps(local.reason.call_args.args[0]))
         detail=service.evidence(owner,documents[0].pk,row.pk)

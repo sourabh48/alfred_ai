@@ -14,6 +14,7 @@ from .local_ai_limits import (context_bytes, context_tokens, deadline as local_d
                               payload_bytes, supports_thinking, thinking_mode, thinking_tokens)
 from .persistent_memory import _owner, MemoryConflict
 from .memory_reasoning import SECTIONS, reason_with_memory, reasoning_provider
+from .law import INSTRUCTIONS as LAW_INSTRUCTIONS
 
 FINANCIAL_LANGUAGE = re.compile(r'\b(?:balance|income|salary|loan|debt|expense|investment|worth|savings|profit|payoff|cost|price|spending|payment|budget)\b',re.I)
 CURRENCY_LANGUAGE = re.compile(r'\b(?:INR|USD|EUR|GBP|JPY|AUD|CAD|CNY|CHF|dollars?|rupees?|euros?|pounds?|yen)\b',re.I)
@@ -146,6 +147,7 @@ class OllamaReasoner(OllamaEmbeddings):
                 'If sources do not establish a requested personal or document fact, say it is unavailable. '
                 'Never infer an account number, loan balance, date or evidence from missing context. '
                 'Label advice and uncertain conclusions as hypotheses. Use word labels for lists. Never invoke tools or change records. '
+                + (LAW_INSTRUCTIONS if any(s.get('classification')=='statute_section' for s in payload.get('sources',[])) else '')
                 + ANSWER_STYLES[style][1]},
                 {'role':'user','content':json.dumps(payload,ensure_ascii=False,allow_nan=False)}]}
         if len(body['messages'][1]['content'].encode())>context_bytes(num_ctx,num_predict): raise ValueError('Local context exceeds its limit.')
@@ -314,8 +316,8 @@ def _cited_record_figures(answer, sources):
 
 def _cited_web_figures(answer, sources):
     """True when the answer cites a web result and every figure in it appears in a cited result's own text."""
-    texts = {str(s['ref']): f"{s['data'].get('title', '')} {s['data'].get('snippet', '')}" for s in sources
-             if s.get('classification') == 'public_web_result' and isinstance(s.get('data'), dict)}
+    texts = {str(s['ref']): ' '.join(str(value) for value in s['data'].values()) for s in sources  # article and section text too
+             if s.get('classification') in ('public_web_result', 'statute_section') and isinstance(s.get('data'), dict)}
     cited = [ref for ref in texts if '[' + ref + ']' in answer]
     if not cited:
         return False
@@ -477,9 +479,11 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     searched=query  # the text sent to Wikipedia and Google News, shown with the answer (owner 2026-11-26)
     auto_web=not web_search and scope=='general' and settings.ALFRED_ASSISTANT_AUTO_WEB
     if auto_web and provider=='gemini' and web_lookup.should_search(query): web=web_lookup.search(query)
+    from . import law as law_lookup
+    law=law_lookup.sections(query) if scope=='general' else []  # public statute text read on this PC (owner 2026-11-26)
     if provider=='gemini':
         result=present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web,searched=searched_text(searched) if web else None),scope,query)
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=law+web,searched=searched_text(searched) if web else None),scope,query)
         if web: result['web_search_text']=searched_text(searched)
         if web_lookup.clearly_public(query) and isinstance(result.get('answer'),str) and result['answer'].strip():
             from .brain import try_remember  # Gemini teaches the local model (owner decision 2026-11-20); kept encrypted on this PC
@@ -493,7 +497,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     if auto_web:  # memory first; the web only for what it lacks, and only for a plainly public question
         if web_lookup.should_search(query,memories): web=web_lookup.search(query)
         elif public:=web_lookup.public_part(query): web=web_lookup.search(public); searched=public  # mixed question: only the public part goes out
-    if web and answer_style=='auto' and not BRIEF.search(query):  # a lookup is explained in full unless a brief answer was asked
+    if (web or law) and answer_style=='auto' and not BRIEF.search(query):  # a lookup is explained in full unless a brief answer was asked
         style, output_limit = answer_budget(query, scope, 'detailed')
     # Filenames and private citation URLs are UI metadata, never model instructions.
     model_tools=tools if scope not in ('bank_statements','financial_records','financial_document','finance','documents') else [{
@@ -511,10 +515,10 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     if web: payload['web_search_text']=searched_text(searched)
     if payload_bytes(payload)>limit: raise ValueError('Select smaller local source context.')
     kept=[]
-    for item in web:  # web results fill the local window first; any that do not fit are left out
+    for item in law+web:  # statute sections, then web results, fill the local window first; any that do not fit are left out
         if payload_bytes(payload|{'sources':payload['sources']+[item]})<=limit:
             payload['sources'].append(item); kept.append(item)
-    web=kept
+    law=[item for item in kept if item in law]; web=[item for item in kept if item in web]
     history = []
     for index in range(len(conversation_context or []) - 2, -1, -2):
         candidate = conversation_context[index:index + 2] + history
@@ -556,7 +560,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
                 'narrative_withheld':False,'context_omitted':0,'memory_retrieval_available':None}
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=web),scope,query)
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=law+web),scope,query)
     if scope!='financial_document':
         with store._transaction() as db:
             store._expire(db,owner)
@@ -573,5 +577,5 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         'memory_retrieval_available':None if scope=='financial_document' else retrieval_error is None,'retrieval_error':retrieval_error,
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
-            'score':item['score']} for item in included]+tools+web,'context_omitted':len(memories)-len(included),
+            'score':item['score']} for item in included]+tools+law+web,'context_omitted':len(memories)-len(included),
         'conversation_context_turns':len(history)//2,'skill_used':skill['name'] if skill else None},scope,query+' '+ ' '.join(turn['content'] for turn in history))

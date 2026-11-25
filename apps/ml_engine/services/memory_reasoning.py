@@ -131,7 +131,9 @@ class GeminiReasoner:
     def body(self,payload,max_output_tokens):
         # Web results were fetched from public sites, so only the owner's own part is held to the private-data check.
         public_payload({key:value for key,value in payload.items() if key!='web_results'})
-        return {'systemInstruction':{'parts':[{'text':INSTRUCTIONS}]},
+        from .law import INSTRUCTIONS as LAW  # statute sections arrive among the web results as refs law-1…
+        law=any(str(item.get('ref','')).startswith('law-') for item in payload.get('web_results',[]))
+        return {'systemInstruction':{'parts':[{'text':INSTRUCTIONS+(LAW if law else '')}]},
             'contents':[{'role':'user','parts':[{'text':encoded(payload).decode()}]}],
             'generationConfig':{'maxOutputTokens':max_output_tokens,'candidateCount':1}}
 

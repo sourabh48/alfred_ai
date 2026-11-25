@@ -14,7 +14,7 @@ os.environ["ALFRED_AUTO_TRAIN_ON_STARTUP"] = "false"
 os.environ["ALFRED_TASK_BACKEND"] = "huey"
 os.environ["DJANGO_SETTINGS_MODULE"] = "alfred_ai.settings"
 datas = [(str(root / "templates"), "templates"), (str(root / "static"), "static"),
-         (str(root / "docs" / "guide"), "guide")]
+         (str(root / "docs" / "guide"), "guide"), (str(root / "apps" / "ml_engine" / "data"), "apps/ml_engine/data")]  # the law file
 # Free keys go in only when the builder names their own private config (owner decision 2026-11-19); never committed.
 if os.environ.get("ALFRED_BUNDLE_KEYS_FROM"):
     from alfred_ai import bundled_keys

@@ -108,23 +108,23 @@ class MemorySyncRuntimeTests(TestCase):
             state=self.store._sync_state(db,_owner(self.alice)); bob=self.store._sync_state(db,_owner(self.bob))
         self.assertEqual(state['reasoning']['reserved'],result['reserved_tokens']); self.assertNotIn('reasoning',bob)
 
-    def test_budget_persists_across_failure_restart_and_reset(self):
+    def test_budget_persists_across_failure_restart_and_reset(self):  # one 4096-token reply fits, a second does not
         self.save(); provider=Mock(); provider.reason.side_effect=OSError('SYNTHETIC-SECRET')
-        with self.assertRaises(SyncUnavailable): reason_with_memory(self.store,self.alice,'synthetic',consent=True,query_sensitivity='public',provider=provider,daily_tokens=2500)
+        with self.assertRaises(SyncUnavailable): reason_with_memory(self.store,self.alice,'synthetic',consent=True,query_sensitivity='public',provider=provider,daily_tokens=6000)
         self.store.reset_owner(self.alice)
         restarted=MemoryStore(self.root/'vault')
-        with self.assertRaises(ReasoningBudgetExceeded): reason_with_memory(restarted,self.alice,'synthetic',consent=True,query_sensitivity='public',provider=provider,daily_tokens=2500)
+        with self.assertRaises(ReasoningBudgetExceeded): reason_with_memory(restarted,self.alice,'synthetic',consent=True,query_sensitivity='public',provider=provider,daily_tokens=6000)
         self.assertEqual(provider.reason.call_count,1)
         with self.store._transaction() as db:
             state=self.store._sync_state(db,_owner(self.alice)); state['reasoning']['day']=(datetime.now(timezone.utc)-timedelta(days=1)).date().isoformat()
             self.store._write_sync_state(db,_owner(self.alice),state)
-        self.assertIn('answer',reason_with_memory(restarted,self.alice,'synthetic',consent=True,query_sensitivity='public',provider=MockReasoner(),daily_tokens=2500))
+        self.assertIn('answer',reason_with_memory(restarted,self.alice,'synthetic',consent=True,query_sensitivity='public',provider=MockReasoner(),daily_tokens=6000))
 
     def test_reasoning_api_budget_429_and_payload_rejection(self):
         payload={'query':'synthetic','consent':True,'query_sensitivity':'public'}
         for bad in (payload|{'owner':self.bob.pk},payload|{'daily_tokens':99999},payload|{'consent':False}):
             self.assertEqual(self.post('reason',bad).status_code,400)
-        with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=2500):
+        with override_settings(ALFRED_MEMORY_REASONING_DAILY_TOKENS=6000):
             self.assertEqual(self.post('reason',payload).status_code,200)
             response=self.post('reason',payload)
             self.assertEqual(response.status_code,429); self.assertIn('Retry-After',response)

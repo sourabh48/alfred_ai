@@ -500,15 +500,16 @@ document.addEventListener("DOMContentLoaded", () => {
         (result.sources || []).forEach(source => {
             const reference = document.createElement("p"); reference.textContent = `Source: ${source.ref} · ${source.classification}`;
             evidence.append(reference);
-            const types = {owner_reviewed_document_record:"Owner-reviewed document fields · not independent authentication", owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records (currency-limited)", canonical_record:"Canonical stored record · not independent authentication", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required", public_web_result:"Public web result · not checked by ALFRED"};
+            const types = {owner_reviewed_document_record:"Owner-reviewed document fields · not independent authentication", owner_verified_statement:"Owner-confirmed memory", canonical_financial_baseline:"Canonical financial records (currency-limited)", canonical_record:"Canonical stored record · not independent authentication", owner_travel_preferences:"Your saved Travel preferences", verified_document_evidence:"Verified loan closure evidence", owner_confirmed_statement_record:"Owner-confirmed bank-statement record (not independently bank-authenticated)", unverified_statement_record:"Bank-statement record · source review required", public_web_result:"Public web result · not checked by ALFRED", statute_section:"Bharatiya Nyaya Sanhita, 2023 · official NCRB text, for reference"};
             const description = document.createElement("p"); description.textContent = `${types[source.classification] || 'Source'} · ${source.verified_at ? `Checked ${new Date(source.verified_at).toLocaleString()}` : 'Verification timestamp not recorded'}`; evidence.append(description);
             if (historical) description.textContent = "Saved reference only; current existence and verification have not been checked.";
             if (!historical && source.source_file_status === "not_retained") {
                 const note = document.createElement("p"); note.textContent = "Verified metadata record only; original source file is not retained. This does not prove independent bank authenticity."; evidence.append(note);
             }
-            if (source.classification === "public_web_result" && /^https:\/\//.test(source.url || "")) {
+            if (["public_web_result", "statute_section"].includes(source.classification) && /^https:\/\//.test(source.url || "")) {
                 const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer nofollow";
-                link.textContent = `${source.data?.title || "Open result"} (${source.data?.source || "web"})`; evidence.append(link);
+                link.textContent = source.classification === "statute_section" ? `BNS section ${source.data?.section}: ${source.data?.heading} (NCRB)`
+                    : `${source.data?.title || "Open result"} (${source.data?.source || "web"})`; evidence.append(link);
             } else if (safeCitation(source.url)) {
                 const link = document.createElement("a"); link.href = source.url; link.textContent = source.classification === "owner_verified_statement" ? "Review or correct this memory" : "Open source records"; evidence.append(link);
             }
