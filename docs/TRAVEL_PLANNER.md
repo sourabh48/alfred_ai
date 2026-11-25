@@ -79,7 +79,7 @@ require selection. Unknown origin distances remain unknown.
 The research panels show weather, stays, transport, permit/source leads, places,
 estimated cost formulas and provider freshness. One Google Maps Platform key
 covers place names, places, hotels, destinations, routes and weather; live flight
-prices wait for a Skyscanner key (a Google Flights link until then). See [provider configuration and limits](TRAVEL_PROVIDERS.md). Their
+prices come from Amadeus Travel Builder, or Skyscanner if a partner key is ever granted (a Google Flights link when neither is set). See [provider configuration and limits](TRAVEL_PROVIDERS.md). Their
 implementation and fixture tests do not establish live-account acceptance.
 Missing credentials leave the affected category unavailable and retain the plan.
 
@@ -104,6 +104,13 @@ request snapshot. Private names, home addresses, travel logs, vehicle details an
 media are excluded from public research queries. The planner sends only required
 public place names, city coordinates, dates, route modes and search categories;
 occupancy is included for stay/flight searches. Free-form conversations are not sent.
+
+## Government sources and access
+
+Which Indian government and other travel sources ALFRED can use, and how an individual gets access, is in
+[research](TRAVEL_INTELLIGENCE_RESEARCH.md), the [access matrix](TRAVEL_API_ACCESS_MATRIX.md),
+[licensing](TRAVEL_DATA_LICENSING.md), the [roadmap](TRAVEL_IMPLEMENTATION_ROADMAP.md) and the
+[acceptance criteria](TRAVEL_ACCEPTANCE_CRITERIA.md) (2026-11-25).
 
 ## Run and configuration
 

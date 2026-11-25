@@ -141,6 +141,10 @@ class SafetyTests(TestCase):
         self.plan = TravelPlan.objects.create(user=user, title="Synthetic Coorg ride", destination="Coorg", status="planned",
                                               start_date=self.today + timedelta(days=2), end_date=self.today + timedelta(days=4),
                                               itinerary={"map": coast})
+        from apps.mobility.services.travel.providers import safety
+        offline = patch.object(safety, "_xml", side_effect=ProviderError("network_error"))  # SACHET has its own tests
+        offline.start()
+        self.addCleanup(offline.stop)
 
     def replies(self, method, url, **kwargs):
         if "earthquake.usgs.gov" in url:
