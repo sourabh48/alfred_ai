@@ -110,7 +110,9 @@ def clean(answer, message, *, pending=None, alfred_said=""):
     budget = answer.get("budget_rupees")
     if type(budget) is int and 0 < budget <= 100_000_000 and re.search(r"\d", message):
         out["budget"] = float(budget)
-        if answer.get("budget_scope") in ("per_person", "whole_trip"):
+        # Per person only when the message says so: live 2026-11-26 the model read "for 2 people, budget 30000" as each.
+        if answer.get("budget_scope") == "whole_trip" or (answer.get("budget_scope") == "per_person"
+                                                          and re.search(r"\b(?:per\s+(?:person|head)|each)\b", message, re.I)):
             out["budget_scope"] = answer["budget_scope"]
     people = answer.get("travellers")
     if type(people) is int and 1 <= people <= 50 and NUMBER_CUE.search(message):

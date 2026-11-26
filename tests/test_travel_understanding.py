@@ -40,6 +40,11 @@ class CleanTests(TestCase):
         far = {"start_date": soon(1), "end_date": soon(40)}
         self.assertEqual(clean(far, "from tomorrow for 40 days"), {})
 
+    def test_per_person_needs_the_message_to_say_so(self):
+        message = "a 4 day car trip from Pune for 2 people, budget 30000 rupees"
+        self.assertNotIn("budget_scope", clean({"budget_rupees": 30000, "budget_scope": "per_person"}, message))
+        self.assertEqual(clean({"budget_rupees": 3000, "budget_scope": "per_person"}, "3000 per head")["budget_scope"], "per_person")
+
     def test_a_lone_place_after_the_starting_city_question_is_the_origin(self):
         self.assertEqual(clean({"destination": "Mysuru"}, "mysuru", pending="origin"), {"origin": "Mysuru"})
         self.assertEqual(clean({"destination": "Coorg"}, "can we do coorg instead?"), {"requested_destination": "Coorg"})

@@ -133,6 +133,18 @@ def extract(state, text, reading=None):
                 if not m[5]:
                     inferred_year = True
                     notes.append(f"I used {start.year} for these dates; tell me if you meant another year.")
+            elif value(state, "trip_duration"):
+                # "a 4 day trip starting 12 December": one start date and a known length
+                one = re.findall(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+({MONTH_PATTERN})\b\.?(?:,?\s+(20\d{{2}}))?", lower)
+                if len(one) == 1:
+                    day, month, year = one[0]
+                    start = date(int(year or timezone.localdate().year), MONTHS[month], int(day))
+                    if not year and start < timezone.localdate():
+                        start = start.replace(year=start.year+1)
+                    dates = start, start + timedelta(days=int(value(state, "trip_duration"))-1)
+                    if not year:
+                        inferred_year = True
+                        notes.append(f"I used {start.year} for these dates; tell me if you meant another year.")
         if dates:
             days = (dates[1]-dates[0]).days+1
             if not 1 <= days <= 30:

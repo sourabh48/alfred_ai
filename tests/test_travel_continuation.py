@@ -33,6 +33,16 @@ class TravelContinuationTests(TestCase):
         self.assertEqual(value(state,"requested_destination"),"Wayanad")
         self.assertEqual(value(state,"origin"),"Bengaluru")
 
+    def test_route_words_end_the_destination(self):
+        """Live 2026-11-26: "Goa via Kolhapur" geocoded to a business named "GOA KOLHAPUR TRANSPORT"."""
+        state = augment(self.state, "a 4 day car trip from Pune to Goa via Kolhapur and Belgaum")
+        self.assertEqual(value(state, "requested_destination"), "Goa")
+
+    def test_one_start_date_and_a_length_give_the_dates(self):
+        from apps.mobility.services.travel_conversation import extract
+        state, _ = extract({}, "suggest beach places for a 4 day car trip from Pune starting 12 December 2030 for 2 people")
+        self.assertEqual((value(state, "available_start_date"), value(state, "available_end_date")), ("2030-12-12", "2030-12-15"))
+
     def test_comparison_and_permit_followup(self):
         state = augment(self.state,"Compare bike vs train vs flight")
         self.assertEqual(value(state,"transport_mode"),"ride")

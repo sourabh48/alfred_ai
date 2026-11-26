@@ -13,8 +13,8 @@ PROFILE_KEYS = {"origin", "transport_mode", "pillion", "maximum_daily_driving", 
     "weather_tolerance", "trip_pace", "preferred_trip_style", "luggage", "favorite_routes"}
 
 
-# Where a place name stops: date and budget words, as in "Coorg next month", are not part of it.
-PLACE_END = (r"(?=\s+(?:(?:for|on|with|under|and|by|from|during|starting|next|this|budget|tomorrow|today)\b"
+# Where a place name stops: date, budget and route words, as in "Coorg next month" or "Goa via Kolhapur", are not part of it.
+PLACE_END = (r"(?=\s+(?:(?:for|on|with|under|and|by|via|from|during|starting|next|this|budget|tomorrow|today)\b"
              r"|in\s+(?:\d|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next|this))|[.,;!?]|$)")
 
 
