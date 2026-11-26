@@ -32,7 +32,8 @@ class WantsThinkingTests(SimpleTestCase):
             with self.subTest(query=query[:40]):
                 self.assertTrue(wants_thinking(query, scope))
         for query, scope in (('How much did I spend on fuel?', 'general'), ('What does SIP mean?', 'general'),
-                             ('Hello', 'travel'), (PUZZLE, 'finance'), (PUZZLE, 'bank_statements'), (PUZZLE, 'documents')):
+                             ('Hello', 'travel'), (PUZZLE, 'finance'), (PUZZLE, 'bank_statements'), (PUZZLE, 'documents'),
+                             ('Walk me through filing an FIR step by step.', 'general')):
             with self.subTest(query=query, scope=scope):
                 self.assertFalse(wants_thinking(query, scope))
 
@@ -121,7 +122,7 @@ class HybridAnswerThinkingTests(TestCase):
         self.local.thought = True
         result = hybrid_answer(self.store, self.user, PUZZLE, local=self.local)
         self.assertIs(self.local.reason.call_args.kwargs['think'], True); self.assertTrue(result['local_thinking'])
-        self.assertEqual(result['local_output_token_limit'], 384)  # the answer budget itself is unchanged
+        self.assertEqual(result['local_output_token_limit'], 2048)  # the detailed budget of a full question, unchanged by thinking
 
     @override_settings(ALFRED_MEMORY_OLLAMA_MODEL='qwen3.5:35b-a3b', ALFRED_QUICK_OLLAMA_MODEL='qwen3.5:9b')
     def test_easy_questions_use_the_fast_model_and_fall_back_to_the_main_one(self):

@@ -244,6 +244,16 @@ class HybridWebLookupTests(TestCase):
     def test_a_figure_no_cited_result_shows_is_still_withheld(self):
         self.local.reason.return_value = "Home loan rates will be 7.25 percent next year [web-1]."
         self.assertTrue(self.ask("repo rate interest outlook", web_search=True)["narrative_withheld"])
+        # A longer answer loses only its unsupported line, and says so; it is still hidden if most of it would go.
+        self.local.reason.return_value = ("**Answer:** The repo rate is 6.5 percent [web-1].\n"
+                                          "- It was cut by 35 basis points in 2019.\n"
+                                          "- Banks pass repo changes on to home loan rates over the following months [web-2].")
+        result = self.ask("repo rate interest outlook", web_search=True)
+        self.assertFalse(result["narrative_withheld"]); self.assertTrue(result["unsupported_lines_removed"])
+        self.assertNotIn("2019", result["answer"]); self.assertIn("6.5 percent [web-1]", result["answer"])
+        self.assertIn("were removed", result["answer"])
+        self.local.reason.return_value = "The repo rate is 6.5 percent [web-1].\n" + "Loan rates rose 35 basis points in 2019 and 40 in 2022, " * 3
+        self.assertTrue(self.ask("repo rate interest outlook", web_search=True)["narrative_withheld"])
 
     def test_no_lookup_unless_asked_and_only_for_general_public_questions(self):
         self.local.reason.return_value = "Synthetic general answer."

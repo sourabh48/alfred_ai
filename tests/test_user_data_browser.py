@@ -2412,7 +2412,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
             const broken=inspect(malformed);
             const wide=inspect('| '+Array(13).fill('Header').join(' | ')+' |\\n| '+Array(13).fill('---').join(' | ')+' |');
             const tall=inspect('| A | B |\\n| --- | --- |\\n'+Array(101).fill('| kept | preserved |').join('\\n'));
-            const long='# '+ 'x'.repeat(8193), fallback=inspect(long);
+            const long='# '+ 'x'.repeat(16385), fallback=inspect(long);
+            const nested=inspect('- **Section 318** [law-1]\\n    *   *Old IPC section:* 415');
             const lines=Array(513).fill('unchanged').join('\\n'), many=inspect(lines);
             const attack=inspect('<img src="https://example.invalid/private" onerror="window.mdLeak=true">\\n<svg onload="window.mdLeak=true"></svg>\\n<script>window.mdLeak=true</script>\\n[Run](javascript:window.mdLeak=true) ![remote](https://example.invalid/image) <iframe srcdoc="bad"></iframe>');
             const escaped=inspect('```html\\n<img src=x onerror="window.mdLeak=true">\\n```');
@@ -2435,7 +2436,8 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
                 unclosed:unclosed.querySelector('pre code').textContent,
                 literalUrl:literalUrl.textContent.includes('https://example.invalid/private_name_value') && literalUrl.textContent.includes('[a_b_c](javascript:window.mdLeak=true)'),
                 identifiers:identifiers.textContent===identifierText && !identifiers.querySelector('em,strong'),
-                underscored:underscored.querySelector('strong').textContent==='strong' && underscored.querySelector('em').textContent==='emphasis',leak:Boolean(window.mdLeak)};
+                underscored:underscored.querySelector('strong').textContent==='strong' && underscored.querySelector('em').textContent==='emphasis',leak:Boolean(window.mdLeak),
+                nested:[nested.querySelectorAll('li').length,nested.querySelector('li em')?.textContent,nested.textContent.includes('*')]};
             host.remove();return result;
         """)
         self.assertEqual((results['head'],results['strong'],results['em'],results['inline']),('Title','bold','careful','example()'))
@@ -2446,6 +2448,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         for key in ('tallText','longFallback','manyFallback','attackText','literalUrl','identifiers','underscored'): self.assertTrue(results[key],key)
         self.assertIn('extra | value',results['brokenText']); self.assertIn('<img',results['escaped'])
         self.assertEqual(results['unclosed'],'print("kept")'); self.assertFalse(results['leak'])
+        self.assertEqual(results['nested'],[2,'Old IPC section:',False])  # live 2026-11-26: indented sub-points showed stray asterisks
         self.assertFalse(self.browser.execute_script("return performance.getEntriesByType('resource').some(r=>r.name.includes('example.invalid'))"))
 
     def test_answer_markdown_saved_reopen_financial_guard_keyboard_and_accessibility(self):

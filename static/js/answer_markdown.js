@@ -14,7 +14,7 @@
     }
     const fence = line => /^ {0,3}(`{3,}|~{3,})([a-zA-Z0-9_+-]{0,24})\s*$/.exec(line);
     const heading = line => /^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/.exec(line);
-    const listItem = line => /^ {0,3}([-+*]|\d{1,9}[.)])\s+(.+)$/.exec(line);
+    const listItem = line => /^ {0,12}([-+*]|\d{1,9}[.)])\s+(.+)$/.exec(line);  // indented sub-points too, shown in the same list
     const quote = line => /^ {0,3}>\s?(.*)$/.exec(line);
     function cells(line) {
         return line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(cell => cell.trim());
@@ -32,7 +32,7 @@
     Alfred.renderAnswerMarkdown = text => {
         const root = document.createElement('div'); root.className = 'assistant-answer';
         const lines = text.replace(/\r\n?/g,'\n').split('\n');
-        if (new TextEncoder().encode(text).length > 8192 || lines.length > 512) {
+        if (new TextEncoder().encode(text).length > 16384 || lines.length > 512) {  // the longest answer either model may give
             const plain = document.createElement('p'); plain.textContent = text; root.append(plain); return root;
         }
         const startsBlock = index => fence(lines[index]) || heading(lines[index]) || listItem(lines[index]) || quote(lines[index]) || tableAt(lines,index);

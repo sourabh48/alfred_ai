@@ -43,7 +43,10 @@ EVERYDAY = {
 }
 _STOP = {"the", "and", "for", "with", "that", "this", "what", "who", "was", "were", "has", "have", "had", "his", "her", "him", "she",
          "they", "them", "can", "will", "shall", "any", "not", "but", "from", "into", "out", "under", "section", "sections", "person",
-         "whoever", "also", "such", "may", "which", "there", "done", "does", "did", "law", "legal", "india", "indian"}
+         "whoever", "also", "such", "may", "which", "there", "done", "does", "did", "law", "legal", "india", "indian",
+         # how-to words: "walk me through filing an FIR step by step" matched "gone through" (live 2026-11-26)
+         "how", "through", "walk", "step", "steps", "file", "filing", "filed", "fir", "police", "complaint", "case", "court",
+         "about", "rights", "should", "would", "could", "want", "need", "someone", "after", "before", "against"}
 
 
 def _stem(word):
@@ -91,7 +94,7 @@ def sections(question, limit=LIMIT):
     wanted = Counter(words)
     scores = [sum(idf.get(word, 0) * (3 * min(head[word], 1) + min(body[word], 3)) for word in wanted)
               for head, body in zip(heads, bodies)]
-    ranked = [items[i] for i in sorted(range(len(items)), key=lambda i: -scores[i]) if scores[i] >= 4][:limit]
+    ranked = [items[i] for i in sorted(range(len(items)), key=lambda i: -scores[i]) if scores[i] >= 4 and items[i]["section"] != 2][:limit]  # s. 2 only defines words; it fits every question a little
     picked = []
     for item in _direct(question, items) or ranked:  # a named section is the answer by itself
         if item not in picked: picked.append(item)

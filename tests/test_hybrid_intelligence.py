@@ -289,7 +289,8 @@ class OllamaReasonerBoundaryTests(SimpleTestCase):
 
     def test_task_budgets_are_bounded_and_explicit_style_overrides_query(self):
         for query, style, tokens in (('Briefly explain','concise',192),('Compare options','comparison',768),
-                ('Walk me through this','steps',768),('Explain in detail','detailed',2048),('Hello','concise',384)):
+                ('Walk me through this','steps',768),('Explain in detail','detailed',2048),('Hello','concise',384),
+                ('What should I pack for Ladakh?','detailed',2048)):
             self.assertEqual(answer_budget(query,'general'), (style,tokens))
         self.assertEqual(answer_budget('Compare options','general','concise'),('concise',192))
         self.assertEqual(answer_budget('Hello','travel'),('concise',256))
@@ -357,3 +358,42 @@ class OllamaReasonerBoundaryTests(SimpleTestCase):
         with patch('apps.ml_engine.services.local_embeddings.HTTPConnection') as connection,self.assertRaises(EmbeddingUnavailable):
             OllamaReasoner()._request('POST','/api/chat',deadline=time.monotonic()-1)
         connection.assert_not_called()
+
+
+class GeneralAnswerFigureLineTests(SimpleTestCase):
+    """Live 2026-11-26: a general answer loses only the lines that put a figure beside money words; owner-record scopes
+    and money questions keep the stricter rule."""
+    PACKING = ("### Packing for Ladakh\n"
+               "Nights drop to -10°C, so pack layers.\n"
+               "#### 1. Clothing\n"
+               "- Thermal base layers and a down jacket.\n"
+               "#### 2. Budget\n"
+               "- Expect about 3000 per day for stays.\n"
+               "- Carry a 20,000mAh power bank.\n"
+               "Taxis cost 500 a day.")
+
+    def present(self, answer, scope='general', query='What should I pack for a 5-day trip to Ladakh?'):
+        from apps.ml_engine.services.hybrid_intelligence import present_answer
+        return present_answer({'answer': answer, 'sources': [], 'provider': 'ollama'}, scope, query, asked=query)
+
+    def test_only_money_lines_go_and_the_answer_says_so(self):
+        result = self.present(self.PACKING)
+        self.assertFalse(result['narrative_withheld']); self.assertTrue(result['unsupported_lines_removed'])
+        for gone in ('3000', '20,000mAh', '500'):  # a heading keeps its own list number
+            self.assertNotIn(gone, result['answer'])
+        for stays in ('-10°C', '1. Clothing', 'Thermal base layers'):
+            self.assertIn(stays, result['answer'])
+        self.assertIn('beside money words were removed', result['answer'])
+
+    def test_finance_scope_money_questions_and_mostly_money_answers_stay_hidden(self):
+        self.assertTrue(self.present(self.PACKING, scope='finance')['narrative_withheld'])
+        self.assertTrue(self.present('Spend 3000 a day.\nStays cost 2000.\nTaxis 500.', query='What will Ladakh cost?')['narrative_withheld'])
+        money_question = self.present("Plan for altitude.\nKeep cash, ATMs are few.\nExpect 3000 per day.", query='What budget do I need for Ladakh?')
+        self.assertTrue(money_question['narrative_withheld']); self.assertNotIn('3000', money_question['answer'])
+
+    def test_the_local_prompt_names_the_home_country_from_the_time_zone_only(self):
+        from apps.ml_engine.services.hybrid_intelligence import home_line
+        with override_settings(TIME_ZONE='Asia/Kolkata'):
+            self.assertIn('lives in India', home_line())
+        with override_settings(TIME_ZONE='UTC'):
+            self.assertEqual(home_line(), '')
