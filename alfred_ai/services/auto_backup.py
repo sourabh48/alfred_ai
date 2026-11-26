@@ -114,3 +114,41 @@ def backup_now():
         return run()
     except Exception as exc:  # already recorded for Settings
         return {"status": "failed", "error": type(exc).__name__}
+
+
+FIELDS = ("account_id", "bucket", "access_key", "secret_key")
+
+
+def _apply(changes: dict) -> None:
+    """Write the lines to config/local.env and use them in the running app at once."""
+    from alfred_ai.services import online_services
+    online_services.save(changes)
+    for name, value in changes.items():
+        setattr(settings, name, value == "true" if name == "ALFRED_CLOUD_BACKUP_AUTHORIZED" else value)
+
+
+def connect(data: dict, client=None) -> None:
+    """Settings > Backup key: the owner's bucket and its token. Cloudflare is asked first, so wrong values are never saved."""
+    from apps.ml_engine.services.memory_r2 import R2Bucket, validate_profile
+    from apps.ml_engine.services.memory_sync import SyncUnavailable
+    from alfred_ai.services.online_services import VALUE
+    from scripts import cloud_backup
+    profile = {name: str((data or {}).get(name) or "").strip() for name in FIELDS} if isinstance(data, dict) else {}
+    try:
+        if len(profile) != len(FIELDS) or not all(VALUE.fullmatch(value) or name == "bucket" for name, value in profile.items()):
+            raise ValueError("Fill in all four values, pasted without spaces or quotes.")
+        checked = validate_profile({**profile, "jurisdiction": ""})
+    except ValueError as exc:
+        raise backup_key.BackupKeyError(str(exc)) from None
+    try:
+        cloud_backup.listing(client or R2Bucket(checked))
+    except (SyncUnavailable, cloud_backup.GateError):
+        raise backup_key.BackupKeyError("Cloudflare did not accept these values. Check them, and that the token may read and "
+                                        "write this bucket.") from None
+    _apply({**{"ALFRED_MEMORY_R2_" + name.upper(): profile[name] for name in FIELDS},
+            "ALFRED_MEMORY_R2_JURISDICTION": "", "ALFRED_CLOUD_BACKUP_AUTHORIZED": "true"})
+
+
+def turn_off() -> None:
+    """Stops the nightly upload; the bucket values and every backup already in it stay."""
+    _apply({"ALFRED_CLOUD_BACKUP_AUTHORIZED": ""})

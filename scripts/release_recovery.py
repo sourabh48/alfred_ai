@@ -32,7 +32,12 @@ from scripts import release_gate as release
 from scripts.verify_private_recovery import verify
 
 CHUNK = 1024 * 1024
-GROUPS = ("config", "media", "ml_models", "artifacts/native/jobs.sqlite3", "artifacts/private-memory-v2")
+GROUPS = ("config", "media", "ml_models", "artifacts/native/jobs.sqlite3", "artifacts/private-memory-v2",
+          "artifacts/personal-keys")  # each person's own service keys, sealed with config/native.env's secret
+# Private-memory keys sealed to this Windows user (DPAPI). Inside the encrypted archive they travel unsealed, so a restore on
+# a new PC or Windows account can open the chats and memories again (owner 2026-11-26, "like most financial application").
+WRAPPED = (b"M15DPAPI1\0", b"M15SYNC1\0")
+PORTABLE = b"M15PORTABLE1\0"
 
 
 def runtime_reference(runtime):
@@ -107,6 +112,28 @@ def database_snapshot(path, ignored_columns=None):
             result[table] = {"count": len(hashes), "sha256": hashlib.sha256(b"".join(sorted(hashes))).hexdigest(),
                              "schema_sha256": hashlib.sha256(schema.encode()).hexdigest()}
         return result
+
+
+def portable_key(path):
+    """The archive form of a key sealed to this Windows user, or None for any other file (or another user's key)."""
+    if path.suffix != ".key" or path.stat().st_size > 4096:
+        return None
+    blob = path.read_bytes()
+    for prefix in WRAPPED:
+        if blob.startswith(prefix):
+            try:
+                return PORTABLE + prefix + protect_key(blob[len(prefix):], decrypt=True)
+            except Exception:  # not this user's: it stays sealed, as before
+                return None
+    return None
+
+
+def rebind_key(path):
+    """Seal a restored portable key to the Windows user doing the restore."""
+    blob = path.read_bytes()
+    for prefix in WRAPPED:
+        if blob.startswith(PORTABLE + prefix):
+            path.write_bytes(prefix + protect_key(blob[len(PORTABLE + prefix):]))
 
 
 def sqlite_copy(source, target, seconds=60):
@@ -188,6 +215,8 @@ def create(runtime, destination, key_file, release_id, candidate, baseline, sour
                 shutil.copyfile(source, target)
                 if release.sha256(target) != before or release.sha256(source) != before:
                     raise release.GateError("recovery_source_changed")
+                if (portable := portable_key(target)) is not None:
+                    target.write_bytes(portable)
             records.append({"backup_path": name, "bytes": target.stat().st_size,
                             "sha256": release.sha256(target), "sqlite_snapshot": is_database})
         if source_repo:
@@ -315,6 +344,9 @@ def restore(backup, key_file, destination):
         for name, expected in metadata["database_snapshots"].items():
             if database_snapshot(staging / name) != expected:
                 raise release.GateError("financial_restore_reconciliation_failed")
+        for record in records:  # after every hash check: from here the key file differs from the archive by design
+            if record["backup_path"].endswith(".key"):
+                rebind_key(staging / record["backup_path"])
         no_links(destination)
         if destination.exists():
             raise release.GateError("recovery_destination_must_be_new")

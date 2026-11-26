@@ -182,6 +182,65 @@ class NightlyBackupTests(R2Setup):
         self.assertEqual(auto_backup.nightly_folder(), self.root / "runtime-backups" / "nightly")
 
 
+class PortableRestoreTests(R2Setup):
+    """A new PC or Windows account must open the restored chats, memories and service keys (owner 2026-11-26)."""
+
+    def test_windows_bound_vault_keys_travel_inside_the_archive_and_are_resealed_on_restore(self):
+        from cryptography.fernet import Fernet
+        from apps.ml_engine.services.memory_key import protect_key
+        vault = self.runtime / "artifacts/private-memory-v2"; vault.mkdir(parents=True)
+        raw = Fernet.generate_key()
+        (vault / "journal.key").write_bytes(b"M15DPAPI1" + bytes(1) + protect_key(raw))
+        (vault / "sync-owner.key").write_bytes(b"M15SYNC1" + bytes(1) + b"another user's sealed key")
+        (self.runtime / "artifacts/personal-keys").mkdir(parents=True)
+        (self.runtime / "artifacts/personal-keys/user-1.json").write_text('{"TRAVEL_GOOGLE_MAPS_API_KEY": "sealed-synthetic"}')
+        self.assertEqual(recovery.portable_key(vault / "journal.key"), recovery.PORTABLE + b"M15DPAPI1" + bytes(1) + raw)
+        self.assertIsNone(recovery.portable_key(vault / "sync-owner.key"))  # not this user's: left sealed
+        key = self.root / "portable.key"; key.write_bytes(Fernet.generate_key())
+        recovery.create(self.runtime, self.root / "backup", key, "synthetic-portable", "a" * 40, "b" * 40)
+        archive = (self.root / "backup/recovery.zip").read_bytes()
+        self.assertNotIn(raw, archive)  # unsealed only inside the encryption
+        restored = self.root / "restored"
+        self.assertEqual(recovery.restore(self.root / "backup", key, restored)["LOCAL_BACKUP_VERIFIED"], "PASS")
+        blob = (restored / "artifacts/private-memory-v2/journal.key").read_bytes()
+        self.assertTrue(blob.startswith(b"M15DPAPI1" + bytes(1)))
+        self.assertEqual(protect_key(blob[10:], decrypt=True), raw)
+        self.assertEqual((restored / "artifacts/private-memory-v2/sync-owner.key").read_bytes(),
+                         (vault / "sync-owner.key").read_bytes())
+        self.assertTrue((restored / "artifacts/personal-keys/user-1.json").is_file())
+
+
+class ConnectCloudTests(R2Setup):
+    VALUES = {"account_id": PROFILE["account_id"], "bucket": PROFILE["bucket"], "access_key": PROFILE["access_key"],
+              "secret_key": PROFILE["secret_key"]}
+
+    def env(self):
+        path = self.runtime / "config/local.env"
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+
+    def test_values_are_checked_with_cloudflare_before_they_are_saved(self):
+        before = self.env()
+        with override_settings(ALFRED_CLOUD_BACKUP_AUTHORIZED=False, ALFRED_MEMORY_R2_ACCOUNT_ID=""):
+            self.assertFalse(backup_key.status()["cloud"]["on"])
+            for bad in ({**self.VALUES, "account_id": "not-hex"}, {**self.VALUES, "secret_key": "has'quote" * 5}, {"bucket": "x"}, "text"):
+                with self.assertRaises(backup_key.BackupKeyError):
+                    auto_backup.connect(bad)
+            with patch("apps.ml_engine.services.memory_r2.request", side_effect=PublicHTTPError("authorization_failed")), \
+                    self.assertRaisesRegex(backup_key.BackupKeyError, "did not accept"):
+                auto_backup.connect(self.VALUES)
+            self.assertEqual(self.env(), before)
+            with patch.dict(os.environ):
+                auto_backup.connect(self.VALUES)
+                cloud = backup_key.status()
+                self.assertEqual(cloud["cloud"], {"on": True, "bucket": PROFILE["bucket"]})
+                self.assertNotIn(PROFILE["secret_key"], json.dumps(cloud))
+                self.assertIn("ALFRED_CLOUD_BACKUP_AUTHORIZED='true'", self.env())
+                self.assertIn("SYNTHETIC_ONLY=not-a-real-credential", self.env())  # other lines kept
+                auto_backup.turn_off()
+                self.assertFalse(backup_key.status()["cloud"]["on"])
+                self.assertIn(PROFILE["access_key"], self.env())  # the bucket stays connected for fetching the key copy
+
+
 class BackupSettingsTests(TestCase):
     def setUp(self):
         self.root = Path(self.enterContext(TemporaryDirectory(prefix="alfred-auto-backup-ui-synthetic-")))

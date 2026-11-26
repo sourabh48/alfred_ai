@@ -1063,6 +1063,12 @@ def backup_key_api_view(request):
                 backup_key.save_to_r2()
             elif data.get("action") == "fetch_r2":
                 backup_key.fetch_from_r2()
+            elif data.get("action") == "connect_r2":
+                from .services.auto_backup import connect
+                connect(data.get("r2"))
+            elif data.get("action") == "turn_off":
+                from .services.auto_backup import turn_off
+                turn_off()
             elif data.get("action") == "backup_now":
                 from .services.auto_backup import backup_now
                 backup_now.delay()

@@ -27,9 +27,30 @@
         </div>
         <div class="col-auto"><button class="btn btn-primary" type="submit">Open the copy</button></div>
     </form>
+    <h3 class="h6 mt-3 mb-1">Nightly backup to Cloudflare R2</h3>
+    <form class="row g-2 align-items-end mb-2 d-none" id="backupCloudForm" data-live-refresh-hold="true" autocomplete="off">
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label small mb-1" for="backupCloudAccount">Account ID</label>
+            <input class="form-control" id="backupCloudAccount" name="account_id" autocomplete="off" spellcheck="false" maxlength="64" required>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label small mb-1" for="backupCloudBucket">Bucket name</label>
+            <input class="form-control" id="backupCloudBucket" name="bucket" autocomplete="off" spellcheck="false" maxlength="63" required>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label small mb-1" for="backupCloudAccess">Access Key ID</label>
+            <input class="form-control" id="backupCloudAccess" name="access_key" autocomplete="off" spellcheck="false" maxlength="128" required>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label small mb-1" for="backupCloudSecret">Secret Access Key</label>
+            <input class="form-control" id="backupCloudSecret" name="secret_key" type="password" autocomplete="off" maxlength="128" required>
+        </div>
+        <div class="col-auto"><button class="btn btn-primary" type="submit">Check and turn on nightly backup</button></div>
+    </form>
     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
         <p class="small mb-0" id="backupAutoStatus"></p>
         <button class="btn btn-outline-dark btn-sm rounded-pill d-none" type="button" id="backupNow">Back up now</button>
+        <button class="btn btn-outline-secondary btn-sm rounded-pill d-none" type="button" id="backupTurnOff">Turn off nightly backup</button>
     </div>
-    <p class="small muted mt-2 mb-0">Cloudflare R2 uses the bucket in config/local.env. Google Drive uses the Google sign-in set up for ALFRED. In your Google Cloud project, turn on the Google Drive API and add the "app data" Drive permission (drive.appdata) to the consent screen; ALFRED can then see only its own file, never your other Drive files. Once the key and its locked copy are saved, ALFRED backs everything up to your R2 bucket each night, encrypted, and keeps the newest 7.</p>
+    <p class="small muted mt-2 mb-0">In Cloudflare: R2 Object Storage, create a bucket, then Manage API tokens, Create Account API token, Object Read &amp; Write for that bucket only. ALFRED checks the values with Cloudflare before saving them in this PC's private config, and never shows the secret again. Google Drive uses the Google sign-in set up for ALFRED. In your Google Cloud project, turn on the Google Drive API and add the "app data" Drive permission (drive.appdata) to the consent screen; ALFRED can then see only its own file, never your other Drive files. Once the key and its locked copy are saved, ALFRED backs everything up to your R2 bucket each night, encrypted, and keeps the newest 7.</p>
 </section>

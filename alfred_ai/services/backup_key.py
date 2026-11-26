@@ -114,7 +114,14 @@ def status() -> dict:
     saved = _saved()
     return {"key": key_path().is_file(), "key_file": str(key_path()), "locked_copy": _sealed_path().is_file(),
             "in_drive": bool(saved.get("drive_file_id")), "saved_on": saved.get("saved_on", ""), "google": saved.get("google", ""),
-            "in_r2": bool(saved.get("r2_saved_on")), "r2_saved_on": saved.get("r2_saved_on", ""), "auto": _auto()}
+            "in_r2": bool(saved.get("r2_saved_on")), "r2_saved_on": saved.get("r2_saved_on", ""), "auto": _auto(), "cloud": _cloud()}
+
+
+def _cloud() -> dict:
+    """Whether the nightly backup may use the owner's R2 bucket; only the bucket's name is ever shown."""
+    from apps.ml_engine.services.memory_r2 import configured_profile
+    profile = configured_profile()
+    return {"on": bool(profile and settings.ALFRED_CLOUD_BACKUP_AUTHORIZED), "bucket": profile["bucket"] if profile else ""}
 
 
 def _auto() -> dict:
