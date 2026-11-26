@@ -36,6 +36,12 @@ WATCHLIST_NAV_MAX_AGE_DAYS = 7
 WATCHLIST_PROOF_NEWS_LIMIT = 2
 WATCHLIST_NAME_EXCLUSIONS = ("IDCW", "DIVIDEND", "BONUS", "UNCLAIMED", "SEGREGATED", "REGULAR", "INTERVAL")
 WATCHLIST_NAME_REQUIRED = ("DIRECT", "GROWTH")
+# Column positions of the older AMFI layouts, used until a file's own header line names them.
+AMFI_LATEST_COLUMNS = {"scheme_code": 0, "isin_growth": 1, "isin_reinvestment": 2, "scheme_name": 3, "nav": 4, "nav_date": 5}
+AMFI_HISTORY_COLUMNS = {"scheme_code": 0, "scheme_name": 1, "isin_growth": 2, "isin_reinvestment": 3, "nav": 4, "nav_date": 7}
+AMFI_HEADER_FIELDS = {"schemecode": "scheme_code", "schemename": "scheme_name", "navname": "scheme_name", "plan": "plan",
+                      "option": "option", "isindivpayout/isingrowth": "isin_growth", "isindivreinvestment": "isin_reinvestment",
+                      "netassetvalue": "nav", "date": "nav_date"}
 WATCHLIST_FAMILY_MAP = {
     "Large Cap Fund": "equity_core",
     "Flexi Cap Fund": "equity_core",
@@ -540,11 +546,17 @@ class PortfolioIntelligenceService:
         current_category = ""
         current_house = ""
         rows: list[dict] = []
+        # AMFI reorders columns without notice (2026-11 added Plan and Option), so each file's header names them.
+        columns = dict(AMFI_HISTORY_COLUMNS if history_mode else AMFI_LATEST_COLUMNS)
         for raw_line in text.splitlines():
             line = raw_line.strip()
             if not line:
                 continue
             if line.startswith("Scheme Code;"):
+                names = [AMFI_HEADER_FIELDS.get(re.sub(r"\s+", "", part).casefold()) for part in line.split(";")]
+                found = {field: index for index, field in enumerate(names) if field}
+                if {"scheme_code", "scheme_name", "nav", "nav_date"} <= found.keys():
+                    columns = found
                 continue
             if ";" not in line:
                 if "Open Ended Schemes" in line or "Close Ended Schemes" in line:
@@ -553,32 +565,29 @@ class PortfolioIntelligenceService:
                     current_house = line
                 continue
             parts = [part.strip() for part in line.split(";")]
-            if not parts or not parts[0].isdigit():
+            if not parts[0].isdigit() or len(parts) <= max(columns.values()):
                 continue
-            if history_mode:
-                if len(parts) < 8:
-                    continue
-                scheme_name = parts[1]
-                nav_value = self._parse_nav(parts[4])
-                nav_date = self._parse_amfi_date(parts[7])
-            else:
-                if len(parts) < 6:
-                    continue
-                scheme_name = parts[3]
-                nav_value = self._parse_nav(parts[4])
-                nav_date = self._parse_amfi_date(parts[5])
+            nav_value = self._parse_nav(parts[columns["nav"]])
+            nav_date = self._parse_amfi_date(parts[columns["nav_date"]])
             if nav_value is None or nav_date is None or nav_date > timezone.localdate():
                 continue
+            scheme_name = parts[columns["scheme_name"]]
+            plan, option = (parts[columns[field]] if field in columns else "" for field in ("plan", "option"))
+            if plan and plan.split()[0].casefold() not in scheme_name.casefold():
+                # The latest file names only the scheme; the plan and option tell Direct Growth from IDCW or Regular.
+                scheme_name = " - ".join(part for part in (scheme_name, plan, option) if part)
+            isin = {field: "" if parts[columns[field]] == "-" else parts[columns[field]]
+                    for field in ("isin_growth", "isin_reinvestment") if field in columns}
             rows.append(
                 {
-                    "scheme_code": parts[0],
+                    "scheme_code": parts[columns["scheme_code"]],
                     "scheme_name": scheme_name,
                     "fund_house": current_house,
                     "category": current_category,
                     "nav": nav_value,
                     "nav_date": nav_date,
-                    "isin_growth": parts[2] if history_mode else parts[1],
-                    "isin_reinvestment": parts[3] if history_mode else parts[2],
+                    "isin_growth": isin.get("isin_growth", ""),
+                    "isin_reinvestment": isin.get("isin_reinvestment", ""),
                 }
             )
         return rows
@@ -605,7 +614,8 @@ class PortfolioIntelligenceService:
         ranked: list[dict] = []
         for scheme_code, latest in latest_by_code.items():
             series = sorted(history_by_code.get(scheme_code, []), key=lambda item: item["nav_date"])
-            identity = ("scheme_name", "isin_growth", "isin_reinvestment")
+            # The two AMFI files spell scheme names differently, so the official code and ISINs are the identity.
+            identity = ("isin_growth", "isin_reinvestment")
             if any(any(str(row.get(field, "")).casefold() != str(latest.get(field, "")).casefold() for field in identity)
                    or not latest["nav_date"] - timedelta(days=WATCHLIST_HISTORY_DAYS) <= row["nav_date"] <= latest["nav_date"] for row in series):
                 continue

@@ -141,6 +141,27 @@ class InvestmentMarketAcceptanceTests(TestCase):
         self.transport.rows = self.transport.rows[:17] + self.transport.rows[-1:]
         self.assertFalse(service.build_short_horizon_watchlist(self.owner)["available"])
 
+    def test_november_2026_layouts_are_read_by_their_headers(self):
+        # AMFI added Plan and Option columns, moved the history ISINs, and names a scheme differently in each file.
+        end = timezone.localdate()
+        self.transport.latest = "\n".join([
+            "Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Plan;Option;Net Asset Value;Date",
+            "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)", "Synthetic Fund House",
+            f"990001;SYNTH-ISIN-A;-;Synthetic Flexi Cap Fund;Direct Plan;Growth Option;106.0001;{end:%d-%b-%Y}",
+            f"990002;SYNTH-ISIN-C;-;Synthetic Flexi Cap Fund;Direct Plan;IDCW Option;50.0001;{end:%d-%b-%Y}",
+        ])
+        self.transport.rows = ["Scheme Code;NAV Name;Plan;Option;ISIN Div Payout/ISIN Growth;ISIN Div Reinvestment;Net Asset Value;Date"] + [
+            f"990001;Synthetic Flexi Cap Fund - Lock in - Direct Growth;Direct Plan;Growth Option;SYNTH-ISIN-A;;{Decimal('100.0001') + Decimal(index) / 10};"
+            f"{end - timedelta(days=60 - index):%d-%b-%Y}" for index in range(61)]
+        latest = service._parse_amfi_nav_report(self.transport.latest, history_mode=False)
+        self.assertEqual([row["scheme_name"] for row in latest], ["Synthetic Flexi Cap Fund - Direct Plan - Growth Option",
+                                                                 "Synthetic Flexi Cap Fund - Direct Plan - IDCW Option"])
+        self.assertEqual((latest[0]["nav"], latest[0]["isin_reinvestment"]), (Decimal("106.0001"), ""))
+        history = service._parse_amfi_nav_report("\n".join(self.transport.rows), history_mode=True)
+        self.assertEqual((len(history), history[-1]["nav"], history[-1]["isin_growth"]), (61, Decimal("106.0001"), "SYNTH-ISIN-A"))
+        items = service.build_short_horizon_watchlist(self.owner)["items"]
+        self.assertEqual([item["scheme_code"] for item in items], ["990001"])
+
     def test_invalid_prices_never_become_observed_navs(self):
         for value in ("NaN", "Infinity", "-1", "0", "", "USD 12", "1,2", "1e9999"):
             with self.subTest(value=value):
