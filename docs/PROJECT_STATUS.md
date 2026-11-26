@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 89/143 (62.2%) verified.**
+**Baseline: 90/143 (62.9%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 31 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 89 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 30 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 90 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -826,7 +826,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
 | OPENAI | 4 | 7 | 57.1 | 3 | 0 | 0 | 0 | 0 |
 | SYNC | 7 | 11 | 63.6 | 1 | 0 | 0 | 0 | 3 |
-| RUNTIME | 11 | 16 | 68.8 | 4 | 1 | 0 | 0 | 0 |
+| RUNTIME | 12 | 16 | 75.0 | 3 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
 
 ## Separate 2.0 acceptance ledger
@@ -3397,14 +3397,15 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-16 — Real-account and manual accessibility acceptance
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P1.
 
-- 2026-11-19 owner decision: the owner will do the real-account sign-in and a Windows Narrator pass during the walkthrough (no password in chat). Waits for that check.
+- 2026-11-19 owner decision: the owner will do the real-account sign-in and a Windows Narrator pass during the walkthrough (no password in chat).
+- Owner acceptance 2026-11-26: the owner accepted RUNTIME-16 ("windows narrator is global so its working", then "accept"). Basis: the owner signs in to the owner runtime with Google in normal use (that session is live), and the proxy check below after c229e32 was pushed and the app restarted (every row button on Home, Spending, Settings, Loans, Budgets and Documents names its item; no unnamed control). Nobody listened to Narrator itself; the acceptance rests on the owner's OK and the proxy check, not on a listen.
 - 2026-11-26 proxy check (owner asked Claude to check): the accessibility names Narrator reads, read from the browser in the owner's app on 14 pages and the signed-out sign-in page (fetched without cookies). No control was unnamed and no id repeated; real Tab presses on Home (30 stops) and Settings (60) went in a sensible order from a working skip link, each with a visible focus ring; Enter opened a menu. Repeated names were found: 16 "Open" links on Home and diagnostics, 60 "Edit" and 60 "Delete" on Spending, Edit/Delete on Budgets, Loans and Documents, 19 "Remove" and several "Get a key" on Settings, and bot Confirm/Dismiss. Fixed locally (each now names its item, for example "Open Bills and EMIs due …"), the letter mark in the logo is hidden from readers, and a source test fails any new unnamed Open/Edit/Delete/Remove/Confirm/Dismiss button. Stays pending: nobody listened to Narrator itself, and the normal sign-in was not done.
 - Source: [alfred_native.py](../alfred_native.py), [alfred_ai/durable_queue.py](../alfred_ai/durable_queue.py), [scripts/package_windows_release.py](../scripts/package_windows_release.py), [packaging/ALFRED.spec](../packaging/ALFRED.spec).
 - APIs/UI/models: /health/native/; local launcher/tray; operator CLI; Isolated data directory, SQLite queue, registry and native runtime metadata.
 - Tests: [tests/test_native_runtime.py](../tests/test_native_runtime.py), [tests/test_native_launcher.py](../tests/test_native_launcher.py), [tests/test_durable_queue.py](../tests/test_durable_queue.py), [tests/test_user_data_browser.py](../tests/test_user_data_browser.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.
-- Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
+- Acceptance: OWNER_ACCEPTED 2026-11-26 on the basis above; no Narrator listen was performed. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Synthetic Chrome/HTTP success does not replace normal sign-in, screen-reader and actual account checks. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Owner signs in normally under acceptance checklist; no password in chat.
 

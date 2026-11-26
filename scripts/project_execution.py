@@ -41,7 +41,6 @@ GATES = {
     'OPENAI-06': 'OWNER_ACTION: fallback after a limit refusal checked live 2026-11-26; a live offline or timeout fallback needs a temporary runtime change the owner approves',
     'SYNC-09': 'OWNER_ACTION: owner saves the locked backup-key copy, then a fetch-and-open drill into a new empty data folder',
     'RUNTIME-08': 'OWNER_ACTION: owner\'s first R2 upload, then a restore drill into a new empty data folder',
-    'RUNTIME-16': 'OWNER_ACTION: owner signs in normally and does a Windows Narrator pass (no password in chat)',
     'RUNTIME-12': 'BLOCKED_APPROVAL: CI runs on each master push; owner-approved ruleset 27070437 (2026-11-12) blocks master deletion and force push; required status checks are unset because finished work is pushed straight to master and need an owner decision',
     'FIN-15': 'BLOCKED_EVIDENCE: all six FIN-15 domains implemented and every currency migration (through users 0006) applied to the owner runtime; calculations never use FX, display-only approximate figures in the viewer currency added 2026-11-07 (ECB via Frankfurter); owner checks in the app pending',
     'FIN-06': 'BLOCKED_EVIDENCE: INR savings goals with Decimal progress implemented 2026-11-06; owner approved migration budgets 0003; owner check in the app remains',
