@@ -214,3 +214,5 @@ class CvExperienceTests(TestCase):
         self.assertIn("Your CV says 4+ years of experience, but its job dates add up to 5.8 years as of November 2026. Update the CV.",
                       check["warnings"][0])
         self.assertIn("Your profile says 5 years", check["warnings"][1])
+        self.assertEqual(check["suggested_profile_years"], 5.8)
+        self.assertEqual(CareerProfile.objects.get(user=user).experience_years, 5)  # only the owner's button changes it

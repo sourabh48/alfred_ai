@@ -1172,6 +1172,23 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('Kotlin', CareerProfile.objects.get(user=owner).skills)
         self.capture('career-weak-resume-confirmed')
 
+    def test_cv_experience_reaches_the_profile_only_after_owner_presses_use(self):
+        from apps.career.models import CareerProfile, CareerResume
+        owner = self.scenario['user']
+        CareerProfile.objects.update_or_create(user=owner, defaults={'role': 'Analyst', 'experience_years': 1, 'skills': 'SQL'})
+        CareerResume.objects.create(user=owner, file_name='dated-synthetic.pdf', parser_status='parsed', parse_confidence=0.9,
+                                    extracted_text='Work Experience\nExample Labs\nJan 2020 - Dec 2023\nEducation\n')
+        self.login(); self.browser.get(self.live_server_url + '/career/')
+        self.wait.until(lambda _: self.browser.find_elements(self.By.CSS_SELECTOR, '[data-use-experience]'))
+        self.assertIn('Example Labs: Jan 2020 - Dec 2023 = 48 months',  # inside the collapsed working list
+                      self.browser.execute_script("return document.getElementById('careerSummaryCards').textContent"))
+        self.assertEqual(CareerProfile.objects.get(user=owner).experience_years, 1)  # shown, not saved
+        self.memory_click('[data-use-experience]')
+        self.wait.until(lambda _: self.browser.execute_script(
+            "return !document.querySelector('[data-use-experience]') && !!document.querySelector('#careerSummaryCards details')"))
+        self.assertEqual(CareerProfile.objects.get(user=owner).experience_years, 4.0)
+        self.capture('career-cv-experience-applied')
+
     def memory_evaluation_fixture(self, health=True):
         from unittest.mock import Mock
         from apps.ml_engine.services.persistent_memory import MemoryStore

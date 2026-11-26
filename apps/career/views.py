@@ -1006,9 +1006,11 @@ def _experience_check(user) -> dict | None:
         warnings.append(f"Your CV says {stated:g}+ years of experience, but its job dates add up to {years:.1f} years "
                         f"as of {today:%B %Y}. Update the CV.")
     profile = CareerProfile.objects.filter(user=user).values_list("experience_years", flat=True).first()
-    if profile is not None and abs(profile - years) >= 0.5:
+    suggest = profile is not None and abs(profile - years) >= 0.5
+    if suggest:
         warnings.append(f"Your profile says {profile:g} years; job matching uses that figure until you change it.")
     return {"years": years, "months": found["months"], "stated_years": stated, "as_of": today.isoformat(), "warnings": warnings,
+            "suggested_profile_years": years if suggest else None,  # the owner applies it with a button; never saved here
             "periods": found["periods"]}
 
 
