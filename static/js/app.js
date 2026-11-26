@@ -276,6 +276,15 @@ function installNavAnchorPersistence() {
 let liveFetchFailures = 0;
 // While a background reload runs, its requests show no progress bar or busy overlay: values just update in place.
 let quietLiveLoads = 0;
+
+// A form rejected by the server ({"payment_mode": ["This field may not be blank."]}) says which field and why.
+function fieldErrors(payload) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "";
+    return Object.entries(payload).filter(([, value]) => Array.isArray(value) && value.length && typeof value[0] === "string")
+        .map(([name, value]) => `${name === "non_field_errors" ? "" : name.replace(/_/g, " ").replace(/^./, c => c.toUpperCase()) + ": "}${value[0]}`)
+        .join(" ");
+}
+
 function fetchJSON(url, options = {}) {
     const {onResponse, ...requestOptions} = options;
     const config = {
@@ -303,7 +312,7 @@ function fetchJSON(url, options = {}) {
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
                 liveFetchFailures += 1;
-                const error = new Error(payload.detail || payload.error || payload.message || (response.status === 413 ? "This file exceeds the upload limit." : "Request failed. Please retry."));
+                const error = new Error(payload.detail || payload.error || payload.message || fieldErrors(payload) || (response.status === 413 ? "This file exceeds the upload limit." : "Request failed. Please retry."));
                 error.status = response.status;
                 error.code = payload.code;
                 error.payload = payload;
@@ -327,9 +336,9 @@ function formatCurrency(value, currency = "INR") {
 }
 
 // Display only: a converted figure from the server, in the viewer's locale. Records keep their own currency.
-function formatApproximate(block, field) {
+function formatApproximate(block, field, sign = "") {
     if (!block || block[field] == null || !block.currency) return "";
-    return `≈ ${new Intl.NumberFormat(undefined, { style: "currency", currency: block.currency, maximumFractionDigits: 2 }).format(Number(block[field]))}`;
+    return `≈ ${sign}${new Intl.NumberFormat(undefined, { style: "currency", currency: block.currency, maximumFractionDigits: 2 }).format(Number(block[field]))}`;
 }
 
 function approximateNote(display) {

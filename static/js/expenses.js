@@ -675,7 +675,7 @@ function renderTimeline(timeline, meta = {}) {
                     <td>${badge(item.category_label, "light text-dark border")}</td>
                     <td>${escapeHtml(item.payment_mode || "BANK")}</td>
                     <td class="text-end fw-semibold ${amountClass}">${item.approximate && Alfred.showHomeCurrency()
-                        ? `${item.direction === "credit" ? "+" : "-"}${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "amount"))}<div class="small text-muted fw-normal" data-expense-approximate>${formatCurrency(item.amount, item.currency)} as recorded, ${Alfred.escapeHtml(item.approximate.rate_date)} rate</div>`
+                        ? `${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "amount", item.direction === "credit" ? "+" : "-"))}<div class="small text-muted fw-normal" data-expense-approximate>${formatCurrency(item.amount, item.currency)} as recorded, ${Alfred.escapeHtml(item.approximate.rate_date)} rate</div>`
                         : `${item.direction === "credit" ? "+" : "-"}${formatCurrency(item.amount, item.currency)}${item.approximate ? `<div class="small text-muted fw-normal" data-expense-approximate>${Alfred.escapeHtml(Alfred.formatApproximate(item.approximate, "amount"))} at the ${Alfred.escapeHtml(item.approximate.rate_date)} rate</div>` : ""}`}${item.currency && item.currency !== "INR" ? `<div class="small text-warning-emphasis fw-normal" data-expense-currency>Kept out of rupee totals</div>` : ""}</td>
                     <td>${escapeHtml(item.source_label)}</td>
                     <td class="text-muted small">${escapeHtml(item.description || item.raw_description || "")}</td>

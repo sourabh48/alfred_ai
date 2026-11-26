@@ -60,7 +60,7 @@ class FollowUpTimingTests(SimpleTestCase):
                                           kind="resume_upload", record_id=2)
         fresh = tracker.match_freshness(_fit(["Python", "Django", "Sql"], years=4.0, record_id=1), current)
         self.assertEqual(fresh["status"], "stale")
-        self.assertEqual((fresh["added_skills"], fresh["removed_skills"]), (["Aws"], ["Sql"]))
+        self.assertEqual((fresh["added_skills"], fresh["removed_skills"]), (["AWS"], ["SQL"]))
         self.assertEqual(len(fresh["reasons"]), 3)  # different resume, skills, experience; role unchanged
         same = tracker.match_freshness(_fit(["Python", "Django", "Aws"], years=5.0, record_id=2), current)
         self.assertEqual(same["status"], "current")
@@ -190,9 +190,9 @@ class CareerApplicationApiTests(TestCase):
         second = CareerResume.objects.create(user=self.owner, file_name="v2.pdf", parser_status="parsed",
                                              extracted_payload={"skills": ["Python", "Kafka"], "role": "Backend Engineer", "experience_years": 5})
         fresh = listed()
-        self.assertEqual((fresh["status"], fresh["added_skills"], fresh["removed_skills"]), ("stale", ["Kafka"], ["Sql"]))
+        self.assertEqual((fresh["status"], fresh["added_skills"], fresh["removed_skills"]), ("stale", ["Kafka"], ["SQL"]))
         diff = self.client.get(f"/api/career/resumes/compare/?from={first.pk}&to={second.pk}").json()
-        self.assertEqual((diff["added_skills"], diff["removed_skills"], diff["kept_skills"]), (["Kafka"], ["Sql"], ["Python"]))
+        self.assertEqual((diff["added_skills"], diff["removed_skills"], diff["kept_skills"]), (["Kafka"], ["SQL"], ["Python"]))
         self.assertTrue(diff["experience_years"]["changed"])
         foreign = CareerResume.objects.create(user=self.other, file_name="x.pdf")
         self.assertEqual(self.client.get(f"/api/career/resumes/compare/?from={first.pk}&to={foreign.pk}").status_code, 404)

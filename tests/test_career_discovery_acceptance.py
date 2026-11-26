@@ -122,8 +122,18 @@ class CareerDiscoveryRulesTests(SimpleTestCase):
 
     def test_configured_java_stack_is_extracted_from_postings_and_resumes(self):
         text = "Java developer with Spring Boot and AWS; laws and draws are not skills."
-        self.assertEqual(set(job_intelligence._extract_skills(text)), {"Java", "Spring Boot", "Aws"})
-        self.assertLessEqual({"Java", "Spring Boot", "Aws"}, set(extract_skill_terms(text, SKILL_CATALOG)))
+        self.assertEqual(set(job_intelligence._extract_skills(text)), {"Java", "Spring", "Spring Boot", "AWS"})  # Spring Boot is Spring, as CVs already list it
+        self.assertLessEqual({"Java", "Spring Boot", "AWS"}, set(extract_skill_terms(text, SKILL_CATALOG)))
+
+    def test_a_pasted_recruiter_message_keeps_company_city_and_every_listed_term_apart(self):
+        """Live 2026-11-26: the company read "Example Fintech Pvt Ltd, Pune. Role" and Kafka, Git, Jenkins were missed."""
+        job = job_intelligence.parse_recruiter_message(
+            "Company: Example Fintech Pvt Ltd, Pune. Role: Senior Java Backend Developer. Experience: 4 to 7 years. "
+            "Must have: Java 17, Spring Boot, Microservices, REST APIs, MySQL, Kafka, Docker, Git, Jenkins. "
+            "Nice to have: AWS, Kubernetes, Redis.")
+        self.assertEqual((job.company, job.location), ("Example Fintech Pvt Ltd", "Pune"))
+        self.assertLessEqual({"Kafka", "Git", "Jenkins", "MySQL", "Microservices", "REST API", "AWS", "Redis"}, set(job.required_skills))
+        self.assertEqual(job_intelligence._extract_company_from_recruiter_text("Client: Acme Corp. Role: SRE"), "Acme Corp")
 
     def test_non_text_saved_skills_do_not_break_discovery(self):
         feeds(self, [feed(), feed(1, jobs=[]), feed(2, jobs=[])])

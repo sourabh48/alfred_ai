@@ -217,3 +217,10 @@ class OfflineMapViewTests(TestCase):
                 self.assertEqual(om.home_country(), "IN")
         with self.settings(TIME_ZONE="UTC"):
             self.assertEqual(om.home_country(), "")
+
+    def test_country_list_names_and_boxes(self):
+        """Live 2026-11-26: Australia was listed as "Ashmore and Cartier Is." and Taiwan's map took in the Indian Himalaya."""
+        boxes = om.countries()
+        self.assertEqual(boxes["AU"]["name"], "Australia")
+        self.assertEqual(boxes["TW"]["boxes"], [[118.19, 21.82, 122.03, 25.38]])
+        self.assertTrue(any(b[0] <= 79 and b[2] >= 80 and b[3] >= 35.5 for b in boxes["IN"]["boxes"]))  # India keeps Aksai Chin

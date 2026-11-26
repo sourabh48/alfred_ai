@@ -521,7 +521,7 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
 class RepeatedButtonNameTests(SimpleTestCase):
     def test_row_buttons_say_which_item_they_act_on(self):
         """Narrator pass 2026-11-26: Tab read "Open, link" 16 times on Home and "Edit"/"Delete" 60 times on Spending."""
-        vague = re.compile(r"<(?:button|a)\b(?:(?!aria-label)[^>])*>(?:Open|Edit|Delete|Remove|Confirm|Dismiss)</(?:button|a)>")
+        vague = re.compile(r"<(?:button|a)\b(?:(?!aria-label)[^>])*>(?:Open|Edit|Delete|Remove|Confirm|Dismiss|Update)</(?:button|a)>")
         found = [f"{path.name}:{number}" for path in sorted((Path(settings.BASE_DIR) / "static" / "js").glob("*.js"))
                  for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if vague.search(line)]
         self.assertEqual(found, [])

@@ -16,10 +16,21 @@ from alfred_ai.services.upload_limits import document_source, upload_deadline
 from pypdf import PdfReader
 
 
+LABELS = {term.casefold(): term for term in (
+    "AWS", "SQL", "GCP", "ETL", "NLP", "LLM", "SEO", "SOAP", "JPA", "MySQL", "PostgreSQL", "MongoDB", "JavaScript",
+    "TypeScript", "FastAPI", "REST API", "CI/CD", "CI CD", "Power BI", "JUnit", "NumPy", "scikit-learn", "API Gateway",
+    "ServiceNow")}
+
+
+def skill_label(term: str) -> str:
+    """How a catalogue term is shown: "AWS", not "Aws". Matching always uses the casefolded term."""
+    return LABELS.get(term.casefold(), term.title())
+
+
 def extract_skill_terms(text, catalog):
     normalized = " ".join(text.casefold().split())
-    return [skill.title() for skill in sorted(catalog)
-            if re.search(r"(?<!\w)" + re.escape(skill) + r"(?!\w)", normalized)][:20]
+    return [skill_label(skill) for skill in sorted(catalog)  # a plural counts: "REST APIs" lists REST API
+            if re.search(r"(?<!\w)" + re.escape(skill) + r"s?(?!\w)", normalized)][:20]
 
 try:
     import pdfplumber

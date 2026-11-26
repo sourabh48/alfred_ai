@@ -23,9 +23,9 @@ from apps.integrations.services import verified_intelligence
 from apps.integrations.services.verified_intelligence import InsightResult, freshness_snapshot
 from apps.expenses.money import expense_money, money_float
 from apps.users.money import profile_money
-from .resume_intelligence import extract_skill_terms
+from .resume_intelligence import SKILL_CATALOG, extract_skill_terms, skill_label
 
-JOB_SKILLS = {
+JOB_SKILLS = SKILL_CATALOG | {  # a job lists every term a CV can (live 2026-11-26: Kafka, Git, Jenkins were missed)
     "python", "sql", "excel", "power bi", "tableau", "django", "react", "node", "azure", "gcp",
     "docker", "kubernetes", "machine learning", "data analysis", "statistics", "forecasting", "finance",
     "risk", "operations", "analytics", "etl", "airflow", "product management", "strategy", "communication",
@@ -417,9 +417,9 @@ class JobIntelligenceService:
     def compare_resume_to_job(self, resume_payload: dict, job: JobPostingSnapshot, *, resume_source=None) -> dict:
         resume_skills = {item.strip().casefold() for item in (resume_payload.get("skills") or []) if isinstance(item, str) and item.strip()}
         required_skills = {item.strip().casefold() for item in job.required_skills if item.strip()}
-        matched = sorted(skill.title() for skill in (resume_skills & required_skills))
-        missing = sorted(skill.title() for skill in (required_skills - resume_skills))
-        extra = sorted(skill.title() for skill in (resume_skills - required_skills))[:8]
+        matched = sorted(map(skill_label, resume_skills & required_skills), key=str.casefold)
+        missing = sorted(map(skill_label, required_skills - resume_skills), key=str.casefold)
+        extra = sorted(map(skill_label, resume_skills - required_skills), key=str.casefold)[:8]
         role = (resume_payload.get("role") or "").strip().lower()
         role_fit = 1.0 if role and role in job.title.lower() else (0.75 if role and any(token in job.title.lower() for token in role.split()) else 0.5)
         try:
@@ -472,10 +472,10 @@ class JobIntelligenceService:
             "score_status": "RULE_BASED" if available else "UNAVAILABLE",
             "uncertainty": uncertainty,
             "sources": [
-                {**resume_source, "skills": sorted(item.title() for item in resume_skills), "role": role,
+                {**resume_source, "skills": sorted(map(skill_label, resume_skills), key=str.casefold), "role": role,
                  "experience_years": exp_years if experience_known else None},
                 {"kind": job.source_kind, "label": job.title or job.source_name,
-                 "skills": sorted(item.title() for item in required_skills), "experience_years": job.experience_years,
+                 "skills": sorted(map(skill_label, required_skills), key=str.casefold), "experience_years": job.experience_years,
                  "excerpt": job.description[:4000]},
             ],
             "matched_skills": matched,
@@ -1569,7 +1569,7 @@ class JobIntelligenceService:
                 break
         tracks = [
             {
-                "skill": skill.title(),
+                "skill": skill_label(skill),
                 "priority": self._study_priority(skill, missing_skills, experience_years),
                 "reason": reason,
                 "grounded_in": grounded_in,
@@ -1747,10 +1747,12 @@ class JobIntelligenceService:
         return _domain_company(domain)
 
     def _extract_company_from_recruiter_text(self, text: str) -> str:
-        for pattern in [r"(?i)\b(?:company|client|organization)\s*[:\-]\s*([A-Z][A-Za-z0-9&.,' -]{2,80})", r"(?i)\bat\s+([A-Z][A-Za-z0-9&.,' -]{2,80})"]:
+        name = r"([A-Z](?:(?![.;,]?\s+[A-Z][A-Za-z ]{0,20}:)[A-Za-z0-9&.,' -]){2,80})"  # stops before ". Role:"
+        for pattern in [r"(?i)\b(?:company|client|organization)\s*[:\-]\s*" + name, r"(?i)\bat\s+" + name]:
             match = re.search(pattern, text[:2000])
-            if match:
-                return match.group(1).strip(" -")
+            if match:  # "Example Fintech Pvt Ltd, Pune" keeps the company; the city is the location
+                return re.sub(r",\s*(?:bengaluru|bangalore|pune|hyderabad|chennai|mumbai|gurugram|gurgaon|delhi|noida|india|remote)\b.*$",
+                              "", match.group(1), flags=re.I).strip(" -.,")
         return ""
 
     def _extract_role_from_text(self, text: str) -> str:

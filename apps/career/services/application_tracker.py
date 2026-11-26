@@ -10,6 +10,8 @@ from datetime import date, timedelta
 
 from django.utils import timezone
 
+from .resume_intelligence import skill_label
+
 STAGES = ("evaluated", "applied", "responded", "assessment", "interview", "offer", "rejected", "discarded", "hired")
 CLOSED_STAGES = {"offer", "rejected", "discarded", "hired"}
 # stage: (days after entering the stage, days between follow-ups, most follow-ups before the lead goes cold)
@@ -178,7 +180,7 @@ def match_freshness(analysis_payload, current: dict | None) -> dict:
     if used["experience_years"] != current["experience_years"]:
         reasons.append("Your years of experience changed.")
     return {"status": "stale" if reasons else "current", "reasons": reasons,
-            "added_skills": [item.title() for item in added], "removed_skills": [item.title() for item in removed], **citation}
+            "added_skills": [skill_label(item) for item in added], "removed_skills": [skill_label(item) for item in removed], **citation}
 
 
 def rechecked_payload(payload: dict, fit: dict, resume_payload: dict, *, today: date) -> dict:
@@ -193,9 +195,9 @@ def rechecked_payload(payload: dict, fit: dict, resume_payload: dict, *, today: 
 
 def compare_resumes(older: dict, newer: dict) -> dict:
     a, b = resume_evidence(older, kind="", record_id=None), resume_evidence(newer, kind="", record_id=None)
-    return {"added_skills": [item.title() for item in sorted(set(b["skills"]) - set(a["skills"]))],
-            "removed_skills": [item.title() for item in sorted(set(a["skills"]) - set(b["skills"]))],
-            "kept_skills": [item.title() for item in sorted(set(a["skills"]) & set(b["skills"]))],
+    return {"added_skills": [skill_label(item) for item in sorted(set(b["skills"]) - set(a["skills"]))],
+            "removed_skills": [skill_label(item) for item in sorted(set(a["skills"]) - set(b["skills"]))],
+            "kept_skills": [skill_label(item) for item in sorted(set(a["skills"]) & set(b["skills"]))],
             "role": {"from": a["role"], "to": b["role"], "changed": a["role"] != b["role"]},
             "experience_years": {"from": a["experience_years"], "to": b["experience_years"],
                                  "changed": a["experience_years"] != b["experience_years"]}}

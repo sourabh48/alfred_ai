@@ -82,7 +82,15 @@ class LocalChat(OllamaReasoner):
         return answer
 
 
-class BulletRewriter(LocalChat):
+class QuickChat(LocalChat):
+    """The fast model when installed: the big memory model's cold load (over 100 s live, 2026-11-26) outlasts these deadlines."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.use_quick_model()
+
+
+class BulletRewriter(QuickChat):
     def rewrite(self, bullet: str, terms: list[str], *, deadline) -> str:
         answer = self.ask(
             "Rewrite one CV bullet so it starts with a strong past-tense verb and reads clearly. "
@@ -98,7 +106,7 @@ FEEDBACK_SCHEMA = {"type": "object", "properties": {"works": {"type": "string", 
                    "required": ["works", "improve"], "additionalProperties": False}
 
 
-class AnswerCoach(LocalChat):
+class AnswerCoach(QuickChat):
     def feedback(self, question: str, answer: str, round_type: str, *, deadline) -> dict:
         reply = self.ask(
             "You coach one interview answer. In one or two sentences each, say what works and what to improve: answer "

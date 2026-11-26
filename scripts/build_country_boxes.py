@@ -2,7 +2,9 @@
 
 Usage: python -I scripts/build_country_boxes.py <ne_50m_admin_0_countries.geojson> <ne_50m_admin_0_breakaway_disputed_areas.geojson>
 Each country gets the boxes around its land, plus every disputed area that any side claims for it,
-so its offline map never leaves out an area the country claims. Nearby boxes are merged.
+so its offline map never leaves out an area the country claims. Nearby boxes are merged. A claim found only in
+the claimant's own point-of-view field (Taiwan's ADM0_A3_TW for Aksai Chin) is left out: no note or other side
+records it, and it would put the Indian Himalaya in Taiwan's map.
 """
 import json
 import re
@@ -51,12 +53,14 @@ def main(countries_path, disputed_path):
         if not re.fullmatch(r"[A-Z]{2}", code or ""):
             continue
         by_a3[p["ADM0_A3"]] = by_a3[p["ISO_A3_EH"]] = code
-        names[code] = p["NAME"]
+        if p["ADM0_A3"] == p["ISO_A3_EH"] or code not in names:  # Australia, not Ashmore and Cartier Is.
+            names[code] = p["NAME"]
         boxes.setdefault(code, []).extend(box(poly) for poly in polygons(feature["geometry"]))
     for feature in disputed:
         p = feature["properties"]
         note = str(p.get("NOTE_BRK") or "")
-        claimants = {by_a3.get(v) for k, v in p.items() if k in {"SOV_A3", "ADM0_A3"} or k.startswith("ADM0_A3_")}
+        claimants = {by_a3.get(v) for k, v in p.items() if k in {"SOV_A3", "ADM0_A3"}
+                     or (k.startswith("ADM0_A3_") and by_a3.get(v) != k[8:])}
         claimants |= {code for code, name in names.items() if re.search(rf"\b{re.escape(name)}\b", note)}
         for code in claimants - {None}:
             boxes[code].extend(box(poly) for poly in polygons(feature["geometry"]))

@@ -62,6 +62,16 @@ class RewriteTests(SimpleTestCase):
         self.assertIn("untrusted data", seen[0]["messages"][0]["content"])
 
 
+class QuickModelTests(SimpleTestCase):
+    def test_coach_and_rewriter_use_the_fast_model(self):
+        """Live 2026-11-26: the 35B memory model's cold load outlasted the 60 s coach deadline ("Local AI is not available")."""
+        for cls in (bullet_rewrite.AnswerCoach, bullet_rewrite.BulletRewriter):
+            with mock.patch.object(bullet_rewrite.LocalChat, "__init__", return_value=None), \
+                    mock.patch.object(bullet_rewrite.LocalChat, "use_quick_model", autospec=True) as quick:
+                cls()
+            quick.assert_called_once()
+
+
 class RewriteApiTests(TestCase):
     def setUp(self):
         users = get_user_model()

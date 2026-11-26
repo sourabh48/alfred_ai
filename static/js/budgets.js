@@ -309,7 +309,7 @@ function renderSavingsGoals(goals) {
                     <label class="form-label small mb-1" for="savingsGoalUpdate${goal.id}">Saved so far</label>
                     <input class="form-control form-control-sm" id="savingsGoalUpdate${goal.id}" type="number" min="0" step="0.01" value="${Alfred.escapeHtml(String(goal.saved_amount))}">
                 </div>
-                <button type="button" class="btn btn-outline-primary btn-sm" data-goal-save="${goal.id}">Update</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-goal-save="${goal.id}" aria-label="Update saved amount for ${Alfred.escapeHtml(goal.name)}">Update</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-edit="${goal.id}" aria-label="Edit goal ${Alfred.escapeHtml(goal.name)}">Edit</button>
                 <button type="button" class="btn btn-outline-danger btn-sm" data-goal-delete="${goal.id}" aria-label="Delete goal ${Alfred.escapeHtml(goal.name)}">Delete</button>
             </div>
@@ -319,8 +319,8 @@ function renderSavingsGoals(goals) {
                     <label class="form-label small mb-1" for="savingsGoalPlanAmount${goal.id}">If I save each month</label>
                     <input class="form-control form-control-sm" id="savingsGoalPlanAmount${goal.id}" type="number" min="0" step="0.01">
                 </div>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-plan="${goal.id}">Return needed</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-invest="${goal.id}">My investments by then</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-plan="${goal.id}" aria-label="Return needed for ${Alfred.escapeHtml(goal.name)}">Return needed</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-invest="${goal.id}" aria-label="My investments by the date of ${Alfred.escapeHtml(goal.name)}">My investments by then</button>
             </div>
             <p class="small mt-2 mb-0" id="savingsGoalPlanResult${goal.id}" aria-live="polite"></p>
             <p class="small mt-2 mb-0" id="savingsGoalInvestResult${goal.id}" aria-live="polite"></p>` : ""}

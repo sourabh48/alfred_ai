@@ -27,19 +27,19 @@ class CareerMatchingRulesTests(SimpleTestCase):
         for service in (job_intelligence, resume_intelligence):
             with self.subTest(service=type(service).__name__):
                 skills = service._extract_skills("JavaScript PostgreSQL proactive excellent Django Python")
-                self.assertIn("Javascript", skills)
-                self.assertIn("Postgresql", skills)
+                self.assertIn("JavaScript", skills)
+                self.assertIn("PostgreSQL", skills)
                 self.assertIn("Python", skills)
-                self.assertTrue({"Java", "Sql", "React", "Excel"}.isdisjoint(skills))
+                self.assertTrue({"Java", "SQL", "React", "Excel"}.isdisjoint(skills))
 
     def test_reviewed_overlap_keeps_existing_weights_and_source_fields(self):
         snapshot = job_intelligence.parse_recruiter_message(JD)
         fit = job_intelligence.compare_resume_to_job({**RESUME, "skills": [" python ", "SQL", "sql"]}, snapshot)
-        self.assertEqual(fit["matched_skills"], ["Python", "Sql"])
+        self.assertEqual(fit["matched_skills"], ["Python", "SQL"])
         self.assertEqual(fit["missing_skills"], ["React"])
         self.assertEqual(fit["fit_score"], 80)
         self.assertEqual(fit["score_status"], "RULE_BASED")
-        self.assertEqual(fit["sources"][0]["skills"], ["Python", "Sql"])
+        self.assertEqual(fit["sources"][0]["skills"], ["Python", "SQL"])
         self.assertIn("Python", fit["sources"][1]["excerpt"])
         self.assertIn("not a hiring probability", " ".join(fit["uncertainty"]))
 

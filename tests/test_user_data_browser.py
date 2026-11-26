@@ -1771,7 +1771,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertIn('1,000.00 at the', cell())
         self.memory_click('[data-currency-toggle] [data-currency-view="home"]')
         self.wait.until(lambda _: 'as recorded' in note())
-        self.assertTrue(cell().startswith('-≈'), cell())
+        self.assertTrue(cell().startswith('≈ -'), cell())
         self.assertIn('$11.00 as recorded', cell())
         self.assertIn('Kept out of rupee totals', cell())
         self.assertEqual(self.browser.find_element(self.By.CSS_SELECTOR, '[data-currency-view="home"]').get_attribute('aria-pressed'), 'true')
@@ -9572,6 +9572,11 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.login()
         self.browser.get(self.live_server_url + "/expenses/")
         self.wait.until(lambda driver: driver.execute_script("return expenseIndex.has(arguments[0]);", row.pk))
+        rejected = self.browser.execute_async_script("""
+            const done = arguments[0];
+            Alfred.fetchJSON('/api/expenses/', {method: 'POST', body: JSON.stringify({amount: '1', payment_mode: ''})})
+                .then(() => done('saved'), error => done(error.message));""")
+        self.assertIn("Payment mode: ", rejected)  # live 2026-11-26: a blank payment mode said only "Request failed"
         self.browser.execute_script("openEditModal(arguments[0]);", row.pk)
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, "expenseSubmitBtn").is_displayed())
         form = self.browser.find_element(self.By.ID, "expenseForm")

@@ -127,7 +127,7 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertNotEqual(payload["latest_resume"]["file_name"], "other-resume.html")
         self.assertTrue(payload["study_recommendations"]["tracks"])
         suggested_skills = {item["skill"] for item in payload["study_recommendations"]["tracks"]}
-        self.assertTrue({"Sql", "Power Bi"} & suggested_skills)
+        self.assertTrue({"SQL", "Power BI"} & suggested_skills)
 
     @patch(
         "apps.career.views.verified_intelligence.macro_context",
