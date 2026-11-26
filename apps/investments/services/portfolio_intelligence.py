@@ -492,10 +492,13 @@ class PortfolioIntelligenceService:
                 download_amfi_history.delay(days)
             return self._empty_amfi_history_report(days=days, notes="Queued for the background worker.",
                 summary="AMFI's price history (about 50 MB) is downloading in the background. Check again in a few minutes.")
-        return self.download_amfi_history_report(days=days)
+        return self.download_amfi_history_report(days=days)  # tests and non-native runs: the page limits, so it fails fast
 
-    def download_amfi_history_report(self, *, days: int) -> dict:
-        """Download AMFI's history for every scheme and keep only the rows the watchlist and owned funds use."""
+    def download_amfi_history_report(self, *, days: int, background: bool = False) -> dict:
+        """Download AMFI's history for every scheme and keep only the rows the watchlist and owned funds use.
+
+        Only background jobs pass background=True for the minutes-long limits; a page request keeps the 16 MB / 20 s ones."""
+        limits = {"max_bytes": AMFI_HISTORY_MAX_BYTES, "max_seconds": AMFI_HISTORY_SECONDS} if background else {"max_bytes": 16_000_000}
         to_date = timezone.localdate()
         from_date = to_date - timedelta(days=days)
         cache_key = f"investments:amfi:history:{days}:v4"
@@ -508,7 +511,7 @@ class PortfolioIntelligenceService:
                     "frmdt": from_date.strftime("%d-%b-%Y"),
                     "todt": to_date.strftime("%d-%b-%Y"),
                 },
-                content_types=("text/plain", "text/html"), max_bytes=AMFI_HISTORY_MAX_BYTES, max_seconds=AMFI_HISTORY_SECONDS,
+                content_types=("text/plain", "text/html"), **limits,
             )
             text = response.content.decode("utf-8-sig", errors="replace")
             owned = set(Investment.objects.exclude(amfi_scheme_code="").values_list("amfi_scheme_code", flat=True))

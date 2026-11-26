@@ -178,11 +178,17 @@ class InvestmentMarketAcceptanceTests(TestCase):
         self.transport.rows += [f"990002;Synthetic Fund - Direct Plan - IDCW;A;B;10.0000;;;{day:%d-%b-%Y}",
                                 f"990003;Synthetic Fund - Regular Plan - Growth;A;B;11.0000;;;{day:%d-%b-%Y}",
                                 f"990004;Synthetic Other Fund - Regular Plan - Growth;A;B;12.0000;;;{day:%d-%b-%Y}"]
-        report = service.download_amfi_history_report(days=60)
+        report = service.download_amfi_history_report(days=60, background=True)
         method, url, options = self.transport.calls[-1]
         self.assertEqual((url, options["max_bytes"], options["max_seconds"]), (AMFI_HISTORY_URL, AMFI_HISTORY_MAX_BYTES, AMFI_HISTORY_SECONDS))
         self.assertEqual({row["scheme_code"] for row in report["series"]}, {"990001", "990003"})  # candidates and owned funds
         self.assertEqual(service._get_amfi_history_report(days=60), report)  # the page then reads the kept copy
+
+    def test_without_the_native_worker_a_page_keeps_the_page_limits(self):
+        """CI #280: under Celery (tests, the Linux run) a page downloaded with the 10-minute limit and browser tests timed out."""
+        service._get_amfi_history_report(days=60)
+        method, url, options = self.transport.calls[-1]
+        self.assertEqual((url, options["max_bytes"], options.get("max_seconds")), (AMFI_HISTORY_URL, 16_000_000, None))
 
     def test_natively_a_page_queues_the_history_download_once_and_never_waits_for_it(self):
         from unittest.mock import Mock

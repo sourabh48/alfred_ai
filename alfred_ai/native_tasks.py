@@ -96,7 +96,7 @@ def native_fund_value_refresh():
     from apps.investments.services.fund_prices import refresh_fund_values
     from apps.investments.services.portfolio_intelligence import WATCHLIST_HISTORY_DAYS, portfolio_intelligence_service
     result = refresh_fund_values()
-    portfolio_intelligence_service.download_amfi_history_report(days=WATCHLIST_HISTORY_DAYS)  # a failure is kept as evidence
+    portfolio_intelligence_service.download_amfi_history_report(days=WATCHLIST_HISTORY_DAYS, background=True)  # a failure is kept as evidence
     return result
 
 
