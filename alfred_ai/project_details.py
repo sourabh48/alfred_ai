@@ -715,6 +715,27 @@ def _build_learning_snapshot(now) -> dict:
     }
 
 
+def _tracker_cards() -> list[dict]:
+    """The requirement tracker's own counts (docs/PROJECT_STATUS.md), so this page never claims more than it does."""
+    try:
+        from scripts.project_execution import synchronize
+        tracker = synchronize()
+    except Exception:  # an installed copy ships without docs/ and the tracker script
+        return [{"label": "Requirements Verified", "value": "—", "copy": "The requirement tracker is not part of this install."}]
+    counts = tracker["counts"]
+    blocked = sum(counts.get(state, 0) for state in ("BLOCKED_APPROVAL", "BLOCKED_EXTERNAL"))
+    return [
+        {"label": "Requirements Verified", "value": f"{tracker['baseline']}/{tracker['denominator']}",
+         "copy": (f"{counts.get('IMPLEMENTED_NOT_ACCEPTED', 0)} built and waiting for an owner check, "
+                  f"{counts.get('PARTIALLY_IMPLEMENTED', 0)} partly built, {blocked} blocked, "
+                  f"{counts.get('NOT_IMPLEMENTED', 0)} not started, {counts.get('OWNER_DESCOPED', 0)} descoped.")},
+        {"label": "2.0 Extensions", "value": f"{tracker['extensions_accepted']}/{tracker['extensions_defined']}",
+         "copy": "Accepted extension stories, counted apart from the 143 original requirements."},
+        {"label": "Next Queued Task", "value": tracker["next_task"] or "None",
+         "copy": "Nothing in the queue is eligible now." if not tracker["next_task"] else "Picked only on an explicit next or sprint."},
+    ]
+
+
 def project_details_payload(guardrails: dict) -> dict:
     now = timezone.now()
     clock = clock_snapshot(now)
@@ -1353,6 +1374,7 @@ def project_details_payload(guardrails: dict) -> dict:
                 "value": f"{calculation_risk['overall_progress']}%",
                 "copy": calculation_risk["summary"],
             },
+            *_tracker_cards(),
         ],
         "scope_completion": {
             "progress": scope_completion_progress,
