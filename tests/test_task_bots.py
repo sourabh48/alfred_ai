@@ -172,6 +172,18 @@ class TaskBotTests(Fixtures):
         task_bots.confirm(self.user, proposal["proposal_id"], [item["id"]], proposal["fingerprint"], self.today)
         self.assertTrue(TravelResearchSession.objects.filter(session=plan.planning_session, recheck=True).exists())
 
+    def test_bills_bot_completes_a_lender_name_the_bank_cut_off(self):
+        from apps.loans.services.loan_intelligence import full_lender_name
+        loan = Loan.objects.create(user=self.user, lender="Bajaj Housing Financ", principal=Decimal("100000"), interest_rate=9.5,
+                                   emi=Decimal("4321.00"), currency="INR", start_date=(self.today + timedelta(days=3)).replace(year=self.today.year - 1))
+        self.assertIn("to Bajaj Housing Finance around", task_bots.run(self.user, "bills_due", self.today)["items"][0]["title"])
+        loan.refresh_from_db()
+        self.assertEqual(loan.lender, "Bajaj Housing Financ", "the stored record is never rewritten")
+        for name, shown in (("BAJAJ HOUSING FINANC", "Bajaj Housing Finance"), ("Bajaj", "Bajaj"), ("Bajaj Fin", "Bajaj Fin"),
+                            ("Tata Capital", "Tata Capital"), ("Synthetic Lender", "Synthetic Lender"), ("", "")):
+            with self.subTest(name=name):
+                self.assertEqual(full_lender_name(name), shown)
+
     def test_bills_paperwork_and_career_bots_read_only_their_owner_records(self):
         Loan.objects.create(user=self.user, lender="Synthetic Bank", principal=Decimal("100000"), interest_rate=9.5, emi=Decimal("4321.00"),
                             currency="INR", start_date=(self.today + timedelta(days=3)).replace(year=self.today.year - 1))

@@ -83,6 +83,7 @@ def _next_due(day, after):
 
 def bills_due(user, today):
     from apps.loans.models import Loan
+    from apps.loans.services.loan_intelligence import full_lender_name
     items = []
     for loan in Loan.objects.filter(user=user, is_active=True, status="active", emi__gt=0).order_by("id"):
         anchor = loan.last_payment_date or loan.start_date
@@ -90,7 +91,7 @@ def bills_due(user, today):
         start = max(today, loan.last_payment_date + timedelta(days=20)) if loan.last_payment_date else today
         due = _next_due(anchor.day, start)
         if due <= today + timedelta(days=7):
-            name = loan.lender or loan.get_loan_type_display()
+            name = full_lender_name(loan.lender) or loan.get_loan_type_display()
             items.append(_item(f"loan:{loan.pk}:{due.isoformat()}", f"EMI {_amount(loan.emi, loan.currency)} to {name} around {due:%d %b}",
                 f"Estimated from the day of your {'last recorded payment' if loan.last_payment_date else 'loan start date'}; "
                 "check your lender's schedule. ALFRED never pays for you.", "/loans/"))

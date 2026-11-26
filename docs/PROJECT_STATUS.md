@@ -1990,6 +1990,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
 
+- 2026-11-26 (found in a live check of the owner's app: picks empty, 0 AMFI rows): AMFI added Plan and Option columns to both files and moved the history ISINs, and the two files now spell scheme names differently. The parser reads column positions from each file's header (older layouts still work), joins plan and option into the latest-file name, and matches latest to history by scheme code and ISIN. On the real 2026-11-26 files: 9505 latest rows, 940 Direct Growth candidates, 926 matched to history. Evidence: tests/test_investment_market_acceptance.py new-layout test. Not accepted: owner check of the picks after restart.
 - Source: [portfolio intelligence](../apps/investments/services/portfolio_intelligence.py), [verified intelligence](../apps/integrations/services/verified_intelligence.py), [investment API](../apps/investments/views.py), [models](../apps/investments/models.py), [URLs](../apps/investments/urls.py).
 - APIs/UI/models: /investments/; /api/investments/; Investment; optional external evidence.
 - Tests: [AMFI](../tests/test_investment_market_acceptance.py), [Yahoo](../tests/test_yahoo_market_acceptance.py), [money](../tests/test_investment_money.py), [projection](../tests/test_investment_projection.py), [Chrome](../tests/test_user_data_browser.py). Original56 AMFI and80 Yahoo backend totals overlap; Chrome/Axe receipts retained separately in EXECUTION_STATE/CONSOLIDATION_STATE.
@@ -2325,6 +2326,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 ### AI-17 — Autonomous user task execution
 
 **IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+
+- 2026-11-26 (live check: the bills bot showed "Bajaj Housing Financ"): the bank's ACH line cuts the payee at 20 characters. The bills bot and new loan inference now complete a cut name when it starts exactly one known lender (apps/loans/services/loan_intelligence.py `full_lender_name`); ambiguous or unknown names and stored records stay unchanged. Evidence: tests/test_task_bots.py.
 
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
