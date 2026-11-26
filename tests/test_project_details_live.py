@@ -1043,3 +1043,21 @@ class ProjectDetailsLiveTests(TestCase):
         self.assertNotIn("Supervised model refresh", in_progress_by_title)
         self.assertEqual(completed_by_title["Supervised model refresh"]["progress"], 100)
         self.assertIn("7/7 trainable models fresh and ready", completed_by_title["Supervised model refresh"]["detail"])
+
+
+class ProjectTrackerCardTests(SimpleTestCase):
+    def test_cards_use_the_tracker_counts(self):
+        from alfred_ai.project_details import _tracker_cards
+        tracker = {"baseline": 90, "denominator": 143, "extensions_accepted": 0, "extensions_defined": 13, "next_task": None,
+                   "counts": {"COMPLETE_VERIFIED": 90, "IMPLEMENTED_NOT_ACCEPTED": 30, "PARTIALLY_IMPLEMENTED": 15,
+                              "BLOCKED_EXTERNAL": 6, "NOT_IMPLEMENTED": 1, "OWNER_DESCOPED": 1}}
+        with patch("scripts.project_execution.synchronize", return_value=tracker):
+            cards = _tracker_cards()
+        self.assertEqual([(card["label"], card["value"]) for card in cards],
+                         [("Requirements Verified", "90/143"), ("2.0 Extensions", "0/13"), ("Next Queued Task", "None")])
+        self.assertIn("30 built and waiting for an owner check, 15 partly built, 6 blocked, 1 not started, 1 descoped", cards[0]["copy"])
+
+    def test_an_install_without_the_tracker_says_so(self):
+        from alfred_ai.project_details import _tracker_cards
+        with patch("scripts.project_execution.synchronize", side_effect=FileNotFoundError):
+            self.assertEqual(_tracker_cards()[0]["value"], "—")
