@@ -267,7 +267,7 @@ function renderRiskNews(items) {
                     <div class="muted small">${Alfred.escapeHtml(item.bucket || "Risk")} | ${Alfred.escapeHtml(item.source || "Unknown source")}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.published || "No publish date")}</div>
                 </div>
-                <a href="${Alfred.safeHref(item.link)}" target="_blank" rel="noopener">Open</a>
+                <a href="${Alfred.safeHref(item.link)}" target="_blank" rel="noopener" aria-label="Open ${Alfred.escapeHtml(item.title || "News item")} (new tab)">Open</a>
             </div>
         </div>
     `).join("") : `<div class="empty-state">No related news was returned right now.</div>`);

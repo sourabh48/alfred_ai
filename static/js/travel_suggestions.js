@@ -13,7 +13,7 @@ window.TravelSuggestions = (() => {
     function step(s) {
         const links = s.links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join(" · ");
         const review = s.action && reviewing === s.id
-            ? `<div class="mt-2" role="group" aria-label="Confirm ${esc(s.title)}"><p class="mb-1">${esc(describe(s.action))}</p><button type="button" class="btn btn-sm btn-primary" data-suggestion-confirm="${esc(s.id)}">Confirm</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-suggestion-cancel>Cancel</button></div>`
+            ? `<div class="mt-2" role="group" aria-label="Confirm ${esc(s.title)}"><p class="mb-1">${esc(describe(s.action))}</p><button type="button" class="btn btn-sm btn-primary" data-suggestion-confirm="${esc(s.id)}" aria-label="Confirm ${esc(s.title)}">Confirm</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-suggestion-cancel>Cancel</button></div>`
             : s.action ? `<div><button type="button" class="btn btn-sm btn-outline-primary mt-1" data-suggestion-review="${esc(s.id)}">Review</button></div>` : "";
         return `<li data-suggestion="${esc(s.id)}"><strong>${esc(s.title)}</strong>${s.due_on ? ` <span class="small">· ${esc(s.due_on)}</span>` : ""}<br>${esc(s.detail)}<br><span class="small">${esc(s.basis)}</span>${links ? `<br>${links}` : ""}${review}</li>`;
     }

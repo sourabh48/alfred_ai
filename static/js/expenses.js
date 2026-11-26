@@ -680,8 +680,8 @@ function renderTimeline(timeline, meta = {}) {
                     <td>${escapeHtml(item.source_label)}</td>
                     <td class="text-muted small">${escapeHtml(item.description || item.raw_description || "")}</td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary me-1" type="button" onclick="openEditModal(${item.id})">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteExpense(${item.id})">Delete</button>
+                        <button class="btn btn-sm btn-outline-primary me-1" type="button" onclick="openEditModal(${item.id})" aria-label="Edit ${escapeHtml(item.merchant || item.description || "transaction")} on ${formatDate(item.transaction_date)}">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteExpense(${item.id})" aria-label="Delete ${escapeHtml(item.merchant || item.description || "transaction")} on ${formatDate(item.transaction_date)}">Delete</button>
                     </td>
                 </tr>
             `;

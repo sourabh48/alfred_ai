@@ -199,7 +199,7 @@ function renderTripLogs(items) {
                     <div class="muted small">${Alfred.formatNumber(item.distance_km || 0, 1)} km | ${Alfred.formatCurrency(item.spend_amount || 0, item.currency || "INR")} | ${Alfred.escapeHtml(item.mood || "No mood set")}</div>
                     ${item.latitude !== null && item.longitude !== null ? `<div class="muted small">Coordinates ${Alfred.formatNumber(item.latitude, 4)}, ${Alfred.formatNumber(item.longitude, 4)}</div>` : ""}
                 </div>
-                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTripLog(${item.id})">Delete</button>
+                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteTripLog(${item.id})" aria-label="Delete trip log ${Alfred.escapeHtml(item.title)}">Delete</button>
             </div>
         </div>
     `).join("") : `<div class="empty-state">No trip logs captured yet.</div>`);
@@ -216,7 +216,7 @@ function renderPhotoGallery(items) {
                 <div class="muted small">${item.trip_log_title ? `Linked log: ${Alfred.escapeHtml(item.trip_log_title)}` : `Plan: ${Alfred.escapeHtml(item.travel_plan_title)}`}</div>
                 <div class="muted small">${item.taken_at ? Alfred.formatDateTime(item.taken_at) : "Time not set"}</div>
                 <details class="mt-2"><summary>Favourite and travel tags</summary><label class="small" for="photoTags${item.id}">Tags you recognise in this photo (hold Ctrl to select several)</label><select id="photoTags${item.id}" class="form-select" multiple>${["mountains","beaches","waterfalls","photography","scenic roads","forests","camping","architecture"].map(tag=>`<option ${item.preference_tags?.includes(tag) ? "selected" : ""}>${tag}</option>`).join("")}</select><button class="btn btn-sm btn-outline-primary mt-2" onclick="savePhotoPreference(${item.id})">${item.is_favorite ? "Remove favourite" : "Mark favourite"}</button><p class="small mt-2">Tags inform travel preferences only if you opt in under Settings.</p></details>
-                <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripPhoto(${item.id})">Delete</button>
+                <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripPhoto(${item.id})" aria-label="Delete photo ${Alfred.escapeHtml(item.caption || item.location_name || item.travel_plan_title)}">Delete</button>
             </div>
         </article>
     `).join("") : `<div class="empty-state w-100">No trip photos uploaded yet.</div>`);
@@ -402,7 +402,7 @@ function loadTripVideos() {
                 <div class="photo-card-body">
                     <div class="fw-semibold">${Alfred.escapeHtml(item.caption || "Trip video")}</div>
                     <div class="muted small">${Alfred.escapeHtml(item.travel_plan_title)} | ${Alfred.formatDateTime(item.created_at)}</div>
-                    <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripVideo(${item.id})">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger mt-3" type="button" onclick="deleteTripVideo(${item.id})" aria-label="Delete video ${Alfred.escapeHtml(item.caption || "Trip video")}">Delete</button>
                 </div>
             </article>
         `).join("") : `<div class="empty-state w-100">No trip videos uploaded yet.</div>`))

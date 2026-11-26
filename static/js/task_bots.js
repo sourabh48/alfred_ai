@@ -14,8 +14,8 @@
 
     function card(p) {
         return `<article class="surface-card mb-3" data-bot-proposal="${esc(p.proposal_id)}"><h3 class="h6">${esc(p.label)} <span class="small">· ${esc(p.for_date)}</span></h3><ul class="home-attention-list">${p.items.map(item =>
-            `<li><span><strong>${esc(item.title)}</strong><br>${esc(item.detail)}${item.action ? `<br><label class="small"><input type="checkbox" data-bot-item="${esc(item.id)}"${item.action.type === "categorise" ? " checked" : ""}> ${esc(describe(item.action))}</label>` : ""}</span><a class="btn btn-sm btn-outline-primary ms-auto" href="${esc(item.url)}">Open</a></li>`).join("")}</ul>
-            <button type="button" class="btn btn-sm btn-primary" data-bot-confirm="${esc(p.proposal_id)}">Confirm</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-bot-dismiss="${esc(p.proposal_id)}">Dismiss</button>
+            `<li><span><strong>${esc(item.title)}</strong><br>${esc(item.detail)}${item.action ? `<br><label class="small"><input type="checkbox" data-bot-item="${esc(item.id)}"${item.action.type === "categorise" ? " checked" : ""}> ${esc(describe(item.action))}</label>` : ""}</span><a class="btn btn-sm btn-outline-primary ms-auto" href="${esc(item.url)}" aria-label="Open ${esc(item.title)}">Open</a></li>`).join("")}</ul>
+            <button type="button" class="btn btn-sm btn-primary" data-bot-confirm="${esc(p.proposal_id)}" aria-label="Confirm the ticked items in ${esc(p.label)}">Confirm</button> <button type="button" class="btn btn-sm btn-outline-secondary" data-bot-dismiss="${esc(p.proposal_id)}" aria-label="Dismiss ${esc(p.label)}">Dismiss</button>
             <p class="small mb-0 mt-2">Confirm marks this review done and does only the ticked steps.</p></article>`;
     }
 

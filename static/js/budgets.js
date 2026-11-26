@@ -310,8 +310,8 @@ function renderSavingsGoals(goals) {
                     <input class="form-control form-control-sm" id="savingsGoalUpdate${goal.id}" type="number" min="0" step="0.01" value="${Alfred.escapeHtml(String(goal.saved_amount))}">
                 </div>
                 <button type="button" class="btn btn-outline-primary btn-sm" data-goal-save="${goal.id}">Update</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-edit="${goal.id}">Edit</button>
-                <button type="button" class="btn btn-outline-danger btn-sm" data-goal-delete="${goal.id}">Delete</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-goal-edit="${goal.id}" aria-label="Edit goal ${Alfred.escapeHtml(goal.name)}">Edit</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-goal-delete="${goal.id}" aria-label="Delete goal ${Alfred.escapeHtml(goal.name)}">Delete</button>
             </div>
             ${p.status === "open" && p.months_left ? `
             <div class="d-flex flex-wrap gap-2 align-items-end mt-2">

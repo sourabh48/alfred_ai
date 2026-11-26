@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
         $("travelNovelty").value=p.novelty;
         $("travelLearning").checked=p.learning_enabled;
         $("travelMediaLearning").checked=p.media_learning_enabled;
-        $("travelPreferenceList").innerHTML=Object.entries(p.preferences).map(([k,v])=>`<div class="travel-preference"><div><strong>${esc(k)}: ${esc(v.value)}</strong><small>${v.confirmed_by_user ? "Set by you" : "Tentative inference"} · confidence ${esc(v.confidence)}</small><small>${esc((v.reasons || [v.source]).join(" · "))}</small></div><div><button class="btn btn-sm btn-outline-primary" data-preference="${esc(k)}" data-preference-action="accept">Accept</button> <button class="btn btn-sm btn-outline-secondary" data-preference="${esc(k)}" data-preference-action="remove">Remove</button></div></div>`).join("") || "No travel preferences learned yet.";
+        $("travelPreferenceList").innerHTML=Object.entries(p.preferences).map(([k,v])=>`<div class="travel-preference"><div><strong>${esc(k)}: ${esc(v.value)}</strong><small>${v.confirmed_by_user ? "Set by you" : "Tentative inference"} · confidence ${esc(v.confidence)}</small><small>${esc((v.reasons || [v.source]).join(" · "))}</small></div><div><button class="btn btn-sm btn-outline-primary" data-preference="${esc(k)}" data-preference-action="accept" aria-label="Accept preference ${esc(k)}">Accept</button> <button class="btn btn-sm btn-outline-secondary" data-preference="${esc(k)}" data-preference-action="remove" aria-label="Remove preference ${esc(k)}">Remove</button></div></div>`).join("") || "No travel preferences learned yet.";
     }
     async function update(data) {
         if (pending) return;

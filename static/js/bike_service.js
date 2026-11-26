@@ -211,8 +211,8 @@ function renderBikeProfileList(items) {
                     <div class="muted small">${Alfred.escapeHtml(item.usage_pattern_label || "Personal / Lifestyle")}${item.estimated_market_value ? ` | ${Alfred.formatCurrency(item.estimated_market_value, item.value_currency || "INR")}` : ""}</div>
                 </div>
                 <div class="list-actions">
-                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="editBikeProfile(${item.id})">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeProfile(${item.id})">Delete</button>
+                    <button class="btn btn-sm btn-outline-primary" type="button" onclick="editBikeProfile(${item.id})" aria-label="Edit vehicle ${Alfred.escapeHtml(item.display_name)}">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeProfile(${item.id})" aria-label="Delete vehicle ${Alfred.escapeHtml(item.display_name)}">Delete</button>
                 </div>
             </div>
         </div>
@@ -568,7 +568,7 @@ function renderBikeDocuments(items) {
                 </div>
                 <div class="text-end">
                     ${item.premium_amount ? `<strong>${Alfred.formatCurrency(item.premium_amount)}</strong><div class="muted small">premium/cost</div>` : ""}
-                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeDocument(${item.id})">Delete</button></div>
+                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeDocument(${item.id})" aria-label="Delete vehicle document from ${Alfred.escapeHtml(item.issuer || "unknown issuer")}">Delete</button></div>
                 </div>
             </div>
         </div>
@@ -589,7 +589,7 @@ function renderBikeRefills(items) {
                 </div>
                 <div class="text-end flex-shrink-0">
                     <strong>${Alfred.formatCurrency(item.total_cost || 0, item.currency || "INR")}</strong>
-                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeRefill(${item.id})">Delete</button></div>
+                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeRefill(${item.id})" aria-label="Delete fuel refill on ${Alfred.formatDate(item.refill_date)}">Delete</button></div>
                 </div>
             </div>
         </div>
@@ -613,7 +613,7 @@ function renderBikeConditions(items) {
                 </div>
                 <div class="text-end">
                     <strong>${Alfred.formatNumber(item.overall_score || 0, 0)}/100</strong>
-                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeCondition(${item.id})">Delete</button></div>
+                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeCondition(${item.id})" aria-label="Delete condition check from ${formatMaybeDateTime(item.captured_at)}">Delete</button></div>
                 </div>
             </div>
         </div>
@@ -685,7 +685,7 @@ function renderBikeServiceLogs(items) {
                 </div>
                 <div class="text-end flex-shrink-0">
                     <strong>${item.parsed_payload?.cost_held_for_review ? "Cost awaiting review" : Alfred.formatCurrency(item.cost || 0, item.currency || "INR")}</strong>
-                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeServiceRecord(${item.id})">Delete</button></div>
+                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeServiceRecord(${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.service_type_label)} service on ${Alfred.formatDate(item.service_date)}">Delete</button></div>
                 </div>
             </div>
         </div>
@@ -714,7 +714,7 @@ function renderBikeIssues(items) {
                 <div class="text-end" style="min-width: 130px;">
                     <strong>${Alfred.formatCurrency(item.projected_cost || 0)}</strong>
                     <div class="muted small">Projected</div>
-                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeIssue(${item.id})">Delete</button></div>
+                    <div class="mt-2"><button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteBikeIssue(${item.id})" aria-label="Delete issue ${Alfred.escapeHtml(item.symptom)}">Delete</button></div>
                 </div>
             </div>
         </div>

@@ -237,9 +237,9 @@ function renderLoanTable(loans) {
                     <div class="muted">Projected end: ${Alfred.formatDate(item.projected_end_date)}</div>` : "Review loan terms first"}
                 </td>
                 <td class="text-end">
-                    <button class="btn btn-sm btn-outline-primary me-2" type="button" onclick="editLoan(${item.id})">Edit</button>
+                    <button class="btn btn-sm btn-outline-primary me-2" type="button" onclick="editLoan(${item.id})" aria-label="Edit ${Alfred.escapeHtml(item.lender || "loan")} ${Alfred.escapeHtml(item.loan_type || "")}">Edit</button>
                     ${item.is_active && confirmed ? `<button class="btn btn-sm btn-soft-primary me-2" type="button" onclick="prepareForeclosure(${item.id})">Foreclose</button>` : ""}
-                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteLoan(${item.id})">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteLoan(${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.lender || "loan")} ${Alfred.escapeHtml(item.loan_type || "")}">Delete</button>
                 </td>
             </tr>
         `;

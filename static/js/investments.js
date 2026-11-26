@@ -830,7 +830,7 @@ function researchDecisionCard(item, today) {
             <p class="small mb-1">${Alfred.escapeHtml(item.thesis)}</p>
             <p class="small mb-1" id="researchOutcome${item.id}">${Alfred.escapeHtml(researchOutcomeText(item))}</p>
             ${settle}
-            <button type="button" class="btn btn-link btn-sm text-danger px-0" data-research-delete="${item.id}">Delete</button>
+            <button type="button" class="btn btn-link btn-sm text-danger px-0" data-research-delete="${item.id}" aria-label="Delete research decision on ${Alfred.escapeHtml(item.instrument)}">Delete</button>
         </div>`;
 }
 

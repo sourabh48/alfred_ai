@@ -21,8 +21,8 @@ document.addEventListener("DOMContentLoaded", () => {
             <label class="form-label small mb-1" for="online-${e(k.name)}">${e(k.label)} ${k.saved ? `<span class="badge text-bg-success">Yours, saved ${e(k.hint)}</span>` : k.shared ? `<span class="badge text-bg-secondary">Using the shared key</span>` : ""}</label>
             <input class="form-control form-control-sm" type="password" id="online-${e(k.name)}" data-key="${e(k.name)}" maxlength="512" autocomplete="off" spellcheck="false"
                 placeholder="${k.saved ? "Saved; paste a new key to replace it" : k.shared ? "Optional: paste your own key" : "Not set"}" aria-describedby="online-${e(k.name)}-help">
-            <div class="form-text" id="online-${e(k.name)}-help">${e(k.use)} <a href="${Alfred.safeHref(k.signup)}" target="_blank" rel="noopener noreferrer">Get a key</a>
-                ${k.saved ? ` · <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-remove-key="${e(k.name)}">Remove</button>` : ""}</div></div>`).join("");
+            <div class="form-text" id="online-${e(k.name)}-help">${e(k.use)} <a href="${Alfred.safeHref(k.signup)}" target="_blank" rel="noopener noreferrer" aria-label="Get a ${e(k.label)} key (new tab)">Get a key</a>
+                ${k.saved ? ` · <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-remove-key="${e(k.name)}" aria-label="Remove ${e(k.label)} key">Remove</button>` : ""}</div></div>`).join("");
         const m = data.mail, current = c => m.ready && c.email === m.address;
         pick.innerHTML = m.choices.length ? m.choices.map((c, i) => `<div class="form-check mb-1">
             <input class="form-check-input" type="radio" name="careerMailFrom" id="careerMail${i}" value="${e(c.email)}" data-via="${e(c.via)}" ${current(c) ? "checked" : ""} ${c.can_send ? "" : "disabled"}>

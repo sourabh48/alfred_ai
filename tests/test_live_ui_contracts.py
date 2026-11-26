@@ -1,3 +1,4 @@
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -5,7 +6,7 @@ from urllib.request import Request, urlopen
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
-from django.test import Client
+from django.test import Client, SimpleTestCase
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -515,3 +516,12 @@ class LiveUIRegressionTests(StaticLiveServerTestCase):
         with urlopen(request, timeout=8) as response:
             self.assertEqual(response.status, 200, path)
             return response.read()
+
+
+class RepeatedButtonNameTests(SimpleTestCase):
+    def test_row_buttons_say_which_item_they_act_on(self):
+        """Narrator pass 2026-11-26: Tab read "Open, link" 16 times on Home and "Edit"/"Delete" 60 times on Spending."""
+        vague = re.compile(r"<(?:button|a)\b(?:(?!aria-label)[^>])*>(?:Open|Edit|Delete|Remove|Confirm|Dismiss)</(?:button|a)>")
+        found = [f"{path.name}:{number}" for path in sorted((Path(settings.BASE_DIR) / "static" / "js").glob("*.js"))
+                 for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if vague.search(line)]
+        self.assertEqual(found, [])

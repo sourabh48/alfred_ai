@@ -427,7 +427,7 @@ function renderStatementUploads(items) {
                 <div class="list-actions mt-3">
                     ${item.extracted_payload?.import_review ? `<a class="btn btn-sm btn-outline-primary" href="/expenses/uploads/${Number(item.id)}/review/">Review extracted rows</a>` : ""}
                     <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('statement_document', ${item.id})">Retry</button>
-                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('statement_document', ${item.id})">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('statement_document', ${item.id})" aria-label="Delete statement ${Alfred.escapeHtml(item.file_name)}">Delete</button>
                 </div>
             </div>
         `;
@@ -455,7 +455,7 @@ function renderLoanUploads(items) {
                 <div class="list-actions mt-3">
                     <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('loan_document', ${item.id})">Retry</button>
                     ${item.review_state ? `<a class="btn btn-sm btn-outline-primary" href="/loans/import-uploads/${Number(item.id)}/review/">${item.review_state === "confirmed" ? "View confirmed review" : "Review extracted loans"}</a>` : ""}
-                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('loan_document', ${item.id})">Delete</button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('loan_document', ${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.file_name || "loan document")}">Delete</button>
                 </div>
             </div>
         `;
@@ -476,7 +476,7 @@ function renderVehicleDocuments(items) {
             <div class="muted small mt-2">${Alfred.escapeHtml(item.verification_status_label || item.verification_status || "Unknown")}${item.expiry_date ? ` | Expires ${Alfred.formatDate(item.expiry_date)}` : ""}</div>
             <div class="list-actions mt-3">
                 <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('vehicle_document', ${item.id})">Retry</button>
-                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('vehicle_document', ${item.id})">Delete</button>
+                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('vehicle_document', ${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.document_type_label || item.document_type)} for ${Alfred.escapeHtml(item.bike_name || item.bike_profile_name || "vehicle")}">Delete</button>
             </div>
         </div>
     `).join(""));
@@ -496,7 +496,7 @@ function renderCareerFiles(items) {
             <div class="muted small mt-2">${Alfred.escapeHtml(item.summary || "")}</div>
             <div class="list-actions mt-3">
                 <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('resume_document', ${item.id})">Retry</button>
-                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('resume_document', ${item.id})">Delete</button>
+                <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('resume_document', ${item.id})" aria-label="Delete resume ${Alfred.escapeHtml(item.file_name || "Resume")}">Delete</button>
             </div>
         </div>
     `).join(""));
@@ -591,7 +591,7 @@ function renderReviewQueue(items) {
                     <div class="list-actions">
                         <button class="btn btn-sm btn-outline-primary" type="button" onclick="retryReviewItem('${item.scope}', ${item.id})">Retry</button>
                         ${item.scope === "investment_document" ? `<a class="btn btn-sm btn-outline-primary" href="/investments/import-uploads/${Number(item.id)}/review/">Review extracted holdings</a>` : ""}
-                        <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('${item.scope}', ${item.id})">Delete</button>
+                        <button class="btn btn-sm btn-outline-danger" type="button" onclick="deleteDocumentCenterItem('${item.scope}', ${item.id})" aria-label="Delete ${Alfred.escapeHtml(item.file_name)}">Delete</button>
                     </div>
                 </div>
                 <details class="mt-3" data-review-key="${Alfred.escapeHtml(key)}"${state.open ? " open" : ""}>
