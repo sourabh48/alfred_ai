@@ -178,3 +178,36 @@ class CareerResumeUseDetailsTests(TestCase):
         self.assertEqual(saved, owner_skills)  # nothing dropped; the list was already at the cap, so nothing new was added
         resume.refresh_from_db()
         self.assertGreater(resume.updated_at, before)
+
+
+class CvExperienceTests(TestCase):
+    """Years worked come from the CV's job dates; the CV's own "N years" claim is checked against them."""
+
+    CV = ("Summary\nJava backend developer with 4+ years of experience in Spring Boot.\n"
+          "Work Experience\nT ata Consultancy ServicesJune 2022 - Present\nSystem Engineer\n"
+          "Infosys Limited\nJan 2020 – Mar 2021\nProject: payments, Feb 2020 - Jun 2020\n"
+          "Education\nB.Tech, 2015 - 2019\n")
+
+    def test_job_dates_are_counted_once_and_education_is_left_out(self):
+        from datetime import date
+        from apps.career.services.resume_intelligence import experience_from_cv
+        found = experience_from_cv(self.CV, date(2026, 11, 26))
+        # Jan 2020-Mar 2021 is 15 months (the project inside it counts once), Jun 2022-Nov 2026 is 54.
+        self.assertEqual(found, {"years": 5.8, "months": 69, "stated_years": 4.0})
+        self.assertIsNone(experience_from_cv("Education\nB.Tech, 2015 - 2019\n", date(2026, 11, 26)))  # unknown, not zero
+
+    def test_dashboard_warns_when_the_cv_claim_or_profile_is_stale(self):
+        from datetime import date
+        from apps.career.models import CareerProfile
+        user = get_user_model().objects.create_user(username="cv_years")
+        CareerProfile.objects.create(user=user, role="Java Backend Developer", experience_years=5, skills="Java")
+        CareerResume.objects.create(user=user, file_name="cv.pdf", parser_status="parsed", extracted_text=self.CV)
+        client = Client()
+        client.force_login(user)
+        with patch("apps.career.views.timezone.localdate", return_value=date(2026, 11, 26)):
+            check = client.get("/api/career/dashboard/").json()["experience_check"]
+        self.assertEqual(check["years"], 5.8)
+        self.assertEqual(len(check["warnings"]), 2)
+        self.assertIn("Your CV says 4+ years of experience, but its job dates add up to 5.8 years as of November 2026. Update the CV.",
+                      check["warnings"][0])
+        self.assertIn("Your profile says 5 years", check["warnings"][1])

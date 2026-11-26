@@ -51,7 +51,7 @@ function loadCareerDashboard(options = {}) {
             careerSimulationBaseline = projection;
             const timing = data.career_timing || {};
             renderCareerHero(profile, projection, timing);
-            renderCareerSummary(profile, projection, data.latest_resume, data.latest_job_analysis, data.market, timing);
+            renderCareerSummary(profile, projection, data.latest_resume, data.latest_job_analysis, data.market, timing, data.experience_check);
             renderCareerChart(projection.projections || []);
             renderCareerInsights(projection.insights || [projection.message || "No projections yet."], data.market?.insights || [], timing);
             renderCareerMacroContext(projection.macro_context || {}, projection.projection_basis || {});
@@ -150,11 +150,13 @@ function renderCareerHero(profile, projection, timing) {
         : (projection.message || "Create a profile to unlock projections.");
 }
 
-function renderCareerSummary(profile, projection, resume, jobAnalysis, market, timing) {
+function renderCareerSummary(profile, projection, resume, jobAnalysis, market, timing, experience) {
     const latest = (projection.projections || []).at(-1);
     const projectionConfidence = projection.projection_confidence || {};
+    const warnings = (experience?.warnings || []).map(text => `<span class="d-block text-warning mt-1" role="status">${Alfred.escapeHtml(text)}</span>`).join("");
     const cards = [
-        { title: "Experience", value: `${Alfred.formatNumber(profile.experience_years, 1)} yrs`, copy: profile.role || "Role pending" },
+        { title: "Experience", value: `${Alfred.formatNumber(experience ? experience.years : profile.experience_years, 1)} yrs`,
+          copy: `${Alfred.escapeHtml(profile.role || "Role pending")}${experience ? " · from your CV's job dates" : ""}${warnings}` },
         { title: "Resume Parse", value: resume ? `${Alfred.formatNumber((resume.parse_confidence || 0) * 100, 0)}%` : "No resume", copy: resume ? (resume.parser_status_label || "Parsed") : "Upload a resume" },
         { title: "Rule-based Job Fit", value: jobAnalysis ? (jobAnalysis.fit_score == null ? "Unavailable" : `${Alfred.formatNumber(jobAnalysis.fit_score, 0)}/100`) : "No comparison", copy: jobAnalysis ? `${Alfred.escapeHtml(jobAnalysis.company || jobAnalysis.source_name || "Latest analysis")} · Not a hiring probability` : "Provide a job description" },
         {

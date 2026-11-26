@@ -29,7 +29,7 @@ from .serializers import CareerJobAnalysisSerializer, CareerOpportunitySerialize
 from .services import build_employment_income_signals, build_projection_simulation, build_salary_projection, job_intelligence, resume_intelligence
 from .services.job_intelligence import ROBOTS_REFUSED_MESSAGE, ROBOTS_UNREADABLE_MESSAGE, JobPostingSnapshot
 from .services import application_kit, application_tracker, evaluation
-from .services.resume_intelligence import ParsedResume
+from .services.resume_intelligence import ParsedResume, experience_from_cv
 
 
 def _career_error_response(exc, message, *, field="detail", status_code=status.HTTP_400_BAD_REQUEST):
@@ -988,7 +988,27 @@ def career_dashboard(request):
     payload["openings"] = [{**item, "source_status": (source_status := job_intelligence.opening_evidence_status(item.get("source_evidence") or {})),
         "verified_source": source_status == "fresh"} for item in payload.get("openings", [])]
     payload["openings_evidence"] = job_intelligence.current_openings_evidence(payload.get("openings_evidence") or {})
+    payload["experience_check"] = _experience_check(request.user)  # outside the cache: it moves with today's date
     return Response(payload)
+
+
+def _experience_check(user) -> dict | None:
+    """Years worked from the latest CV's job dates, and a warning when the CV's own "N years" claim or the profile disagrees."""
+    resume = CareerResume.objects.filter(user=user).order_by("-created_at", "-id").only("extracted_text").first()
+    today = timezone.localdate()
+    found = experience_from_cv(resume.extracted_text if resume else "", today)
+    if not found:
+        return None
+    years, stated = found["years"], found["stated_years"]
+    warnings = []
+    # "5+ years" still fits 5.9 years worked; it is stale from 6, and overstated below 5.
+    if stated is not None and (years < stated or int(years) > int(stated)):
+        warnings.append(f"Your CV says {stated:g}+ years of experience, but its job dates add up to {years:.1f} years "
+                        f"as of {today:%B %Y}. Update the CV.")
+    profile = CareerProfile.objects.filter(user=user).values_list("experience_years", flat=True).first()
+    if profile is not None and abs(profile - years) >= 0.5:
+        warnings.append(f"Your profile says {profile:g} years; job matching uses that figure until you change it.")
+    return {"years": years, "months": found["months"], "stated_years": stated, "as_of": today.isoformat(), "warnings": warnings}
 
 
 def _career_dashboard_payload(request) -> dict:

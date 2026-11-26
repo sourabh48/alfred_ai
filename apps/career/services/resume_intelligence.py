@@ -76,6 +76,45 @@ COMPANY_FIELD_RE = re.compile(
 )
 
 
+MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+_MONTH = r"(?:(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*|(\d{1,2})\s*/\s*)?((?:19|20)\d\d)"
+WORK_RANGE_RE = re.compile(_MONTH + r"\s*(?:-|–|—|to|till)+\s*(?:(present|current|now|till date|to date|date)|" + _MONTH + ")", re.IGNORECASE)
+STATED_YEARS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:[a-z-]+\s+){0,3}?experience", re.IGNORECASE)
+SECTION_END_RE = re.compile(r"^(?:education|academic|skills|technical skills|projects|certifications?|achievements|awards|"
+                            r"languages|interests|hobbies|publications|personal|declaration|references)\b[^a-z]*$", re.IGNORECASE)
+
+
+def experience_from_cv(text: str, today) -> dict | None:
+    """Years worked, from the job dates in the CV's experience section, as of `today`; None when the CV has no such dates.
+
+    Overlapping jobs count once; months are counted inclusively, as LinkedIn does (Jun 2021 - Mar 2023 = 22 months).
+    """
+    # "ServicesJune 2022 - Present" (the owner's PDF runs the company into the dates).
+    lines = [line.strip() for line in re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text or "").splitlines()]
+    start = next((at for at, line in enumerate(lines) if EXPERIENCE_HEADING_RE.match(line)), None)
+    if start is None:
+        return None  # dates elsewhere are usually education; unknown is not zero
+    section = []
+    for line in lines[start + 1:]:
+        if SECTION_END_RE.match(line):
+            break
+        section.append(line)
+    def index(name, number, year):
+        # shortcut: a year with no month counts from January, so "2019 - 2021" reads as 25 months; fine for a warning.
+        month = MONTHS.index(name.casefold()[:3]) + 1 if name else int(number) if number and 1 <= int(number) <= 12 else 1
+        return int(year) * 12 + month - 1
+
+    now = today.year * 12 + today.month - 1
+    months = set()
+    for match in WORK_RANGE_RE.finditer("\n".join(section)):
+        last = now if match.group(4) else index(*match.group(5, 6, 7))
+        months.update(range(index(*match.group(1, 2, 3)), min(last, now) + 1))
+    if not months:
+        return None
+    stated = [float(found.group(1)) for found in STATED_YEARS_RE.finditer(" ".join((text or "").split()))]
+    return {"years": round(len(months) / 12, 1), "months": len(months), "stated_years": max(stated) if stated else None}
+
+
 class _HTMLTextStripper(HTMLParser):
     def __init__(self):
         super().__init__()
