@@ -1,0 +1,19 @@
+<section class="surface-card mb-4" id="settingsStartup" aria-labelledby="settingsStartupTitle">
+    <h2 class="page-section-title mb-1" id="settingsStartupTitle"><i class="fa-solid fa-power-off me-1" aria-hidden="true"></i>Start with Windows</h2>
+    <p class="page-section-copy mb-2">ALFRED can start by itself when you sign in to Windows on this PC. It uses your own Windows startup list, so no administrator rights are needed, and Windows Settings &gt; Apps &gt; Startup shows the same switch.</p>
+    <p id="startupStatus" class="small" role="status" aria-live="polite">Checking Windows…</p>
+    <form id="startupForm" data-live-refresh-hold="true" hidden>
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="startupOn" aria-describedby="startupOnHelp">
+            <label class="form-check-label" for="startupOn">Start ALFRED when I sign in to Windows</label>
+            <div class="form-text" id="startupOnHelp">ALFRED starts after you sign in, not before.</div>
+        </div>
+        <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch" id="startupBrowser" aria-describedby="startupBrowserHelp">
+            <label class="form-check-label" for="startupBrowser">Open ALFRED in the browser when it starts</label>
+            <div class="form-text" id="startupBrowserHelp">When off, ALFRED starts quietly in the notification area (system tray). Open it from the ALFRED icon there.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" type="submit" id="startupSave">Save startup</button>
+    </form>
+    <p id="startupFeedback" class="small mt-2 mb-0" role="status" aria-live="polite"></p>
+</section>

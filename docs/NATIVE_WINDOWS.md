@@ -56,6 +56,13 @@ auto-start are separate configurations, not enabled by this installer.
 
 ### Automatic startup after Windows sign-in
 
+The simplest way is **Settings > Start with Windows** in ALFRED (for the person who
+manages ALFRED on this PC). It switches the same current-user `ALFRED` Run entry
+on or off and chooses whether ALFRED opens in the browser or starts quietly in the
+notification area. It writes and reads the entry through WMI, so the status shown
+is what Windows itself will run, including a switch-off in Windows Startup apps.
+The browser choice is kept in `config\local.env` as `ALFRED_START_OPENS_BROWSER`.
+
 For the existing checkout, double-click **Enable ALFRED startup.cmd** in
 `F:\ALFRED`. Wait for its confirmation before closing the window. Alternatively,
 run the following in PowerShell from `F:\ALFRED`:

@@ -5589,6 +5589,34 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.assertTrue(self.browser.find_element(self.By.ID, 'offlineMapsCountry').is_displayed())
         self.run_axe_light_dark('settings-online-services')
 
+    def test_start_with_windows_switches_by_keyboard_and_show_what_windows_reads_back(self):
+        """Settings > Start with Windows: labelled switches, keyboard only; the status line is Windows' own read-back (synthetic)."""
+        from selenium.webdriver.common.keys import Keys
+        from alfred_ai.services import windows_startup as startup
+        from tests.test_windows_startup import FakeWindows
+        root = Path(self.enterContext(TemporaryDirectory(prefix='alfred-startup-browser-synthetic-')))
+        self.enterContext(patch.dict(os.environ, {'ALFRED_DATA_DIR': str(root)}))
+        os.environ.pop(startup.BROWSER_SETTING, None)
+        windows = FakeWindows()
+        self.enterContext(patch.object(startup, '_wmi', windows))
+        owner = self.scenario['user']; owner.is_superuser = True; owner.save(update_fields=['is_superuser'])
+        self.login(); self.browser.get(self.live_server_url + '/settings/')
+        self.wait.until(lambda _: 'Off: ALFRED does not start with Windows.' in self.text('startupStatus'))
+        labels = {box: self.browser.find_element(self.By.CSS_SELECTOR, f'label[for="{box}"]').text for box in ('startupOn', 'startupBrowser')}
+        self.assertEqual(labels, {'startupOn': 'Start ALFRED when I sign in to Windows', 'startupBrowser': 'Open ALFRED in the browser when it starts'})
+        for box in ('startupOn', 'startupBrowser'):
+            self.browser.find_element(self.By.ID, box).send_keys(Keys.SPACE)
+        self.browser.find_element(self.By.ID, 'startupSave').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'next sign-in' in self.text('startupFeedback'))
+        self.assertIn('On: ALFRED starts when you sign in to Windows, and opens in the browser.', self.text('startupStatus'))
+        self.assertEqual(windows.command, startup.command(True))
+        self.browser.find_element(self.By.ID, 'startupOn').send_keys(Keys.SPACE)
+        self.browser.find_element(self.By.ID, 'startupSave').send_keys(Keys.ENTER)
+        self.wait.until(lambda _: 'will not start with Windows' in self.text('startupFeedback'))
+        self.assertEqual(windows.command, '')
+        self.assertTrue(self.browser.find_element(self.By.ID, 'startupBrowser').is_selected())  # the choice is kept for next time
+        self.run_axe_light_dark('settings-windows-startup')
+
     def test_offline_map_one_press_download_with_spinner_pause_resume_and_cancel(self):
         """Owner check 2026-11-19: one Download press, a spinning circle while the size is worked out, then Pause,
         Resume and Cancel."""

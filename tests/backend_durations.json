@@ -105,6 +105,7 @@
  "tests.test_mobility_money": 45.97,
  "tests.test_model_loading_safety": 0.0,
  "tests.test_native_launcher": 0.02,
+ "tests.test_windows_startup": 12.7,
  "tests.test_native_observation": 0.0,
  "tests.test_native_probe_runner": 8.72,
  "tests.test_native_runtime": 0.77,

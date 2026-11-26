@@ -1083,6 +1083,35 @@ def backup_key_api_view(request):
     return response
 
 
+@login_required
+@require_http_methods(["GET", "POST"])
+def windows_startup_api_view(request):
+    """Settings > Start with Windows: ALFRED's own entry in the current Windows user's startup list, read back from Windows."""
+    import subprocess
+    from alfred_private_storage import PrivateStorageUnavailable
+    from .services import windows_startup
+    from .services.online_services import can_manage
+    manager = can_manage(request.user)
+    if request.method == "POST":
+        if not manager:
+            return JsonResponse({"detail": "Only the person who manages ALFRED on this PC can change how it starts."}, status=403)
+        try:
+            data = json.loads(request.body or b"{}")
+            if not isinstance(data, dict) or not isinstance(data.get("on"), bool) or not isinstance(data.get("open_browser"), bool):
+                raise ValueError("Send on and open_browser as true or false.")
+            result = windows_startup.save(data["on"], data["open_browser"])
+        except ValueError as exc:
+            return JsonResponse({"detail": str(exc) if not isinstance(exc, json.JSONDecodeError) else "Send the choice as JSON."}, status=400)
+        except (OSError, PrivateStorageUnavailable, subprocess.SubprocessError) as exc:
+            logging.getLogger(__name__).warning("Windows startup could not be changed: %s", exc)
+            return JsonResponse({"detail": str(exc) or "Windows did not answer. Nothing was changed.", **windows_startup.status(), "can_manage": manager}, status=500)
+    else:
+        result = windows_startup.status()
+    response = JsonResponse({**result, "can_manage": manager})
+    response["Cache-Control"] = "no-store, private"
+    return response
+
+
 # Phone sign-in with a code (owner decision 2026-11-19): Google and Microsoft never send a sign-in back to a home-network
 # address, so a phone on the Wi-Fi shows a short code and a signed-in person approves it on this PC, like a TV sign-in.
 PHONE_CODE_SECONDS = 300
