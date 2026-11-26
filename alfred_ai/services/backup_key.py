@@ -1,4 +1,5 @@
-"""The backup key and its passphrase-locked copy in Google Drive (owner decision 2026-11-19, SYNC-09 and RUNTIME-08).
+"""The backup key and its passphrase-locked copy in Google Drive or Cloudflare R2 (owner decisions 2026-11-19 and 2026-11-26,
+SYNC-09 and RUNTIME-08).
 
 ALFRED's encrypted backups (scripts/cloud_backup.py, to Cloudflare R2) open only with the backup key, a plain Fernet key
 file that never leaves this PC. If the PC is lost, the key must come from somewhere else: ALFRED locks a copy with a
@@ -6,6 +7,9 @@ passphrase the person remembers (scrypt, then Fernet) and keeps only that locked
 Google Drive (drive.appdata: ALFRED sees only its own file, the person's other Drive files stay out of reach). On a new
 PC: sign in to Google, fetch the locked copy, type the passphrase. Google alone cannot open it, and the passphrase is
 never stored or sent.
+
+The owner may keep the locked copy in their Cloudflare R2 bucket instead (2026-11-26, "use auto backup... to cloudflare"),
+next to the encrypted backups. Then the passphrase alone protects the key (scrypt makes each guess slow), so it must be long.
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ NAME = "alfred-backup-key.json"
 FILES, UPLOAD = "https://www.googleapis.com/drive/v3/files", "https://www.googleapis.com/upload/drive/v3/files"
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 17, 8, 1  # about 128 MB and a second per try, so guessing a passphrase is slow
 MIN_PASSPHRASE = 12
+R2_NAME = "alfred-backup-key-v1/sealed.json"
 
 
 class BackupKeyError(Exception):
@@ -89,13 +94,36 @@ def unseal(doc: dict, passphrase: str) -> bytes:
     return key
 
 
-def status() -> dict:
+def _saved() -> dict:
     try:
         saved = json.loads(_status_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         saved = {}
+    return saved if isinstance(saved, dict) else {}
+
+
+def _remember(**fields) -> None:
+    _write(_status_path(), json.dumps({**_saved(), **fields}).encode())
+
+
+def _today() -> str:
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def status() -> dict:
+    saved = _saved()
     return {"key": key_path().is_file(), "key_file": str(key_path()), "locked_copy": _sealed_path().is_file(),
-            "in_drive": bool(saved.get("drive_file_id")), "saved_on": saved.get("saved_on", ""), "google": saved.get("google", "")}
+            "in_drive": bool(saved.get("drive_file_id")), "saved_on": saved.get("saved_on", ""), "google": saved.get("google", ""),
+            "in_r2": bool(saved.get("r2_saved_on")), "r2_saved_on": saved.get("r2_saved_on", ""), "auto": _auto()}
+
+
+def _auto() -> dict:
+    """What alfred_ai/services/auto_backup.py last did, for Settings."""
+    try:
+        saved = json.loads((folder() / "auto-backup.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {k: saved.get(k) for k in ("last_ok", "last_try", "error", "kept")} if isinstance(saved, dict) else {}
 
 
 def make(passphrase: str, repeat: str) -> dict:
@@ -151,8 +179,7 @@ def upload(token: str, google_email: str) -> dict:
         raise BackupKeyError("Google Drive did not keep the locked copy intact. Try again.")
     if old and old != found:  # the new copy is checked first, so Drive never holds none
         _call("DELETE", f"{FILES}/{old}", token, accepted_statuses=(204,), content_types=("",))
-    _write(_status_path(), json.dumps({"drive_file_id": found, "google": google_email,
-                                       "saved_on": datetime.now(timezone.utc).date().isoformat()}).encode())
+    _remember(drive_file_id=found, google=google_email, saved_on=_today())
     return status()
 
 
@@ -169,7 +196,7 @@ def fetch(token: str, google_email: str) -> dict:
     if not _valid(doc):
         raise BackupKeyError("The copy in Google Drive is not an ALFRED backup key copy.")
     _write(_sealed_path(), json.dumps(doc).encode())
-    _write(_status_path(), json.dumps({"drive_file_id": found, "google": google_email, "saved_on": ""}).encode())
+    _remember(drive_file_id=found, google=google_email, saved_on="")
     return status()
 
 
@@ -178,11 +205,54 @@ def restore(passphrase: str) -> dict:
     try:
         doc = json.loads(_sealed_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        raise BackupKeyError("Fetch the locked copy from Google Drive first.") from None
+        raise BackupKeyError("Fetch the locked copy from Google Drive or Cloudflare R2 first.") from None
     key = unseal(doc, passphrase if isinstance(passphrase, str) else "")
     if key_path().is_file():
         if key_path().read_bytes().strip() != key:
             raise BackupKeyError("This PC already has a different backup key; it was left as it is.")
     else:
         _write(key_path(), key)
+    return status()
+
+
+def _r2(client, method, **kwargs):
+    """One request for the locked copy in the owner's R2 bucket; the bucket is the one cloud backups use."""
+    from apps.ml_engine.services.memory_sync import SyncUnavailable
+    from scripts import cloud_backup
+    try:
+        client = client or cloud_backup.bucket()
+        return client._send(method, R2_NAME, deadline=cloud_backup.seconds(), maximum=64 * 1024, **kwargs)
+    except cloud_backup.GateError:
+        raise BackupKeyError("Cloudflare R2 is not set up yet. Add your bucket's four ALFRED_MEMORY_R2_ values and "
+                             "ALFRED_CLOUD_BACKUP_AUTHORIZED=true to config/local.env, then restart ALFRED.") from None
+    except SyncUnavailable:
+        raise BackupKeyError("Could not reach Cloudflare R2. Try again later.") from None
+
+
+def save_to_r2(client=None) -> dict:
+    """Put the locked copy in the R2 bucket, then read it back to prove it arrived whole."""
+    try:
+        body = _sealed_path().read_bytes()
+    except OSError:
+        raise BackupKeyError("Make the locked copy first: choose a passphrase above.") from None
+    _r2(client, "PUT", data=body)
+    if _r2(client, "GET").content != body:
+        raise BackupKeyError("Cloudflare R2 did not keep the locked copy intact. Try again.")
+    _remember(r2_saved_on=_today())
+    return status()
+
+
+def fetch_from_r2(client=None) -> dict:
+    """On a new PC with the same R2 settings: bring the locked copy down; the passphrase opens it in restore()."""
+    response = _r2(client, "GET", statuses=(200, 404))
+    try:
+        doc = json.loads(response.content) if response.status == 200 else None
+    except ValueError:
+        doc = None
+    if response.status == 404:
+        raise BackupKeyError("No ALFRED backup key copy is in this Cloudflare R2 bucket.")
+    if not _valid(doc):
+        raise BackupKeyError("The copy in Cloudflare R2 is not an ALFRED backup key copy.")
+    _write(_sealed_path(), json.dumps(doc).encode())
+    _remember(r2_saved_on=_today())  # the copy is there
     return status()

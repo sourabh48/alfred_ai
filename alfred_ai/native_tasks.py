@@ -12,6 +12,7 @@ from apps.expenses.tasks import retry_low_confidence_statement_uploads, retry_st
 from apps.integrations.tasks import (
     cleanup_verified_external_intelligence, refresh_verified_external_intelligence,
 )
+from alfred_ai.services.auto_backup import backup_now  # noqa: F401  register Settings' Back up now
 from apps.ml_engine.continual.tasks import run_global_training_cycle
 from apps.mobility.tasks import research_travel, resume_travel_research, cleanup_travel_request_history
 
@@ -139,7 +140,13 @@ def _retrieval_quality():
     return weekly_check() if settings.ALFRED_WEEKLY_QUALITY_CHECK and weekly_due() else {"status": "not_due"}
 
 
+def _cloud_backup():
+    from alfred_ai.services.auto_backup import run
+    return run()
+
+
 DAILY_JOBS = {
+    "cloud-backup": _cloud_backup,
     "budget-publication-check": _budget_publication_check,
     "intelligence-cleanup": lambda: cleanup_verified_external_intelligence(retention_days=90),
     "private-memory-cleanup": _private_memory_cleanup,
@@ -164,6 +171,11 @@ def _run_daily(name):
         return result
     finally:
         cache.delete(f"native:daily:{name}:running")
+
+
+@db_periodic_task(crontab(minute="15", hour="20"))  # about 01:45 in India; catch-up covers nights the PC was off
+def native_cloud_backup():
+    return _run_daily("cloud-backup")
 
 
 @db_periodic_task(crontab(minute="45", hour="1"))

@@ -1059,6 +1059,13 @@ def backup_key_api_view(request):
                 backup_key.make(data.get("passphrase"), data.get("repeat"))
             elif data.get("action") == "restore":
                 backup_key.restore(data.get("passphrase"))
+            elif data.get("action") == "save_r2":
+                backup_key.save_to_r2()
+            elif data.get("action") == "fetch_r2":
+                backup_key.fetch_from_r2()
+            elif data.get("action") == "backup_now":
+                from .services.auto_backup import backup_now
+                backup_now.delay()
             else:
                 raise ValueError("Choose to make the key or open the copy.")
         except backup_key.BackupKeyError as exc:

@@ -1,4 +1,4 @@
-"""The central brain keeps what ALFRED learns, encrypted per owner in the private vault (owner decision 2026-11-20)."""
+"""The central brain keeps what ALFRED learns, encrypted in the private vault (owner decisions 2026-11-20 and 2026-11-26)."""
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -33,7 +33,9 @@ class BrainTests(TestCase):
         MemoryStore(self.vault).reset_owner(self.alice)
         self.assertEqual(brain.examples(self.alice, "travel_reading"), [])
 
-    def test_fine_tuning_gets_only_this_owners_examples_as_chats(self):
+    def test_fine_tuning_gets_this_owners_corrections_and_everyones_shared_examples(self):
+        # Owner 2026-11-26, "like Claude and Codex": public answers and practice are shared; real messages are not.
+        brain.remember(self.bob, "travel_reading", {"message": "bob's real trip", "meant": {"travellers": 2}})
         brain.remember(self.alice, "travel_reading", {"message": "me n the gang", "meant": {"travellers": 5}})
         brain.remember(self.alice, "public_answer", {"question": "What is a dosa?", "answer": "A rice and lentil crepe."})
         brain.remember(self.bob, "public_answer", {"question": "Bob's question?", "answer": "Bob's answer."})
@@ -41,14 +43,17 @@ class BrainTests(TestCase):
         brain.remember(self.alice, "travel_practice", {"message": "ooty", "meant": {"destination": "ooty"}, "held_back": True})
         chats = brain.training_chats(self.alice, today=date(2026, 11, 20))
         self.assertEqual([chat["messages"][-1]["content"] for chat in chats],
-                         ['{"travellers": 5}', '{"destination": "goa"}', "A rice and lentil crepe."])
+                         ['{"travellers": 5}', '{"destination": "goa"}', "A rice and lentil crepe.", "Bob's answer."])
         self.assertEqual(chats[0]["messages"][1]["content"], '{"message": "me n the gang", "alfred_last_asked": null}')
         self.assertIn("Today is Friday 2026-11-20.", chats[0]["messages"][0]["content"])
         self.assertIn("Output schema:", chats[0]["messages"][0]["content"])
         held = brain.held_back(self.alice, today=date(2026, 11, 20))
         self.assertEqual([(item["messages"][1]["content"], item["expected"]) for item in held],
                          [('{"message": "ooty", "alfred_last_asked": null}', {"destination": "ooty"})])
-        self.assertEqual(brain.held_back(self.bob), [])
+        self.assertEqual(len(brain.held_back(self.bob)), 1)  # shared practice, never Alice's own messages
+        self.assertNotIn("bob's real trip", str(chats)); self.assertNotIn("the gang", str(brain.training_chats(self.bob)))
+        MemoryStore(self.vault).reset_owner(self.bob)
+        self.assertNotIn("Bob's answer.", str(brain.examples(self.alice, "public_answer")))  # a reset takes back shared ones too
 
     def test_a_correction_right_after_i_understood_teaches_the_reader(self):
         session = new_session(self.alice)

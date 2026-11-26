@@ -2,7 +2,9 @@
 
 Each example is encrypted with the private memory vault's key and kept per owner in the vault database on this PC.
 That folder is inside the encrypted recovery archive that scripts/cloud_backup.py copies to R2, so the brain is backed up
-with it and never leaves the PC unencrypted. Only the owner's own examples are ever read back.
+with it and never leaves the PC unencrypted. Like a chat app (owner 2026-11-26, "like Claude and Codex"), general know-how is
+shared and a person's own words are not: public answers and made-up practice messages teach ALFRED for everyone, while each
+person's real travel messages and corrections are read back only for that person. A reset still removes all of a person's own.
 """
 import logging
 from pathlib import Path
@@ -17,6 +19,7 @@ from .persistent_memory import MemoryStore, _json, _owner
 
 logger = logging.getLogger(__name__)
 KINDS = ("travel_reading", "travel_practice", "public_answer")  # travel_practice: Gemini's made-up messages, never lessons
+SHARED = ("public_answer", "travel_practice")  # never a person's own messages
 PER_KIND = 500  # shortcut: the oldest examples are dropped past this; raise it with a measured fine-tuning budget
 
 
@@ -38,13 +41,15 @@ def remember(user, kind, example, *, store=None):
 
 
 def examples(user, kind, *, limit=PER_KIND, store=None):
-    """This owner's examples of one kind, newest first; unreadable ones are skipped."""
+    """Examples of one kind, newest first: everyone's for a shared kind, else only this owner's; unreadable ones are skipped."""
     import json
     owner, store, found = _owner(user), store or _store(), []
     with store._transaction() as db:
         cipher = store._cipher(db)
-        rows = db.execute("SELECT record FROM brain_examples WHERE owner=? AND kind=? ORDER BY created DESC LIMIT ?",
-                          (owner, kind, int(limit))).fetchall()
+        rows = (db.execute("SELECT record FROM brain_examples WHERE kind=? ORDER BY created DESC LIMIT ?", (kind, int(limit)))
+                if kind in SHARED else
+                db.execute("SELECT record FROM brain_examples WHERE owner=? AND kind=? ORDER BY created DESC LIMIT ?",
+                           (owner, kind, int(limit)))).fetchall()
         for (record,) in rows:
             try:
                 found.append(json.loads(cipher.decrypt(record)))
@@ -88,7 +93,8 @@ def _readings(user, store):
 
 
 def training_chats(user, *, store=None, today=None):
-    """This owner's examples as chat records for fine-tuning, oldest first; held-back practice examples are left out."""
+    """This owner's corrections and everyone's shared examples as chat records for fine-tuning, oldest first; held-back
+    practice examples are left out."""
     import json
     from django.utils import timezone
     today, out = today or timezone.localdate(), []

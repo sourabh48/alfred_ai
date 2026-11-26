@@ -1,4 +1,5 @@
-// Settings > Backup key: lock the key with a passphrase, save or fetch the locked copy in Google Drive, open a fetched copy.
+// Settings > Backup key: lock the key with a passphrase, save or fetch the locked copy in Cloudflare R2 or Google Drive,
+// open a fetched copy, and show the nightly backup.
 (function () {
     const $ = id => document.getElementById(id), URL = "/api/settings/backup-key/";
     if (!$("settingsBackupKey")) return;
@@ -12,12 +13,20 @@
     function render(data) {
         const show = (id, on) => $(id).classList.toggle("d-none", !on);
         $("backupKeyStatus").textContent = !data.key && !data.locked_copy ? "No backup key on this PC yet. Choose a passphrase to make one."
-            : !data.key ? `A locked copy was fetched from ${data.google || "Google Drive"}. Type its passphrase to open it.`
-            : data.in_drive && data.saved_on ? `Backup key on this PC. Locked copy saved in the Google Drive of ${data.google} on ${data.saved_on}. Key file: ${data.key_file}`
-            : data.locked_copy ? `Backup key on this PC and locked with your passphrase, but not yet in Google Drive. Key file: ${data.key_file}`
+            : !data.key ? "A locked copy was fetched. Type its passphrase to open it."
+            : data.in_r2 || (data.in_drive && data.saved_on) ? `Backup key on this PC. Locked copy saved in ${[
+                data.in_r2 ? `Cloudflare R2 on ${data.r2_saved_on}` : "", data.in_drive && data.saved_on ? `the Google Drive of ${data.google} on ${data.saved_on}` : "",
+              ].filter(Boolean).join(" and ")}. Key file: ${data.key_file}`
+            : data.locked_copy ? `Backup key on this PC and locked with your passphrase, but no copy is saved off this PC yet. Key file: ${data.key_file}`
             : `Backup key on this PC, not locked yet. Key file: ${data.key_file}`;
         $("backupKeyMake").textContent = data.key ? "Lock the key with a new passphrase" : "Make the key and lock it";
         show("backupKeySave", data.key && data.locked_copy);
+        show("backupKeySaveR2", data.key && data.locked_copy);
+        show("backupNow", data.key && (data.in_r2 || (data.in_drive && data.saved_on)));
+        const auto = data.auto || {};
+        $("backupAutoStatus").textContent = auto.last_ok
+            ? `Nightly backup: last saved to Cloudflare R2 on ${auto.last_ok}, ${auto.kept} kept.${auto.error ? ` The last try failed: ${auto.error}` : ""}`
+            : auto.error ? `Nightly backup is not running yet: ${auto.error}` : "";
         show("backupKeyRestoreForm", !data.key && data.locked_copy);
         if (data.error) say(data.error, "danger");
     }
@@ -33,13 +42,22 @@
 
     Alfred.fetchJSON(URL).then(render).catch(error => {
         say(error.message, error.status === 403 ? "secondary" : "danger");
-        ["backupKeyMakeForm", "backupKeyFetch"].forEach(id => $(id).classList.add("d-none"));
+        ["backupKeyMakeForm", "backupKeyFetch", "backupKeyFetchR2"].forEach(id => $(id).classList.add("d-none"));
     });
     $("backupKeyMakeForm").addEventListener("submit", event => {
         event.preventDefault();
         post({ action: "make", passphrase: $("backupKeyPassphrase").value, repeat: $("backupKeyRepeat").value },
-            "Key locked. Now save the locked copy to Google Drive.", event.currentTarget);
+            "Key locked. Now save the locked copy to Cloudflare R2 or Google Drive.", event.currentTarget);
     });
+    [["backupKeySaveR2", "save_r2", "Locked copy saved to Cloudflare R2."], ["backupKeyFetchR2", "fetch_r2", "Locked copy fetched. Type its passphrase to open it."],
+     ["backupNow", "backup_now", "Backup started. It takes a few minutes; reopen this page to see the result."]]
+        .forEach(([id, action, done]) => $(id).addEventListener("click", () => {
+            $(id).disabled = true;
+            Alfred.fetchJSON(URL, { method: "POST", body: JSON.stringify({ action }) })
+                .then(data => { render(data); say(done, "success"); })
+                .catch(error => { if (error.payload && "key" in error.payload) render(error.payload); say(error.message, "danger"); })
+                .finally(() => { $(id).disabled = false; });
+        }));
     $("backupKeyRestoreForm").addEventListener("submit", event => {
         event.preventDefault();
         post({ action: "restore", passphrase: $("backupKeyRestorePassphrase").value }, "Backup key restored on this PC.", event.currentTarget);

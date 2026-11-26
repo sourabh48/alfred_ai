@@ -181,11 +181,15 @@ def download(digest, key_file, destination, *, client=None):
     return {"CLOUD_DOWNLOAD_VERIFIED": "PASS", "backup_directory": str(destination), "archive_sha256": digest}
 
 
-def create(runtime, destination, key_file):
-    """A fresh encrypted local backup of a stopped runtime, independently restored before upload."""
-    head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30).stdout.strip()
-    release_id = "cloud-backup-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return recovery.create(runtime, destination, key_file, release_id, head, head)
+def create(runtime, destination, key_file, *, live=False):
+    """A fresh encrypted local backup, restored as a check before upload; live for the nightly backup of a running app."""
+    try:
+        head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30).stdout.strip()
+    except OSError:  # an installed ALFRED has no Git
+        head = ""
+    head = head if re.fullmatch(r"[a-f0-9]{40}", head) else "0" * 40
+    release_id = ("auto-backup-" if live else "cloud-backup-") + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return recovery.create(runtime, destination, key_file, release_id, head, head, live=live)
 
 
 def new_key(path):

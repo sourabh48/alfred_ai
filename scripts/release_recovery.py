@@ -6,7 +6,7 @@ Only newly created private scratch directories are removed after verified succes
 from __future__ import annotations
 
 import argparse
-from contextlib import ExitStack, closing, contextmanager
+from contextlib import ExitStack, closing, contextmanager, nullcontext
 import errno
 import hashlib
 import json
@@ -156,7 +156,10 @@ def selected_files(runtime):
     return files, coverage
 
 
-def create(runtime, destination, key_file, release_id, candidate, baseline, source_repo=None):
+def create(runtime, destination, key_file, release_id, candidate, baseline, source_repo=None, *, live=False):
+    """live: the nightly backup of a running ALFRED (owner 2026-11-26). Each database is still copied as one consistent
+    SQLite snapshot and a file that changes mid-copy still fails the run, but no lock stops the app, so files may differ
+    by seconds; the decrypt-and-restore check then runs in this process, since an installed ALFRED has no script to start."""
     release.new_manifest(release_id, candidate, baseline)
     runtime, destination, key_file = map(no_links, (runtime, destination, key_file))
     if (destination == runtime or destination.is_relative_to(runtime) or runtime.is_relative_to(destination)
@@ -172,7 +175,7 @@ def create(runtime, destination, key_file, release_id, candidate, baseline, sour
                 "production_baseline_sha": baseline, "complete": False, "files": records,
                 "coverage": coverage, "database_snapshots": snapshots, "key_kind": key_kind,
                 "runtime_reference": runtime_reference(runtime)}
-    with writer_barriers(runtime, databases):
+    with nullcontext() if live else writer_barriers(runtime, databases):
         for name, source in files.items():
             target = scratch / name
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -231,11 +234,16 @@ def create(runtime, destination, key_file, release_id, candidate, baseline, sour
     write_json(destination / "backup.json", public)
     # Independent process: decrypt and restore with the supplied existing key, not capture's in-memory cipher.
     restored = destination / "independent-local-restore"
+    if live:
+        return _finish(scratch, destination, restore(destination, key_file, restored))
     process = subprocess.run([sys.executable, str(Path(__file__)), "--backup", str(destination),
                               "--key-file", str(key_file), "--restore", str(restored)], capture_output=True, timeout=300)
     if process.returncode:
         raise release.GateError("independent_local_restore_failed")
-    receipt = json.loads(process.stdout)
+    return _finish(scratch, destination, json.loads(process.stdout))
+
+
+def _finish(scratch, destination, receipt):
     if receipt.get("LOCAL_BACKUP_VERIFIED") != "PASS":
         raise release.GateError("independent_local_restore_incomplete")
     if not scratch.resolve().is_relative_to(destination.resolve()) or not scratch.name.startswith("capture-"):

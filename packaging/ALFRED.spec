@@ -26,7 +26,9 @@ binaries = []
 hiddenimports = ["alfred_launcher", "alfred_tray", "pystray._win32", "alfred_ai.native_settings", "diskcache.djangocache", "huey.contrib.djhuey",
                  "django.db.backends.sqlite3", "django.contrib.sessions.backends.db",
                  "django.template.backends.django", "django.contrib.auth.backends",
-                 "corsheaders", "rest_framework", "rest_framework.authtoken"]
+                 "corsheaders", "rest_framework", "rest_framework.authtoken",
+                 # the nightly R2 backup (alfred_ai/services/auto_backup.py) runs these inside the app
+                 "scripts.cloud_backup", "scripts.release_recovery", "scripts.release_gate", "scripts.verify_private_recovery"]
 for package in ("corsheaders", "whitenoise", "rest_framework"):
     hiddenimports += collect_submodules(package, on_error="ignore")
 for package in ("apps", "alfred_ai"):

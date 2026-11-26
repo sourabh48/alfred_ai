@@ -1,6 +1,6 @@
 <section class="surface-card mb-4" id="settingsBackupKey" aria-labelledby="settingsBackupKeyTitle">
     <h2 class="page-section-title mb-1" id="settingsBackupKeyTitle"><i class="fa-solid fa-key me-1" aria-hidden="true"></i>Backup key (if this PC is lost)</h2>
-    <p class="page-section-copy mb-2">ALFRED's backups are encrypted with a backup key that stays on this PC. So a new PC can open them, ALFRED locks a copy of the key with a passphrase you choose and keeps only that locked copy in a hidden ALFRED folder in your Google Drive. On a new PC: sign in to Google here, fetch the copy, and type the passphrase. Google cannot open it without your passphrase, and ALFRED never stores or sends the passphrase. If you forget it, the backups cannot be opened.</p>
+    <p class="page-section-copy mb-2">ALFRED's backups are encrypted with a backup key that stays on this PC. So a new PC can open them, ALFRED locks a copy of the key with a passphrase you choose and keeps only that locked copy in your Cloudflare R2 bucket or in a hidden ALFRED folder in your Google Drive. On a new PC: fetch the copy and type the passphrase. Neither Cloudflare nor Google can open it without your passphrase, and ALFRED never stores or sends the passphrase. If you forget it, the backups cannot be opened.</p>
     <div id="backupKeyFeedback" class="d-none alert mb-2" role="status" aria-live="polite"></div>
     <p class="small mb-2" id="backupKeyStatus">Checking…</p>
     <form class="row g-2 align-items-end mb-2" id="backupKeyMakeForm" data-live-refresh-hold="true" autocomplete="off">
@@ -15,7 +15,9 @@
         <div class="col-auto"><button class="btn btn-primary" type="submit" id="backupKeyMake">Lock the key with this passphrase</button></div>
     </form>
     <div class="d-flex flex-wrap gap-2 mb-2">
+        <button class="btn btn-outline-dark btn-sm rounded-pill d-none" type="button" id="backupKeySaveR2">Save the locked copy to Cloudflare R2</button>
         <a class="btn btn-outline-dark btn-sm rounded-pill d-none" id="backupKeySave" href="/auth/google/start/?purpose=backupkey&amp;mode=save">Save the locked copy to Google Drive</a>
+        <button class="btn btn-outline-dark btn-sm rounded-pill" type="button" id="backupKeyFetchR2">New PC: fetch the locked copy from Cloudflare R2</button>
         <a class="btn btn-outline-dark btn-sm rounded-pill" id="backupKeyFetch" href="/auth/google/start/?purpose=backupkey&amp;mode=fetch">New PC: fetch the locked copy from Google Drive</a>
     </div>
     <form class="row g-2 align-items-end d-none" id="backupKeyRestoreForm" data-live-refresh-hold="true" autocomplete="off">
@@ -25,5 +27,9 @@
         </div>
         <div class="col-auto"><button class="btn btn-primary" type="submit">Open the copy</button></div>
     </form>
-    <p class="small muted mt-2 mb-0">Uses the Google sign-in set up for ALFRED. In your Google Cloud project, turn on the Google Drive API and add the "app data" Drive permission (drive.appdata) to the consent screen; ALFRED can then see only its own file, never your other Drive files. Backups themselves go to your Cloudflare R2 bucket (scripts/cloud_backup.py with --key-file set to the key file shown above).</p>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <p class="small mb-0" id="backupAutoStatus"></p>
+        <button class="btn btn-outline-dark btn-sm rounded-pill d-none" type="button" id="backupNow">Back up now</button>
+    </div>
+    <p class="small muted mt-2 mb-0">Cloudflare R2 uses the bucket in config/local.env. Google Drive uses the Google sign-in set up for ALFRED. In your Google Cloud project, turn on the Google Drive API and add the "app data" Drive permission (drive.appdata) to the consent screen; ALFRED can then see only its own file, never your other Drive files. Once the key and its locked copy are saved, ALFRED backs everything up to your R2 bucket each night, encrypted, and keeps the newest 7.</p>
 </section>

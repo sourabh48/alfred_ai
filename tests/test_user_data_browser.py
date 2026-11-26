@@ -5441,7 +5441,9 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.browser.find_element(self.By.ID, 'backupKeyPassphrase').send_keys('synthetic four word passphrase')
         self.browser.find_element(self.By.ID, 'backupKeyRepeat').send_keys('synthetic four word passphrase')
         self.memory_click('#backupKeyMake')
-        self.wait.until(lambda _: 'not yet in Google Drive' in self.text('backupKeyStatus'))
+        self.wait.until(lambda _: 'no copy is saved off this PC yet' in self.text('backupKeyStatus'))
+        self.assertTrue(self.browser.find_element(self.By.ID, 'backupKeySaveR2').is_displayed())
+        self.assertFalse(self.browser.find_element(self.By.ID, 'backupNow').is_displayed())  # not before a copy is saved
         save = self.browser.find_element(self.By.ID, 'backupKeySave')
         self.assertTrue(save.is_displayed())
         self.assertTrue(save.get_attribute('href').endswith('/auth/google/start/?purpose=backupkey&mode=save'))
