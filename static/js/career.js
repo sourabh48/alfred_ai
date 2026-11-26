@@ -154,9 +154,12 @@ function renderCareerSummary(profile, projection, resume, jobAnalysis, market, t
     const latest = (projection.projections || []).at(-1);
     const projectionConfidence = projection.projection_confidence || {};
     const warnings = (experience?.warnings || []).map(text => `<span class="d-block text-warning mt-1" role="status">${Alfred.escapeHtml(text)}</span>`).join("");
+    const periods = (experience?.periods || []).map(period => `<li>${Alfred.escapeHtml(period.where || "Job")}: ${Alfred.escapeHtml(period.dates)} = ${period.months} months</li>`).join("");
+    const working = experience ? `<details class="mt-1"><summary>How this is worked out</summary><ul class="small ps-3 mb-1">${periods}</ul>
+        <span class="d-block small">Months that overlap count once: ${experience.months} months ÷ 12 = ${Alfred.formatNumber(experience.years, 1)} years, as of ${Alfred.formatDate(experience.as_of)}.</span></details>` : "";
     const cards = [
         { title: "Experience", value: `${Alfred.formatNumber(experience ? experience.years : profile.experience_years, 1)} yrs`,
-          copy: `${Alfred.escapeHtml(profile.role || "Role pending")}${experience ? " · from your CV's job dates" : ""}${warnings}` },
+          copy: `${Alfred.escapeHtml(profile.role || "Role pending")}${experience ? " · from your CV's job dates" : ""}${warnings}${working}` },
         { title: "Resume Parse", value: resume ? `${Alfred.formatNumber((resume.parse_confidence || 0) * 100, 0)}%` : "No resume", copy: resume ? (resume.parser_status_label || "Parsed") : "Upload a resume" },
         { title: "Rule-based Job Fit", value: jobAnalysis ? (jobAnalysis.fit_score == null ? "Unavailable" : `${Alfred.formatNumber(jobAnalysis.fit_score, 0)}/100`) : "No comparison", copy: jobAnalysis ? `${Alfred.escapeHtml(jobAnalysis.company || jobAnalysis.source_name || "Latest analysis")} · Not a hiring probability` : "Provide a job description" },
         {
@@ -170,7 +173,7 @@ function renderCareerSummary(profile, projection, resume, jobAnalysis, market, t
         <article class="metric-card">
             <p class="metric-kicker">${card.title}</p>
             <h2 class="metric-value">${card.value}</h2>
-            <p class="metric-caption">${card.copy}</p>
+            <div class="metric-caption">${card.copy}</div>
         </article>
     `).join(""));
 }

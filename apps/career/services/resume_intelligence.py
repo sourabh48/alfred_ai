@@ -105,14 +105,23 @@ def experience_from_cv(text: str, today) -> dict | None:
         return int(year) * 12 + month - 1
 
     now = today.year * 12 + today.month - 1
-    months = set()
-    for match in WORK_RANGE_RE.finditer("\n".join(section)):
+    months, periods = set(), []
+    joined = "\n".join(section)
+    for match in WORK_RANGE_RE.finditer(joined):
         last = now if match.group(4) else index(*match.group(5, 6, 7))
-        months.update(range(index(*match.group(1, 2, 3)), min(last, now) + 1))
+        span = range(index(*match.group(1, 2, 3)), min(last, now) + 1)
+        months.update(span)
+        # Shown so the owner can check the sum: the text before the dates on their line, else the line above.
+        row = joined.count("\n", 0, match.start())
+        where = joined[joined.rfind("\n", 0, match.start()) + 1:match.start()].strip(" -|,:–—")
+        where = re.sub(r"\b([A-Z]) (?=[a-z]{2,})", r"\1", where or (section[row - 1] if row else ""))  # "T ata" in the PDF
+        periods.append({"where": where[:80], "dates": " ".join(match.group(0).split()),
+                        "months": len(span)})
     if not months:
         return None
     stated = [float(found.group(1)) for found in STATED_YEARS_RE.finditer(" ".join((text or "").split()))]
-    return {"years": round(len(months) / 12, 1), "months": len(months), "stated_years": max(stated) if stated else None}
+    return {"years": round(len(months) / 12, 1), "months": len(months), "stated_years": max(stated) if stated else None,
+            "periods": periods}
 
 
 class _HTMLTextStripper(HTMLParser):

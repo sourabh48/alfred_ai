@@ -193,7 +193,10 @@ class CvExperienceTests(TestCase):
         from apps.career.services.resume_intelligence import experience_from_cv
         found = experience_from_cv(self.CV, date(2026, 11, 26))
         # Jan 2020-Mar 2021 is 15 months (the project inside it counts once), Jun 2022-Nov 2026 is 54.
-        self.assertEqual(found, {"years": 5.8, "months": 69, "stated_years": 4.0})
+        self.assertEqual(found, {"years": 5.8, "months": 69, "stated_years": 4.0, "periods": [
+            {"where": "Tata Consultancy Services", "dates": "June 2022 - Present", "months": 54},
+            {"where": "Infosys Limited", "dates": "Jan 2020 – Mar 2021", "months": 15},
+            {"where": "Project: payments", "dates": "Feb 2020 - Jun 2020", "months": 5}]})
         self.assertIsNone(experience_from_cv("Education\nB.Tech, 2015 - 2019\n", date(2026, 11, 26)))  # unknown, not zero
 
     def test_dashboard_warns_when_the_cv_claim_or_profile_is_stale(self):

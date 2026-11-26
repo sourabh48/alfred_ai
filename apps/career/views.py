@@ -1008,7 +1008,8 @@ def _experience_check(user) -> dict | None:
     profile = CareerProfile.objects.filter(user=user).values_list("experience_years", flat=True).first()
     if profile is not None and abs(profile - years) >= 0.5:
         warnings.append(f"Your profile says {profile:g} years; job matching uses that figure until you change it.")
-    return {"years": years, "months": found["months"], "stated_years": stated, "as_of": today.isoformat(), "warnings": warnings}
+    return {"years": years, "months": found["months"], "stated_years": stated, "as_of": today.isoformat(), "warnings": warnings,
+            "periods": found["periods"]}
 
 
 def _career_dashboard_payload(request) -> dict:
