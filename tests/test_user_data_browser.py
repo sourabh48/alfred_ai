@@ -5763,11 +5763,18 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         self.wait.until(lambda _: self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').get_attribute('data-checked-on') == today.isoformat())
         self.assertFalse(self.browser.find_element(self.By.ID, 'dashboardCareerFollowUps').is_displayed())
 
+    def wait_for_career_opportunity_list(self):
+        # The page's first opportunity load re-renders the job panels and stops any mock interview (CI #278 race).
+        self.wait.until(lambda _: self.browser.execute_script(
+            "const s = document.getElementById('careerOutcomeAnalysis');"
+            "return s.options.length > 1 || s.options[0].text === 'No recorded opportunities';"))
+
     def test_career_mock_interview_discards_late_voice_and_feedback(self):
         from tests.test_career_matching_acceptance import offline_career
         offline_career(self)
         self.login(); self.browser.get(self.live_server_url + '/career/')
         self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRoot'))
+        self.wait_for_career_opportunity_list()
         result = self.browser.execute_async_script("""
             const done = arguments[0], original = {...AlfredVoice}, fetch = Alfred.fetchJSON;
             const form = document.createElement('form'); document.body.append(form);
@@ -5849,6 +5856,7 @@ class UserDataBrowserTests(StaticLiveServerTestCase):
         offline_career(self)
         self.login(); self.browser.get(self.live_server_url + '/career/')
         self.wait.until(lambda _: self.browser.find_elements(self.By.ID, 'careerRoot'))
+        self.wait_for_career_opportunity_list()
         result = self.browser.execute_async_script("""
             const done = arguments[0], original = {...AlfredVoice}, fetch = Alfred.fetchJSON;
             const form = document.createElement('form'); document.body.append(form);
