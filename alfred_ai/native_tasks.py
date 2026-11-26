@@ -89,7 +89,7 @@ def native_intelligence_refresh():
     return refresh_verified_external_intelligence(batch_size=75)
 
 
-@db_periodic_task(crontab(minute="30", hour="7,23"))
+@db_periodic_task(crontab(minute="0", hour="2,18"))  # UTC like the others: 23:30 and 07:30 in India (was 05:00 and 13:00)
 def native_fund_value_refresh():
     # AMFI publishes the day's NAVs late in the evening; the morning run catches a late file.
     from apps.investments.services.fund_prices import refresh_fund_values
