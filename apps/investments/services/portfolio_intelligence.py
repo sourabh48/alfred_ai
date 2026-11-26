@@ -30,6 +30,10 @@ AMFI_HISTORY_URL = "https://portal.amfiindia.com/DownloadNAVHistoryReport_Po.asp
 AMFI_CACHE_TTL_SECONDS = 60 * 60 * 8
 AMFI_FAILURE_CACHE_TTL_SECONDS = 60 * 15
 WATCHLIST_HISTORY_DAYS = 60
+# 60 days of every scheme was 48 MB and took about 154 s on 2026-11-27, so it downloads in the background job.
+AMFI_HISTORY_MAX_BYTES = 96_000_000
+AMFI_HISTORY_SECONDS = 600
+AMFI_HISTORY_TTL_SECONDS = 26 * 60 * 60  # refreshed after each twice-daily fund price update
 WATCHLIST_TARGET_COUNT = 5
 WATCHLIST_MIN_OBSERVATIONS = 18
 WATCHLIST_NAV_MAX_AGE_DAYS = 7
@@ -372,9 +376,10 @@ class PortfolioIntelligenceService:
         evidence = [market.evidence, latest_nav_report["evidence"], history_report["evidence"]]
         market_values = self._market_values(market.payload)
         if not latest_nav_report["items"] or not history_report["series"] or market_values is None or not freshness_snapshot(evidence)["proof_complete"]:
+            history_note = "" if not latest_nav_report["items"] or history_report["series"] else history_report["evidence"]["summary"] + " "
             return {
                 "available": False,
-                "summary": "Watchlist unavailable: required market or AMFI observations are missing, invalid or expired. Recorded holdings are unchanged.",
+                "summary": history_note + "Watchlist unavailable: required market or AMFI observations are missing, invalid or expired. Recorded holdings are unchanged.",
                 "algorithm": self._watchlist_algorithm_payload(),
                 "items": [],
                 "evidence": evidence,
@@ -476,12 +481,24 @@ class PortfolioIntelligenceService:
         return report
 
     def _get_amfi_history_report(self, *, days: int) -> dict:
-        to_date = timezone.localdate()
-        from_date = to_date - timedelta(days=days)
-        cache_key = f"investments:amfi:history:{from_date.isoformat()}:{to_date.isoformat()}:v3"
+        """The kept history, else (natively) a background download is queued and the page is told it is on its way."""
+        cache_key = f"investments:amfi:history:{days}:v4"
         cached = cache.get(cache_key)
         if cached:
             return cached
+        from apps.investments.tasks import download_amfi_history
+        if hasattr(download_amfi_history, "queued"):  # the native worker: a page never waits minutes for this file
+            if cache.add(f"{cache_key}:queued", 1, timeout=AMFI_HISTORY_SECONDS):
+                download_amfi_history.delay(days)
+            return self._empty_amfi_history_report(days=days, notes="Queued for the background worker.",
+                summary="AMFI's price history (about 50 MB) is downloading in the background. Check again in a few minutes.")
+        return self.download_amfi_history_report(days=days)
+
+    def download_amfi_history_report(self, *, days: int) -> dict:
+        """Download AMFI's history for every scheme and keep only the rows the watchlist and owned funds use."""
+        to_date = timezone.localdate()
+        from_date = to_date - timedelta(days=days)
+        cache_key = f"investments:amfi:history:{days}:v4"
         fetched_at = timezone.now()
         source_url = f"{AMFI_HISTORY_URL}?frmdt={from_date.strftime('%d-%b-%Y')}&todt={to_date.strftime('%d-%b-%Y')}"
         try:
@@ -491,10 +508,12 @@ class PortfolioIntelligenceService:
                     "frmdt": from_date.strftime("%d-%b-%Y"),
                     "todt": to_date.strftime("%d-%b-%Y"),
                 },
-                content_types=("text/plain", "text/html"), max_bytes=16_000_000,
+                content_types=("text/plain", "text/html"), max_bytes=AMFI_HISTORY_MAX_BYTES, max_seconds=AMFI_HISTORY_SECONDS,
             )
             text = response.content.decode("utf-8-sig", errors="replace")
-            series = self._parse_amfi_nav_report(text, history_mode=True)
+            owned = set(Investment.objects.exclude(amfi_scheme_code="").values_list("amfi_scheme_code", flat=True))
+            series = [row for row in self._parse_amfi_nav_report(text, history_mode=True)
+                      if row["scheme_code"] in owned or self._candidate_name(row["scheme_name"])]
         except Exception as exc:
             safe_error_details(exc, "AMFI NAV history could not be loaded.", logger_name=__name__)
             report = {
@@ -518,15 +537,16 @@ class PortfolioIntelligenceService:
                 source_url=source_url,
                 summary=f"Loaded official AMFI NAV history from {from_date.isoformat()} to {to_date.isoformat()} for short-horizon scoring.",
                 fetched_at=fetched_at,
-                ttl_seconds=AMFI_CACHE_TTL_SECONDS,
+                ttl_seconds=AMFI_HISTORY_TTL_SECONDS,
                 notes="Official AMFI history endpoint; Alfred uses the latest 60-day NAV window for momentum, drawdown, and volatility math.",
                 status="fresh" if series else "failed",
             ),
         }
-        cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS if series else AMFI_FAILURE_CACHE_TTL_SECONDS)
+        cache.set(cache_key, report, AMFI_HISTORY_TTL_SECONDS if series else AMFI_FAILURE_CACHE_TTL_SECONDS)
         return report
 
-    def _empty_amfi_history_report(self, *, days: int, summary: str) -> dict:
+    def _empty_amfi_history_report(self, *, days: int, summary: str,
+                                   notes="History fetch was skipped after an earlier AMFI dependency failed.") -> dict:
         to_date = timezone.localdate()
         from_date = to_date - timedelta(days=days)
         fetched_at = timezone.now()
@@ -538,7 +558,7 @@ class PortfolioIntelligenceService:
                 summary=summary,
                 fetched_at=fetched_at,
                 ttl_seconds=AMFI_FAILURE_CACHE_TTL_SECONDS,
-                notes="History fetch was skipped after an earlier AMFI dependency failed.",
+                notes=notes,
                 status="failed",
             ),
         }
@@ -921,12 +941,13 @@ class PortfolioIntelligenceService:
         family = self._watchlist_family(item.get("category", ""), item.get("scheme_name", ""))
         if not family:
             return False
-        scheme_name = str(item.get("scheme_name", "")).upper()
-        if any(token not in scheme_name for token in WATCHLIST_NAME_REQUIRED):
-            return False
-        if any(token in scheme_name for token in WATCHLIST_NAME_EXCLUSIONS):
-            return False
-        return True
+        return self._candidate_name(item.get("scheme_name", ""))
+
+    @staticmethod
+    def _candidate_name(scheme_name) -> bool:
+        scheme_name = str(scheme_name).upper()
+        return (all(token in scheme_name for token in WATCHLIST_NAME_REQUIRED)
+                and not any(token in scheme_name for token in WATCHLIST_NAME_EXCLUSIONS))
 
     def _history_proof_url(self) -> str:
         to_date = timezone.localdate()

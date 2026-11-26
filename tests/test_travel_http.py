@@ -114,6 +114,22 @@ class TravelHTTPTests(SimpleTestCase):
         self.assertLess(time.monotonic()-started,1)  # the lookup itself blocks for 2 seconds
         released.set(); self.pool_class.assert_not_called()
 
+    def test_only_an_explicit_max_seconds_extends_the_default_limit(self):
+        from unittest.mock import patch
+        self.dns.return_value=[]  # no address: the call stops at the lookup, after the time check
+        with patch('alfred_ai.services.public_http.DEFAULT_SECONDS',0):
+            with self.assertRaisesRegex(PublicHTTPError,'^timeout$'):
+                request('GET','https://example.org/')
+            with self.assertRaisesRegex(PublicHTTPError,'^unsafe_url$'):  # AMFI's minutes-long history file passes 600
+                request('GET','https://example.org/',max_seconds=30)
+        self.pool_class.assert_not_called()
+
+    def test_a_long_call_waits_longer_per_read_and_a_normal_call_does_not(self):
+        reads = lambda: self.pool_class.call_args.kwargs['timeout'].read_timeout
+        request('GET','https://example.org/'); self.assertEqual(reads(), 5)
+        self.response.read.side_effect=[b'{"ok":true}', b""]
+        request('GET','https://example.org/',max_seconds=600); self.assertEqual(reads(), 60)  # AMFI's first byte took 16 s
+
     def test_delete_no_content_and_redirect_rules_remain_enforced(self):
         self.response.status=204; self.response.headers={}; self.response.read.side_effect=[b'']
         self.assertEqual(request('DELETE','https://example.org/object',accepted_statuses=(204,)).status,204)

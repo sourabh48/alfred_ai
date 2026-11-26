@@ -87,9 +87,12 @@ Server fetches additionally validate DNS and pin the socket target below.
 
 def request(method, url, *, params=None, headers=None, json_body=None, data=None,
             content_types=("application/json", "application/geo+json", "application/sparql-results+json"),
-            max_bytes=4_000_000, accepted_statuses=(200, 201), deadline=None):
+            max_bytes=4_000_000, accepted_statuses=(200, 201), deadline=None, max_seconds=None):
     started = monotonic()
-    deadline = min(deadline, started+DEFAULT_SECONDS) if deadline is not None else started+DEFAULT_SECONDS
+    # max_seconds: only background jobs pass a longer limit (AMFI's price history takes minutes); pages keep the default.
+    limit = started + (max_seconds or DEFAULT_SECONDS)
+    step = 60 if max_seconds else 5  # per socket read; AMFI builds its history file for ~16 s before the first byte
+    deadline = min(deadline, limit) if deadline is not None else limit
     def budget():
         seconds = deadline-monotonic()
         if seconds <= 0: raise PublicHTTPError("timeout")
@@ -128,7 +131,7 @@ def request(method, url, *, params=None, headers=None, json_body=None, data=None
             outgoing["Content-Type"] = "application/x-www-form-urlencoded" if isinstance(data, dict) else "application/octet-stream"
     pool = urllib3.HTTPSConnectionPool(str(addresses[0]), port=443, server_hostname=parts.hostname,
         assert_hostname=parts.hostname, ssl_context=ssl.create_default_context(),
-        timeout=urllib3.Timeout(connect=min(5,budget()), read=min(5,budget()), total=budget()), maxsize=1, retries=False)
+        timeout=urllib3.Timeout(connect=min(5,budget()), read=min(step,budget()), total=budget()), maxsize=1, retries=False)
     response = None
     try:
         budget()
@@ -159,7 +162,7 @@ def request(method, url, *, params=None, headers=None, json_body=None, data=None
             # Tighten each socket read so a slow response cannot renew the total budget.
             connection = getattr(response, "connection", None)
             socket = getattr(connection, "sock", None)
-            if socket is not None: socket.settimeout(min(5,budget()))
+            if socket is not None: socket.settimeout(min(step,budget()))
             budget()
             chunk = response.read(min(65536, max_bytes-count+1), decode_content=False)
             budget()

@@ -12,7 +12,8 @@ from django.utils import timezone
 from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.investments.models import Investment
 from apps.investments.services.portfolio_intelligence import (
-    AMFI_FAILURE_CACHE_TTL_SECONDS, AMFI_HISTORY_URL, AMFI_OPEN_NAV_URL, portfolio_intelligence_service as service,
+    AMFI_FAILURE_CACHE_TTL_SECONDS, AMFI_HISTORY_MAX_BYTES, AMFI_HISTORY_SECONDS, AMFI_HISTORY_URL, AMFI_OPEN_NAV_URL,
+    portfolio_intelligence_service as service,
 )
 
 
@@ -168,6 +169,34 @@ class InvestmentMarketAcceptanceTests(TestCase):
         with patch.object(cache, "set", wraps=cache.set) as saved:
             self.assertEqual(service._get_amfi_latest_nav_report()["items"], [])
         self.assertEqual(saved.call_args.args[2], AMFI_FAILURE_CACHE_TTL_SECONDS)
+
+    def test_history_uses_the_long_background_limits_and_keeps_only_rows_the_page_uses(self):
+        """Live 2026-11-27: 60 days of every scheme was 48 MB and took 154 s, over the 16 MB / 20 s page limits."""
+        day = timezone.localdate() - timedelta(days=1)
+        Investment.objects.create(user=self.other, asset_type="mutual_fund", asset_name="Owned regular", amfi_scheme_code="990003",
+                                  current_value="1.00")
+        self.transport.rows += [f"990002;Synthetic Fund - Direct Plan - IDCW;A;B;10.0000;;;{day:%d-%b-%Y}",
+                                f"990003;Synthetic Fund - Regular Plan - Growth;A;B;11.0000;;;{day:%d-%b-%Y}",
+                                f"990004;Synthetic Other Fund - Regular Plan - Growth;A;B;12.0000;;;{day:%d-%b-%Y}"]
+        report = service.download_amfi_history_report(days=60)
+        method, url, options = self.transport.calls[-1]
+        self.assertEqual((url, options["max_bytes"], options["max_seconds"]), (AMFI_HISTORY_URL, AMFI_HISTORY_MAX_BYTES, AMFI_HISTORY_SECONDS))
+        self.assertEqual({row["scheme_code"] for row in report["series"]}, {"990001", "990003"})  # candidates and owned funds
+        self.assertEqual(service._get_amfi_history_report(days=60), report)  # the page then reads the kept copy
+
+    def test_natively_a_page_queues_the_history_download_once_and_never_waits_for_it(self):
+        from unittest.mock import Mock
+        queued = Mock(queued=True)
+        with patch("apps.investments.tasks.download_amfi_history", queued):
+            first, second = (service._get_amfi_history_report(days=60) for _ in range(2))
+        queued.delay.assert_called_once_with(60)
+        self.assertEqual(self.transport.calls, [])
+        self.assertEqual((first["series"], first["evidence"]["status"]), ([], "failed"))
+        self.assertIn("downloading in the background", second["evidence"]["summary"])
+        with patch("apps.investments.tasks.download_amfi_history", queued):
+            watchlist = service.build_short_horizon_watchlist(self.owner)
+        self.assertFalse(watchlist["available"])
+        self.assertTrue(watchlist["summary"].startswith("AMFI's price history (about 50 MB) is downloading"))
 
     def test_invalid_prices_never_become_observed_navs(self):
         for value in ("NaN", "Infinity", "-1", "0", "", "USD 12", "1,2", "1e9999"):

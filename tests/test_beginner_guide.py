@@ -91,6 +91,14 @@ class HoldingEvidenceTests(TestCase):
                 self.assertIn(reason, result["text"]); self.assertIn("No signal is given", result["text"])
                 self.assertNotIn("sell", result["text"].lower())
 
+    def test_no_history_at_all_says_why_and_the_empty_picks_say_why_too(self):
+        waiting = {"series": [], "evidence": {"summary": "AMFI's price history (about 50 MB) is downloading in the background. Check again in a few minutes."}}
+        with patch.object(guide.portfolio_intelligence_service, "_get_amfi_history_report", return_value=waiting):
+            result = guide.beginner_guide(self.user, {"available": False, "summary": "Synthetic watchlist reason."})
+        self.assertEqual(result["holdings"][0]["text"], "ALFRED cannot judge this fund now: AMFI's price history (about 50 MB) is "
+                         "downloading in the background. Check again in a few minutes. No signal is given.")
+        self.assertEqual(result["picks_reason"], "Synthetic watchlist reason.")
+
     def test_the_scheduled_fund_bot_stays_quiet_on_stale_history_and_speaks_on_fresh(self):
         from apps.ml_engine.services import task_bots
         target = "apps.investments.services.portfolio_intelligence.portfolio_intelligence_service._get_amfi_history_report"

@@ -78,7 +78,9 @@ def beginner_guide(user, watchlist):
     holdings = []
     if owned:
         # The watchlist has just loaded this window, so this normally reads the cache rather than downloading again.
-        history = portfolio_intelligence_service._get_amfi_history_report(days=WATCHLIST_HISTORY_DAYS)["series"]
+        report = portfolio_intelligence_service._get_amfi_history_report(days=WATCHLIST_HISTORY_DAYS)
+        history = report["series"]
+        missing = "" if history else str(report.get("evidence", {}).get("summary", "")).rstrip(".")
         codes = {item.amfi_scheme_code for item in owned}
         series, today = {}, timezone.localdate()
         for row in history:
@@ -86,6 +88,7 @@ def beginner_guide(user, watchlist):
                 series.setdefault(row["scheme_code"], []).append(row)
         for item in owned:
             navs, as_of, reason = dated_navs(series.get(item.amfi_scheme_code, []), today)
+            reason = missing or reason  # no history at all: say why (downloading, or AMFI failed), not "no recent prices"
             signal = holding_signal(navs) if navs else None
             if signal:
                 action, text = signal[0], f"{signal[1]} Based on AMFI prices up to {as_of:%d %b %Y}."
@@ -93,4 +96,5 @@ def beginner_guide(user, watchlist):
                 action, text = "unknown", f"ALFRED cannot judge this fund now: {reason or 'its prices are incomplete'}. No signal is given."
             holdings.append({"id": item.id, "name": item.asset_name, "action": action, "text": text,
                              "as_of": as_of.isoformat() if as_of else None})
-    return {"picks": picks, "holdings": holdings, "note": NOTE}
+    return {"picks": picks, "holdings": holdings, "note": NOTE,
+            "picks_reason": "" if watchlist.get("available") else watchlist.get("summary") or ""}

@@ -302,7 +302,7 @@ function renderBeginnerGuide(guide) {
             <p class="metric-caption mb-2">${Alfred.escapeHtml(pick.how)}</p>
             <button type="button" class="btn btn-outline-primary btn-sm" data-bought-code="${Alfred.escapeHtml(pick.scheme_code)}" data-bought-name="${Alfred.escapeHtml(pick.name)}">I bought this</button>
         </article>`).join("")
-        : `<div class="empty-state">No picks right now: today's official fund prices could not be checked. Try again later.</div>`);
+        : `<div class="empty-state">No picks right now. ${Alfred.escapeHtml(guide.picks_reason || "Today's official fund prices could not be checked. Try again later.")}</div>`);
     Alfred.setHTML(document.getElementById("beginnerHoldings"), holdings.length ? holdings.map(item => {
         const [label, chip] = BEGINNER_ACTION[item.action] || BEGINNER_ACTION.unknown;
         return `<li class="insight-item"><span class="${chip}">${label}</span> <strong>${Alfred.escapeHtml(item.name)}</strong>: ${Alfred.escapeHtml(item.text)}</li>`;

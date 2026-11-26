@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from alfred_ai.tasks import production_probe_task  # register the end-to-end probe
 from apps.expenses.tasks import retry_low_confidence_statement_uploads, retry_statement_upload_task
+from apps.investments.tasks import download_amfi_history  # noqa: F401  register the Investments page's background download
 from apps.integrations.tasks import (
     cleanup_verified_external_intelligence, refresh_verified_external_intelligence,
 )
@@ -93,7 +94,10 @@ def native_intelligence_refresh():
 def native_fund_value_refresh():
     # AMFI publishes the day's NAVs late in the evening; the morning run catches a late file.
     from apps.investments.services.fund_prices import refresh_fund_values
-    return refresh_fund_values()
+    from apps.investments.services.portfolio_intelligence import WATCHLIST_HISTORY_DAYS, portfolio_intelligence_service
+    result = refresh_fund_values()
+    portfolio_intelligence_service.download_amfi_history_report(days=WATCHLIST_HISTORY_DAYS)  # a failure is kept as evidence
+    return result
 
 
 @db_periodic_task(crontab(minute="45", hour="*/4"))
