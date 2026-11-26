@@ -2458,7 +2458,11 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 **IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P2.
 
 - 2026-11-19 owner decision ("Drop OpenAI completely... Use gemini"): OpenAI is removed from ALFRED; this ID keeps its intent with Google Gemini and each person's own free key (aistudio.google.com/apikey) in Settings > Online services. `GeminiReasoner` posts to `generativelanguage.googleapis.com/v1beta/models/<ALFRED_GEMINI_MODEL>:generateContent` (default `gemini-3.5-flash-lite`, configurable in config/local.env; not checked against a live key) with no tools or grounding. A leftover OpenAI key is deleted when read and its consent does not carry over. Synthetic tests: `tests.test_memory_reasoning` 13 PASS, AI answer suites 166 PASS, 11 Chrome PASS. Earlier OpenAI evidence below no longer applies to the running code.
-- Next: owner check that a failed or refused Gemini call falls back to the local answer path without leaking details.
+- 2026-11-26 live (owner's app on 2fab7b9, during the OPENAI-05 cap check): Gemini refused by the daily limit, then Ask
+  ALFRED fell back to the local model ("AI hypothesis · Ollama (local)") without an error on the page. The server log
+  line held only an error id and `ReasoningBudgetExceeded`, with no question, key or reply. Not exercised live: a
+  Gemini timeout or network failure, and Google's own refusal (the stop-code log line is synthetic-tested only).
+- Next: a live timeout or offline fallback check.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
