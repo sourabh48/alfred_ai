@@ -433,7 +433,7 @@ class PortfolioIntelligenceService:
         return "Generic"
 
     def _get_amfi_latest_nav_report(self) -> dict:
-        cache_key = "investments:amfi:latest-open-nav:v2"
+        cache_key = "investments:amfi:latest-open-nav:v3"  # v3: header-read columns
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -471,13 +471,14 @@ class PortfolioIntelligenceService:
                 status="fresh" if items else "failed",
             ),
         }
-        cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS)
+        # A file that yields no rows (a new layout) is retried like a failed download, not kept for hours.
+        cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS if items else AMFI_FAILURE_CACHE_TTL_SECONDS)
         return report
 
     def _get_amfi_history_report(self, *, days: int) -> dict:
         to_date = timezone.localdate()
         from_date = to_date - timedelta(days=days)
-        cache_key = f"investments:amfi:history:{from_date.isoformat()}:{to_date.isoformat()}:v2"
+        cache_key = f"investments:amfi:history:{from_date.isoformat()}:{to_date.isoformat()}:v3"
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -522,7 +523,7 @@ class PortfolioIntelligenceService:
                 status="fresh" if series else "failed",
             ),
         }
-        cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS)
+        cache.set(cache_key, report, AMFI_CACHE_TTL_SECONDS if series else AMFI_FAILURE_CACHE_TTL_SECONDS)
         return report
 
     def _empty_amfi_history_report(self, *, days: int, summary: str) -> dict:

@@ -12,7 +12,7 @@ from django.utils import timezone
 from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.investments.models import Investment
 from apps.investments.services.portfolio_intelligence import (
-    AMFI_HISTORY_URL, AMFI_OPEN_NAV_URL, portfolio_intelligence_service as service,
+    AMFI_FAILURE_CACHE_TTL_SECONDS, AMFI_HISTORY_URL, AMFI_OPEN_NAV_URL, portfolio_intelligence_service as service,
 )
 
 
@@ -161,6 +161,13 @@ class InvestmentMarketAcceptanceTests(TestCase):
         self.assertEqual((len(history), history[-1]["nav"], history[-1]["isin_growth"]), (61, Decimal("106.0001"), "SYNTH-ISIN-A"))
         items = service.build_short_horizon_watchlist(self.owner)["items"]
         self.assertEqual([item["scheme_code"] for item in items], ["990001"])
+
+    def test_a_file_with_no_readable_rows_is_retried_soon_not_kept_for_hours(self):
+        """Live 2026-11-26: the old parser's empty result stayed in the on-disk cache for 8 hours after the fix."""
+        self.transport.latest = "Scheme Code;Something New\nOpen Ended Schemes(Equity)\nunreadable;row"
+        with patch.object(cache, "set", wraps=cache.set) as saved:
+            self.assertEqual(service._get_amfi_latest_nav_report()["items"], [])
+        self.assertEqual(saved.call_args.args[2], AMFI_FAILURE_CACHE_TTL_SECONDS)
 
     def test_invalid_prices_never_become_observed_navs(self):
         for value in ("NaN", "Infinity", "-1", "0", "", "USD 12", "1,2", "1e9999"):
