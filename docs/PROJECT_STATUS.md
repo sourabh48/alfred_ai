@@ -2327,6 +2327,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 **IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
 
+- 2026-11-26 (live check: the bills bot showed "Bajaj Housing Financ"): the bank's ACH line cuts the payee at 20 characters. The bills bot and new loan inference now complete a cut name when it starts exactly one known lender (apps/loans/services/loan_intelligence.py `full_lender_name`); ambiguous or unknown names and stored records stay unchanged. Evidence: tests/test_task_bots.py.
+
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
 - Tests: [tests/test_hybrid_intelligence.py](../tests/test_hybrid_intelligence.py), [tests/test_persistent_memory.py](../tests/test_persistent_memory.py). Source/test presence reviewed; full execution or product accuracy not newly established. See evidence ledger for any covered synthetic scope.

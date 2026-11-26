@@ -15,6 +15,24 @@ from apps.loans.models import Loan, LoanPaymentHistory
 from apps.loans.money import loan_money, loan_money_float
 from apps.reports.services import reporting_service
 
+# Bank ACH lines cut the payee at 20 characters ("BAJAJ HOUSING FINANC"); these complete such a cut name.
+KNOWN_LENDERS = (
+    "Aditya Birla Finance", "Axis Bank", "Bajaj Finance", "Bajaj Finserv", "Bajaj Housing Finance", "Fullerton India",
+    "HDFC Bank", "ICICI Bank", "ICICI Home Finance", "IDFC First Bank", "Kotak Mahindra Bank", "L&T Finance",
+    "LIC Housing Finance", "Manappuram Finance", "Muthoot Finance", "PNB Housing Finance", "Poonawalla Fincorp",
+    "State Bank of India", "Tata Capital", "Tata Capital Housing Finance",
+)
+
+
+def full_lender_name(name: str) -> str:
+    """The known lender a cut-off name starts, when exactly one matches; otherwise the name unchanged."""
+    text = " ".join(str(name or "").split())
+    key = text.casefold()
+    if len(key) < 8 or any(known.casefold() == key for known in KNOWN_LENDERS):
+        return text
+    matches = [known for known in KNOWN_LENDERS if known.casefold().startswith(key)]
+    return matches[0] if len(matches) == 1 else text
+
 
 class LoanIntelligenceService:
     """ML-powered loan tracking and detection."""
@@ -166,7 +184,7 @@ class LoanIntelligenceService:
         # Estimate loan parameters
         emi = expense.amount
         first_payment = similar_expenses.first()
-        lender = expense.company_name or expense.merchant or "Unknown Lender"
+        lender = full_lender_name(expense.company_name or expense.merchant) or "Unknown Lender"
 
         # Estimate principal (rough approximation)
         estimated_principal = emi * 24  # Assume 2-year tenure initially
