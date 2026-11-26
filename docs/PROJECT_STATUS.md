@@ -2439,7 +2439,13 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - 2026-11-26 live (owner's app, at the owner's request): Settings > Gemini read "Today (UTC 2026-11-25): 7,133 of
   1,000,000 tokens used; spending cap USD 1.00, which applies only if billing is on for your key", with no limit boxes.
   The live refusal at the cap was not exercised (synthetic tests only).
-- Next: owner check of the daily limit in Settings with a live key.
+- 2026-11-26 live cap check (owner: "Yes, test it"), owner's app on 2fab7b9: one line
+  `ALFRED_MEMORY_REASONING_DAILY_TOKENS=1000` was added to the runtime `config/local.env`, and Settings read "0 of
+  1,000 tokens used". "What is the capital of Japan?" was not sent to Gemini: the server log shows
+  `ReasoningBudgetExceeded` before any call, and Ollama (qwen3.5:9b, 53.5 s) answered instead. The usage stayed 0. The
+  line was then removed (file checksum and permissions match the original), and after a restart Settings read
+  "0 of 1,000,000". The USD cap is still synthetic-only: it applies only with billing on, and no paid use is approved.
+- Next: the USD cap needs a billed key, which is not approved; until then this ID stays open.
 - Source: [apps/ml_engine/services/memory_reasoning.py](../apps/ml_engine/services/memory_reasoning.py), [apps/ml_engine/api/memory.py](../apps/ml_engine/api/memory.py), [alfred_ai/settings.py](../alfred_ai/settings.py).
 - APIs/UI/models: Memory reasoning/policy API; operator key configuration command; Owner reasoning policy and encrypted key; atomic local budget reservations.
 - Tests: [tests/test_memory_reasoning.py](../tests/test_memory_reasoning.py). Dated exact-source M15/M14 release regression evidence at 3932f391; technical scope only. See evidence ledger; audit reruns are separately identified.
