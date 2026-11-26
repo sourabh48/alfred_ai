@@ -344,8 +344,10 @@ class DocumentCorpusTests(TestCase):
         self.assertEqual(found['text_origin'], 'scanned_pdf_local_ocr')
         self.assertIn('maintenance', found['excerpt'].lower())
         self.assertEqual(self.corpus.original(self.owner, scanned['document']['id'])[1], scanned_bytes)
+        white = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50), 0)
+        white.clear_with(255)  # a new pixmap holds leftover memory, which OCR read as text after other tests (CI 274-276)
         with fitz.open() as blank:
-            blank.new_page().insert_image(fitz.Rect(0, 0, 200, 200), pixmap=fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 50, 50), 0))
+            blank.new_page().insert_image(fitz.Rect(0, 0, 200, 200), pixmap=white)
             empty = blank.tobytes()
         self.assertFalse(self.corpus.upload(self.owner, SimpleUploadedFile('Synthetic blank.pdf', empty), consent=True, days=1)['stored'])
         self.assertEqual(self.count(), 2)  # nothing readable: nothing kept
