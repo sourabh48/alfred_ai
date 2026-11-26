@@ -77,6 +77,8 @@ class LegalAssistantTests(SimpleTestCase):
         self.assertEqual(found("What is the punishment under IPC 302?"), [103])
         self.assertEqual(found("Explain section 103 BNS"), [103])
         self.assertEqual(found("What is a good hobby?"), [])
+        [cheating, *_] = law.sections("A man took money online promising a job and vanished; what is the punishment for cheating?")
+        self.assertIn("seven years", cheating["data"]["text"])  # the punishment clauses come after long illustrations
         [source] = law.sections("What is the punishment under IPC 302?")
         self.assertEqual((source["ref"], source["classification"]), ("law-1", "statute_section"))
 
@@ -228,6 +230,13 @@ class HybridWebLookupTests(TestCase):
         self.assertEqual(result["answer_style"], "detailed")
         self.assertFalse(result["narrative_withheld"])
         self.assertIn("law-1", [s["ref"] for s in result["sources"]])
+        # Live 2026-11-26: the owner's own figure may be repeated; a figure from nowhere is still withheld.
+        self.local.reason.return_value = "Taking 50,000 rupees by a false job promise is cheating [law-1]; up to seven years and fine."
+        self.assertFalse(self.ask("A man took 50,000 rupees promising a job and vanished. Is it cheating?")["narrative_withheld"])
+        self.local.reason.return_value = "Taking 50,000 rupees by a false job promise is cheating [ref: law-1]; up to seven years."
+        self.assertFalse(self.ask("A man took 50,000 rupees promising a job and vanished. Is it cheating?")["narrative_withheld"])
+        self.local.reason.return_value = "Taking 80,000 rupees by a false job promise is cheating [law-1]."
+        self.assertTrue(self.ask("A man took 50,000 rupees promising a job and vanished. Is it cheating?")["narrative_withheld"])
         self.local.reason.return_value = "Synthetic general answer."
         self.assertFalse(any(s.get("classification") == "statute_section" for s in self.ask("What is a good hobby?")["sources"]))
         self.assertFalse(any(s.get("classification") == "statute_section" for s in self.ask("Explain IPC 302", scope="finance")["sources"]))

@@ -119,6 +119,7 @@ class OllamaReasoner(OllamaEmbeddings):
                and prompt_bytes<=context_bytes(num_ctx,max_output_tokens+thinking_tokens()))
         self.thought=think
         num_predict=max_output_tokens+(thinking_tokens() if think else 0)
+        law_sources=any(s.get('classification')=='statute_section' for s in payload.get('sources',[]))
         body={'model':self.model,'stream':False,'think':think,'keep_alive':KEEP_ALIVE,
             'options':{'num_predict':num_predict,'num_ctx':num_ctx,'temperature':0},
             'messages':[{'role':'system','content':
@@ -139,7 +140,8 @@ class OllamaReasoner(OllamaEmbeddings):
                 'Sources classified public_web_result are public information from the named website, not personal facts or advice; '
                 'when you use one, cite its ref in brackets such as [web-1], and quote any figure exactly as that result shows it. '
                 'For current figures prefer the most recent dated result and give its date; encyclopedia text may be out of date. '
-                'When public_web_result sources are supplied, explain in full in '+SECTIONS+' '
+                + (('Public web results are supplied: explain in full in '+SECTIONS+' ')  # only then, or a legal answer copies it
+                   if any(s.get('classification')=='public_web_result' for s in payload.get('sources',[])) and not law_sources else '') +
                 'Only canonical financial tool data is authoritative; do not calculate or invent financial values. '
                 'You may state a monetary amount only when it is copied exactly from a supplied source amount, written as digits '
                 'with that source ref in brackets beside it and its recorded currency code if it has one. Never calculate, total, '
@@ -147,7 +149,7 @@ class OllamaReasoner(OllamaEmbeddings):
                 'If sources do not establish a requested personal or document fact, say it is unavailable. '
                 'Never infer an account number, loan balance, date or evidence from missing context. '
                 'Label advice and uncertain conclusions as hypotheses. Use word labels for lists. Never invoke tools or change records. '
-                + (LAW_INSTRUCTIONS if any(s.get('classification')=='statute_section' for s in payload.get('sources',[])) else '')
+                + (LAW_INSTRUCTIONS if law_sources else '')
                 + ANSWER_STYLES[style][1]},
                 {'role':'user','content':json.dumps(payload,ensure_ascii=False,allow_nan=False)}]}
         if len(body['messages'][1]['content'].encode())>context_bytes(num_ctx,num_predict): raise ValueError('Local context exceeds its limit.')
@@ -314,21 +316,23 @@ def _cited_record_figures(answer, sources):
     return all(_decimal(token) in allowed for token in NUMBER.findall(claims))
 
 
-def _cited_web_figures(answer, sources):
-    """True when the answer cites a web result and every figure in it appears in a cited result's own text."""
+def _cited_web_figures(answer, sources, asked=''):
+    """True when the answer cites a web result and every figure in it appears in a cited result's own text or in the
+    question itself ("took 50,000 rupees": the owner's own figure, repeated)."""
     texts = {str(s['ref']): ' '.join(str(value) for value in s['data'].values()) for s in sources  # article and section text too
              if s.get('classification') in ('public_web_result', 'statute_section') and isinstance(s.get('data'), dict)}
+    answer = re.sub(r'\[(?:ref|source):\s*', '[', answer)  # "[ref: law-1]", as the local model sometimes writes it
     cited = [ref for ref in texts if '[' + ref + ']' in answer]
     if not cited:
         return False
     claims = answer
     for ref in sorted(texts, key=len, reverse=True):
         claims = claims.replace('[' + ref + ']', '')
-    shown = {_decimal(token) for ref in cited for token in NUMBER.findall(texts[ref])}
+    shown = {_decimal(token) for text in [asked] + [texts[ref] for ref in cited] for token in NUMBER.findall(text)}
     return all(_decimal(token) in shown for token in NUMBER.findall(claims))
 
 
-def present_answer(result,scope,query=''):
+def present_answer(result,scope,query='',asked=''):
     # Financial models currently have no currency column; never infer it from model prose or OCR.
     claims=result['answer']
     for source in result.get('sources',[]): claims=claims.replace(str(source['ref']),'')
@@ -340,7 +344,7 @@ def present_answer(result,scope,query=''):
     # Owner decision 2026-11-12: figures copied from the owner's own records and cited to them may stay.
     if withheld and result.get('provider')=='ollama' and _cited_record_figures(result['answer'],result.get('sources',[])):
         withheld=False; result['cited_record_figures']=True
-    if withheld and scope=='general' and _cited_web_figures(result['answer'],result.get('sources',[])):
+    if withheld and scope=='general' and _cited_web_figures(result['answer'],result.get('sources',[]),asked):
         withheld=False; result['cited_web_figures']=True
     if withheld:
         result['answer']='The numerical or currency claims in the AI narrative were withheld. Review the recorded values and evidence below; missing currency or financial evidence cannot be inferred.'
@@ -483,7 +487,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
     law=law_lookup.sections(query) if scope=='general' else []  # public statute text read on this PC (owner 2026-11-26)
     if provider=='gemini':
         result=present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=law+web,searched=searched_text(searched) if web else None),scope,query)
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=law+web,searched=searched_text(searched) if web else None),scope,query,asked=query)
         if web: result['web_search_text']=searched_text(searched)
         if web_lookup.clearly_public(query) and isinstance(result.get('answer'),str) and result['answer'].strip():
             from .brain import try_remember  # Gemini teaches the local model (owner decision 2026-11-20); kept encrypted on this PC
@@ -560,7 +564,7 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
                 'narrative_withheld':False,'context_omitted':0,'memory_retrieval_available':None}
         if not cloud_consent or query_sensitivity!='public' or scope!='general': raise
         return present_answer(reason_with_memory(store,user,query,consent=True,query_sensitivity='public',provider=reasoning_provider(store,user),
-            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=law+web),scope,query)
+            daily_tokens=settings.ALFRED_MEMORY_REASONING_DAILY_TOKENS,daily_microusd=settings.ALFRED_MEMORY_REASONING_DAILY_MICROUSD,web_results=law+web),scope,query,asked=query)
     if scope!='financial_document':
         with store._transaction() as db:
             store._expire(db,owner)
@@ -578,4 +582,4 @@ def hybrid_answer(store,user,query,*,scope='general',document_id=None,transactio
         'sources':[{'ref':item['id'],'classification':'owner_verified_statement','provenance':item['provenance'],
             'url':f"/settings/#memory-{item['id']}",'verified_at':item['verified_at'],
             'score':item['score']} for item in included]+tools+law+web,'context_omitted':len(memories)-len(included),
-        'conversation_context_turns':len(history)//2,'skill_used':skill['name'] if skill else None},scope,query+' '+ ' '.join(turn['content'] for turn in history))
+        'conversation_context_turns':len(history)//2,'skill_used':skill['name'] if skill else None},scope,query+' '+ ' '.join(turn['content'] for turn in history),asked=query)

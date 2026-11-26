@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 
 FILE = Path(__file__).resolve().parents[1] / "data" / "bns_2023.json"
-SECTION_CHARS = 3000  # the longest offence sections; Definitions (s. 2) is cut
+SECTION_CHARS = 9000  # whole offence sections, with the punishment clauses after the illustrations; only s. 2 is cut
 LIMIT = 4
 
 LEGAL = re.compile(
@@ -111,5 +111,7 @@ INSTRUCTIONS = (
     'saying which facts are missing or unclear), Likely outcome and punishment (only as the section text states it; the real result '
     'depends on the evidence and the court), What would change it (facts or defences that matter), Next steps (practical steps such '
     'as a police complaint or FIR, keeping evidence, a lawyer or free legal aid) and Note (general information, not legal advice). '
-    'If web results are also supplied, add What was searched and What was found after Answer. Quote only section numbers, terms of '
-    'punishment and amounts that the supplied sources state, with their refs. Say plainly when no supplied section fits the facts. ')
+    'If web results are also supplied, add What was searched and What was found after Answer. Name only the sections supplied '
+    '(their section and ipc fields): never another section number, even one you remember, since the whole answer is hidden if it '
+    'names one. Quote terms of punishment and amounts exactly as the supplied sources state them, with their refs. Say plainly '
+    'when no supplied section fits the facts. ')
