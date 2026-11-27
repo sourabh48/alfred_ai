@@ -295,7 +295,7 @@ function renderBeginnerGuide(guide) {
     const picks = Array.isArray(guide.picks) ? guide.picks : [], holdings = Array.isArray(guide.holdings) ? guide.holdings : [];
     Alfred.setHTML(document.getElementById("beginnerPicks"), picks.length ? picks.map(pick => `
         <article class="metric-card">
-            <p class="metric-kicker mb-1">${Alfred.escapeHtml(pick.kind || "Fund")} · ${Alfred.escapeHtml(pick.risk)} risk</p>
+            <p class="metric-kicker mb-1">${Alfred.escapeHtml(pick.kind || "Fund")} · ${Alfred.escapeHtml(pick.risk)} price swings</p>
             <h3 class="investment-watch-title mb-1">${Alfred.escapeHtml(pick.name)}</h3>
             <p class="metric-caption mb-2">${Alfred.escapeHtml(pick.fund_house || "")} · price ₹${Alfred.escapeHtml(pick.nav)} on ${Alfred.escapeHtml(pick.nav_date)}</p>
             <p class="mb-1">${Alfred.escapeHtml(pick.why)}</p>

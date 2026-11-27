@@ -250,6 +250,14 @@ class AssistantActionTests(TestCase):
         mine.refresh_from_db(); theirs.refresh_from_db()
         self.assertEqual((mine.saved_amount, theirs.saved_amount), (Decimal("250.10"), Decimal("0")))
 
+    def test_update_finds_a_goal_whose_name_ends_in_goal(self):
+        """Live 2026-11-27: \"update TEST chat goal saved to 10000\" looked for \"TEST chat\"."""
+        goal = SavingsGoal.objects.create(user=self.owner, name="Car goal", target_amount="1000.00")
+        self.assertEqual(propose(self.owner, "update car goal saved to 10", TODAY)["fields"], {"id": goal.pk, "saved_amount": "10.00"})
+        SavingsGoal.objects.create(user=self.owner, name="Car", target_amount="1000.00")
+        with self.assertRaises(ActionError):  # "Car" and "Car goal" both match: ambiguous, nothing proposed
+            propose(self.owner, "update car goal saved to 10", TODAY)
+
     def test_unknown_actions_and_invalid_values_are_refused(self):
         for payload in ({"action": "transfer_money", "fields": {"amount": "5"}, "confirmed": True},
                         {"action": "create_savings_goal", "fields": {"name": "X", "target_amount": "-1"}, "confirmed": True},

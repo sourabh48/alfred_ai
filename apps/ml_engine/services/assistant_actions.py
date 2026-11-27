@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 
@@ -122,7 +123,8 @@ def propose(user, text, today=None):
                 "depends_on": [f"No savings goal named \"{name}\" yet"]}
     if match := UPDATE.match(text):
         name = match.group("name").strip()
-        goals = list(SavingsGoal.objects.filter(user=user, name__iexact=name)[:2])
+        # The pattern's optional "goal" word also ends names such as "Car goal": try both; two matches stay ambiguous.
+        goals = list(SavingsGoal.objects.filter(Q(name__iexact=name) | Q(name__iexact=f"{name} goal"), user=user)[:2])
         if len(goals) != 1:
             raise ActionError(f"I found {'no' if not goals else 'more than one'} savings goal named \"{name}\". Check the name on Budgets.")
         saved = _amount(match, "saved")

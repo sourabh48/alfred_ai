@@ -20,6 +20,7 @@ NOTE = ("A guide built from official AMFI prices, not financial advice. Past pri
 
 
 def _risk_word(volatility):
+    # Shown as "price swings": it is the last 60 days' volatility, not the category risk Portfolio guidance uses.
     return "Low" if volatility < 3 else "Medium" if volatility < 6 else "High"
 
 
