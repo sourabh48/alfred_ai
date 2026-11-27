@@ -8,7 +8,7 @@ from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth import get_user_model
 from django.test import Client, SimpleTestCase, TestCase, override_settings
@@ -27,11 +27,21 @@ PASS = "four unrelated synthetic words"
 
 
 class ObjectR2Wire(MultipartR2Wire):
-    """Adds plain object PUT, whole GET (404 when missing) and object DELETE to the signed multipart wire."""
+    """Adds plain object PUT, whole GET (404 when missing), object DELETE and the unfinished-upload list to the signed wire."""
+
+    def __init__(self):
+        super().__init__()
+        self.started = {}  # upload id -> (key, initiated), for uploads the test leaves unfinished
 
     def request(self, method, url, *, headers, data=None, accepted_statuses=(200,), **kwargs):
         parts = urlsplit(url); key = parts.path.lstrip("/").partition("/")[2]
         outgoing = {k.lower(): v for k, v in headers.items()}
+        if method == "GET" and not key and "uploads" in parse_qs(parts.query, keep_blank_values=True):
+            super().request(method, url, headers=headers, data=data, accepted_statuses=accepted_statuses, **kwargs)  # signature
+            rows = "".join(f"<Upload><Key>{k}</Key><UploadId>{u}</UploadId><Initiated>{t}</Initiated></Upload>"
+                           for u, (k, t) in self.started.items() if u in self.uploads)
+            return PublicResponse(f'<ListMultipartUploadsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">{rows}'
+                                  '</ListMultipartUploadsResult>'.encode(), "application/xml", 200)
         if parts.query or not key or (method == "GET" and "range" in outgoing) or method == "POST":
             return super().request(method, url, headers=headers, data=data, accepted_statuses=accepted_statuses, **kwargs)
         self.calls.append((method, parts.path, ""))
@@ -177,6 +187,68 @@ class NightlyBackupTests(R2Setup):
         auto = backup_key.status()["auto"]
         self.assertTrue(auto["last_ok"] and "tries again" in auto["error"])
         self.assertNotIn(str(self.root), auto["error"])
+
+    def stored(self):
+        return sum(map(len, self.wire.objects.values())) + sum(len(p) for upload in self.wire.uploads.values() for p in upload.values())
+
+    def watch_peak(self):
+        """The most the bucket ever held, checked after every request, unfinished parts included."""
+        inner, self.peak = self.wire.request, 0
+        def request(*args, **kwargs):
+            try:
+                return inner(*args, **kwargs)
+            finally:
+                self.peak = max(self.peak, self.stored())
+        self.enterContext(patch("apps.ml_engine.services.memory_r2.request", request))
+
+    def test_the_bucket_never_holds_more_than_the_free_storage_even_while_uploading(self):
+        self.ready()
+        size = len(self.wire.objects[cloud_backup.PREFIX + auto_backup.run(self.client)["archive_sha256"] + ".zip"])
+        manual = cloud_backup.PREFIX + "f" * 64 + ".zip"
+        self.wire.objects[manual] = b"h" * (size // 2)  # a hand upload counts against the free storage too
+        limit = self.stored() + 2 * size + size // 4  # room for about three nightly copies beside the hand upload
+        self.enterContext(patch.object(cloud_backup, "FREE_STORAGE", limit))
+        self.watch_peak()
+        with patch.object(auto_backup, "datetime", Clock()):
+            digests = [auto_backup.run(self.client)["archive_sha256"] for _ in range(5)]
+        self.assertLessEqual(self.peak, limit)
+        self.assertIn(manual, self.wire.objects)  # never touched
+        self.assertIn(cloud_backup.PREFIX + digests[-1] + ".zip", self.wire.objects)
+        self.assertEqual(backup_key.status()["auto"]["error"], "")
+
+    def test_a_backup_that_cannot_fit_is_not_uploaded_and_the_last_good_one_stays(self):
+        self.ready()
+        first = auto_backup.run(self.client)["archive_sha256"]
+        self.enterContext(patch.object(cloud_backup, "FREE_STORAGE", self.stored() + 100))
+        with patch.object(auto_backup, "datetime", Clock()), self.assertRaises(cloud_backup.GateError):
+            auto_backup.run(self.client)
+        self.assertEqual(self.archives(), [cloud_backup.PREFIX + first + ".zip"])
+        auto = backup_key.status()["auto"]
+        self.assertIn("past its free 9 GB", auto["error"])
+        self.assertEqual(auto_backup.status()["tries"]["count"], 1)  # a refusal before any part went up is not a try
+
+    def test_a_cut_off_upload_is_cleared_and_a_running_one_waits(self):
+        self.ready()
+        name = cloud_backup.PREFIX + "a" * 64 + ".zip"
+        self.wire.uploads["cut-off"] = {1: b"x" * 500}
+        self.wire.started["cut-off"] = (name, "2026-01-01T00:00:00.000Z")
+        self.assertEqual(auto_backup.run(self.client)["status"], "saved")
+        self.assertNotIn("cut-off", self.wire.uploads)
+        self.wire.uploads["running"] = {1: b"x" * 500}
+        self.wire.started["running"] = (name, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+        with patch.object(auto_backup, "datetime", Clock()), self.assertRaises(cloud_backup.GateError):
+            auto_backup.run(self.client)
+        self.assertIn("running", self.wire.uploads)
+        self.assertIn("still running", backup_key.status()["auto"]["error"])
+
+    def test_tries_stop_for_the_month_far_below_the_free_million_writes(self):
+        largest_try = cloud_backup.FREE_STORAGE // (8 * 1024 * 1024) + 20  # parts at the real 8 MiB size, plus the other calls
+        self.assertLess(auto_backup.MONTHLY_TRIES * largest_try, 100_000)
+        self.ready()
+        auto_backup._record(tries={"month": datetime.now(timezone.utc).strftime("%Y-%m"), "count": auto_backup.MONTHLY_TRIES})
+        self.assertEqual(auto_backup.run(self.client), {"status": "monthly_limit"})
+        self.assertEqual(self.archives(), [])
+        self.assertIn("next month", backup_key.status()["auto"]["error"])
 
     def test_the_backup_folder_sits_beside_the_data_folder(self):
         self.assertEqual(auto_backup.nightly_folder(), self.root / "runtime-backups" / "nightly")

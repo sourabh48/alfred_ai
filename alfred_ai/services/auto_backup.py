@@ -3,7 +3,10 @@
 Done "like most financial applications": one archive of everything, made while ALFRED runs, encrypted with the backup key
 before it leaves the PC, then read back from R2 and hash-checked. Each person's data stays theirs because a restored ALFRED
 keeps its sign-in and owner checks. R2 keeps the newest 7 nightly archives and this PC the newest one; an older one is
-removed only after a newer one is verified in R2, and archives uploaded by hand are never touched. Nothing runs until R2 is
+removed only after a newer one is verified in R2, and archives uploaded by hand are never touched. The bucket always stays
+inside Cloudflare's free allowance (owner 2026-11-27, "keep under limit always"): before an upload the oldest nightly copies
+make room, the newest verified one always stays, and an archive that still does not fit is not uploaded; tries are capped
+each month so writes stay far below the free million. Nothing runs until R2 is
 set up, the owner turned cloud backup on, and the backup key's locked copy is saved off this PC: an archive that only this
 PC could open would be lost with it.
 """
@@ -25,7 +28,11 @@ from alfred_ai.services import backup_key
 
 logger = logging.getLogger(__name__)
 KEEP = 7
-FREE_BYTES = 9 * 1024 ** 3  # stays inside R2's 10 GB free storage
+MONTHLY_TRIES = 60  # a try is at most 1,152 parts plus a few calls: about 70,000 of R2's free 1 million writes a month
+FRIENDLY = {
+    "free_storage_full": "This backup would take R2 past its free 9 GB, so it was not uploaded; the newest backup in R2 is kept",
+    "another_cloud_upload_running": "Another upload to R2 is still running",
+}
 STAMP = re.compile(r"\d{8}T\d{6}Z")
 
 
@@ -77,15 +84,25 @@ def _run(client):
     except cloud_backup.GateError:
         _record(error="Cloudflare R2 is not set up yet (config/local.env).")
         return {"status": "not_set_up"}
+    month = now.strftime("%Y-%m")
+    tries = status().get("tries") or {}
+    count = tries.get("count", 0) if tries.get("month") == month else 0
+    if count >= MONTHLY_TRIES:
+        _record(error=f"{MONTHLY_TRIES} backup tries this month already, so ALFRED waits for next month to keep R2 free. "
+                      "The newest backup in R2 is kept.")
+        return {"status": "monthly_limit"}
+    _record(tries={"month": month, "count": count + 1})
     root = nightly_folder()
     destination = root / now.strftime("%Y%m%dT%H%M%SZ")
     try:
         cloud_backup.create(runtime(), destination, backup_key.key_path(), live=True)
         shutil.rmtree(destination / "independent-local-restore")  # the check's plain copy is not kept
+        public = json.loads((destination / "backup.json").read_text(encoding="utf-8"))
+        _make_room(client, public["archive_sha256"], public["archive_bytes"])
         receipt = cloud_backup.upload(destination, backup_key.key_path(), recovery_copy_confirmed=True, client=client)
         digest = receipt["archive_sha256"]
         history = [digest] + [d for d in status().get("history", []) if d != digest]
-        keep = max(1, min(KEEP, FREE_BYTES // max(receipt["archive_bytes"], 1)))
+        keep = max(1, min(KEEP, cloud_backup.FREE_STORAGE // max(receipt["archive_bytes"], 1)))
         remote = cloud_backup.listing(client)
         for old in history[keep:]:
             if old in remote:
@@ -96,6 +113,9 @@ def _run(client):
         if destination.parent == root and destination.exists():  # this run's own unfinished folder, with any plain scratch copy
             shutil.rmtree(destination, ignore_errors=True)
         reason = str(exc) if isinstance(exc, (cloud_backup.GateError, SyncUnavailable)) else type(exc).__name__  # never raw paths or data
+        if reason in FRIENDLY:  # refused before any part went up: not a try against the monthly cap
+            reason = FRIENDLY[reason]
+            _record(tries={"month": month, "count": count})
         _record(last_try=now.strftime("%Y-%m-%d %H:%M UTC"), error=f"{reason.rstrip('.')}. ALFRED tries again within the hour.")
         logger.warning("Nightly backup failed (%s)", type(exc).__name__)
         raise
@@ -105,6 +125,22 @@ def _run(client):
     _record(last_ok=now.strftime("%Y-%m-%d %H:%M UTC"), last_try=now.strftime("%Y-%m-%d %H:%M UTC"), error="",
             history=history, kept=len(history), bytes=receipt["archive_bytes"])
     return {"status": "saved", "archive_sha256": digest, "kept": len(history)}
+
+
+def _make_room(client, digest, size):
+    """Before an upload, the oldest nightly copies go until it fits R2's free storage; the newest verified one always stays."""
+    from scripts import cloud_backup
+    remote = cloud_backup.listing(client)
+    if digest in remote:
+        return
+    history = [d for d in status().get("history", []) if d in remote]
+    room = cloud_backup.FREE_STORAGE - cloud_backup.stored_bytes(client)
+    while size > room and len(history) > 1:
+        old = history.pop()
+        client._send("DELETE", cloud_backup.PREFIX + old + ".zip", deadline=cloud_backup.seconds(), maximum=64 * 1024,
+                     statuses=(204,))
+        room += remote[old][0]
+    _record(history=history)
 
 
 @shared_task

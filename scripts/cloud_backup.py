@@ -9,7 +9,7 @@ Every upload is read back from R2 and hash-checked before it counts as an off-de
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -27,7 +27,9 @@ from scripts import release_recovery as recovery
 GateError = recovery.release.GateError
 PREFIX = "alfred-backup-v1/"
 PART = 8 * 1024 * 1024  # R2 multipart parts must be equal-sized (min 5 MiB) except the last
-MAX_ARCHIVE = 9 * 1024 ** 3  # stays inside R2's 10 GB free storage
+FREE_STORAGE = 9 * 1024 ** 3  # every object in the bucket together stays inside R2's 10 GB free storage
+MAX_ARCHIVE = FREE_STORAGE
+STALE_UPLOAD = timedelta(hours=6)  # an unfinished upload older than this was cut off (crash, power loss), not running
 MAX_PARTS = 10000
 
 
@@ -74,6 +76,35 @@ def listing(client):
         if match and size.isdigit():
             result[match.group(1)] = (int(size), row.findtext(tag(root, "LastModified")) or "")
     return result
+
+
+def stored_bytes(client):
+    """Every object in the bucket, the locked key copy and hand uploads included: R2's free storage counts them all."""
+    root = xml(client._send("GET", query={"list-type": "2", "prefix": "", "max-keys": "1000"},
+                            deadline=seconds(), maximum=1024 * 1024))
+    if (root.findtext(tag(root, "IsTruncated")) or "").strip().lower() == "true":
+        raise GateError("cloud_listing_truncated")
+    sizes = [row.findtext(tag(root, "Size")) or "" for row in root.findall(tag(root, "Contents"))]
+    if not all(size.isdigit() for size in sizes):
+        raise GateError("invalid_cloud_listing")
+    return sum(map(int, sizes))
+
+
+def clear_unfinished_uploads(client, now=None):
+    """R2 bills the parts of an upload that never finished: drop the ones a crash left behind; refuse while one is running."""
+    root = xml(client._send("GET", query={"uploads": "", "prefix": PREFIX}, deadline=seconds(), maximum=1024 * 1024))
+    now = now or datetime.now(timezone.utc)
+    for row in root.findall(tag(root, "Upload")):
+        key, upload_id, started = (row.findtext(tag(root, name)) or "" for name in ("Key", "UploadId", "Initiated"))
+        try:
+            begun = datetime.fromisoformat(started.replace("Z", "+00:00"))
+        except ValueError:
+            begun = None
+        if begun and now - begun < STALE_UPLOAD:
+            raise GateError("another_cloud_upload_running")
+        if not key.startswith(PREFIX) or not re.fullmatch(r"[A-Za-z0-9._~+/=-]{1,1024}", upload_id):
+            raise GateError("invalid_cloud_listing")
+        client._send("DELETE", key, query={"uploadId": upload_id}, deadline=seconds(), maximum=64 * 1024, statuses=(204,))
 
 
 def chunks(client, digest, size):
@@ -125,6 +156,9 @@ def upload(backup, key_file, *, recovery_copy_confirmed, client=None):
     name = PREFIX + digest + ".zip"
     already = listing(client).get(digest)
     if not already:
+        clear_unfinished_uploads(client)
+        if stored_bytes(client) + size > FREE_STORAGE:
+            raise GateError("free_storage_full")
         upload_id = xml(client._send("POST", name, query={"uploads": ""}, headers={"content-type": "application/octet-stream"},
                                      deadline=seconds(), maximum=64 * 1024)).findtext("{*}UploadId") or ""
         if not re.fullmatch(r"[A-Za-z0-9._~+/=-]{1,1024}", upload_id):

@@ -3337,6 +3337,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: HDD copy user reported; portable independent key/restore unverified. Historical M15 waiver does not extend to future releases. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Wait for explicit recoverable method/acceptance without repeated cancelled dialogs.
+- 2026-11-27 (owner: "keep under limit always"): the R2 bucket stays inside Cloudflare's free allowance at every moment. `cloud_backup.upload` (nightly, Back up now and by hand) clears unfinished uploads older than 6 hours (their parts are billed), refuses while a newer one is running, and refuses when every object in the bucket (key copy and hand uploads included) plus the new archive would pass 9 GiB; the nightly job first removes its oldest copies, never the newest verified one, and stops after 60 tries a month (at most about 70,000 of the free million Class A writes; a refusal before any part goes up is not a try). Settings says why in plain words. `tests.test_auto_backup` 4 new (peak bucket size checked after every request, unfinished parts included; a mutation without the pruning fails it); backup, recovery and R2 suites 113 PASS. Synthetic only; no live R2 yet.
 
 ### RUNTIME-09 — Filesystem protection of private DB/config
 

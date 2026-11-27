@@ -275,6 +275,10 @@ Each backup (ALFRED stopped first):
 ```
 
 The archive is encrypted on the PC, uploaded, read back from R2 and hash-checked. `list` shows what is in the bucket.
+The bucket always stays inside Cloudflare's free allowance: every upload first clears parts that a cut-off upload left
+behind and is refused when everything in the bucket plus the new archive would pass 9 GB; the nightly backup removes its
+oldest copies first (never the newest verified one) and stops for the month after 60 tries (at most about 70,000 of the
+free million writes).
 
 New PC after a loss: install ALFRED, start it with a new empty data folder, sign in with Google, open Settings >
 Backup key, press "New PC: fetch the locked copy from Google Drive" and type the passphrase. Then download and restore

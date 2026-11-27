@@ -3,6 +3,7 @@
 ## Backup and Gemini (owner 2026-11-27, "Finish this too")
 - OPENAI-02 live on d4f61fb: Gemini (your key) answered a public question with `gemini-3.5-flash-lite` (default; enforced by the modelVersion check); AI Studio free tier 15 RPM / 250K TPM / 500 RPD, 28-day peaks 13 / 12.03K / 84. COMPLETE_VERIFIED, 101/143.
 - RUNTIME-08 / SYNC-09 wait on the owner: no backup key yet and R2 not connected (Settings > Backup key). R2 needs a Cloudflare R2 subscription checkout (free monthly allowance, then usage billing); the data folder is 3.37 GB (artifacts 2.98), and the nightly job keeps only as many archives as fit the free 10 GB. After the owner connects R2 and makes the key: Back up now, save the locked copy to R2, then restore into a new empty folder with scripts/cloud_backup.py download and scripts/release_recovery.py.
+- Owner "keep under limit always": uploads now never take the bucket past 9 GiB (unfinished parts cleared, oldest nightly copies pruned first, newest verified kept, 60 tries a month); see RUNTIME-08. 113 backup/recovery tests PASS; local, not pushed.
 
 ## Owner checks 2026-11-27 ("complete these", "check with dummy") — local, not pushed
 - Live in the owner's app on c78677a (TEST records): FIN-15, FIN-06, DOC-09, AI-10, AI-18, CAREER-07 and TRAVEL-20 passed and are COMPLETE_VERIFIED by the owner's delegation; INV-07 too (owner: "changing their status is your call"). INV-05 stays: its Yahoo stock half was not checked. 0/13 extensions.
