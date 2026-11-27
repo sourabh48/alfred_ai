@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 104/143 (72.7%) verified.**
+**Baseline: 105/143 (73.4%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 104 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 105 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -825,7 +825,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 2 | 0 | 0 | 0 | 0 |
-| SYNC | 9 | 11 | 81.8 | 1 | 0 | 0 | 0 | 1 |
+| SYNC | 10 | 11 | 90.9 | 0 | 0 | 0 | 0 | 1 |
 | RUNTIME | 13 | 16 | 81.2 | 2 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
 
@@ -2612,7 +2612,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-10 — Real provider activation, costs and IAM acceptance
 
-**IMPLEMENTED_NOT_ACCEPTED** · Encrypted intelligence synchronization · P2.
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
 
 - 2026-11-19 owner decision: Cloudflare R2 free tier is the provider (no AWS, no paid plan). Approval is given; what remains is outside ALFRED: the owner creates the free account, one bucket and a bucket-only token and puts them in the data folder's config/local.env (never in chat). Then one live upload and read-back.
 - Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
@@ -2622,6 +2622,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Real sync remains disabled; region/bucket/account and spending/least-privilege acceptance not selected. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Obtain provider selection and separate synthetic-only authorization.
 - Live check 2026-11-27 (owner: "Check SYNC-10/11"): provider is the owner's Cloudflare R2 bucket alfred-backup on the $0 R2 plan (10 GB, 1M Class A, 10M Class B a month), connected through Settings (values checked with Cloudflare, kept only in the data folder's config/local.env). Live upload and read-back passed (the locked key copy and the full backup). Costs: ALFRED keeps everything in the bucket under 9 GiB and at most 60 backup tries a month (32d1ec6). Least privilege: the token reads and writes alfred-backup, and R2 refused it a ListBuckets call on the account (authorization_failed), so it is limited to that bucket. Private-memory sync to R2 stays off (ALFRED_MEMORY_SYNC_PROVIDER and ALFRED_MEMORY_CLOUD_AUTHORIZED unset); the chats and training data travel only inside the encrypted backup, as decided 2026-11-20. Open: the owner confirms the earlier all-buckets token, whose keys were shown in chat, is deleted in Cloudflare.
+- Owner acceptance 2026-11-27 (owner: "Yes, deleted"): the owner confirmed the earlier all-buckets R2 token is deleted in Cloudflare, so only the bucket-only token checked above remains. The deletion is the owner's word; it was not tested, because that would mean using the keys shown in chat.
 
 ### SYNC-11 — Full application/cloud backup
 
