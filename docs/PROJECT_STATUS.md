@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 90/143 (62.9%) verified.**
+**Baseline: 98/143 (68.5%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 30 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 90 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 22 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 98 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -814,13 +814,13 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| FIN | 12 | 17 | 70.6 | 2 | 2 | 0 | 0 | 0 |
+| FIN | 14 | 17 | 82.4 | 0 | 2 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
-| INV | 3 | 8 | 37.5 | 5 | 0 | 0 | 0 | 0 |
-| DOC | 7 | 9 | 77.8 | 1 | 1 | 0 | 0 | 0 |
-| AI | 11 | 18 | 61.1 | 5 | 2 | 0 | 0 | 0 |
-| CAREER | 5 | 8 | 62.5 | 2 | 1 | 0 | 0 | 0 |
-| TRAVEL | 12 | 23 | 52.2 | 4 | 3 | 1 | 0 | 3 |
+| INV | 4 | 8 | 50.0 | 4 | 0 | 0 | 0 | 0 |
+| DOC | 8 | 9 | 88.9 | 0 | 1 | 0 | 0 | 0 |
+| AI | 13 | 18 | 72.2 | 3 | 2 | 0 | 0 | 0 |
+| CAREER | 6 | 8 | 75.0 | 1 | 1 | 0 | 0 | 0 |
+| TRAVEL | 13 | 23 | 56.5 | 3 | 3 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
@@ -1690,7 +1690,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-06 — Persisted savings goals and progress workflow
 
-**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P2.
+**COMPLETE_VERIFIED** · Personal finance · P2.
 
 - Source: [apps/expenses/services/financial_intelligence.py](../apps/expenses/services/financial_intelligence.py), [apps/expenses/urls.py](../apps/expenses/urls.py), [apps/expenses/models.py](../apps/expenses/models.py).
 - APIs/UI/models: /expenses/; /api/expenses/ (see urls.py); User, Expense, BankAccount, Loan, Investment; canonical baseline.
@@ -1700,6 +1700,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - SCOPED_IMPLEMENTATION 2026-11-06: new `SavingsGoal` (migration budgets 0003) with name, INR target, saved-so-far and optional target date, using the existing Budget Decimal money field. Owner-only `/api/budgets/goals/` list/create/update/delete. Progress is owner-entered, not matched transactions; the monthly amount spreads what is left evenly over the months to the target date, rounded up to the cent; reached and overdue states are explicit. Budgets page has a Savings Goals section; account data reset removes goals. INR only; no FX (FIN-15 stays approval-gated). [Tests](../tests/test_savings_goals.py): 5 backend PASS (cents, edges, invalid input, other owners, reset) plus budget/reset/profile suites (58 PASS); a new Chrome test PASS with desktop and 390px captures inspected.
 - Next: owner check in the app after approving the migration; linking goals to transactions or investments is a separate decision.
 - 2026-11-20 walkthrough: the owner pointed out that income was CTC/12, not in-hand pay. Fixed in the shared income service (take-home after PF, professional tax and income tax; entered in-hand pay and bonus in Settings). Goals still need the owner's recheck with the corrected income.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): a TEST goal showed the right monthly amount and percent done, and the return needed (28.2%) matched an independent calculation (28.18%).
 
 ### FIN-07 — Cash-flow forecasting
 
@@ -1712,6 +1713,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Three completed recorded months drive an uncalibrated constant-cost estimate; missing months are unknown and recorded months may be incomplete. Historical ranges are not prediction intervals. Walk-forward spending MAE does not validate future income/fixed bills or bank balances. Sufficient genuine outcomes and calibrated sustained forecast quality remain unverified; no model training/activation or currency-policy change.
 - 2026-11-06 (`f586455`): each walk-forward month now records whether its actual living spend fell inside the prior three months' range, and the Budgets page shows the count (observed coverage, not a probability). Backend 51 and the forecast Chrome test PASS. Owner-authorized read of the owner's own forecast panel: 9 walk-forward months, the prior range held in **6 of 9**, average error about a quarter of a typical month; the forecast itself is UNAVAILABLE because the account has no income evidence. Amounts stay in local evidence (`F:\ALFRED\dev-evidence\post-audit\fin-07-20261106`), not in Git.
 - Next: no predictive-accuracy claim on this evidence. Revisit after more recorded months and income evidence on the owner's account; a better method needs held-out owner months to show improvement before it replaces the three-month average. Continue independent INV-07 development meanwhile.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): 18 synthetic months with festival peaks: the forecast switches on with profile income and with salary credits alone (observed income); walk-forward error 8–12% of a typical month, about the same as "same as last month"; the 3-month range held in 4–5 of 9 months. The three-month average does not model seasonality. No accuracy claim.
 
 ### FIN-08 — Expense categorization and merchant correction learning
 
@@ -1795,7 +1797,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### FIN-15 — Canonical currency persistence and multi-currency aggregation
 
-**IMPLEMENTED_NOT_ACCEPTED** · Personal finance · P1.
+**COMPLETE_VERIFIED** · Personal finance · P1.
 
 - 2026-11-19 status review: every part is built. Currency is recorded on investments, loans, bank accounts and transactions, income, budgets and goals, career salary, vehicles and travel (migrations approved and applied 2026-11-06/07). Canonical maths stay per currency with FX off (owner contract 2026-11-06). Totals across currencies show only in the person's display currency at each day's ECB reference rate (display-only FX, 2026-11-07; dated rates and home currency, 2026-11-18; `fx_rates` bot). The Limitations line below ("finance models generally lack currency codes") predates these slices and is historical. Currency suites re-run 2026-11-19: banking, budget, exchange rates, income, INR tokens, intelligence, investment, loan and mobility currency, 68 PASS. Nothing here is accepted until the owner checks it.
 - 2026-11-20 walkthrough: the owner asked for a toggle "to show original and user selected home". Expenses, Investments, Loans and Travel now have an "Original currency / Home currency" switch (kept per browser); Home currency leads with the approximate home figure and keeps the recorded amount beside it. Display only: records and rupee totals never change. Browser test added.
@@ -1812,6 +1814,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - 2026-11-07 owner approved migration users 0006 (display currency). CI reviewed-source pin moved to bde1ea6. Owner runtime backed up to F:/ALFRED_BACKUPS/pre-display-currency-migration-20261107 (raw trio plus consolidated copy, sha256 290388ec..., integrity ok) and migrated; no migration pending, quick_check ok. Approval of the schema is not acceptance of the feature.
 - 2026-11-06 Completion slice (same contract, FX off, committed locally): currency for bank accounts and transactions (expenses 0007), entered income, variable income and housing cost (users 0005), career salary (career 0006), budget plans and savings goals (budgets 0004), and vehicle value and support, running costs, documents and travel-plan budgets (mobility 0015). Each is expand-only with a guarded reverse; unknown stays null and counts as legacy INR. Rupee totals, the canonical baseline, balance sheet, timeline, budgets, bike and travel summaries, tax income, ML features and learned trip spend read only INR or not-recorded amounts; other currencies are listed or excluded, never converted. A confirmed account currency prefills new postings without relabelling history; a recorded transaction currency, or an account currency once it has transactions, cannot change. A budget plan compares only spend in its own currency. Exports carry the currency column. Tests: backend full suite 1902 run serially: 10 older money-migration and API-shape tests needed updates for the new columns (they asserted no currency field or ran live code on a pre-currency schema; fixed with a documented test helper and the existing defer precedent) and now PASS, 135 affected tests re-run PASS; currency suites 33 PASS; 41 related Chrome tests PASS including the new account, transaction and budget currency test (it caught an account confirmation message being overwritten, fixed).
 - Next: owner check of the new currency fields in the app. (The migrations were approved and applied on 2026-11-07, as recorded above.)
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): the currency choice is on Spending, Loans, Investments and Budgets and is remembered; a USD 12.50 test expense showed ₹1,155.63 at the dated ECB rate (26 Nov 92.45, matching Frankfurter) and stayed out of rupee totals; every money domain has a currency field. Limit: a new foreign-currency record gets its rupee figure after the next daily rates run, or after running the fx_rates bot.
 
 ### FIN-16 — Tax calculations and source-backed eligibility
 
@@ -1932,6 +1935,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Synthetic parser/closure tests and older reviewed documents do not cover every lender/layout. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Run an approved redacted/private-copy lender acceptance corpus.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): 8 lender-style statement PDFs (HDFC, SBI, Bajaj, ICICI, Tata Capital, Axis, Kotak layouts and one fictional NBFC; Rs., INR, ₹, A/C No., Agreement No., years/months tenure) scored 72/72 fields after two extractor fixes in 6f97ee3: OCR no longer replaces a readable text layer on a near-tie (it dropped ₹ amounts and read EMI as "EMl"), and a font's soft-hyphen dash stays a dash in dates. Real lender documents remain unseen.
 
 ### INV-01 — Portfolio register, valuation and allocation
 
@@ -1959,6 +1963,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 - Bounded INV-02/SCOPE-02 (2026-10-26): [synthetic representative layout acceptance](../tests/test_investment_layout_acceptance.py) covers labelled fund/symbol tables, account identity, raw source money, totals, duplicate conflicts, owner correction/retry and safe review. UI/Chrome/Axe evidence is in the checkpoint above. OCR output requires owner review; mocked OCR confidence/provenance is not accuracy evidence. Broad broker/layout/OCR and authorized real-account acceptance remains outstanding; no capability promotion.
 - Next: owner check with their own broker statements, on this computer only (never uploaded elsewhere); broader broker layouts need reviewed sample files.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): 7 holdings PDFs laid out cell by cell like real statements (Kite, Groww, CAMS summary, Upstox, Angel One, an unlabelled Kuvera page and a malformed cell): 8/8 holdings right, 0 wrong, both unsafe pages safe (nothing imported, or estimated money the review blocks until the owner saves it). Fixes in 6f97ee3: Angel One was never detected ("ANGLE ONE"), UCC and Client Code were not read as accounts, cell-per-line text outscored the column layout, and the fallback made titles, account lines and dates into ₹0 holdings. Real broker documents remain unseen.
 
 ### INV-03 — Returns and planning projections
 
@@ -1985,6 +1990,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Allocation/watchlist logic is heuristic, supported by available sources; suitability accuracy is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_INSPECTION 2026-11-06: market suggestions read `user.age`, but the user model has no age, so every user was treated as 30 and told "As a young investor, consider aggressive equity/SIP investments". Removed (no age, no age-based advice). Removed an unused news scraper that sent a browser User-Agent. Portfolio Guidance now states it is rule-based on recorded holdings with fixed asset-class weights and is general information, not personalised or certified advice. Risk score = value-weighted fixed class weights (Equity 80, Mutual Fund 60, Crypto 100, REIT 50, Debt 20, Gold 30, Cash 10; unknown 50); diversification = normalised Shannon entropy over 7 classes. Tests: 54 investment backend tests PASS, including a new no-assumed-age test.
 - Next: acceptance needs a reviewed definition of risk evidence (for example fund category instead of one Mutual Fund weight); suitability stays out of scope without the owner's stated goals and horizon.
+- Live check 2026-11-27: picks show live and an owned fund's Hold verdict uses the right AMFI code (152194). The pick card called its 60-day volatility "risk", contradicting Portfolio guidance's category risk; relabelled "price swings" in f7fd53f; recheck after deploy. Friction: Current Value is required even when fund and units are given.
 
 ### INV-05 — AMFI/Yahoo market evidence and historical performance
 
@@ -1997,6 +2003,8 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: SCOPE-01 AMFI complete at79a26ae/run40292154135 PASS, already in canonical development. SCOPE-02 Yahoo complete100% atdaed068/run40325761619 all3 PASS; source reconciled into local candidate only, PR18 still review-blocked. Identity/date/close/dated baseline, source/cache expiry, unavailable recovery and unchanged owned records retained. Candidate results require separate receipts.
 - Limitations/dependencies: Full capability/live terms/quota, real accounts and exchange-close correctness remain unaccepted. Seven-calendar-day bound is not an exchange calendar. No BETTER adapter, currency inference, FX or holding revaluation. Cross-domain risk/career defaults remain outside this scope.
 - Next: Obtain mandatory review and validate permitted integration; retain both bounded receipts. Do not repeat or promote completed synthetic scope into full capability acceptance.
+- Live check 2026-11-27: the AMFI half passed (fund NAV revaluation and AMFI price history in the background job). The Yahoo stock-close half was not checked live, so the status stays.
+
 ### INV-06 — Long-term investment planning
 
 **IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
@@ -2012,7 +2020,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### INV-07 — Persistent portfolio alerts
 
-**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
+**COMPLETE_VERIFIED** · Investments · P2.
 
 - 2026-11-19 (closes the monetary-threshold and background gaps): Investments > Value alerts ([value_alerts.py](../apps/investments/services/value_alerts.py), `/api/investments/value-alerts/`) lets the owner set a lower and/or upper limit per holding, in that holding's own recorded currency (Decimal cents, HALF_UP; the approved FX-off contract, nothing converted). Limits live in the encrypted local vault without names. The new `value_alerts` task bot checks them every hour, after AMFI's daily fund revaluation, and a crossed limit shows on Home under For your attention as "below/above your limit" with the value and its source. A holding with no value, a fund price that is not current, or a currency changed since the limit was set is reported as not checked, never as crossed. Owner-only, revision-checked, read-only on holdings; no email, price forecast, trading signal or trade. Tests: `tests.test_investment_value_alerts` 5 PASS, with task bots, review alerts, fund prices and Home 84 PASS; Chrome `test_investment_value_alerts_limit_crossing_and_removal` PASS with axe light/dark and 390px.
 - Next: owner check: set a limit on a real fund just above its value and see the Home notice after the next price update.
@@ -2022,6 +2030,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: Synthetic local record-review consent, encrypted reopen, owner/CSRF, read/dismiss/resolved lifecycle, correction/deletion/reset/retention, future-date abstention and bounded on-request checks accepted. Money remains unchanged; no source/market valuation is inferred from record edit dates.
 - Limitations/dependencies: Monetary thresholds require approved currency/valuation evidence. No background/external delivery, price/trading signal or normal real-account/release acceptance; therefore this capability remains partial.
 - Next: Preserve the accepted local lifecycle; obtain the gated valuation/currency decisions before monetary rules. Continue independent AI readiness/document-quality work.
+- Owner acceptance 2026-11-27 (owner: "INV-05/07 already passed live tonight; changing their status is your call"): after an owner-requested fund refresh the app's own job revalued a TEST fund to AMFI's 25 Nov NAV (₹9,576.01 for 100 units), its alert read "inside" for 9,500–20,000 and "below" after the floor moved to 9,600, on Investments and, after the value-alert bot ran, on Home under ALFRED's checks; the 07:30 IST fund job ran on schedule. Test records removed.
 
 ### INV-08 — Investment contribution to net worth
 
@@ -2120,6 +2129,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Current bounded extensions: explicit recorded category/classification and statement-period answers use current reviewed bank facts, per-record citations and revalidation without memory/model/cloud/history. Statement periods additionally require complete matching retained/current boundaries, an in-range transaction and exactly one explicitly selected statement; missing, conflicting, ambiguous and cross-document periods abstain. Backend privacy/selection/retention guards and desktop/mobile Chrome evidence are in the corresponding checkpoints above. These do not implement arbitrary document knowledge.
 - Packaged evidence: exact source `3bc75ac` passed ten compiled HTTP/Chrome period/classification checks, including separate accounts, foreign citations, missing/conflicting boundaries, ambiguous periods, zero generation and financial/original invariance. Fresh package also passed all 35 native AI/restart/recovery checks; this remains bounded synthetic evidence, not arbitrary-document or normal-account acceptance. Receipts: `artifacts/windows-integrated-20261023/`.
 - Next: Preserve reviewed bank transaction dates at 98a3c89, recorded-label questions and current source/correction/revocation/citation safeguards. Arbitrary PDF/OCR Q&A still requires separately accepted extraction, retention, relevance and provenance; do not infer it from these bounded record questions. No implicit monetary totals, currency/authenticity inference or cloud fallback.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): a 40-page synthetic health policy with 10 planted facts and 3 trick questions (keywords present, answer absent), through the encrypted corpus and the local model: 13/13 after bb89629 (a keyword in an excerpt's overlap tail was returned cut mid-sentence, so "maternity" came back insufficient). About 0.8 s a question after the first. Scanned PDFs are still read only to page six; real long documents remain unseen.
 
 ### DOC-08 — Loan closure document Q&A and abstention
 
@@ -2134,7 +2144,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### DOC-09 — Document deletion and retention
 
-**IMPLEMENTED_NOT_ACCEPTED** · Document intelligence · P2.
+**COMPLETE_VERIFIED** · Document intelligence · P2.
 
 - Source: [alfred_ai/services/document_extraction.py](../alfred_ai/services/document_extraction.py), [alfred_ai/services/document_review.py](../alfred_ai/services/document_review.py), [alfred_ai/views.py](../alfred_ai/views.py), [static/js/documents.js](../static/js/documents.js), [alfred_ai/services/upload_privacy.py](../alfred_ai/services/upload_privacy.py).
 - APIs/UI/models: /documents/; document-center actions in alfred_ai/urls.py; Module-owned upload records; DocumentParserLearningMemory; no universal document-knowledge model.
@@ -2143,6 +2153,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Owner deletion/raw cleanup switches exist; native vault retention and historic backups retain data under separate policies. Source/non-native DEBUG media route served a synthetic file anonymously; native owner media is protected. No current live exposure asserted. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_INSPECTION 2026-11-06: deleting a document from Documents removed its rows but left the uploaded file on disk for every scope. Delete now removes stored files the delete orphaned, after commit, only when no remaining record references the same name (`stored_file_names`/`remove_unreferenced_files` in upload_privacy.py). The private media view and delete share one field list, so media ownership is one source (AUD-11 owner check already in place). The encrypted search index entry is removed by the existing post-delete signal. The delete prompt now says the stored file goes and earlier backups keep their copy. Raw-upload cleanup after extraction stays opt-in. Tests: 118 document/media/reset/retention backend tests PASS, including a new owner-only file-removal test.
 - Next: owner check on a synthetic document in the app (never a real record); backup/recovery copies keep data under their own retention policy.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): a synthetic .txt document was uploaded and removed from Documents; its original URL then returned 404.
 
 ### AI-01 — Ollama local inference
 
@@ -2245,7 +2256,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### AI-10 — Persistent general conversation history
 
-**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
 
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
@@ -2253,6 +2264,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: New-conversation action clears current UI; no dedicated persisted general chat model/event history demonstrated. Travel messages are separate. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Encrypted consent/owner/restart/retention/history APIs and UI implemented (20b916e); tests/test_conversation_history.py. Operator activation OFF pending retention and recovery approval.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): the assistant's chat list passed in the owner runtime.
 
 ### AI-11 — Financial grounding and numeric/currency suppression
 
@@ -2299,6 +2311,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Candidate extraction/evaluation and scheduled training paths exist; genuine outcome sufficiency is model dependent. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Run sustained eligible training with consent and reviewed outcomes.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): 144 synthetic service records from a known cost rule trained to quality 96.9 (average-only baseline 66.7); the same records with shuffled costs scored 67.9 and passed every gate. Fixed in f8ca424: salary, relationship and service-cost models are kept only when they beat the training average by 5% on the holdout; the orchestrator test's salary fixture (3x worse than the average) had been marked ready. Real outcomes are still needed for any accuracy claim.
 
 ### AI-15 — Model registry and serving readiness
 
@@ -2310,6 +2323,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: Bounded synthetic registry eligibility, deterministic adapter fallback, private-field omission, sample/quality/proxy/freshness gates, missing/corrupt artifacts, invalid scores/future completion, error/refresh and desktop/390px workflow PASS. Eligibility does not establish executable artifacts or real predictive accuracy; actual adapters revalidate.
 - Limitations/dependencies: Full capability remains unaccepted pending genuine per-model held-out outcomes. No model promotion, calibrated confidence, live provider, package, normal real-account or production acceptance claimed.
 - Next: Obtain an authorized reviewed outcome contract; validate each real model without weakening the newly accepted gates.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): serving readiness now depends on the baseline gate above (f8ca424): a fit that learned nothing is skipped with no artifact. Synthetic results do not establish real per-model accuracy.
 
 ### AI-16 — Retrieval/model quality and drift monitoring
 
@@ -2339,10 +2353,11 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - SCOPED_IMPLEMENTATION 2026-11-06: before a question goes to the model, `/api/ai/actions/propose/` checks it with fixed patterns (no model) for two allow-listed actions: create a savings goal ("add a savings goal Emergency fund of 1.5 lakh by March 2027"; k/lakh/crore and dates read) and set a goal's saved amount ("update Emergency fund saved to 25000", owner's goal by exact name). The chat shows a proposal card with the exact values; nothing is saved until Confirm, which posts to `/api/ai/actions/confirm/` with `confirmed: true` and goes through the Budgets serializer. Cancel saves nothing. Requests that look like actions but fail parsing stop with a message and never reach the model. [Service](../apps/ml_engine/services/assistant_actions.py), [tests](../tests/test_assistant_actions.py): 5 backend PASS (parsing, no-proposal questions, confirm-only saves, other owners, unknown actions); 106 related backend PASS; new Chrome test PASS (cancel, confirm, escaped text, model never called), capture inspected.
 - Next: owner check in the app; more actions (reminders, trip drafts) only one at a time with the same confirm rule.
 - SCOPED_IMPLEMENTATION 2026-11-14 (owner: "i need bots to do tasks"): six task bots in `apps/ml_engine/services/task_bots.py` (weekly money review, bills and EMIs due, fund review, vehicle papers and service, career follow-ups, travel preparation). Each reads only the owner's records, without a model, and writes one reviewable proposal (OperationalLog, no migration); the daily Huey job `task-bots` (02:30 UTC, with catch-up) refreshes them, and Home > Your assistants runs them on request. Confirm re-reads the records and refuses a stale review (409); it marks the review done and runs only ticked travel steps (add a reminder, start a recheck). Nothing pays, books, trades, sends or changes a financial record. Tests: tests/test_task_bots.py (14) and two Chrome tests in tests/test_travel_planner_browser.py. Owner check in the app remains.
+- Live check 2026-11-27: creating a goal from chat and Confirm passed; "update TEST chat goal saved to 10000" failed ("no savings goal named TEST chat": the optional word "goal" swallowed the name's ending). Fixed in f7fd53f with a test; recheck live after the owner approves the push and the app restarts.
 
 ### AI-18 — Voice assistant
 
-**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
 
 - Source: [apps/ml_engine/services/hybrid_intelligence.py](../apps/ml_engine/services/hybrid_intelligence.py), [apps/ml_engine/services/persistent_memory.py](../apps/ml_engine/services/persistent_memory.py), [apps/ml_engine/api/urls.py](../apps/ml_engine/api/urls.py), [static/js/intelligence.js](../static/js/intelligence.js), [apps/ml_engine/services/voice_assistant.py](https://github.com/sourabh48/alfred_ai/blob/3932f391aa4eed7b3200ad3b034f7991435e01e4/apps/ml_engine/services/voice_assistant.py).
 - APIs/UI/models: /ai/insights/; memory/learning/reasoning API paths in apps/ml_engine/api/urls.py; User; encrypted MemoryStore SQLite/index/journal, not canonical financial authority.
@@ -2355,6 +2370,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - SCOPED_IMPLEMENTATION 2026-11-06: [scripts/download_speech_models.py](../scripts/download_speech_models.py) fetches the pinned files once and keeps each only if its size and hash match (into ignored `ml_models/speech/`). On the assistant page, **Speak** turns the microphone on until **Stop listening** (30 s cap), the browser sends 16 kHz WAV to `/api/ai/speech/transcribe/`, Whisper turns it into text in memory and the text goes into the question box for the owner to check; nothing is asked or stored automatically. **Read aloud** on each reply and action card plays `/api/ai/speech/speak/`: Piper speaker p254 (Southern English male), played 4% slower and lower for a calm tone. Buttons stay hidden when models are missing; both endpoints are signed-in only and rate-limited as expensive. Real round trip on this PC: Piper 3.6 s; Whisper 8.2 s first load, then 0.8 s, exact words back. [Service](../apps/ml_engine/services/speech.py), [tests](../tests/test_speech.py): 5 backend PASS; Chrome test PASS (fake microphone, track ends on stop, CSRF path, Read aloud), capture inspected; 149 related backend PASS.
 - REAL SPOKEN CHECK 2026-11-06 (synthetic sandbox, real Chrome with a fake microphone playing a Piper recording, real Whisper and Piper, no mocks): first runs found three defects, all fixed: crude 48→16 kHz downsampling garbled words (now a 16 kHz audio context), Whisper wrote "1-Lac by much 2027" (now a short vocabulary hint; offline check at four start offsets gave "1 lakh by March 2027" every time), and the page's Content Security Policy blocked `blob:` audio so Read aloud was silent (now Web Audio). The AI-17 parser also accepts spoken forms ("add the savings goal", "1-lac", "lakh rupees"). Final run twice: heard exactly, action card ₹100,000.00 by 31 Mar 2027 with no model, 8 s spoken reply, goal saved after Confirm. The browser's own noise suppression and echo cancellation are requested; a paid Krisp SDK was considered and not needed.
 - Limits: the installer build excludes Piper (GPL), so Read aloud works from a checkout only; the microphone needs `localhost` or HTTPS, so plain-HTTP LAN devices cannot use Speak. Next: owner check in the app.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): Read aloud fetched Piper speech (200, 4.1 s); Piper's own recording of a savings-goal sentence, sent as 16 kHz WAV like the page's recorder, came back from Whisper word for word (17 s with the first model load). Microphone capture is covered by the Chrome fake-microphone test; nobody spoke into a real microphone. Limits unchanged: installer builds exclude Piper; Speak needs localhost or HTTPS.
 
 ### OPENAI-01 — Gemini generateContent request/response adapter
 
@@ -2851,7 +2867,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-20 — Video management and social Travel profile
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - Source: [apps/mobility/services/travel_conversation.py](../apps/mobility/services/travel_conversation.py), [apps/mobility/services/travel/research.py](../apps/mobility/services/travel/research.py), [apps/mobility/urls.py](../apps/mobility/urls.py), [static/js/travel_planner.js](../static/js/travel_planner.js).
 - APIs/UI/models: /mobility/; travel routes in apps/mobility/urls.py; TravelPlan, TravelPlanningSession, TravelMessage, TravelResearchEvidence, TravelProviderState, TravelProviderRequest, preferences/history/media.
@@ -2863,6 +2879,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - SCOPED_IMPLEMENTATION 2026-11-06: model `TripVideo` (migration `mobility/0014_trip_video`, awaiting owner approval), `/api/mobility/trip-videos/` list/upload and `<id>/` caption, plan, delete. MP4/MOV/WebM checked by file header, not name; the file is served only through the owner-checked private media route (`private, no-store`); a video cannot be swapped in place; delete and the account data reset remove the file. Travel page section **Trip Videos** with upload, playback and delete. Social profile and sharing are out of scope by owner decision. Uploads use the existing 25 MB per-file limit (`ALFRED_UPLOAD_FILE_BYTES`). [Tests](../tests/test_trip_videos.py): 5 backend PASS (upload, playback bytes, refused non-videos, other accounts, delete, reset); Chrome test PASS (real one-second WebM recorded in Chrome, plays, escaped caption, delete removes the file), capture inspected; 296 related backend PASS.
 - OWNER APPROVAL 2026-11-06: migration mobility 0014 approved. CI reviewed source re-pinned to `d8a51e3` (`0ef41f8`, local preflight PASS). Owner runtime: database copied first to `F:\ALFRED_BACKUPS\pre-travel20-migration-20261106` (SHA-256 match, integrity ok), then the app start applied `0014_trip_video`; schema-only check shows the empty `mobility_tripvideo` table.
 - Next: owner check in the app.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): a 2.5 s WebM recorded in the browser was uploaded through the Trip Videos form, played (ready, 160 px), served private no-store; a text file named .mp4 was refused; Delete removed it and its file URL returned 404. Not linked to a travel plan (the account has none).
 
 ### TRAVEL-21 — Freshness, cache, quotas and safe external HTTP
 
@@ -2977,7 +2994,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### CAREER-07 — Interview preparation
 
-**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
+**COMPLETE_VERIFIED** · Career · P2.
 
 - Source: [apps/career/services/job_intelligence.py](../apps/career/services/job_intelligence.py), [apps/career/services/resume_intelligence.py](../apps/career/services/resume_intelligence.py), [apps/career/urls.py](../apps/career/urls.py), [static/js/career.js](../static/js/career.js).
 - APIs/UI/models: /career/; /api/career/ (see urls.py); CareerProfile, CareerResume, CareerResumeLearningMemory, CareerJobAnalysis.
@@ -2986,6 +3003,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Study recommendations exist; no demonstrated interactive verified interview-coach workflow. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_IMPLEMENTATION 2026-11-06: choosing a saved opportunity in Career now shows an Interview preparation panel built only from that job match: one example prompt per matched skill (up to 5), one honest-gap prompt per missing skill (up to 4) and four general practice questions. No model, network or hiring prediction; it abstains when no job match is saved. `job_intelligence.interview_prep`, `interview_prep` on the opportunity list API, `renderCareerInterviewPrep` in career.js. [Tests](../tests/test_career_interview_prep.py): 73 career backend tests PASS; the career-outcome Chrome test PASS with the panel and escaped skill text, capture inspected.
 - Next: owner check in the app; mock-interview practice with answer feedback would need the local model and a reviewed scoring rubric.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; live check in the owner runtime on master c78677a with TEST records): a job match against a public Greenhouse posting with the owner's CV built the Interview preparation panel (2 matched-skill, 4 gap and 4 general prompts); the page's mock interview asked a question, took a typed answer and returned local-model feedback (what worked, what to improve) with nothing saved; a direct practice-feedback call answered in 2.5 s. Answering by voice was not tried. TEST job analysis 6 left for the owner to delete.
 
 ### CAREER-08 — Predictive career forecasting and timing
 
@@ -3119,6 +3137,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: Rules, condition snapshots and optional service model exist; prediction quality is unverified. Existing owner/session controls; canonical data availability; acceptance plan.
 - SCOPED_IMPLEMENTATION 2026-11-06: each part card now states its window, for example "General 4,000 km or 180 days window, not your manufacturer's schedule. Check the owner's manual." The 28–96% figure is relabelled "Evidence score" (it grows with logged services, issues and checks; not a measured probability). Backend test added; 44 bike backend tests and 3 bike Chrome tests PASS.
 - Next: evaluate predictions against real logged service outcomes before any accuracy claim.
+- DUMMY CHECK 2026-11-27 (owner: "check with dummy"; synthetic data in an isolated runtime, not real documents or outcomes): 27 walk-forward next-routine-service costs over 3 synthetic bikes (costs rising about 8% a year): 7.7% error, against 8.7% for "same as last service". Part due windows are fixed rules and were not scored (scoring them against invented intervals would be circular). Side note: the cost model's service-type scores have no entries for oil_chain, tyres, accessory or custom, which all score as routine. No accuracy claim.
 
 ### BIKE-04 — Insurance/service documents and invoice review
 
