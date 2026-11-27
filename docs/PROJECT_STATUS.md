@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 101/143 (70.6%) verified.**
+**Baseline: 103/143 (72.0%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 101 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 103 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -825,8 +825,8 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 2 | 0 | 0 | 0 | 0 |
-| SYNC | 7 | 11 | 63.6 | 1 | 0 | 0 | 0 | 3 |
-| RUNTIME | 12 | 16 | 75.0 | 3 | 1 | 0 | 0 | 0 |
+| SYNC | 8 | 11 | 72.7 | 0 | 0 | 0 | 0 | 3 |
+| RUNTIME | 13 | 16 | 81.2 | 2 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
 
 ## Separate 2.0 acceptance ledger
@@ -2597,7 +2597,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-09 — Portable keys and independent multi-device/device-loss recovery
 
-**IMPLEMENTED_NOT_ACCEPTED** · Encrypted intelligence synchronization · P1.
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P1.
 
 - 2026-11-19 owner decision: recovery uses Google + passphrase. Settings > Backup key ([alfred_ai/services/backup_key.py](../alfred_ai/services/backup_key.py)) makes a portable Fernet backup key (an existing key is never replaced), locks a copy with the person's passphrase (scrypt n=2^17, r=8, p=1, then Fernet) and keeps only the locked copy in the hidden Google Drive app folder (drive.appdata, one-time access, no lasting token); upload is read back and compared. A new PC fetches the copy after Google sign-in and opens it with the passphrase. Manager-only, CSRF-checked, the passphrase is never stored, logged or returned. Restore steps in [NATIVE_WINDOWS.md](NATIVE_WINDOWS.md#off-pc-backup-cloudflare-r2-and-the-backup-key-owner-decision-2026-11-19). Synthetic tests: `tests.test_backup_key` 8 PASS (lock/open, wrong passphrase, save then new-PC restore, damaged upload, existing key kept, manager-only API, scope and callback); Chrome `test_settings_backup_key_is_made_and_locked_without_showing_the_passphrase` PASS with axe light/dark. Not run against live Google Drive: the owner turns on the Drive API and drive.appdata first.
 - 2026-11-26 owner decision ("use auto backup... to cloudflare account if its free", "do it like most financial application"): the locked key copy can also be saved to and fetched from the owner's Cloudflare R2 bucket (Settings > Backup key; `backup_key.save_to_r2` reads it back and compares, `fetch_from_r2` checks its shape). In R2 the passphrase alone guards the key. Synthetic tests: `tests.test_auto_backup` 8 PASS on a signed fake R2 (save, new-PC fetch and open, wrong passphrase, missing, damaged, not set up); Chrome backup-key test PASS with axe. Not run against a live R2 bucket: none is set up yet.
@@ -2608,6 +2608,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Profile-independent key/archive restore is unverified; cancelled passphrase flow and release-specific M15 waiver stay scoped. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: User selects a genuinely portable secure recovery method; do not restart cancelled dialogs.
+- Owner acceptance 2026-11-27 (owner: "SYNC-09: save the locked backup-key copy, then run a restore drill"): Save the locked copy to Cloudflare R2 read it back (Settings: "Locked copy saved in Cloudflare R2 on 2026-11-27"). Drill: a new empty folder standing in for a new PC fetched the locked copy from R2 with `backup_key.fetch_from_r2`, the owner typed the passphrase into a hidden prompt in their own terminal (never seen, printed or stored), `backup_key.restore` opened it, and the opened key's SHA-256 matched this PC's key; the drill folder was then removed. That key opened and restored the R2 archive (RUNTIME-08). Limits: same PC and Windows account; no Google Drive copy (the owner chose R2).
 
 ### SYNC-10 — Real provider activation, costs and IAM acceptance
 
@@ -3324,7 +3325,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### RUNTIME-08 — Off-device/device-loss disaster recovery
 
-**IMPLEMENTED_NOT_ACCEPTED** · Windows, deployment and release · P1.
+**COMPLETE_VERIFIED** · Windows, deployment and release · P1.
 
 - 2026-11-19 owner decision: recovery uses Google + passphrase. Settings > Backup key ([alfred_ai/services/backup_key.py](../alfred_ai/services/backup_key.py)) makes a portable Fernet backup key (an existing key is never replaced), locks a copy with the person's passphrase (scrypt n=2^17, r=8, p=1, then Fernet) and keeps only the locked copy in the hidden Google Drive app folder (drive.appdata, one-time access, no lasting token); upload is read back and compared. A new PC fetches the copy after Google sign-in and opens it with the passphrase. Manager-only, CSRF-checked, the passphrase is never stored, logged or returned. Restore steps in [NATIVE_WINDOWS.md](NATIVE_WINDOWS.md#off-pc-backup-cloudflare-r2-and-the-backup-key-owner-decision-2026-11-19). Synthetic tests: `tests.test_backup_key` 8 PASS (lock/open, wrong passphrase, save then new-PC restore, damaged upload, existing key kept, manager-only API, scope and callback); Chrome `test_settings_backup_key_is_made_and_locked_without_showing_the_passphrase` PASS with axe light/dark. Not run against live Google Drive: the owner turns on the Drive API and drive.appdata first.
 - 2026-11-26 owner decision ("use auto backup... to cloudflare account if its free", "do it like most financial application"): the locked key copy can also be saved to and fetched from the owner's Cloudflare R2 bucket (Settings > Backup key; `backup_key.save_to_r2` reads it back and compares, `fetch_from_r2` checks its shape). In R2 the passphrase alone guards the key. Synthetic tests: `tests.test_auto_backup` 8 PASS on a signed fake R2 (save, new-PC fetch and open, wrong passphrase, missing, damaged, not set up); Chrome backup-key test PASS with axe. Not run against a live R2 bucket: none is set up yet.
@@ -3338,6 +3339,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Limitations/dependencies: HDD copy user reported; portable independent key/restore unverified. Historical M15 waiver does not extend to future releases. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Wait for explicit recoverable method/acceptance without repeated cancelled dialogs.
 - 2026-11-27 (owner: "keep under limit always"): the R2 bucket stays inside Cloudflare's free allowance at every moment. `cloud_backup.upload` (nightly, Back up now and by hand) clears unfinished uploads older than 6 hours (their parts are billed), refuses while a newer one is running, and refuses when every object in the bucket (key copy and hand uploads included) plus the new archive would pass 9 GiB; the nightly job first removes its oldest copies, never the newest verified one, and stops after 60 tries a month (at most about 70,000 of the free million Class A writes; a refusal before any part goes up is not a try). Settings says why in plain words. `tests.test_auto_backup` 4 new (peak bucket size checked after every request, unfinished parts included; a mutation without the pruning fails it); backup, recovery and R2 suites 113 PASS. Synthetic only; no live R2 yet.
+- Owner acceptance 2026-11-27 (owner: "RUNTIME-08: do the first R2 upload, then a restore into an empty data folder"; owner runtime on 1c39fa0, bucket alfred-backup): the owner connected R2 in Settings (checked with Cloudflare) and made the backup key. The first Back up now in the worker failed on a 20-second request limit (timeout; the unfinished upload was cleared, the bucket stayed empty); 20 test 8 MiB uploads took 1.1-2.0 s each (about 56 Mbit/s), and the same `auto_backup.run` with each R2 request timed then saved: 16 parts up, 16 read back, no request over 5 s, 84 s in all, archive d5ceabe2... 128,745,560 bytes. `cloud_backup download` into a new folder passed its hash check, and `release_recovery --restore` into a new empty folder (F:/ALFRED_DEV/restore-drill-20261127) restored 9,695 files and 3 databases with every encrypted chunk hash, SQLite integrity, foreign keys and each database snapshot (financial reconciliation) passing. The archive leaves out brain-model (2.95 GB, rebuilt from the chats, which are in private-memory-v2) and brain-training scratch. Two live R2 faults were fixed on the way: Cloudflare's text/plain reply to an upload (1c39fa0) and the free-allowance guard (32d1ec6). Limits: the restored copy was not started and signed in to (that needs a second app instance and sign-in on another port); same PC; a one-off request stall fails a night and is retried within the hour.
 
 ### RUNTIME-09 — Filesystem protection of private DB/config
 
