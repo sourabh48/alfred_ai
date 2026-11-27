@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 103/143 (72.0%) verified.**
+**Baseline: 104/143 (72.7%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 103 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 18 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 104 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -825,7 +825,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
 | OPENAI | 5 | 7 | 71.4 | 2 | 0 | 0 | 0 | 0 |
-| SYNC | 8 | 11 | 72.7 | 0 | 0 | 0 | 0 | 3 |
+| SYNC | 9 | 11 | 81.8 | 1 | 0 | 0 | 0 | 1 |
 | RUNTIME | 13 | 16 | 81.2 | 2 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
 
@@ -2612,7 +2612,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### SYNC-10 — Real provider activation, costs and IAM acceptance
 
-**BLOCKED_EXTERNAL** · Encrypted intelligence synchronization · P2.
+**IMPLEMENTED_NOT_ACCEPTED** · Encrypted intelligence synchronization · P2.
 
 - 2026-11-19 owner decision: Cloudflare R2 free tier is the provider (no AWS, no paid plan). Approval is given; what remains is outside ALFRED: the owner creates the free account, one bucket and a bucket-only token and puts them in the data folder's config/local.env (never in chat). Then one live upload and read-back.
 - Source: [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
@@ -2621,10 +2621,11 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. BLOCKED_APPROVAL
 - Limitations/dependencies: Real sync remains disabled; region/bucket/account and spending/least-privilege acceptance not selected. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Obtain provider selection and separate synthetic-only authorization.
+- Live check 2026-11-27 (owner: "Check SYNC-10/11"): provider is the owner's Cloudflare R2 bucket alfred-backup on the $0 R2 plan (10 GB, 1M Class A, 10M Class B a month), connected through Settings (values checked with Cloudflare, kept only in the data folder's config/local.env). Live upload and read-back passed (the locked key copy and the full backup). Costs: ALFRED keeps everything in the bucket under 9 GiB and at most 60 backup tries a month (32d1ec6). Least privilege: the token reads and writes alfred-backup, and R2 refused it a ListBuckets call on the account (authorization_failed), so it is limited to that bucket. Private-memory sync to R2 stays off (ALFRED_MEMORY_SYNC_PROVIDER and ALFRED_MEMORY_CLOUD_AUTHORIZED unset); the chats and training data travel only inside the encrypted backup, as decided 2026-11-20. Open: the owner confirms the earlier all-buckets token, whose keys were shown in chat, is deleted in Cloudflare.
 
 ### SYNC-11 — Full application/cloud backup
 
-**BLOCKED_EXTERNAL** · Encrypted intelligence synchronization · P2.
+**COMPLETE_VERIFIED** · Encrypted intelligence synchronization · P2.
 
 - 2026-11-19 status review: Built; what remains is outside ALFRED: the owner creates the free Cloudflare R2 account, one bucket and a bucket-only token and puts them in the data folder's config/local.env (never in chat), then one live check. Same blocker as SYNC-10.
 - Source: [scripts/cloud_backup.py](../scripts/cloud_backup.py), [scripts/release_recovery.py](../scripts/release_recovery.py), [apps/ml_engine/services/memory_r2.py](../apps/ml_engine/services/memory_r2.py), [apps/ml_engine/services/memory_sync.py](../apps/ml_engine/services/memory_sync.py), [apps/ml_engine/services/memory_cloud.py](../apps/ml_engine/services/memory_cloud.py), [alfred_ai/native_tasks.py](../alfred_ai/native_tasks.py).
@@ -2636,6 +2637,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Owner decision 2026-11-06: cloud backup approved. Upload only an encrypted backup archive through the SYNC-02 adapter; the key never leaves the PC and needs an independent recovery copy before first upload. Local backups stay as they are.
 - 2026-11-06 implementation: `scripts/cloud_backup.py` uploads only the existing encrypted `recovery.zip` from `release_recovery.py` (Fernet chunks, encrypted manifest, no file names) to R2 by multipart upload under its sha256, aborts interrupted uploads, then reads the whole copy back and hash-checks it before reporting OFF_DEVICE_COPY_VERIFIED. Download writes a new private folder that `release_recovery.py` restores with full integrity and financial reconciliation. Uploads require `--recovery-copy-confirmed` and a portable key that opens the archive; Windows-profile-bound keys are refused. Off by default (`ALFRED_CLOUD_BACKUP_AUTHORIZED`). [tests/test_cloud_backup.py](../tests/test_cloud_backup.py) 5 tests on a synthetic signed server; related suites 244 PASS locally. Not live-tested: no R2 account yet; device-loss restore on another PC remains SYNC-09.
 - 2026-11-26: nightly automatic backup ([alfred_ai/services/auto_backup.py](../alfred_ai/services/auto_backup.py), Huey 20:15 UTC plus the daily catch-up, and Settings > Backup key > Back up now). One encrypted archive of the whole ALFRED made while it runs (each database a consistent SQLite snapshot; no stop), restored and checked in-process, uploaded, read back and hash-checked. R2 keeps the newest 7, this PC the newest 1 (beside the data folder, `<data>-backups/nightly`); older ones go only after a newer one is verified, hand uploads are never touched, and the plain restore-check copy is deleted. Runs only with R2 set up, ALFRED_CLOUD_BACKUP_AUTHORIZED and the key's locked copy saved off the PC. Synthetic tests: a running WAL database backed up and restored with every person's rows; 9 nights keep 7; a failed night keeps the last good one. Limits: the backup key, personal keys and `artifacts/security` are not in the archive (as before); the installer build with these modules was not rebuilt or run; no live R2 run yet.
+- Owner acceptance 2026-11-27 (owner: "Check SYNC-10/11"): the full application backup ran live against the owner's R2 bucket alfred-backup: one encrypted archive of the running ALFRED (128,745,560 bytes; config, media, ml_models, the job queue, private memory with its chats and training examples, personal keys) uploaded in 16 parts, read back and hash-checked, then downloaded into a new folder and restored into a new empty folder with every chunk hash, SQLite integrity, foreign-key and financial reconciliation check passing (see RUNTIME-08). The bucket stays inside the free allowance (32d1ec6). Not yet observed: a nightly run on its own schedule (first due 20:15 UTC on 2026-11-27).
 
 ### TRAVEL-01 — Conversational discovery and saved preferences
 
