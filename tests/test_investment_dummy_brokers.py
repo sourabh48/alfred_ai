@@ -57,3 +57,28 @@ class DummyBrokerTests(TestCase):
         self.assertEqual((rows, review["status"]), ([], "needs_review"))
         rows, review = service._parse_holdings_table(KITE.replace("37,500.00", "3,7500.00"), broker="Generic")
         self.assertEqual((rows, review["status"]), ([], "needs_review"))
+
+    def test_a_table_drawn_cell_by_cell_with_an_arial_dash_is_read_from_its_columns(self):
+        # Real statements place each cell separately; Arial writes the title's dash as a soft hyphen.
+        user = get_user_model().objects.create_user("synthetic-column-owner")
+        document = fitz.open(); page = document.new_page(width=842, height=595)
+        font = dict(fontsize=9, fontname="arial", fontfile=r"C:\Windows\Fonts\arial.ttf")
+        page.insert_text((30, 40), "Groww - Mutual fund holdings", **font)
+        page.insert_text((30, 54), "Account: GRW0012345", **font)
+        for y, row in ((80, ["Scheme Name", "Units", "Invested Value", "Current Value", "Returns"]),
+                       (94, ["Synthetic Flexi Cap Fund Direct Growth", "512.334", "25,000.00", "28,412.75", "13.65%"])):
+            for x, cell in zip((30, 330, 400, 500, 600), row):
+                page.insert_text((x, y), cell, **font)
+        document.subset_fonts()
+        parsed = service.parse_portfolio_document(BytesIO(document.tobytes()), user=user, filename="dummy-columns-portfolio.pdf")
+        self.assertEqual([(item["asset_name"], item["invested_amount"], item["current_value"]) for item in parsed["investments"]],
+                         [("Synthetic Flexi Cap Fund Direct Growth", "25000.00", "28412.75")])
+
+    def test_angel_one_and_upstox_statements_name_their_broker_and_client_code(self):
+        self.assertEqual(service._detect_broker("Angel One Limited - Holding statement"), "Angel One")
+        self.assertEqual(service._extract_account_hint("Client Code: ANG445566"), "ANG445566")
+        self.assertEqual(service._extract_account_hint("UCC: UPX778899"), "UPX778899")
+
+    def test_the_fallback_never_turns_titles_account_lines_or_dates_into_holdings(self):
+        text = "Kuvera portfolio\nAccount: KUV001122\nStatement date: 27-11-2026\nFund Units Amount Worth\nSynthetic Index Fund Direct 100.000 15,000.00 16,250.00"
+        self.assertEqual([row["asset_name"] for row in service._parse_line_items(text, institution="")], ["Synthetic Index Fund Direct"])

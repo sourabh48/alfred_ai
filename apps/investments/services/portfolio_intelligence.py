@@ -433,7 +433,7 @@ class PortfolioIntelligenceService:
             return "Groww"
         elif "UPSTOX" in text_upper:
             return "Upstox"
-        elif "ANGLE ONE" in text_upper or "ANGEL BROKING" in text_upper:
+        elif "ANGEL ONE" in text_upper or "ANGEL BROKING" in text_upper:
             return "Angel One"
         return "Generic"
 
@@ -1154,6 +1154,10 @@ class PortfolioIntelligenceService:
             if not normalized or len(normalized) < 6:
                 continue
             numeric_values = [item.replace(",", "") for item in re.findall(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?(?![\w.])", normalized)]
+            # Titles, account lines, dates and column headings carry no amount; they are not holdings.
+            undated = re.sub(r"\b\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b", " ", normalized)
+            if len(re.findall(r"(?<![\w.])\d[\d,]*(?:\.\d+)?(?![\w.])", undated)) < 2 and not re.search(r"(?<![\w.])\d[\d,]*(?:,\d{3}|\.\d+)(?![\w.%])", undated):
+                continue
             asset_name = self._extract_asset_name(normalized)
             if not asset_name:
                 continue
@@ -1209,7 +1213,8 @@ class PortfolioIntelligenceService:
 
     def _extract_account_hint(self, text: str) -> str:
         # A label word is never the identifier, so "Demat Account: 1208..." does not stop at the word "Account".
-        match = re.search(r"\b(?:folio|account|demat|client)\b[ \t]*(?:no\.?|number|id)?[ \t]*[:#-]?[ \t]*((?!(?:account|folio|demat|client|statement|number|holdings?)\b)[A-Z0-9/-]{6,24})\b", text, re.IGNORECASE)
+        # "UCC" is Upstox's unique client code; Angel One prints "Client Code".
+        match = re.search(r"\b(?:folio|account|demat|client|ucc)\b[ \t]*(?:no\.?|number|id|code)?[ \t]*[:#-]?[ \t]*((?!(?:account|folio|demat|client|statement|number|holdings?)\b)[A-Z0-9/-]{6,24})\b", text, re.IGNORECASE)
         return (match.group(1) if match else "").strip()
 
     def _calculate_portfolio_risk_score(self, asset_breakdown: Dict, total_value: float) -> float:

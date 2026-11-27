@@ -335,7 +335,8 @@ def _extract_pdf_text(raw_bytes: bytes, filename: str, *, ocr_page_limit: int, d
             page_limit=min(ocr_page_limit, 4),
             document_hint=document_hint,
         )
-        if ocr_text and _text_quality_score(ocr_text) > _text_quality_score(finalized.text):
+        # A readable text layer is exact; OCR replaces it only when clearly better, not on a layout-bonus tie.
+        if ocr_text and _text_quality_score(ocr_text) >= _text_quality_score(finalized.text) + OCR_REPLACE_MARGIN:
             return _finalize_text(
                 ocr_text,
                 ocr_method,
@@ -346,6 +347,9 @@ def _extract_pdf_text(raw_bytes: bytes, filename: str, *, ocr_page_limit: int, d
         finalized.review_payload = _merge_review_payloads(finalized.review_payload, ocr_review)
 
     return finalized
+
+
+OCR_REPLACE_MARGIN = 0.1
 
 
 PDF_PASSWORD_MESSAGE = (
@@ -1092,13 +1096,14 @@ def _text_quality_score(text: str) -> float:
         confidence += 0.15
     if word_count >= 25:
         confidence += 0.12
-    if line_count >= 8:
+    # Lines and gaps count only when they hold layout: one table cell per line, or a blank line, is not structure.
+    if line_count >= 8 and word_count >= 2 * line_count:
         confidence += 0.08
     if DATE_RE.search(normalized):
         confidence += 0.06
     if MONEY_RE.search(normalized):
         confidence += 0.06
-    if "\t" in normalized or TABLE_SPLIT_RE.search(normalized):
+    if re.search(r"\S(?:[ ]{2,}|\t+)\S", normalized):
         confidence += 0.08
     alpha_ratio = sum(char.isalpha() for char in normalized) / max(len(normalized), 1)
     if 0.2 <= alpha_ratio <= 0.92:
@@ -1107,7 +1112,11 @@ def _text_quality_score(text: str) -> float:
 
 
 def _clean_text(text: str) -> str:
-    return (text or "").replace("\ufeff", "").replace("\xa0", " ").replace("Ã¢â€šÂ¹", "₹").strip()
+    text = (text or "").replace("\ufeff", "").replace("\xa0", " ").replace("Ã¢â€šÂ¹", "₹")
+    # Some PDF fonts (Arial among them) map their hyphen glyph to the soft hyphen: inside a word it is a break hint
+    # (dropped, as HTML and Word use it); anywhere else (dates, minus signs, " - ") it was a drawn dash.
+    text = re.sub(r"(?<=[^\W\d_])\xad(?=[^\W\d_])", "", text)
+    return text.replace("\xad", "-").strip()
 
 
 @lru_cache(maxsize=1)
