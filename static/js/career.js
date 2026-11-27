@@ -575,6 +575,7 @@ function renderCareerApplication(item) {
             ${["due", "upcoming"].includes(follow.status) ? `<button class="btn btn-outline-secondary btn-sm" type="button" id="careerFollowUpSent">I sent a follow-up today</button>` : ""}
             ${history || sent ? `<details class="small mt-2"><summary>History</summary><ul class="mb-0">${history}${sent}</ul></details>` : ""}
             <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="careerHistoryReviewOpen">Review retained history${follow.status === 'unavailable' ? ' and recovery' : ''}</button>
+            <button class="btn btn-outline-danger btn-sm mt-2" type="button" id="careerJobDelete">Delete this opportunity</button>
             <div id="careerHistoryReviewHost"></div>
             <div id="careerApplicationFeedback" class="d-none alert mt-2 mb-0" role="status" aria-live="polite"></div>
         </div>`;
@@ -607,6 +608,15 @@ function renderCareerApplication(item) {
                 button.disabled = false;
                 showCareerFeedback("careerApplicationFeedback", error.message, "danger");
             });
+    });
+    document.getElementById("careerJobDelete").addEventListener("click", event => {
+        if (!window.confirm("Delete this opportunity? Its job match, interview notes, outcome and application history are removed. This cannot be undone.")) return;
+        const button = event.currentTarget;
+        button.disabled = true;
+        Alfred.fetchJSON(`/api/career/job-analyses/${item.id}/`, {method: "DELETE"})
+            .then(() => loadCareerOpportunities())
+            .then(() => showCareerFeedback("careerOutcomeListFeedback", "Opportunity deleted.", "success"))
+            .catch(error => { button.disabled = false; showCareerFeedback("careerApplicationFeedback", error.message, "danger"); });
     });
     document.getElementById('careerHistoryReviewOpen').addEventListener('click', () => {
         const host = document.getElementById('careerHistoryReviewHost');

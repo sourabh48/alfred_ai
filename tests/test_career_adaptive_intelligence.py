@@ -358,6 +358,22 @@ class CareerAdaptiveIntelligenceTests(TestCase):
         self.assertTrue({"Naukri", "Instahyre"} <= recommended_names)
         self.assertEqual(gap_policy["policy"], "candidate_only_until_connector_or_adapter_is_added")
 
+    def test_owner_deletes_one_job_analysis_and_cannot_touch_another_owners(self):
+        def job(user, title):
+            return CareerJobAnalysis.objects.create(user=user, job_url=f"https://example.com/jobs/{title}", company="Example Co", job_title=title,
+                extracted_payload={"interview_notes": {"stories": ["kept on the record"]}, "application": {"stage": "applied"}})
+        mine, kept, theirs = job(self.user, "mine"), job(self.user, "kept"), job(self.other_user, "theirs")
+        guarded = Client(enforce_csrf_checks=True)
+        guarded.force_login(self.user)
+        self.assertEqual(guarded.delete(f"/api/career/job-analyses/{mine.id}/").status_code, 403)
+
+        self.assertEqual(self.client.delete(f"/api/career/job-analyses/{theirs.id}/").status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/career/job-analyses/{mine.id}/").status_code, 204)
+        self.assertEqual(self.client.delete(f"/api/career/job-analyses/{mine.id}/").status_code, 404)
+        self.assertEqual(set(CareerJobAnalysis.objects.values_list("id", flat=True)), {kept.id, theirs.id})
+        listed = self.client.get("/api/career/job-analyses/").json()["results"]
+        self.assertEqual([row["id"] for row in listed], [kept.id])
+
     def test_career_job_outcome_endpoint_records_salary_bearing_decisions_and_dashboard_summary(self):
         CareerProfile.objects.create(
             user=self.user,

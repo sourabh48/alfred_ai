@@ -1,5 +1,6 @@
 from django.urls import path
 from .history_review_api import CareerHistoryReviewAPI
+from .views import CareerJobAnalysisDetailView
 from .views import CareerApplicationKitView, CareerToolsView, CareerPlanCheckView, CareerPracticeFeedbackView, CareerBatchTriageView, CareerBulletRewriteView, CareerInterviewNotesView, career_story_bank, CareerSendEmailView, CareerOfferPrepView, CareerTriageView, career_patterns, career_triage_brief, CareerApplicationView, CareerJobMatchView, CareerMatchRecheckView, CareerJobOutcomeView, CareerResumeCompareView, career_follow_ups, CareerOpportunityListView, CareerProfileView, CareerProjectionSimulationView, CareerRecruiterMatchView, CareerResumeListView, CareerResumeUploadView, CareerResumeUseDetailsView, career_dashboard, career_projection
 
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     path("follow-ups/", career_follow_ups, name="career_follow_ups"),
     path("resumes/compare/", CareerResumeCompareView.as_view(), name="career_resume_compare"),
     path("job-analyses/", CareerOpportunityListView.as_view(), name="career_opportunities"),
+    path("job-analyses/<int:pk>/", CareerJobAnalysisDetailView.as_view(), name="career_job_analysis_detail"),
     path("job-analyses/<int:pk>/triage/", CareerTriageView.as_view(), name="career_job_triage"),
     path("job-analyses/<int:pk>/kit/", CareerApplicationKitView.as_view(), name="career_job_kit"),
     path("job-analyses/<int:pk>/rewrite-bullets/", CareerBulletRewriteView.as_view(), name="career_job_rewrite_bullets"),

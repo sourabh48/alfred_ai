@@ -1069,6 +1069,17 @@ def _owned_analysis(request, pk):
     return CareerJobAnalysis.objects.filter(user=request.user, id=pk).first()
 
 
+class CareerJobAnalysisDetailView(APIView):
+    """Delete one saved job; its match, notes, outcome and application history live on the record and go with it."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        deleted, _ = CareerJobAnalysis.objects.filter(user=request.user, id=pk).delete()
+        if not deleted:
+            return Response({"detail": "Job analysis not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 def _draft_sources(user):
     return (CareerResume.objects.filter(user=user).order_by("-created_at", "-id").first(),
             CareerProfile.objects.filter(user=user).first())
