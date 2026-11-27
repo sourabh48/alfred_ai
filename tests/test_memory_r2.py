@@ -16,7 +16,7 @@ from django.test import TestCase, override_settings
 
 from alfred_ai.services.public_http import PublicHTTPError, PublicResponse
 from apps.ml_engine.services.memory_cloud import configured_provider, synchronizer
-from apps.ml_engine.services.memory_r2 import R2MemoryProvider, signed_headers, validate_profile
+from apps.ml_engine.services.memory_r2 import R2Bucket, R2MemoryProvider, signed_headers, validate_profile
 from apps.ml_engine.services.memory_sync import MemorySynchronizer, SyncConflict, SyncUnavailable
 from apps.ml_engine.services.persistent_memory import MemoryStore, _owner
 from tests.test_persistent_memory import SyntheticEmbeddings
@@ -169,3 +169,17 @@ class R2MemorySyncTests(TestCase):
         self.assertEqual(self.sync.prune(self.alice, confirm=True), 1)
         with closing(sqlite3.connect(self.wire.database)) as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM objects WHERE key LIKE ?', ('%' + other_owner + '%',)).fetchone()[0], 1)
+
+
+class LiveR2ReplyTests(TestCase):
+    def test_an_upload_answered_with_an_empty_text_plain_body_is_accepted_through_the_real_http_checks(self):
+        """Live R2 replies to PUT with Content-Type text/plain; the fake wires never did, so the key copy save failed."""
+        import ipaddress
+        from unittest.mock import Mock
+        response = Mock(status=200, headers={'Content-Type': 'text/plain', 'ETag': '"synthetic"'})
+        response.read.return_value = b''
+        pool = Mock(); pool.urlopen.return_value = response
+        with patch('alfred_ai.services.public_http._resolve_host_ips', return_value=[ipaddress.ip_address('104.18.2.35')]),                 patch('alfred_ai.services.public_http.urllib3.HTTPSConnectionPool', return_value=pool):
+            reply = R2Bucket(PROFILE)._send('PUT', 'alfred-backup-key-v1/sealed.json', data=b'synthetic', deadline=time.monotonic() + 20)
+        self.assertEqual(reply.status, 200)
+        self.assertEqual(pool.urlopen.call_args.args[0], 'PUT')

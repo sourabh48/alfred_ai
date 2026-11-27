@@ -80,7 +80,8 @@ class R2Bucket:
         if method == 'PUT': headers['content-type'] = 'application/octet-stream'
         try:
             return request(method, url, headers=signed_headers(method, url, data, self.profile, headers), data=data if method in ('PUT', 'POST') else None,
-                content_types=('application/octet-stream', 'application/xml', 'text/xml', 'application/json', ''),
+                # Cloudflare answers an object or part upload with an empty text/plain body (seen live 2026-11-27).
+                content_types=('application/octet-stream', 'application/xml', 'text/xml', 'application/json', 'text/plain', ''),
                 accepted_statuses=statuses, max_bytes=maximum, deadline=deadline)
         except PublicHTTPError as error:  # codes are fixed words such as authorization_failed; never credentials
             raise SyncUnavailable(f'Cloud storage refused or failed the request ({error.code}); local data is retained.') from None
