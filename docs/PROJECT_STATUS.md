@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 105/143 (73.4%) verified.**
+**Baseline: 110/143 (76.9%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 17 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 105 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 12 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 4 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 110 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -815,12 +815,12 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | Module | Verified | Total | Verified % | Unaccepted | Partial | Missing | Approval | External |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | FIN | 14 | 17 | 82.4 | 0 | 2 | 0 | 0 | 0 |
-| LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
-| INV | 5 | 8 | 62.5 | 3 | 0 | 0 | 0 | 0 |
+| LOAN | 7 | 8 | 87.5 | 1 | 0 | 0 | 0 | 0 |
+| INV | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
 | DOC | 8 | 9 | 88.9 | 0 | 1 | 0 | 0 | 0 |
 | AI | 14 | 18 | 77.8 | 2 | 2 | 0 | 0 | 0 |
-| CAREER | 6 | 8 | 75.0 | 1 | 1 | 0 | 0 | 0 |
-| TRAVEL | 13 | 23 | 56.5 | 3 | 3 | 1 | 0 | 3 |
+| CAREER | 7 | 8 | 87.5 | 0 | 1 | 0 | 0 | 0 |
+| TRAVEL | 15 | 23 | 65.2 | 1 | 3 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
@@ -1916,7 +1916,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### LOAN-07 — Loan forecasting and cross-module liabilities
 
-**IMPLEMENTED_NOT_ACCEPTED** · Loans and liabilities · P2.
+**COMPLETE_VERIFIED** · Loans and liabilities · P2.
 
 - Source: [apps/loans/services/loan_intelligence.py](../apps/loans/services/loan_intelligence.py), [apps/loans/models.py](../apps/loans/models.py), [apps/loans/urls.py](../apps/loans/urls.py).
 - APIs/UI/models: /loans/; /api/loans/ (see urls.py); Loan, LoanPaymentHistory, LoanImportDocument, LoanClosureDocument, LoanForeclosureSnapshot.
@@ -1924,6 +1924,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Projection is amortization/assumption based, not a calibrated personal prediction. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Verify real payment histories and forecast uncertainty.
+- Owner acceptance 2026-11-27 (owner: "Yes, accept them"; live checks in the owner runtime with TEST records, see EXECUTION_STATE): a test loan's payoff (11 to 9 months), interest (5,898.48 to 3,809.54) and the invest-instead comparison matched an independent Decimal recomputation, and net worth counted the loan. Limit: the owner's own loans still have guessed terms (needs-review, excluded from forecasts) until real terms or documents are entered; a forecast is amortization-based, not a calibrated prediction.
 
 ### LOAN-08 — Broad real-document/lender acceptance
 
@@ -2008,7 +2009,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### INV-06 — Long-term investment planning
 
-**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
+**COMPLETE_VERIFIED** · Investments · P2.
 
 - 2026-11-19 (goals joined to the projection engine): each open savings goal with a future date has "My investments by then" (`GET /api/budgets/goals/<id>/investments/`, [budgets/views.py](../apps/budgets/views.py) `SavingsGoalInvestmentsView`). It grows every holding in the goal's own currency to the goal's date with the existing `_project_position_money` engine (the owner's entered yearly return, compounded monthly, plus its monthly SIP) and shows each holding, the total and the share of the target. Holdings in other currencies are counted and left out, never converted (approved FX-off contract); a record without a currency is the legacy rupee amount. Read-only and owner-only; it warns not to add holdings already counted in Saved so far. Tests: `GoalInvestmentsApiTests` (2) with goal and projection suites 30 PASS; Chrome `test_savings_goal_plan_shows_the_yearly_return_needed` extended and PASS. Risk calibration of the entered returns stays the owner's input, not a forecast.
 - Next: owner check with a real goal; FIN-06 and FIN-15 acceptance still apply to the goal and currency data it reads.
@@ -2018,6 +2019,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Growth scenarios exist; owner-specific goals, full portfolio risk calibration and currency policy are incomplete. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: Reuse projection engine when implementing approved goals.
+- Owner acceptance 2026-11-27 (owner: "Yes, accept them"; live checks in the owner runtime with TEST records, see EXECUTION_STATE): the SIP growth projection matched an independent calculation to the paisa.
 
 ### INV-07 — Persistent portfolio alerts
 
@@ -2680,7 +2682,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-04 — Multiple destinations and day-wise itineraries
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - 2026-11-19 (closes the inter-stop gap): every leg of a multi-stop trip, home to each stop and back, is now asked of Google Routes (the approved router) in the trip's mode, two-wheeler for a motorcycle, with the avoid-expressway and toll choices ([travel_itinerary.py](../apps/mobility/services/travel_itinerary.py) `road_leg`). Road km feed the shared budget and each travel day reads "~N km by road, about H h (Google)". A leg Google does not answer (no key, limit, failure, back-off) keeps the labelled straight-line estimate and the note says how many legs are road routes; the route is PROVIDER only when every leg is. The stop-order proposal still compares every order on the same estimates and says so, with no extra Google calls. Closures, permits, traffic and motorcycle legality stay unverified. Test `test_each_leg_uses_google_road_routes_and_a_failed_leg_stays_a_labelled_estimate`; travel suites 135 PASS.
 - Next: owner check with their Google key: a two-stop ride, compare each leg with Google Maps.
@@ -2692,6 +2694,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: Verify inter-stop routing and feasibility using approved provider evidence; keep unknown road legality and availability explicit. Independent DOC-07 quality work can continue meanwhile.
 - SCOPED_INSPECTION 2026-11-06: routing uses OpenRouteService only when `TRAVEL_ORS_API_KEY` is set; it is not configured, so inter-stop roads cannot be verified without a new credential.
 - SCOPED_IMPLEMENTATION 2026-11-14 (owner: "more proactive travel planner"): the planner's "Suggested for you" panel (`apps/mobility/services/travel/proactive.py`, GET planner/suggestions/) lists next steps for a saved trip from its own records: weather recheck once the dates enter Google's 10-day forecast, changes a recheck found (rain, and now route distance), stays not marked booked with the verified booking sites, unticked packing items, bike service and papers due, and a reminder for the evening before. Reminder and recheck steps run only after Review and Confirm. It also suggests offline-guide destinations for the next free weekend from saved preferences, labelled STATIC_REFERENCE with weather, prices, roads and rooms unchecked. No new provider call. Status unchanged.
+- Owner acceptance 2026-11-27 (owner: "Yes, accept them"; live checks in the owner runtime with TEST records, see EXECUTION_STATE): a three-stop beach trip from chat gave 4 days, one night each, Google legs 142+118+357+308 = 925 km and FASTag tolls INR 1,300; fuel 8,054, stay, food, a 15% buffer of 3,016 and the INR 23,120 total were rechecked by hand; the order preview suggested a shorter order and stated its town-centre basis.
 
 ### TRAVEL-05 — Budget summaries and estimates
 
@@ -2849,7 +2852,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### TRAVEL-18 — Google Maps API integration and offline map packages
 
-**IMPLEMENTED_NOT_ACCEPTED** · Travel · P2.
+**COMPLETE_VERIFIED** · Travel · P2.
 
 - 2026-11-13 (owner request: store the map of the country in use, ask before downloading, add or remove countries in Settings): offline country maps from the free Protomaps OpenStreetMap build, sized from its index before any download, stored per country under ALFRED_DATA_DIR/maps, resumable, removable, drawn by vendored protomaps-leaflet 5.1.0 when Google tiles are missing or fail. Evidence: tests/test_offline_maps.py (synthetic PMTiles), Settings browser test with axe; live Singapore download and Chrome render on a scratch server 2026-11-13. Not accepted: no owner download in the real app yet.
 
@@ -2861,6 +2864,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Acceptance: PENDING; no normal existing-account visual acceptance performed by this audit. NOT_APPLICABLE for local logic; configured/live provider claims require separate evidence.
 - Limitations/dependencies: Map link-outs/Leaflet are not authenticated Google Maps integration or offline tile bundles. Existing owner/session controls; canonical data availability; acceptance plan.
 - Next: owner adds the Google key and downloads their country's map in Settings, then checks the Travel map online and offline.
+- Owner acceptance 2026-11-27 (owner: "Yes, accept them"; live checks in the owner runtime with TEST records, see EXECUTION_STATE): the Maldives offline map served its tiles and refused tiles outside the country (404); on 2026-11-27 the signed-in Google tile proxy returned a live Google Map Tiles PNG (200, image/png, 19.9 KB) with the owner's key, which never reaches the browser; Google Places supplied the TRAVEL-04 stop candidates. Places hotel prices are not part of Google's data.
 
 ### TRAVEL-19 — Photos, GPS/date inference and trip galleries
 
@@ -2963,7 +2967,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: Keep these guards; live providers need separate approval and evidence.
 ### CAREER-04 — Recruiter email/attachment processing
 
-**IMPLEMENTED_NOT_ACCEPTED** · Career · P2.
+**COMPLETE_VERIFIED** · Career · P2.
 
 - 2026-11-19 (mailbox intake, under the 2026-11-18 owner approval to read the mailbox read-only): reply watch now also lists new recruiter emails that match no saved opportunity (plain rules quote the deciding phrase; newsletters and job alerts are skipped; at most 20) and says when one has an attachment. Pressing Analyse sends only that email's id to the existing recruiter intake (`POST /api/career/recruiter-match/` with `mail_id`), which reads the email and its first PDF, DOCX or TXT job-description file (up to 10 MB) through the person's own Gmail or Outlook read permission ([career_mail.py](../apps/career/services/career_mail.py) `read_message`) and saves the opportunity exactly as a pasted email and uploaded JD would be. The mailbox is only read (GET); nothing is marked read, moved or sent, no model reads the mail, and nothing is saved until the person presses Analyse. Tests: `test_new_recruiter_email_with_a_jd_file_is_listed_and_analysed_only_on_request` with career tools, mail, recruiter and send suites 68 PASS; Chrome `test_career_reply_watch_lists_a_new_recruiter_email_and_analyses_it_on_request` PASS (an HTML-laden subject renders as text). Career Ops was resolved on 2026-11-12, so that earlier limitation no longer applies.
 - Next: owner check with their real Gmail or Outlook inbox: one recruiter email with a JD attachment, Analyse, then compare the saved opportunity with the email.
@@ -2975,6 +2979,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: Preserve accepted manual source/correction/retry contracts. Automatic mailbox processing requires separately approved provider access, a reviewed integration and live acceptance; continue independent DOC/AI work meanwhile.
 - SCOPED_INSPECTION 2026-11-06: career backend tests re-run PASS (73, including the recruiter/evidence and matching suites). Manual intake stays the accepted path; no mailbox access was added.
 - 2026-11-12: the unreachable IMAP scanner (`email_integration.py`) and the investment email scraper were deleted; nothing in the app called them. EmailConnection rows are unchanged.
+- Owner acceptance 2026-11-27 (owner: "Yes, accept them"; live checks in the owner runtime with TEST records, see EXECUTION_STATE): an attached job PDF gave company, city, role, apply link, the INR 15-20 lakh salary and skills. Automatic mailbox access stays approval-gated, as accepted 2026-11-06.
 
 ### CAREER-05 — Application and opportunity outcome tracking
 
