@@ -1,8 +1,8 @@
 # ALFRED execution state
 
 ## Owner checks 2026-11-27 ("complete these", "check with dummy") — local, not pushed
-- Live in the owner's app on c78677a (TEST records): FIN-15, FIN-06, DOC-09, AI-10, AI-18, CAREER-07 and TRAVEL-20 passed and are COMPLETE_VERIFIED by the owner's delegation; INV-07 too (owner: "changing their status is your call"). INV-05 stays: its Yahoo stock half was not checked. 98/143, 0/13.
-- Failed live and fixed locally (f7fd53f): AI-17 "update TEST chat goal saved to 10000" (the word "goal" ate the name); INV-04's pick card called volatility "risk". Both need a live recheck after a push and restart.
+- Live in the owner's app on c78677a (TEST records): FIN-15, FIN-06, DOC-09, AI-10, AI-18, CAREER-07 and TRAVEL-20 passed and are COMPLETE_VERIFIED by the owner's delegation; INV-07 too (owner: "changing their status is your call"). INV-05 stays: its Yahoo stock half was not checked. 0/13 extensions.
+- Failed live and fixed locally (f7fd53f): AI-17 "update TEST chat goal saved to 10000" (the word "goal" ate the name); INV-04's pick card called volatility "risk". Pushed 1ea2d05 with the owner's OK (preflight PASS) and restarted the owner's app; both rechecked live and PASS, so AI-17 and INV-04 are COMPLETE_VERIFIED too: 100/143. CI for 1ea2d05 not yet read.
 - Dummy checks (synthetic, isolated runtime; statuses unchanged): LOAN-08 72/72 fields over 8 lender layouts, INV-02 8/8 holdings over 7 broker layouts, DOC-07 13/13 on a 40-page policy, AI-14/15 a shuffled-cost model had passed every gate, FIN-07 and BIKE-03 walk-forward error about the same as or slightly better than "same as last time". Fixes: 6f97ee3 (PDF text layer vs OCR, soft-hyphen dash, broker detection and fallback), bb89629 (excerpt overlap tail), f8ca424 (models must beat the training average by 5%).
 - Tests: 63 extraction/loan, 416 document/statement, 42 investment, 74 knowledge/corpus, 85 ML PASS. Not run: the full backend and browser suites.
 - Test records still in the owner's account, waiting for the owner's OK to delete: expense 5201, savings goals 3 and "TEST chat goal", investment 4, Career job analysis 6.

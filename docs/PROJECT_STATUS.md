@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 98/143 (68.5%) verified.**
+**Baseline: 100/143 (69.9%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 22 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 98 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 100 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -816,9 +816,9 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | FIN | 14 | 17 | 82.4 | 0 | 2 | 0 | 0 | 0 |
 | LOAN | 6 | 8 | 75.0 | 2 | 0 | 0 | 0 | 0 |
-| INV | 4 | 8 | 50.0 | 4 | 0 | 0 | 0 | 0 |
+| INV | 5 | 8 | 62.5 | 3 | 0 | 0 | 0 | 0 |
 | DOC | 8 | 9 | 88.9 | 0 | 1 | 0 | 0 | 0 |
-| AI | 13 | 18 | 72.2 | 3 | 2 | 0 | 0 | 0 |
+| AI | 14 | 18 | 77.8 | 2 | 2 | 0 | 0 | 0 |
 | CAREER | 6 | 8 | 75.0 | 1 | 1 | 0 | 0 | 0 |
 | TRAVEL | 13 | 23 | 56.5 | 3 | 3 | 1 | 0 | 3 |
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
@@ -1979,7 +1979,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### INV-04 — Risk classification and recommendations
 
-**IMPLEMENTED_NOT_ACCEPTED** · Investments · P2.
+**COMPLETE_VERIFIED** · Investments · P2.
 
 - 2026-11-19 (risk evidence by fund category): a mutual fund with an AMFI scheme code now weighs by its official AMFI (SEBI) scheme category instead of the one Mutual Fund weight 60: sectoral/thematic 95, small or mid cap 90, large & mid cap 85, overseas FoF 85, other equity, ELSS, index and ETF 80, hybrid 60, arbitrage and debt 20, liquid, overnight and money market 10, gold 30 ([portfolio_intelligence.py](../apps/investments/services/portfolio_intelligence.py) `FUND_CATEGORY_RISK`). An unmapped category or an AMFI outage keeps 60, and Portfolio Guidance says how many funds were weighted by category. The Home risk state counts a fund weighted 80 or more as equity-like. The table is a fixed reading of SEBI categories, not each fund's own riskometer. Tests: `FundCategoryRiskTests` (2) with investment money, projection, baseline and beginner guide 61 PASS; investments Chrome PASS.
 - Next: owner reviews the weight table during the walkthrough; suitability stays out of scope without the owner's stated goals and horizon.
@@ -1991,6 +1991,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - SCOPED_INSPECTION 2026-11-06: market suggestions read `user.age`, but the user model has no age, so every user was treated as 30 and told "As a young investor, consider aggressive equity/SIP investments". Removed (no age, no age-based advice). Removed an unused news scraper that sent a browser User-Agent. Portfolio Guidance now states it is rule-based on recorded holdings with fixed asset-class weights and is general information, not personalised or certified advice. Risk score = value-weighted fixed class weights (Equity 80, Mutual Fund 60, Crypto 100, REIT 50, Debt 20, Gold 30, Cash 10; unknown 50); diversification = normalised Shannon entropy over 7 classes. Tests: 54 investment backend tests PASS, including a new no-assumed-age test.
 - Next: acceptance needs a reviewed definition of risk evidence (for example fund category instead of one Mutual Fund weight); suitability stays out of scope without the owner's stated goals and horizon.
 - Live check 2026-11-27: picks show live and an owned fund's Hold verdict uses the right AMFI code (152194). The pick card called its 60-day volatility "risk", contradicting Portfolio guidance's category risk; relabelled "price swings" in f7fd53f; recheck after deploy. Friction: Current Value is required even when fund and units are given.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; rechecked live after the push of 1ea2d05 and a restart): fund picks show live with AMFI prices of 26 Nov and are labelled "HIGH/MEDIUM price swings", no longer "risk"; an owned fund's Hold verdict uses its AMFI code (152194); the category-weighted portfolio risk and balance suggestion passed on 2026-11-26. Suitability stays out of scope without the owner's goals and horizon. Friction left: Current Value is required even when fund and units are given.
 
 ### INV-05 — AMFI/Yahoo market evidence and historical performance
 
@@ -2339,7 +2340,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### AI-17 — Autonomous user task execution
 
-**IMPLEMENTED_NOT_ACCEPTED** · ALFRED intelligence · P2.
+**COMPLETE_VERIFIED** · ALFRED intelligence · P2.
 
 - 2026-11-26 (live check: the bills bot showed "Bajaj Housing Financ"): the bank's ACH line cuts the payee at 20 characters. The bills bot and new loan inference now complete a cut name when it starts exactly one known lender (apps/loans/services/loan_intelligence.py `full_lender_name`); ambiguous or unknown names and stored records stay unchanged. Evidence: tests/test_task_bots.py.
 
@@ -2354,6 +2355,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - Next: owner check in the app; more actions (reminders, trip drafts) only one at a time with the same confirm rule.
 - SCOPED_IMPLEMENTATION 2026-11-14 (owner: "i need bots to do tasks"): six task bots in `apps/ml_engine/services/task_bots.py` (weekly money review, bills and EMIs due, fund review, vehicle papers and service, career follow-ups, travel preparation). Each reads only the owner's records, without a model, and writes one reviewable proposal (OperationalLog, no migration); the daily Huey job `task-bots` (02:30 UTC, with catch-up) refreshes them, and Home > Your assistants runs them on request. Confirm re-reads the records and refuses a stale review (409); it marks the review done and runs only ticked travel steps (add a reminder, start a recheck). Nothing pays, books, trades, sends or changes a financial record. Tests: tests/test_task_bots.py (14) and two Chrome tests in tests/test_travel_planner_browser.py. Owner check in the app remains.
 - Live check 2026-11-27: creating a goal from chat and Confirm passed; "update TEST chat goal saved to 10000" failed ("no savings goal named TEST chat": the optional word "goal" swallowed the name's ending). Fixed in f7fd53f with a test; recheck live after the owner approves the push and the app restarts.
+- Owner acceptance 2026-11-27 (owner listed it and said "complete these"; rechecked live after the push of 1ea2d05 and a restart): "update TEST chat goal saved to 10000" now proposes "TEST chat goal" from ₹0.00 to ₹10,000.00; Confirm saved it and Budgets shows ₹10,000.00 of ₹50,000.00, 20%, ₹10,000.00 a month for 4 months (checked by hand). Goal creation, Confirm and the task bots passed earlier. Scope stays two confirm-gated chat actions plus the six proposal bots; no money movement, bookings, trading or sending.
 
 ### AI-18 — Voice assistant
 
