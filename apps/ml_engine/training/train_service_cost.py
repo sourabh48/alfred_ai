@@ -10,6 +10,7 @@ from apps.ml_engine.inference_adapters.service_cost_predictor import (
     vehicle_type_score,
 )
 from apps.mobility.models import BikeServiceRecord
+from .quality import baseline_shortfall
 from .simple_models import fit_linear_regression, mean_absolute_percentage_error, random_train_test_split
 
 
@@ -42,6 +43,10 @@ def train_service_cost_model():
 
     predictions = model.predict(X_test)
     mape = float(mean_absolute_percentage_error(y_test, predictions)) if len(y_test) else 1.0
+    average = sum(y_train) / len(y_train)
+    shortfall = baseline_shortfall(mape, float(mean_absolute_percentage_error(y_test, [average] * len(y_test))))
+    if shortfall:
+        return _skip(shortfall, sample_count=len(rows))
     quality_score = round(max(0.0, min(100.0, 100.0 - (mape * 100.0))), 2)
     coverage_score = min(100.0, (len(rows) / 50.0) * 100.0)
     confidence_estimate = round(max(18.0, (quality_score * 0.65) + (coverage_score * 0.35)), 2)

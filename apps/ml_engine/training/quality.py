@@ -25,6 +25,14 @@ PROXY_TARGET_NOTES = {
 }
 
 
+def baseline_shortfall(model_error, baseline_error, minimum_improvement=0.05):
+    """A note when the holdout error does not beat predicting the training average by 5%; None when it does."""
+    if math.isfinite(model_error) and baseline_error > 0 and model_error <= baseline_error * (1 - minimum_improvement):
+        return None
+    return (f"Holdout error {model_error:.2f} does not beat predicting the training average ({baseline_error:.2f}) by "
+            f"{minimum_improvement:.0%}; the fit learned nothing usable, so no model is kept.")
+
+
 def resolve_artifact_path(raw_path):
     candidate = Path(raw_path)
     return candidate if candidate.is_absolute() else Path(settings.BASE_DIR) / candidate

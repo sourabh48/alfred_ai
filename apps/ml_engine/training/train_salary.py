@@ -5,6 +5,7 @@ from django.utils import timezone
 from apps.ml_engine.data_extractors.user_profile import load_user_profiles
 from apps.ml_engine.inference_adapters.artifacts import dump_artifact
 from apps.ml_engine.inference_adapters.salary_predictor import MODEL_PATH, SalaryPredictor
+from .quality import baseline_shortfall
 from .simple_models import fit_linear_regression, mean_absolute_percentage_error, random_train_test_split
 
 
@@ -59,6 +60,10 @@ def train_salary_model() -> dict:
 
     predictions = model.predict(X_test)
     mape = float(mean_absolute_percentage_error(y_test, predictions)) if len(y_test) else 1.0
+    average = sum(y_train) / len(y_train)
+    shortfall = baseline_shortfall(mape, float(mean_absolute_percentage_error(y_test, [average] * len(y_test))))
+    if shortfall:
+        return _skip(shortfall, sample_count=sample_count)
     quality_score = max(0.0, min(100.0, 100.0 - (mape * 100.0)))
     coverage_score = min(100.0, (sample_count / 40.0) * 100.0)
     confidence_estimate = round(max(22.0, (quality_score * 0.65) + (coverage_score * 0.35)), 2)

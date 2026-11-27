@@ -242,12 +242,11 @@ class MLTrainingOrchestratorTests(TestCase):
         self.assertEqual(result["status"], "completed")
         states = {item.model_key: item for item in AdaptiveModelState.objects.all()}
         results = {item["model_key"]: item for item in result["results"]}
-        self._assert_training_outcome(
-            state=states["salary_predictor"],
-            result_item=results["salary_predictor"],
-            minimum_confidence=22,
-            artifact_expected=True,
-        )
+        # The fixture's primary profile is an outlier: the salary fit (about 30% holdout error) is worse than
+        # predicting the average (about 9%), so nothing is kept. The ready path is covered by BaselineGateTests.
+        self.assertEqual(results["salary_predictor"]["status"], "skipped")
+        self.assertIn("does not beat predicting the training average", results["salary_predictor"]["notes"])
+        self.assertFalse(states["salary_predictor"].inference_ready)
         # This small fixture supports fitting other pilots, but does not meet
         # the forecaster's validation gate.
         self.assertEqual(states["expense_forecaster"].status, "skipped")
@@ -429,3 +428,45 @@ class MLTrainingOrchestratorTests(TestCase):
             self.assertTrue(bootstrap_startup_training())
             thread_cls.assert_called_once()
             thread_cls.return_value.start.assert_called_once()
+
+
+class BaselineGateTests(TestCase):
+    """Synthetic service records from a known cost rule; shuffling the costs leaves nothing to learn."""
+
+    def setUp(self):
+        import random
+        from datetime import date
+        from decimal import Decimal
+        artifacts = Path(tempfile.mkdtemp(prefix="alfred-ml-baseline-"))
+        self.addCleanup(lambda: shutil.rmtree(artifacts, ignore_errors=True))
+        self.enterContext(patch("apps.ml_engine.training.train_service_cost.MODEL_PATH", str(artifacts / "service_cost.pkl")))
+        rng = random.Random(7)
+        user = get_user_model().objects.create_user(username="synthetic-garage-owner")
+        rows = []
+        for vehicle in range(4):
+            profile = BikeProfile.objects.create(user=user, display_name=f"Synthetic bike {vehicle}", model_name=f"SYN-{vehicle}",
+                                                 engine_cc=150 + 50 * vehicle, expected_mileage_kmpl=35)
+            for visit in range(20):
+                parts, labour = rng.randint(0, 6), rng.randint(1, 3)
+                cost = (600 + 420 * parts + 280 * labour + 2.5 * profile.engine_cc) * rng.uniform(0.95, 1.05)
+                rows.append(BikeServiceRecord(user=user, bike_profile=profile, bike_name=profile.display_name,
+                    service_date=date(2023, 1 + visit % 12, 1 + vehicle), odometer_km=3000 * (visit + 1), service_type="routine",
+                    cost=Decimal(f"{cost:.2f}"), currency="INR",
+                    parsed_payload={"service_payload": {"parts_items": ["p"] * parts, "labour_items": ["l"] * labour}}))
+        BikeServiceRecord.objects.bulk_create(rows)
+        self.rng = rng
+
+    def test_a_model_that_learns_the_cost_rule_is_kept_and_shuffled_costs_are_not(self):
+        from apps.ml_engine.training.train_service_cost import train_service_cost_model
+        learned = train_service_cost_model()
+        self.assertEqual(learned["status"], "ready")
+        self.assertGreater(learned["quality_score"], 80)
+        records = list(BikeServiceRecord.objects.order_by("id"))
+        costs = [record.cost for record in records]
+        self.rng.shuffle(costs)
+        for record, cost in zip(records, costs):
+            record.cost = cost
+        BikeServiceRecord.objects.bulk_update(records, ["cost"])
+        shuffled = train_service_cost_model()
+        self.assertEqual((shuffled["status"], shuffled["artifact_path"]), ("skipped", ""))
+        self.assertIn("does not beat predicting the training average", shuffled["notes"])
