@@ -184,8 +184,11 @@ class BrowserTestRunner(DiscoverRunner):
                     return 0
                 finally:
                     self.teardown_test_environment()
-            failures = super().run_tests(test_labels, **kwargs)
-            complete = bool(self.selected) and len(self.execution_ids) == len(self.selected) and set(self.records) == set(self.selected) and all(
+            from tests.test_windows_startup import FakeWindows
+            # Settings reads this PC's startup entry through PowerShell/WMI; a slow runner timed out Settings tests.
+            with patch('alfred_ai.services.windows_startup._wmi', FakeWindows()):
+                failures = super().run_tests(test_labels, **kwargs)
+            complete =bool(self.selected) and len(self.execution_ids) == len(self.selected) and set(self.records) == set(self.selected) and all(
                 row['status'] == 'passed' for row in self.records.values())
             if not failures and not complete:
                 raise RuntimeError('Browser accounting incomplete or unexpected skips')
