@@ -804,9 +804,9 @@ owns deterministic selection. Work happens on `master` only; there is no open in
 - **PR/CI:** master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 - **Current task:** Phase B worked through; next queue task is AI-17 (phase D). See EXECUTION_STATE for the resume point. Preserve 143 original IDs and 13 extensions separately.
 <!-- BEGIN STATUS DASHBOARD -->
-**Baseline: 100/143 (69.9%) verified.**
+**Baseline: 101/143 (70.6%) verified.**
 
-IMPLEMENTED_NOT_ACCEPTED: 20 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 100 | OWNER_DESCOPED: 1
+IMPLEMENTED_NOT_ACCEPTED: 19 | PARTIALLY_IMPLEMENTED: 15 | BLOCKED_APPROVAL: 0 | BLOCKED_EXTERNAL: 6 | NOT_IMPLEMENTED: 1 | COMPLETE_VERIFIED: 101 | OWNER_DESCOPED: 1
 
 PR/CI: master `3dc51ff` CI_PASSED (run 43307042381: Linux, four Windows backend shards, native, three Selenium shards). PR #16/#18/#19 closed by the owner 2026-10-27; PR #20/#21/#22 merged; no open PR. Master ruleset blocks deletion and force push since 2026-11-12 (RUNTIME-12). Pages rebuilds from master:/docs on every push.
 
@@ -824,7 +824,7 @@ Extensions: **0/13 accepted**; separate source-bound story ledger.
 | FAMILY | 7 | 7 | 100.0 | 0 | 0 | 0 | 0 | 0 |
 | BIKE | 4 | 6 | 66.7 | 0 | 2 | 0 | 0 | 0 |
 | COUNCIL | 0 | 5 | 0.0 | 2 | 3 | 0 | 0 | 0 |
-| OPENAI | 4 | 7 | 57.1 | 3 | 0 | 0 | 0 | 0 |
+| OPENAI | 5 | 7 | 71.4 | 2 | 0 | 0 | 0 | 0 |
 | SYNC | 7 | 11 | 63.6 | 1 | 0 | 0 | 0 | 3 |
 | RUNTIME | 12 | 16 | 75.0 | 3 | 1 | 0 | 0 | 0 |
 <!-- END STATUS DASHBOARD -->
@@ -2390,7 +2390,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 
 ### OPENAI-02 — Model compatibility and current price review
 
-**IMPLEMENTED_NOT_ACCEPTED** · Optional Gemini (OPENAI IDs kept) · P1.
+**COMPLETE_VERIFIED** · Optional Gemini (OPENAI IDs kept) · P1.
 
 - 2026-11-19 official pages read (no API call; ai.google.dev now redirects to aistudio.google.com/docs): [models](https://aistudio.google.com/docs/models) lists `gemini-3.5-flash-lite` as Stable; [deprecations](https://aistudio.google.com/docs/deprecations) gives release 2026-07-21 and no shutdown date; [pricing](https://aistudio.google.com/docs/pricing) lists it free of charge on the free tier (where Google may use content to improve its products) and $0.30 input / $2.50 output per 1M tokens with billing on. ALFRED's reservation of 1 and 4 micro-USD per input/output token is above both rates, so the local budget can only over-reserve. Free-tier request limits are not published per model; Google shows them in AI Studio per project. The model stays configurable (`ALFRED_GEMINI_MODEL`); no silent switch.
 - Next: the owner's live key test (OPENAI-07) confirms the model answers.
@@ -2404,6 +2404,7 @@ For unchanged rows the dated code/test scope is retained from the completed audi
 - (Historical, OpenAI removed 2026-11-19.) Next: Select/test replacement with current official rates before enabling; no silent model switch.
 - (Historical, OpenAI removed 2026-11-19.) SCOPED_INSPECTION 2026-11-06: OpenAI stays OFF by the owner's decision and no call is made. The pinned model retires 2027-01-14; choosing a replacement and re-checking rates waits until the owner approves enabling OpenAI.
 - (Historical, OpenAI removed 2026-11-19.) 2026-11-19 official pages read (no API call): [deprecations](https://developers.openai.com/api/docs/deprecations) lists `gpt-4.1-mini-2025-04-14` shutdown 2027-01-14 (notice 2026-10-14) with recommended replacement `gpt-6-luna`; [pricing](https://developers.openai.com/api/docs/pricing) standard short-context rates per 1M tokens: `gpt-6-luna` $0.10 input / $0.50 output / $0.01 cached, `gpt-4.1-mini` still listed at $0.40 / $1.60 / $0.10. No dated `gpt-6-luna` snapshot is listed. The code stays on the pinned model until the owner chooses; no silent switch.
+- Owner acceptance 2026-11-27 (owner: "OPENAI-02: a live Gemini key check"; owner runtime on d4f61fb): a public question ("What is the boiling point of water at sea level in Fahrenheit?") was answered by "Gemini (your key)" with 212 °F and cited sources; ALFRED rejects any reply whose modelVersion is not the configured model, and the owner runtime sets none, so the live reply came from the default `gemini-3.5-flash-lite`, listed on Google's models page (aistudio.google.com/docs/models; Google also routes gemini-2.5-flash to it from 1 Dec 2026). Settings' daily count rose from 0 to 5,056 of 1,000,000 tokens. Google publishes free-tier limits only per project in AI Studio (docs/rate-limits); the owner's AI Studio Rate Limit page (free tier) shows Gemini 3.5 Flash Lite at 15 requests a minute, 250K tokens a minute and 500 requests a day, with 28-day peaks of 13, 12.03K and 84. ALFRED's 1,000,000-token day is about 200 answers at this size, under 500 a day; a refused or rate-limited reply is logged by error type only and the answer falls back without Gemini. The cost reservation (1 and 4 micro-USD per token) matters only with billing on.
 
 ### OPENAI-03 — Encrypted key provisioning and owner consent
 
