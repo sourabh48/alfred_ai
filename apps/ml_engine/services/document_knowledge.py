@@ -14,6 +14,7 @@ from .persistent_memory import _owner
 
 TEXT_BYTES = max(256 * 1024, settings.ALFRED_DOCUMENT_KNOWLEDGE_MAX_TEXT_BYTES)
 PASSAGE_CHARS = 600
+OVERLAP_CHARS = 100
 RESULT_LIMIT = 6
 EVIDENCE_LIMITATION = ('These are unverified extracted excerpts, not current financial facts or answers. '
     'Extraction can omit or misread text; review the original and current corrected records. '
@@ -34,7 +35,7 @@ def _terms(query):
 
 def _passages(text):
     # Overlap keeps ordinary phrases spanning a passage boundary searchable.
-    for start in range(0, len(text), PASSAGE_CHARS - 100):
+    for start in range(0, len(text), PASSAGE_CHARS - OVERLAP_CHARS):
         end = min(len(text), start + PASSAGE_CHARS)
         yield start, end, text[start:end]
         if end == len(text):
@@ -85,9 +86,15 @@ def matching_passages(text, terms, positions=None):
             term = match.group().casefold()
             if term in positions:
                 positions[term].append((match.start(), match.end()))
-    last_end = -1
+    last_end, pending = -1, None
+
+    def take(match):
+        nonlocal last_end
+        matches.append(match); last_end = match['end']
+        return len(matches) > RESULT_LIMIT
+
     for start, end, excerpt in _passages(text):
-        found = 0; fresh = False
+        found = 0; early = fresh = False
         for term in terms:
             spans = positions.get(term, [])
             index = bisect_left(spans, start, key=lambda span: span[0])
@@ -96,11 +103,23 @@ def matching_passages(text, terms, positions=None):
             # Include a keyword that crossed the previous excerpt's end.
             index = max(index, bisect_right(spans, last_end, key=lambda span: span[1]))
             fresh = fresh or index < len(spans) and spans[index][1] <= end
-        if found == len(terms) and fresh:
-            matches.append(dict(start=start, end=end, excerpt=excerpt))
-            last_end = end
-            if len(matches) > RESULT_LIMIT:
-                break
+            early = early or index < len(spans) and spans[index][1] <= end - OVERLAP_CHARS
+        qualifies = found == len(terms) and fresh
+        if pending is not None and not qualifies and take(pending):
+            return matches
+        pending = None
+        if not qualifies:
+            continue
+        match = dict(start=start, end=end, excerpt=excerpt)
+        # New keywords only in the overlap tail are cut off mid-sentence here; the next excerpt holds them with what
+        # follows, so it replaces this one when it matches too.
+        if early or end == len(text):
+            if take(match):
+                return matches
+        else:
+            pending = match
+    if pending is not None:
+        take(pending)
     return matches
 
 

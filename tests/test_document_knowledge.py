@@ -229,3 +229,18 @@ class DocumentKnowledgeTests(TestCase):
             return dict(text='Replacement bank text.', method='pymupdf_text_only')
         with patch.object(knowledge, 'run_bounded_parser', side_effect=changed), self.assertRaises(SourceSelectionConflict):
             self.bank_search(document, query='bank text')
+
+
+class PassageBoundaryTests(TestCase):
+    def test_a_keyword_in_an_excerpts_overlap_tail_is_returned_with_the_words_that_follow(self):
+        text = "Filler clause. " * 38 + "Maternity cover begins after a waiting period of 24 months. " + "Filler clause. " * 60
+        hit = text.index("Maternity")
+        self.assertTrue(knowledge.PASSAGE_CHARS - knowledge.OVERLAP_CHARS < hit < knowledge.PASSAGE_CHARS)  # cut in the first excerpt
+        matches = knowledge.matching_passages(text, {"maternity"})
+        self.assertEqual(len(matches), 1)
+        self.assertIn("24 months", matches[0]["excerpt"])
+
+    def test_a_match_only_in_the_tail_is_kept_when_the_next_excerpt_lacks_another_keyword(self):
+        text = "Policy " + "x " * 270 + "maternity " + "y " * 400
+        matches = knowledge.matching_passages(text, {"policy", "maternity"})
+        self.assertEqual([match["start"] for match in matches], [0])
